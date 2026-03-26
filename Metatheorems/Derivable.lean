@@ -151,6 +151,10 @@ inductive Derivable {ι : Type} (F : ι → Ty ι)
       (Formula.eq0 s t ∧ᶠ Formula.eq0 t u →ᶠ Formula.eq0 s u)
 
   -- QF-ER (§9.7, eq. 9.58)
+  -- NOTE: The document's QF-ER only requires QF, not ∨-free. We add isVFree here
+  -- because our Dialectica proof (dialectica_qfer) needs Subsingleton on the counter
+  -- type, which requires ∨-free. To remove hvf, the Dialectica proof would need to
+  -- first encode A₀ as `qf_term A₀ =₀ 0` (which IS ∨-free) via qf_term_correct.
   | qfer         : {A₀ : Formula F Γ} →
                    A₀.isQF = true → A₀.isVFree = true →
                    Derivable F EqX allowed (A₀ →ᶠ eqAtType EqX ρ s t) →
