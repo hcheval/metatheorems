@@ -36,7 +36,8 @@ noncomputable def nd_soundness
     (h : Derivable F EqX Allowed.classical A)
     (env : interpCtx X Γ)
     : dialecticaRealizerCtx si A.negTrans env :=
-  dialectica_soundness_ctx si eqxi A.negTrans env (negTrans_sound adm h)
+  dialectica_soundness_ctx si eqxi A.negTrans env
+    ((negTrans_sound adm h).castAllowed (by constructor <;> decide))
 
 /-- Closed-formula variant: the realizer lives at the empty environment. -/
 noncomputable def nd_soundness_closed
@@ -49,3 +50,4 @@ noncomputable def nd_soundness_closed
     (h : Derivable F EqX Allowed.classical A)
     : dialecticaRealizer si A.negTrans :=
   nd_soundness si eqxi adm h ()
+

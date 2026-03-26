@@ -52,11 +52,15 @@ namespace Allowed
 /-- Base intuitionistic system WE-HA^{ω,X}. -/
 def base : Allowed := {}
 
-/-- Extended system T^ω[X,F] + AC + IP^ω_∀ + M^ω (Dialectica target). -/
-def extended : Allowed := { markov := true, ip := true, ac := true }
+/-- Extended system T^ω[X,F] + AC + IP^ω_∀ + M^ω (Dialectica target).
+    Includes qfac since full AC implies QF-AC. -/
+def extended : Allowed := { markov := true, ip := true, ac := true, qfac := true }
 
 /-- Classical system WE-HA^{ω,X}_c + LEM + QF-AC (negative translation source). -/
 def classical : Allowed := { lem := true, qfac := true }
+
+/-- NT target: T^ω + QF-AC + M^ω (negative translation output, Lemma lem:negative-eliminates-lem). -/
+def nt_target : Allowed := { qfac := true, markov := true }
 
 /-- Partial order: a₁ ≤ a₂ if every principle allowed in a₁ is also in a₂. -/
 def le (a₁ a₂ : Allowed) : Prop :=

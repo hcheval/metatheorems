@@ -665,9 +665,10 @@ noncomputable def dialectica_soundness_ctx' {Γ : Ctx ι} (A : Formula F Γ) (en
   | markov _ hqf hvf   => intro env; exact dialectica_markov si hqf hvf env
   | ip _ hqf hvf       => intro env; exact dialectica_ip si hqf hvf env
   | ac _               => intro env; exact dialectica_ac si env
-  -- Impossible (Allowed.extended.lem = false, qfac = false)
+  -- QF-AC: same Dialectica as full AC (QF restriction is only on the proof rule)
+  | qfac _ _           => intro env; exact dialectica_ac si env
+  -- Impossible (Allowed.extended.lem = false)
   | lem h_lem          => exact absurd h_lem (by decide)
-  | qfac h_qfac _      => exact absurd h_qfac (by decide)
 
 /-- **Dialectica Soundness Theorem** (Theorem 3.0.7). -/
 noncomputable def dialectica_soundness' (A : Formula F ([] : Ctx ι))
