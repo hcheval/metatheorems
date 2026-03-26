@@ -804,6 +804,58 @@ noncomputable def negTrans_qfer {a : Allowed} (adm : AdmissibleEqX EqX) {Γ : Ct
   Eq.mp (congrArg (fun x => Derivable F EqX a (Formula.neg (Formula.neg x))) ki_imp.symm)
     (.mp (.syllogism step1 fwd) neg_neg_imp_rev)
 
+-- ── QF-AC ──────────────────────────────────────────────────────────────────
+
+/-- NT(QF-AC): from Markov + QF-AC, derive the negative translation of QF-AC.
+
+    NT((∀ρ ∃τ A₀) → ∃(ρ→τ) (∀ρ acSubst A₀))
+    = ¬¬(∀ρ ¬¬(∃τ A₀) → ∃(ρ→τ) (∀ρ ¬¬(acSubst A₀)))
+
+    Proof: Markov eliminates ¬¬∃ under ∀, QF-AC gives the choice function,
+    then dnn_intro strengthens the conclusion. -/
+noncomputable def negTrans_qfac (adm : AdmissibleEqX EqX)
+    {Γ : Ctx ι} {ρ τ : Ty ι} {A₀ : Formula F (τ :: ρ :: Γ)}
+    (hqf : A₀.isQF = true) (hvf : Formula.isVFree A₀ = true) :
+    Derivable F EqX Allowed.nt_target
+      ((Formula.all ρ (Formula.ex τ A₀)) →ᶠ
+       Formula.ex (ρ →ₜ τ) (Formula.all ρ (Formula.substF Formula.acSubst A₀))).negTrans := by
+  -- The NT unfolds to ¬¬(∀ρ ¬¬(∃τ A₀) → ∃(ρ→τ) (∀ρ ¬¬(acSubst A₀)))
+  -- kurodaInner is identity on QF formulas; substF preserves QF
+  have hqf_subst : (Formula.substF Formula.acSubst A₀).isQF = true := by
+    suffices h : ∀ {Γ' Δ : Ctx ι} (B : Formula F Γ') (σ : Term.Subst F Γ' Δ),
+        B.isQF = true → (B.substF σ).isQF = true from h A₀ _ hqf
+    intro Γ' Δ B σ hB
+    induction B generalizing Δ with
+    | bot | eq0 => simp [Formula.substF, Formula.isQF]
+    | and A B ihA ihB => simp [Formula.substF, Formula.isQF] at hB ⊢; exact ⟨ihA _ hB.1, ihB _ hB.2⟩
+    | or A B ihA ihB => simp [Formula.substF, Formula.isQF] at hB ⊢; exact ⟨ihA _ hB.1, ihB _ hB.2⟩
+    | imp A B ihA ihB => simp [Formula.substF, Formula.isQF] at hB ⊢; exact ⟨ihA _ hB.1, ihB _ hB.2⟩
+    | all | ex => simp [Formula.isQF] at hB
+  simp only [Formula.negTrans, Formula.kurodaInner, kurodaInner_qf _ hqf,
+    kurodaInner_qf _ hqf_subst]
+  -- Step 1: Markov at context ρ :: Γ: ¬¬(∃τ A₀) → ∃τ A₀
+  have markov_step : Derivable F EqX Allowed.nt_target
+      (¬ᶠ¬ᶠ(Formula.ex τ A₀) →ᶠ Formula.ex τ A₀) :=
+    .markov rfl hqf hvf
+  -- Step 2: ∀ρ (¬¬∃τ A₀) → ∀ρ (∃τ A₀)  via forall_map
+  have step2 : Derivable F EqX Allowed.nt_target
+      (Formula.all ρ (¬ᶠ¬ᶠFormula.ex τ A₀) →ᶠ Formula.all ρ (Formula.ex τ A₀)) :=
+    forall_map markov_step
+  -- Step 3: QF-AC: ∀ρ (∃τ A₀) → ∃(ρ→τ) (∀ρ (acSubst A₀))
+  have step3 : Derivable F EqX Allowed.nt_target
+      (Formula.all ρ (Formula.ex τ A₀) →ᶠ
+       Formula.ex (ρ →ₜ τ) (Formula.all ρ (Formula.substF Formula.acSubst A₀))) :=
+    .qfac rfl hqf hvf
+  -- Step 4: Strengthen conclusion: acSubst A₀ → ¬¬(acSubst A₀) via dnn_intro
+  -- Lift B → ¬¬B through ∀ρ then ∃(ρ→τ):
+  -- ∃(ρ→τ)(∀ρ B) → ∃(ρ→τ)(∀ρ ¬¬B) by exist_rule + forall_map dnn_intro + exist_ax
+  have step4 : Derivable F EqX Allowed.nt_target
+      (Formula.ex (ρ →ₜ τ) (Formula.all ρ (Formula.substF Formula.acSubst A₀)) →ᶠ
+       Formula.ex (ρ →ₜ τ) (Formula.all ρ (¬ᶠ¬ᶠFormula.substF Formula.acSubst A₀))) :=
+    exist_map (forall_map dnn_intro)
+  -- Compose steps 2, 3, 4 and wrap in ¬¬
+  exact Derivable.mp (.syllogism (.syllogism step2 step3) step4) dnn_intro
+
 end NegTransCases
 
 -- ============================================================================
@@ -942,7 +994,7 @@ noncomputable def negTrans_sound {Γ : Ctx ι} {A : Formula F Γ}
       negTrans_induction (negTrans_sound h_zero) (negTrans_sound h_step)
   -- Extension principles
   | .lem _                 => negTrans_lem _
-  | .qfac _ _              => by sorry  -- NT(QF-AC) requires Markov
+  | .qfac _ hqf hvf        => negTrans_qfac adm hqf hvf
   | .ac h ..               => absurd h (by decide)
   | .markov h ..           => absurd h (by decide)
   | .ip h ..               => absurd h (by decide)

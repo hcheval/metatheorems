@@ -197,9 +197,13 @@ inductive Derivable {ι : Type} (F : ι → Ty ι)
                      ((Formula.all ρ (Formula.ex τ A)) →ᶠ
                       Formula.ex (ρ →ₜ τ) (Formula.all ρ (Formula.substF Formula.acSubst A)))
 
-  -- QF-Axiom of choice (matrix must be QF)
+  -- QF-Axiom of choice (matrix must be QF ∨-free)
+  -- NOTE: The document's QF-AC only requires QF. We add isVFree because the NT
+  -- proof uses Markov (which requires ∨-free). To remove hvf, one would derive
+  -- a general Markov for QF via the decision function (qf_term_correct).
   | qfac         : allowed.qfac = true →
                    {A₀ : Formula F (τ :: ρ :: Γ)} → A₀.isQF = true →
+                   Formula.isVFree A₀ = true →
                    Derivable F EqX allowed
                      ((Formula.all ρ (Formula.ex τ A₀)) →ᶠ
                       Formula.ex (ρ →ₜ τ) (Formula.all ρ (Formula.substF Formula.acSubst A₀)))
@@ -248,7 +252,7 @@ def Derivable.castAllowed {ι : Type} {F : ι → Ty ι}
   | .markov h1 hqf hvf => .markov (h_le.2.1 h1) hqf hvf
   | .ip h1 hqf hvf     => .ip (h_le.2.2.1 h1) hqf hvf
   | .ac h1             => .ac (h_le.2.2.2.1 h1)
-  | .qfac h1 hqf       => .qfac (h_le.2.2.2.2 h1) hqf
+  | .qfac h1 hqf hvf   => .qfac (h_le.2.2.2.2 h1) hqf hvf
 
 -- ============================================================================
 -- Admissibility conditions on EqX

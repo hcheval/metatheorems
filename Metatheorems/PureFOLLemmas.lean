@@ -134,3 +134,17 @@ def forall_map {Γ : Ctx ι} {ρ : Ty ι} {P Q : Formula F (ρ :: Γ)}
     Derivable F EqX a (Formula.all ρ P →ᶠ Formula.all ρ Q) :=
   -- Use forall_rule directly: (∀x.P).w → P [forall_ax_vz] → Q [h]
   .forall_rule (.syllogism forall_ax_vz h)
+
+/-- Introduce ∃ from variable 0: Q → (∃x.Q).weakenBy ρ in context ρ :: Γ. -/
+private def exist_ax_vz {Γ : Ctx ι} {ρ : Ty ι} {A : Formula F (ρ :: Γ)} :
+    Derivable F EqX a (A →ᶠ (Formula.ex ρ A).weakenBy ρ) :=
+  Eq.mp (congrArg (Derivable F EqX a ·)
+    (congrArg (· →ᶠ (Formula.ex ρ A).weakenBy ρ) (weaken_subst0_id A)))
+    (.exist_ax (.var .vz) (A.renameF (Renaming.ext Renaming.shift)))
+
+/-- Map a derivation through ∃:
+    from ⊢ P(x) → Q(x), derive ⊢ (∃x. P(x)) → (∃x. Q(x)). -/
+def exist_map {Γ : Ctx ι} {ρ : Ty ι} {P Q : Formula F (ρ :: Γ)}
+    (h : Derivable F EqX a (P →ᶠ Q)) :
+    Derivable F EqX a (Formula.ex ρ P →ᶠ Formula.ex ρ Q) :=
+  .exist_rule (.syllogism h exist_ax_vz)
