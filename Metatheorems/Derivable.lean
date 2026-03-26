@@ -57,6 +57,13 @@ def extended : Allowed := { markov := true, ip := true, ac := true }
 /-- Classical system WE-HA^{ω,X}_c + LEM + AC (negative translation source). -/
 def classical : Allowed := { lem := true, ac := true }
 
+/-- Partial order: a₁ ≤ a₂ if every principle allowed in a₁ is also in a₂. -/
+def le (a₁ a₂ : Allowed) : Prop :=
+  (a₁.lem = true → a₂.lem = true) ∧
+  (a₁.markov = true → a₂.markov = true) ∧
+  (a₁.ip = true → a₂.ip = true) ∧
+  (a₁.ac = true → a₂.ac = true)
+
 end Allowed
 
 -- ============================================================================
@@ -179,6 +186,51 @@ inductive Derivable {ι : Type} (F : ι → Ty ι)
                    Derivable F EqX allowed
                      ((Formula.all ρ (Formula.ex τ A)) →ᶠ
                       Formula.ex (ρ →ₜ τ) (Formula.all ρ (Formula.substF Formula.acSubst A)))
+
+-- ============================================================================
+-- Weakening of allowed principles
+-- ============================================================================
+
+/-- If `a₁ ≤ a₂`, then any derivation in system `a₁` is also a derivation in `a₂`.
+    Proved by structural recursion on the derivation. -/
+def Derivable.castAllowed {ι : Type} {F : ι → Ty ι}
+    {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
+    {a₁ a₂ : Allowed} (h_le : Allowed.le a₁ a₂)
+    {Γ : Ctx ι} {A : Formula F Γ}
+    (h : Derivable F EqX a₁ A) : Derivable F EqX a₂ A :=
+  match h with
+  | .or_contract  => .or_contract
+  | .and_contract => .and_contract
+  | .or_weak      => .or_weak
+  | .and_weak     => .and_weak
+  | .or_perm      => .or_perm
+  | .and_perm     => .and_perm
+  | .exfalso      => .exfalso
+  | .forall_ax t  => .forall_ax t
+  | .exist_ax t A => .exist_ax t A
+  | .mp h1 h2     => .mp (h1.castAllowed h_le) (h2.castAllowed h_le)
+  | .syllogism h1 h2 => .syllogism (h1.castAllowed h_le) (h2.castAllowed h_le)
+  | .exportation h1   => .exportation (h1.castAllowed h_le)
+  | .importation h1   => .importation (h1.castAllowed h_le)
+  | .expansion h1     => .expansion (h1.castAllowed h_le)
+  | .forall_rule h1   => .forall_rule (h1.castAllowed h_le)
+  | .exist_rule h1    => .exist_rule (h1.castAllowed h_le)
+  | .univ_gen h1      => .univ_gen (h1.castAllowed h_le)
+  | .succ_ne_zero     => .succ_ne_zero
+  | .succ_inj         => .succ_inj
+  | .proj_ax          => .proj_ax
+  | .comb_ax          => .comb_ax
+  | .rec_zero         => .rec_zero
+  | .rec_succ         => .rec_succ
+  | .refl0            => .refl0
+  | .sym0             => .sym0
+  | .trans0           => .trans0
+  | .qfer hqf hvf h1  => .qfer hqf hvf (h1.castAllowed h_le)
+  | .induction h1 h2  => .induction (h1.castAllowed h_le) (h2.castAllowed h_le)
+  | .lem h1           => .lem (h_le.1 h1)
+  | .markov h1 hqf hvf => .markov (h_le.2.1 h1) hqf hvf
+  | .ip h1 hqf hvf     => .ip (h_le.2.2.1 h1) hqf hvf
+  | .ac h1             => .ac (h_le.2.2.2 h1)
 
 -- ============================================================================
 -- Admissibility conditions on EqX
