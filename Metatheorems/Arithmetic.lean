@@ -600,7 +600,7 @@ def pd_succ (n : Term F Γ Ty.nat) :
 -- ── add ─────────────────────────────────────────────────────────────────────
 
 /-- x + 0 = x. -/
-def add_zero (x : Term F Γ Ty.nat) :
+def add_zero_r (x : Term F Γ Ty.nat) :
     Derivable F EqX al (Formula.eq0 (Term.app2 Term.add x Term.zero) x) :=
   let body : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat :=
     Term.app3 (.prec Ty.nat) (.var (.vs .vz))
@@ -736,7 +736,7 @@ def mul_zero_l (y : Term F Γ Ty.nat) :
     -- t1: mul 0 (Sy) = add (mul 0 y) 0
     let t1 := mul_succ adm Term.zero (.var .vz : Term F (Ty.nat :: Γ) _)
     -- t2: add (mul 0 y) 0 = mul 0 y
-    let t2 := add_zero adm (Term.app2 Term.mul Term.zero (.var .vz : Term F (Ty.nat :: Γ) _))
+    let t2 := add_zero_r adm (Term.app2 Term.mul Term.zero (.var .vz : Term F (Ty.nat :: Γ) _))
     -- t12: mul 0 (Sy) = mul 0 y (by trans)
     let t12 := .mp (.mp t2 (.mp t1 and_intro)) .trans0
     -- Chain: (mul 0 (Sy) = mul 0 y) ∧ (mul 0 y = 0) → mul 0 (Sy) = 0
@@ -862,7 +862,7 @@ def add_succ_l {Γ : Ctx ι} (x y : Term F Γ Ty.nat) :
     simp only [A, xw, Formula.subst0, Formula.substF, Term.subst, Term.subst0_map, Term.app2,
       add_closed_subst, xw_subst0]
   have base : Derivable F EqX al (A.subst0 Term.zero) := base_nf ▸
-    .mp (.mp (succ_congr (.mp (add_zero adm x) .sym0)) (.mp (add_zero adm (.app .succ x)) and_intro)) .trans0
+    .mp (.mp (succ_congr (.mp (add_zero_r adm x) .sym0)) (.mp (add_zero_r adm (.app .succ x)) and_intro)) .trans0
   -- Step: A(y) → A(Sy). add_succ on both sides + S-congruence on IH.
   have step_nf : Formula.substVar0 A (.app .succ (.var .vz)) =
       Formula.eq0 (Term.app2 Term.add (.app .succ xw) (.app .succ (.var .vz)))
@@ -935,7 +935,7 @@ def add_eq_zero_iff (x y : Term F Γ Ty.nat) :
       Formula.eq0 (Term.app2 Term.add Term.zero y) (Term.app2 Term.add Term.zero Term.zero)) :=
     qfer_nat_nf (by rfl) (by rfl) I_comb (add_qfer_r_nf Term.zero y y) (add_qfer_r_nf Term.zero y Term.zero)
   have add00 : Derivable F EqX al (Formula.eq0 (Term.app2 Term.add (Term.zero (F := F) (Γ := Γ)) Term.zero) Term.zero) :=
-    add_zero adm (Term.zero (F := F) (Γ := Γ))
+    add_zero_r adm (Term.zero (F := F) (Γ := Γ))
   have bwd : Derivable F EqX al (Formula.eq0 x Term.zero ∧ᶠ Formula.eq0 y Term.zero →ᶠ
       Formula.eq0 (Term.app2 Term.add x y) Term.zero) :=
     Derivable.syllogism
@@ -961,7 +961,7 @@ def add_eq_zero_iff (x y : Term F Γ Ty.nat) :
   -- base proof: add(x,0)=0 → x=0 ∧ 0=0. From add_zero: add(x,0)=x. Sym+trans: x=0. Pair with refl.
   have base : Derivable F EqX al (A.subst0 Term.zero) := base_nf ▸
     Derivable.syllogism
-      (pair_h (weaken_intro_h (Derivable.mp (add_zero adm x) .sym0)) I_comb)
+      (pair_h (weaken_intro_h (Derivable.mp (add_zero_r adm x) .sym0)) I_comb)
       (Derivable.syllogism .trans0 (pair_h I_comb (weaken_intro_h .refl0)))
   -- Step nf: substVar0 A (S(var vz)) normalizes.
   have step_nf : Formula.substVar0 A (.app .succ (.var .vz)) =
@@ -1198,7 +1198,7 @@ def add_zero_l (y : Term F Γ Ty.nat) :
       Formula.eq0 (Term.app2 Term.add Term.zero Term.zero) Term.zero := by
     simp only [A, Formula.subst0, Formula.substF, Term.subst, Term.subst0_map, Term.app2,
       add_closed_subst]
-  have base : Derivable F EqX al (A.subst0 Term.zero) := base_nf ▸ add_zero adm Term.zero
+  have base : Derivable F EqX al (A.subst0 Term.zero) := base_nf ▸ add_zero_r adm Term.zero
   have step_nf : Formula.substVar0 A (.app .succ (.var .vz)) =
       Formula.eq0 (Term.app2 Term.add Term.zero (.app .succ (.var .vz))) (.app .succ (.var .vz)) := by
     simp only [A, Formula.substVar0, Formula.substF, Term.subst, Term.substVar0_map, Term.app2,
@@ -1315,7 +1315,7 @@ def monus_cancel (x y : Term F Γ Ty.nat) :
       monus_closed_rename, add_closed_rename]
   have base : Derivable F EqX al (B.subst0 Term.zero) := base_nf ▸
     let kv : Term F (Ty.nat :: Γ) _ := .var .vz
-    univ_gen (.mp (.mp (add_zero adm kv)
+    univ_gen (.mp (.mp (add_zero_r adm kv)
       (.mp (monus_zero adm (Term.app2 Term.add kv Term.zero)) and_intro)) .trans0)
   let step := @monus_cancel_step _ _ _ _ adm Γ
   -- Normalize B.subst0 y to an explicit ∀k formula
@@ -1707,7 +1707,7 @@ def abs_diff_eq_zero_iff (x y : Term F Γ Ty.nat) :
     (by simp [Term.subst0, Term.app2, Term.subst, Term.subst0_map, add_closed_subst'])
     (by simp [Term.subst0, Term.app2, Term.subst, Term.subst0_map, add_closed_subst'])
   -- add00: add(monus x x)(monus x x) = 0  via add_congr + add_zero
-  let add00 := .mp (.mp (add_zero adm Term.zero) (.mp add_congr and_intro)) .trans0
+  let add00 := .mp (.mp (add_zero_r adm Term.zero) (.mp add_congr and_intro)) .trans0
   -- chain1_2: x=y → add(monus x y)(monus y x) = 0
   let chain1_2 := .syllogism (pair_h qf_monus (weaken_intro_h add00)) .trans0
   -- bwd: x=y → abs_diff x y = 0  (via unfold + chain1_2 + trans)

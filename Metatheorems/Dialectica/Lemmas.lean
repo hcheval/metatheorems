@@ -589,11 +589,18 @@ def dialectica_ac {Γ : Ctx ι} {ρ τ : Ty ι} {A : Formula F (τ :: ρ :: Γ)}
 -- Soundness for the base Derivable proof system
 -- ============================================================================
 
-/-- Dialectica realizer for every axiom and rule of the base `Derivable` system,
-    parametric in the environment. -/
-private noncomputable def dialectica_soundness_base {Γ : Ctx ι} {A : Formula F Γ}
-    (h : @Derivable ι F EqX Γ A) : ∀ env : interpCtx X Γ, dialecticaRealizerCtx si A env := by
+-- ============================================================================
+-- Main soundness theorem (Theorem 3.0.7) — proved here to avoid circular import
+-- ============================================================================
+
+/-- Generalized Dialectica realizer for any context and environment.
+    Matches on all constructors of `Derivable F EqX Allowed.extended`. -/
+noncomputable def dialectica_soundness_ctx' {Γ : Ctx ι} (A : Formula F Γ) (env : interpCtx X Γ)
+    (h : @Derivable ι F EqX Allowed.extended Γ A) : dialecticaRealizerCtx si A env := by
+  suffices h_all : ∀ env' : interpCtx X Γ, dialecticaRealizerCtx si A env' from h_all env
+  clear env
   induction h with
+  -- Base constructors
   | or_contract   => intro env; exact dialectica_or_contract si env
   | and_contract  => intro env; exact dialectica_and_contract si env
   | or_weak       => intro env
@@ -654,27 +661,14 @@ private noncomputable def dialectica_soundness_base {Γ : Ctx ι} {A : Formula F
   | «induction» _ _ ih_base ih_step =>
     intro env
     exact dialectica_induction si env (ih_base env) (ih_step env)
-
--- ============================================================================
--- Main soundness theorem (Theorem 3.0.7) — proved here to avoid circular import
--- ============================================================================
-
-/-- Generalized Dialectica realizer for any context and environment.
-    Proved here (in Lemmas.lean) because the proof calls all the per-axiom
-    lemmas above; `Dialectica.lean` only carries a `sorry` stub. -/
-noncomputable def dialectica_soundness_ctx' {Γ : Ctx ι} (A : Formula F Γ) (env : interpCtx X Γ)
-    (h : @DerivableExt ι F EqX Γ A) : dialecticaRealizerCtx si A env := by
-  suffices h_all : ∀ env' : interpCtx X Γ, dialecticaRealizerCtx si A env' from h_all env
-  clear env
-  induction h with
-  | base hd          => exact dialectica_soundness_base si eqxi hd
-  | markov hqf hvf   => intro env; exact dialectica_markov si hqf hvf env
-  | ip hqf hvf       => intro env; exact dialectica_ip si hqf hvf env
-  | ac               => intro env; exact dialectica_ac si env
-  | mp _ _ iha ihab  =>
-    intro env; exact dialectica_mp si env (iha env) (ihab env)
+  -- Extension constructors
+  | markov _ hqf hvf   => intro env; exact dialectica_markov si hqf hvf env
+  | ip _ hqf hvf       => intro env; exact dialectica_ip si hqf hvf env
+  | ac _               => intro env; exact dialectica_ac si env
+  -- Impossible (Allowed.extended.lem = false)
+  | lem h_lem          => exact absurd h_lem (by decide)
 
 /-- **Dialectica Soundness Theorem** (Theorem 3.0.7). -/
 noncomputable def dialectica_soundness' (A : Formula F ([] : Ctx ι))
-    (h : @DerivableExt ι F EqX [] A) : dialecticaRealizer si A :=
+    (h : @Derivable ι F EqX Allowed.extended [] A) : dialecticaRealizer si A :=
   dialectica_soundness_ctx' si eqxi A () h

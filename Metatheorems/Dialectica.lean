@@ -25,7 +25,7 @@ noncomputable def dialectica_soundness_ctx
     {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
     (eqxi : EqXInterp X F si EqX)
     {Γ : Ctx ι} (A : Formula F Γ) (env : interpCtx X Γ)
-    (h : DerivableExt F EqX A)
+    (h : Derivable F EqX Allowed.extended A)
     : dialecticaRealizerCtx si A env :=
   dialectica_soundness_ctx' si eqxi A env h
 
@@ -39,6 +39,6 @@ noncomputable def dialectica_soundness
     {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
     (eqxi : EqXInterp X F si EqX)
     (A : Formula F ([] : Ctx ι))
-    (h : DerivableExt F EqX A)
+    (h : Derivable F EqX Allowed.extended A)
     : dialecticaRealizer si A :=
   dialectica_soundness' si eqxi A h
