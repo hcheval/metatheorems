@@ -240,6 +240,14 @@ private def nn_all_nn {Γ : Ctx ι} {ρ : Ty ι} {Q : Formula F (ρ :: Γ)} :
   Derivable.forall_rule (Derivable.mp (Derivable.mp inst neg_neg_imp_rev) neg_neg_mp)
 
 
+/-- ¬¬(A → B) → A → ¬¬B  (intuitionistically valid). -/
+private def nn_imp_extract {Γ : Ctx ι} {A B : Formula F Γ} :
+    Derivable F EqX a (¬ᶠ¬ᶠ(A →ᶠ B) →ᶠ A →ᶠ ¬ᶠ¬ᶠB) :=
+  let get_nn_imp : Derivable F EqX a (¬ᶠ¬ᶠ(A →ᶠ B) ∧ᶠ A →ᶠ ¬ᶠ¬ᶠ(A →ᶠ B)) := .and_weak
+  let get_nn_a : Derivable F EqX a (¬ᶠ¬ᶠ(A →ᶠ B) ∧ᶠ A →ᶠ ¬ᶠ¬ᶠA) :=
+    .syllogism (.syllogism .and_perm .and_weak) dnn_intro
+  .exportation (.syllogism (pair_h get_nn_imp get_nn_a) (.importation neg_neg_mp))
+
 end HilbertExtras
 
 -- ============================================================================
@@ -910,12 +918,25 @@ noncomputable def negTrans_sound {Γ : Ctx ι} {A : Formula F Γ}
   | .rec_zero              => negTrans_rec_zero adm
   | .rec_succ              => negTrans_rec_succ adm
   -- QF-ER
-  | .qfer hqf hvf h_inner  =>
-      -- TODO: needs castAllowed from classical→extended, but classical.lem ≠ extended.lem.
-      -- The premise h_inner only uses base constructors (it's a QF-ER premise),
-      -- but the type system doesn't reflect this. Need a finer weakening or
-      -- restructuring of the Allowed hierarchy.
-      sorry
+  | .qfer (ρ := ρ_v) (σ := σ_v) (s := s_v) (t := t_v) (r := r_v) hqf hvf h_inner => by
+      -- ih : NT(A₀ → eq_ρ s t) = ¬¬(A₀ → eq_ρ.ki)
+      let ih := negTrans_sound h_inner
+      simp only [Formula.negTrans, Formula.kurodaInner, kurodaInner_qf _ hqf] at ih ⊢
+      -- step1: A₀ → ¬¬eq_ρ.ki  (from ¬¬(A₀ → eq_ρ.ki) using nn_imp_extract)
+      let step1 := Derivable.mp ih nn_imp_extract
+      -- step2: A₀ → eq_ρ  (syllogism with backward of negTrans_iff_pu)
+      let bwd := (negTrans_iff_pu (a := Allowed.nt_target) adm (eqAtType EqX ρ_v s_v t_v)
+        (eqAtType_isPU adm ρ_v s_v t_v)).2
+      let step2 := Derivable.syllogism step1 bwd
+      -- step3: A₀ → eq_σ r[s] r[t]  (QF-ER)
+      let step3 := Derivable.qfer (σ := σ_v) (r := r_v) hqf hvf step2
+      -- step4: A₀ → ¬¬eq_σ.ki  (syllogism with forward of negTrans_iff_pu)
+      let fwd := (negTrans_iff_pu (a := Allowed.nt_target) adm
+        (eqAtType EqX σ_v (r_v.subst0 s_v) (r_v.subst0 t_v))
+        (eqAtType_isPU adm σ_v _ _)).1
+      let step4 := Derivable.syllogism step3 fwd
+      -- step5: ¬¬(A₀ → eq_σ.ki) = NT(A₀ → eq_σ)
+      exact Derivable.mp step4 neg_neg_imp_rev
   -- induction
   | .induction h_zero h_step =>
       negTrans_induction (negTrans_sound h_zero) (negTrans_sound h_step)
