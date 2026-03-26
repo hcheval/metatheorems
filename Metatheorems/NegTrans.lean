@@ -921,7 +921,8 @@ noncomputable def negTrans_sound {Γ : Ctx ι} {A : Formula F Γ}
       negTrans_induction (negTrans_sound h_zero) (negTrans_sound h_step)
   -- Extension principles
   | .lem _                 => negTrans_lem _
-  | .ac _                  => by sorry  -- NT(QF-AC) requires Markov
+  | .qfac _ _              => by sorry  -- NT(QF-AC) requires Markov
+  | .ac h ..               => absurd h (by decide)
   | .markov h ..           => absurd h (by decide)
   | .ip h ..               => absurd h (by decide)
 

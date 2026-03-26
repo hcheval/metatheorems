@@ -45,6 +45,7 @@ structure Allowed where
   markov : Bool := false
   ip     : Bool := false
   ac     : Bool := false
+  qfac   : Bool := false
 
 namespace Allowed
 
@@ -54,15 +55,16 @@ def base : Allowed := {}
 /-- Extended system T^ω[X,F] + AC + IP^ω_∀ + M^ω (Dialectica target). -/
 def extended : Allowed := { markov := true, ip := true, ac := true }
 
-/-- Classical system WE-HA^{ω,X}_c + LEM + AC (negative translation source). -/
-def classical : Allowed := { lem := true, ac := true }
+/-- Classical system WE-HA^{ω,X}_c + LEM + QF-AC (negative translation source). -/
+def classical : Allowed := { lem := true, qfac := true }
 
 /-- Partial order: a₁ ≤ a₂ if every principle allowed in a₁ is also in a₂. -/
 def le (a₁ a₂ : Allowed) : Prop :=
   (a₁.lem = true → a₂.lem = true) ∧
   (a₁.markov = true → a₂.markov = true) ∧
   (a₁.ip = true → a₂.ip = true) ∧
-  (a₁.ac = true → a₂.ac = true)
+  (a₁.ac = true → a₂.ac = true) ∧
+  (a₁.qfac = true → a₂.qfac = true)
 
 end Allowed
 
@@ -180,12 +182,19 @@ inductive Derivable {ι : Type} (F : ι → Ty ι)
                      ((Formula.all σ A₀ →ᶠ Formula.ex ρ B) →ᶠ
                       Formula.ex ρ ((Formula.all σ A₀).weakenBy ρ →ᶠ B))
 
-  -- Axiom of choice AC
+  -- Axiom of choice AC (full, for arbitrary A)
   | ac           : allowed.ac = true →
                    {A : Formula F (τ :: ρ :: Γ)} →
                    Derivable F EqX allowed
                      ((Formula.all ρ (Formula.ex τ A)) →ᶠ
                       Formula.ex (ρ →ₜ τ) (Formula.all ρ (Formula.substF Formula.acSubst A)))
+
+  -- QF-Axiom of choice (matrix must be QF)
+  | qfac         : allowed.qfac = true →
+                   {A₀ : Formula F (τ :: ρ :: Γ)} → A₀.isQF = true →
+                   Derivable F EqX allowed
+                     ((Formula.all ρ (Formula.ex τ A₀)) →ᶠ
+                      Formula.ex (ρ →ₜ τ) (Formula.all ρ (Formula.substF Formula.acSubst A₀)))
 
 -- ============================================================================
 -- Weakening of allowed principles
@@ -230,7 +239,8 @@ def Derivable.castAllowed {ι : Type} {F : ι → Ty ι}
   | .lem h1           => .lem (h_le.1 h1)
   | .markov h1 hqf hvf => .markov (h_le.2.1 h1) hqf hvf
   | .ip h1 hqf hvf     => .ip (h_le.2.2.1 h1) hqf hvf
-  | .ac h1             => .ac (h_le.2.2.2 h1)
+  | .ac h1             => .ac (h_le.2.2.2.1 h1)
+  | .qfac h1 hqf       => .qfac (h_le.2.2.2.2 h1) hqf
 
 -- ============================================================================
 -- Admissibility conditions on EqX
