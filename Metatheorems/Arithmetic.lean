@@ -41,20 +41,20 @@ open Formula
 
 variable {ι : Type} {F : ι → Ty ι}
     {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
-    (adm : AdmissibleEqX EqX)
+    {al : Allowed} (adm : AdmissibleEqX EqX)
 
 -- Private combinators used throughout (same as NegTrans.lean private defs)
 private def self_imp_h {Γ : Ctx ι} {A : Formula F Γ} :
-    Derivable F EqX (A →ᶠ A) :=
+    Derivable F EqX al (A →ᶠ A) :=
   .syllogism .and_contract .and_weak
 
 private def weaken_intro_h {Γ : Ctx ι} {A B : Formula F Γ}
-    (h : Derivable F EqX A) : Derivable F EqX (B →ᶠ A) :=
+    (h : Derivable F EqX al A) : Derivable F EqX al (B →ᶠ A) :=
   .mp h (.exportation .and_weak)
 
 /-- (∀x:ρ. P).weakenBy ρ →ᶠ P  in context ρ :: Γ. -/
 private def forall_ax_inst {Γ : Ctx ι} {ρ : Ty ι} (P : Formula F (ρ :: Γ)) :
-    Derivable F EqX ((Formula.all ρ P).weakenBy ρ →ᶠ P) :=
+    Derivable F EqX al ((Formula.all ρ P).weakenBy ρ →ᶠ P) :=
   let hbody : ∀ {τ : Ty ι} (v : Var (ρ :: Γ) τ),
       Term.subst0_map (.var .vz) (Renaming.ext Renaming.shift v) = Term.var v :=
     fun {_} v => match v with
@@ -63,13 +63,13 @@ private def forall_ax_inst {Γ : Ctx ι} {ρ : Ty ι} (P : Formula F (ρ :: Γ))
   let heq : (Formula.renameF (Renaming.ext Renaming.shift) P).subst0 (.var .vz) = P :=
     Formula.substF_renameF_id (Renaming.ext Renaming.shift)
       (Term.subst0_map (.var .vz)) hbody P
-  have h := @Derivable.forall_ax ι F EqX (ρ :: Γ) ρ
+  have h := @Derivable.forall_ax ι F EqX al (ρ :: Γ) ρ
               (Formula.renameF (Renaming.ext Renaming.shift) P) (.var .vz)
   -- h : ⊢ all ρ (renameF (ext shift) P) →ᶠ X  where X = (renameF (ext shift) P).subst0 (var vz)
   -- heq : X = P.  Use Eq.mp to convert only the consequent X → P.
   -- Antecedent (all ρ P).weakenBy ρ = all ρ (renameF (ext shift) P) definitionally.
   let ant := Formula.all ρ (Formula.renameF (Renaming.ext Renaming.shift) P)
-  Eq.mp (congrArg (fun Y => Derivable F EqX (ant →ᶠ Y)) heq) h
+  Eq.mp (congrArg (fun Y => Derivable F EqX al (ant →ᶠ Y)) heq) h
 
 -- ============================================================================
 -- Section 1: Arithmetic Term Definitions
@@ -154,28 +154,28 @@ variable {Γ : Ctx ι}
 /-- Reflexivity of higher-type equality (derived from refl0 + forall_rule).
     eqAtType ρ s s -/
 def eqAtType_refl {Γ : Ctx ι} {ρ : Ty ι} (s : Term F Γ ρ) :
-    Derivable F EqX (eqAtType EqX ρ s s) :=
+    Derivable F EqX al (eqAtType EqX ρ s s) :=
   match ρ with
   | .nat    => .refl0
   | .base _ => adm.eqx_refl s
   | .arr ρ' σ' =>
     -- eqAtType (ρ'→σ') s s = ∀x:ρ'. eqAtType σ' (s.weaken x) (s.weaken x)
     -- IH in context ρ'::Γ; then weaken_intro + forall_rule + mp to close ∀
-    let ih : Derivable F EqX (eqAtType EqX σ' (Term.app s.weaken (.var .vz)) (Term.app s.weaken (.var .vz))) :=
+    let ih : Derivable F EqX al (eqAtType EqX σ' (Term.app s.weaken (.var .vz)) (Term.app s.weaken (.var .vz))) :=
       eqAtType_refl (Term.app s.weaken (.var .vz))
     -- weaken_intro: ⊢ B →ᶠ P where B = ⊥ᶠ →ᶠ ⊥ᶠ (= (⊥ᶠ →ᶠ ⊥ᶠ).weakenBy ρ' definitionally)
-    let step1 : Derivable F EqX ((⊥ᶠ →ᶠ ⊥ᶠ) →ᶠ eqAtType EqX σ' (Term.app s.weaken (.var .vz)) (Term.app s.weaken (.var .vz))) :=
+    let step1 : Derivable F EqX al ((⊥ᶠ →ᶠ ⊥ᶠ) →ᶠ eqAtType EqX σ' (Term.app s.weaken (.var .vz)) (Term.app s.weaken (.var .vz))) :=
       weaken_intro_h ih
     -- forall_rule: B = ⊥ᶠ →ᶠ ⊥ᶠ in Γ; (⊥ᶠ→ᶠ⊥ᶠ).weakenBy ρ' = ⊥ᶠ→ᶠ⊥ᶠ definitionally
-    let step2 : Derivable F EqX ((⊥ᶠ →ᶠ ⊥ᶠ) →ᶠ Formula.all ρ' (eqAtType EqX σ' (Term.app s.weaken (.var .vz)) (Term.app s.weaken (.var .vz)))) :=
+    let step2 : Derivable F EqX al ((⊥ᶠ →ᶠ ⊥ᶠ) →ᶠ Formula.all ρ' (eqAtType EqX σ' (Term.app s.weaken (.var .vz)) (Term.app s.weaken (.var .vz)))) :=
       .forall_rule step1
     -- self_imp at ⊥ᶠ gives ⊢ ⊥ᶠ →ᶠ ⊥ᶠ; then mp closes the goal
-    let taut : Derivable F EqX (⊥ᶠ →ᶠ ⊥ᶠ) := self_imp_h
+    let taut : Derivable F EqX al (⊥ᶠ →ᶠ ⊥ᶠ) := self_imp_h
     .mp taut step2
 
 /-- Symmetry of higher-type equality (from sym0 + forall_rule). -/
 def eqAtType_sym {Γ : Ctx ι} {ρ : Ty ι} {s t : Term F Γ ρ} :
-    Derivable F EqX (eqAtType EqX ρ s t →ᶠ eqAtType EqX ρ t s) :=
+    Derivable F EqX al (eqAtType EqX ρ s t →ᶠ eqAtType EqX ρ t s) :=
   match ρ with
   | .nat    => .sym0
   | .base _ => adm.eqx_sym
@@ -183,14 +183,14 @@ def eqAtType_sym {Γ : Ctx ι} {ρ : Ty ι} {s t : Term F Γ ρ} :
     let P_st : Formula F (ρ' :: Γ) :=
       eqAtType EqX σ' (Term.app s.weaken (.var .vz)) (Term.app t.weaken (.var .vz))
     let inst_st := forall_ax_inst P_st
-    let ih : Derivable F EqX (P_st →ᶠ
+    let ih : Derivable F EqX al (P_st →ᶠ
         eqAtType EqX σ' (Term.app t.weaken (.var .vz)) (Term.app s.weaken (.var .vz))) :=
       eqAtType_sym
     .forall_rule (.syllogism inst_st ih)
 
 /-- Transitivity of higher-type equality (from trans0 + forall_rule). -/
 def eqAtType_trans {Γ : Ctx ι} {ρ : Ty ι} {s t u : Term F Γ ρ} :
-    Derivable F EqX (eqAtType EqX ρ s t ∧ᶠ eqAtType EqX ρ t u →ᶠ eqAtType EqX ρ s u) :=
+    Derivable F EqX al (eqAtType EqX ρ s t ∧ᶠ eqAtType EqX ρ t u →ᶠ eqAtType EqX ρ s u) :=
   match ρ with
   | .nat    => .trans0
   | .base _ => adm.eqx_trans
@@ -201,16 +201,16 @@ def eqAtType_trans {Γ : Ctx ι} {ρ : Ty ι} {s t u : Term F Γ ρ} :
       eqAtType EqX σ' (Term.app t.weaken (.var .vz)) (Term.app u.weaken (.var .vz))
     let inst_st := forall_ax_inst P_st
     let inst_tu := forall_ax_inst P_tu
-    let ih : Derivable F EqX (P_st ∧ᶠ P_tu →ᶠ
+    let ih : Derivable F EqX al (P_st ∧ᶠ P_tu →ᶠ
         eqAtType EqX σ' (Term.app s.weaken (.var .vz)) (Term.app u.weaken (.var .vz))) :=
       eqAtType_trans
-    let get_P_st : Derivable F EqX
+    let get_P_st : Derivable F EqX al
         ((Formula.all ρ' P_st ∧ᶠ Formula.all ρ' P_tu).weakenBy ρ' →ᶠ P_st) :=
       .syllogism .and_weak inst_st
-    let get_P_tu : Derivable F EqX
+    let get_P_tu : Derivable F EqX al
         ((Formula.all ρ' P_st ∧ᶠ Formula.all ρ' P_tu).weakenBy ρ' →ᶠ P_tu) :=
       .syllogism (.syllogism .and_perm .and_weak) inst_tu
-    let get_pair : Derivable F EqX
+    let get_pair : Derivable F EqX al
         ((Formula.all ρ' P_st ∧ᶠ Formula.all ρ' P_tu).weakenBy ρ' →ᶠ P_st ∧ᶠ P_tu) :=
       pair_h get_P_st get_P_tu
     .forall_rule (.syllogism get_pair ih)
@@ -269,34 +269,34 @@ private theorem eqAtType_subst0 (adm : AdmissibleEqX EqX) {τ : Ty ι} {ρ : Ty 
     Proof: pad with A₀ = (0 =₀ 0) which is trivially QF ∧ VFree. -/
 private def qfer_no_premise {ρ σ : Ty ι} {Γ : Ctx ι}
     {s t : Term F Γ ρ} {r : Term F (ρ :: Γ) σ}
-    (h : Derivable F EqX (eqAtType EqX ρ s t)) :
-    Derivable F EqX (eqAtType EqX σ (r.subst0 s) (r.subst0 t)) :=
+    (h : Derivable F EqX al (eqAtType EqX ρ s t)) :
+    Derivable F EqX al (eqAtType EqX σ (r.subst0 s) (r.subst0 t)) :=
   .mp (.refl0 (t := Term.zero)) (.qfer (by rfl) (by rfl) (weaken_intro_h h))
 
 /-- QF-ER at nat type with explicit normal forms for the subst0 results.
     Avoids deep defeq reduction in downstream proofs. -/
 private def qfer_nat_nf {Γ : Ctx ι} {A₀ : Formula F Γ}
     (hqf : A₀.isQF = true) (hvf : A₀.isVFree = true)
-    {s t : Term F Γ Ty.nat} (h : Derivable F EqX (A₀ →ᶠ Formula.eq0 s t))
+    {s t : Term F Γ Ty.nat} (h : Derivable F EqX al (A₀ →ᶠ Formula.eq0 s t))
     {r : Term F (Ty.nat :: Γ) Ty.nat} {rs rt : Term F Γ Ty.nat}
     (hs : r.subst0 s = rs) (ht : r.subst0 t = rt) :
-    Derivable F EqX (A₀ →ᶠ Formula.eq0 rs rt) :=
-  let h' : Derivable F EqX (A₀ →ᶠ eqAtType EqX Ty.nat s t) := h
-  let q : Derivable F EqX (A₀ →ᶠ Formula.eq0 (r.subst0 s) (r.subst0 t)) :=
+    Derivable F EqX al (A₀ →ᶠ Formula.eq0 rs rt) :=
+  let h' : Derivable F EqX al (A₀ →ᶠ eqAtType EqX Ty.nat s t) := h
+  let q : Derivable F EqX al (A₀ →ᶠ Formula.eq0 (r.subst0 s) (r.subst0 t)) :=
     .qfer (σ := Ty.nat) hqf hvf h'
-  Eq.mp (congrArg (Derivable F EqX ·) (by rw [show r.subst0 s = rs from hs,
+  Eq.mp (congrArg (Derivable F EqX al ·) (by rw [show r.subst0 s = rs from hs,
     show r.subst0 t = rt from ht])) q
 
 /-- QF-ER without premise, at nat type, with explicit normal forms. -/
 private def qfer_no_premise_nat_nf {Γ : Ctx ι}
-    {s t : Term F Γ Ty.nat} (h : Derivable F EqX (Formula.eq0 s t))
+    {s t : Term F Γ Ty.nat} (h : Derivable F EqX al (Formula.eq0 s t))
     {r : Term F (Ty.nat :: Γ) Ty.nat} {rs rt : Term F Γ Ty.nat}
     (hs : r.subst0 s = rs) (ht : r.subst0 t = rt) :
-    Derivable F EqX (Formula.eq0 rs rt) :=
-  let h' : Derivable F EqX (eqAtType EqX Ty.nat s t) := h
-  let q : Derivable F EqX (Formula.eq0 (r.subst0 s) (r.subst0 t)) :=
+    Derivable F EqX al (Formula.eq0 rs rt) :=
+  let h' : Derivable F EqX al (eqAtType EqX Ty.nat s t) := h
+  let q : Derivable F EqX al (Formula.eq0 (r.subst0 s) (r.subst0 t)) :=
     qfer_no_premise (σ := Ty.nat) h'
-  Eq.mp (congrArg (Derivable F EqX ·) (by rw [show r.subst0 s = rs from hs,
+  Eq.mp (congrArg (Derivable F EqX al ·) (by rw [show r.subst0 s = rs from hs,
     show r.subst0 t = rt from ht])) q
 
 -- ============================================================================
@@ -317,7 +317,7 @@ section LamCorrect
     - constant c: (K c) s = c  (proj_ax) -/
 def Term.lam_correct {ρ τ : Ty ι} {Γ : Ctx ι}
     (t : Term F (ρ :: Γ) τ) (s : Term F Γ ρ) :
-    Derivable F EqX (eqAtType EqX τ (Term.app (Term.lam t) s) (t.subst0 s)) :=
+    Derivable F EqX al (eqAtType EqX τ (Term.app (Term.lam t) s) (t.subst0 s)) :=
   match t with
   | .var .vz =>
     -- lam (var vz) reduces to I combinator; (I) s = s = (var vz).subst0 s
@@ -334,7 +334,7 @@ def Term.lam_correct {ρ τ : Ty ι} {Γ : Ctx ι}
     let IH_f := lam_correct f s
     let IH_a := lam_correct a s
     -- Step 1: comb_ax: (Σ lf la) s =_τ (lf s)(la s)
-    let step1 : Derivable F EqX (eqAtType EqX τ
+    let step1 : Derivable F EqX al (eqAtType EqX τ
         (Term.app3 (.comb ρ _ _) lf la s)
         (Term.app (Term.app lf s) (Term.app la s))) := .comb_ax
     -- Step 2: IH_f instantiated at (la s): (lf s)(la s) =_τ (f[s])(la s)
@@ -344,16 +344,16 @@ def Term.lam_correct {ρ τ : Ty ι} {Γ : Ctx ι}
         eqAtType EqX τ (Term.app (Term.app lf s) (Term.app la s))
                         (Term.app (f.subst0 s) (Term.app la s)) := by
       rw [eqAtType_subst0 adm, app_weaken_vz_subst0, app_weaken_vz_subst0]
-    let step2 := Eq.mp (congrArg (Derivable F EqX) heq2) step2_raw
+    let step2 := Eq.mp (congrArg (Derivable F EqX al) heq2) step2_raw
     -- Step 3: qfer_no_premise IH_a: (f[s])(la s) =_τ (f[s])(a[s])
-    let step3_raw := @qfer_no_premise _ _ EqX _ _ _ (Term.app la s) (a.subst0 s)
+    let step3_raw := @qfer_no_premise _ _ EqX al _ _ _ (Term.app la s) (a.subst0 s)
         (Term.app (f.subst0 s).weaken (.var .vz)) IH_a
     let heq3 : eqAtType EqX τ ((Term.app (f.subst0 s).weaken (.var .vz)).subst0 (Term.app la s))
         ((Term.app (f.subst0 s).weaken (.var .vz)).subst0 (a.subst0 s)) =
         eqAtType EqX τ (Term.app (f.subst0 s) (Term.app la s))
                         (Term.app (f.subst0 s) (a.subst0 s)) := by
       rw [app_weaken_vz_subst0, app_weaken_vz_subst0]
-    let step3 := Eq.mp (congrArg (Derivable F EqX) heq3) step3_raw
+    let step3 := Eq.mp (congrArg (Derivable F EqX al) heq3) step3_raw
     -- Step 4: chain via eqAtType_trans
     let chain12 := .mp (.mp step2 (.mp step1 and_intro)) (eqAtType_trans adm)
     .mp (.mp step3 (.mp chain12 and_intro)) (eqAtType_trans adm)
@@ -373,10 +373,10 @@ end LamCorrect
 
 /-- Universal generalization: from ⊢ A in context ρ :: Γ, derive ⊢ ∀x:ρ. A in context Γ. -/
 private def univ_gen {Γ : Ctx ι} {ρ : Ty ι} {A : Formula F (ρ :: Γ)}
-    (h : Derivable F EqX A) : Derivable F EqX (Formula.all ρ A) :=
+    (h : Derivable F EqX al A) : Derivable F EqX al (Formula.all ρ A) :=
   -- Use B = ⊥→⊥ which satisfies B.weakenBy ρ = B definitionally
-  let h1 : Derivable F EqX ((⊥ᶠ →ᶠ ⊥ᶠ : Formula F (ρ :: Γ)) →ᶠ A) := weaken_intro_h h
-  let h2 : Derivable F EqX ((⊥ᶠ →ᶠ ⊥ᶠ : Formula F Γ) →ᶠ Formula.all ρ A) := .forall_rule h1
+  let h1 : Derivable F EqX al ((⊥ᶠ →ᶠ ⊥ᶠ : Formula F (ρ :: Γ)) →ᶠ A) := weaken_intro_h h
+  let h2 : Derivable F EqX al ((⊥ᶠ →ᶠ ⊥ᶠ : Formula F Γ) →ᶠ Formula.all ρ A) := .forall_rule h1
   .mp self_imp_h h2
 
 /-- Lambda correctness for two-argument application:
@@ -388,7 +388,7 @@ private def univ_gen {Γ : Ctx ι} {ρ : Ty ι} {A : Formula F (ρ :: Γ)}
 def Term.lam2_correct {ρ₂ ρ₁ τ : Ty ι} {Γ : Ctx ι}
     (adm : AdmissibleEqX EqX)
     (body : Term F (ρ₁ :: ρ₂ :: Γ) τ) (s₁ : Term F Γ ρ₂) (s₂ : Term F Γ ρ₁) :
-    Derivable F EqX (eqAtType EqX τ
+    Derivable F EqX al (eqAtType EqX τ
       (Term.app2 (Term.lam (Term.lam body)) s₁ s₂)
       ((body.subst0 (s₂.weaken)).subst0 s₁)) :=
   -- Step A: first lam_correct gives arrow equality
@@ -397,22 +397,22 @@ def Term.lam2_correct {ρ₂ ρ₁ τ : Ty ι} {Γ : Ctx ι}
   -- Instantiate at s₂ via forall_ax + transport
   let P := eqAtType EqX τ (Term.app (Term.app (Term.lam (Term.lam body)) s₁).weaken (.var .vz))
                             (Term.app ((Term.lam body).subst0 s₁).weaken (.var .vz))
-  let step_a2_raw : Derivable F EqX (P.subst0 s₂) := .mp step_a (.forall_ax s₂)
+  let step_a2_raw : Derivable F EqX al (P.subst0 s₂) := .mp step_a (.forall_ax s₂)
   let heq_a : P.subst0 s₂ = eqAtType EqX τ
       (Term.app (Term.app (Term.lam (Term.lam body)) s₁) s₂)
       (Term.app ((Term.lam body).subst0 s₁) s₂) := by
     rw [eqAtType_subst0 adm, app_weaken_vz_subst0, app_weaken_vz_subst0]
-  let step_a2 := Eq.mp (congrArg (Derivable F EqX) heq_a) step_a2_raw
+  let step_a2 := Eq.mp (congrArg (Derivable F EqX al) heq_a) step_a2_raw
   -- Step B: second lam_correct in extended context ρ₂ :: Γ
   -- lam_correct body (s₂.weaken) in context ρ₂ :: Γ
-  let step_b : Derivable F EqX
+  let step_b : Derivable F EqX al
       (eqAtType EqX τ (Term.app (Term.lam body) s₂.weaken) (body.subst0 s₂.weaken)) :=
     Term.lam_correct (adm := adm) body s₂.weaken
   -- Universalize over ρ₂ variable, then instantiate at s₁
   let step_b_all := univ_gen step_b
   -- step_b_all : ∀x:ρ₂. eqAtType τ (app (lam body) (s₂.weaken)) (body.subst0 (s₂.weaken))
   let Q := eqAtType EqX τ (Term.app (Term.lam body) s₂.weaken) (body.subst0 s₂.weaken)
-  let step_b2_raw : Derivable F EqX (Q.subst0 s₁) := .mp step_b_all (.forall_ax s₁)
+  let step_b2_raw : Derivable F EqX al (Q.subst0 s₁) := .mp step_b_all (.forall_ax s₁)
   -- Transport Q.subst0 s₁:
   -- Q.subst0 s₁ = eqAtType τ (app ((lam body).subst0 s₁) (s₂.weaken.subst0 s₁))
   --                            ((body.subst0 s₂.weaken).subst0 s₁)
@@ -426,7 +426,7 @@ def Term.lam2_correct {ρ₂ ρ₁ τ : Ty ι} {Γ : Ctx ι}
       show Term.app ((Term.lam body).subst0 s₁) (s₂.weaken.subst0 s₁) =
            Term.app ((Term.lam body).subst0 s₁) s₂
       rw [weaken_subst0_h]
-  let step_b2 := Eq.mp (congrArg (Derivable F EqX) heq_b) step_b2_raw
+  let step_b2 := Eq.mp (congrArg (Derivable F EqX al) heq_b) step_b2_raw
   -- Chain step_a2 and step_b2 via eqAtType_trans
   .mp (.mp step_b2 (.mp step_a2 and_intro)) (eqAtType_trans adm)
 
@@ -436,8 +436,8 @@ def Term.lam2_correct {ρ₂ ρ₁ τ : Ty ι} {Γ : Ctx ι}
 private def lam2_correct_nf (adm : AdmissibleEqX EqX) {ρ₂ ρ₁ τ : Ty ι} {Γ : Ctx ι}
     (body : Term F (ρ₁ :: ρ₂ :: Γ) τ) (s₁ : Term F Γ ρ₂) (s₂ : Term F Γ ρ₁)
     {target : Term F Γ τ} (hnf : (body.subst0 (s₂.weaken)).subst0 s₁ = target) :
-    Derivable F EqX (eqAtType EqX τ (Term.app2 (Term.lam (Term.lam body)) s₁ s₂) target) :=
-  Eq.mp (congrArg (Derivable F EqX ·)
+    Derivable F EqX al (eqAtType EqX τ (Term.app2 (Term.lam (Term.lam body)) s₁ s₂) target) :=
+  Eq.mp (congrArg (Derivable F EqX al ·)
     (congrArg (eqAtType EqX τ (Term.app2 (Term.lam (Term.lam body)) s₁ s₂)) hnf))
     (Term.lam2_correct adm body s₁ s₂)
 
@@ -445,8 +445,8 @@ private def lam2_correct_nf (adm : AdmissibleEqX EqX) {ρ₂ ρ₁ τ : Ty ι} {
 private def lam_correct_nf (adm : AdmissibleEqX EqX) {ρ τ : Ty ι} {Γ : Ctx ι}
     (body : Term F (ρ :: Γ) τ) (s : Term F Γ ρ)
     {target : Term F Γ τ} (hnf : body.subst0 s = target) :
-    Derivable F EqX (eqAtType EqX τ (Term.app (Term.lam body) s) target) :=
-  Eq.mp (congrArg (Derivable F EqX ·)
+    Derivable F EqX al (eqAtType EqX τ (Term.app (Term.lam body) s) target) :=
+  Eq.mp (congrArg (Derivable F EqX al ·)
     (congrArg (eqAtType EqX τ (Term.app (Term.lam body) s)) hnf))
     (Term.lam_correct (adm := adm) body s)
 
@@ -556,7 +556,7 @@ variable {Γ : Ctx ι}
 
 /-- sḡ(0) = 1  (= S0). -/
 def sg_bar_zero {Γ : Ctx ι} :
-    Derivable F EqX (Formula.eq0 (Term.app (Term.sg_bar (Γ := Γ)) Term.zero) (.app .succ .zero)) :=
+    Derivable F EqX al (Formula.eq0 (Term.app (Term.sg_bar (Γ := Γ)) Term.zero) (.app .succ .zero)) :=
   let body : Term F (Ty.nat :: Γ) Ty.nat :=
     Term.app3 (.prec Ty.nat) (.app .succ .zero) (Term.lam (Term.lam .zero)) (.var .vz)
   let h1 := Term.lam_correct (adm := adm) body Term.zero
@@ -564,7 +564,7 @@ def sg_bar_zero {Γ : Ctx ι} :
 
 /-- sḡ(Sn) = 0. -/
 def sg_bar_succ (n : Term F Γ Ty.nat) :
-    Derivable F EqX (Formula.eq0 (Term.app Term.sg_bar (Term.app Term.succ n)) Term.zero) :=
+    Derivable F EqX al (Formula.eq0 (Term.app Term.sg_bar (Term.app Term.succ n)) Term.zero) :=
   let body : Term F (Ty.nat :: Γ) Ty.nat :=
     Term.app3 (.prec Ty.nat) (.app .succ .zero) (Term.lam (Term.lam .zero)) (.var .vz)
   let z := Term.lam (Term.lam (.zero : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat))
@@ -578,7 +578,7 @@ def sg_bar_succ (n : Term F Γ Ty.nat) :
 
 /-- pd(0) = 0. -/
 def pd_zero {Γ : Ctx ι} :
-    Derivable F EqX (Formula.eq0 (Term.app (Term.pd (Γ := Γ)) Term.zero) Term.zero) :=
+    Derivable F EqX al (Formula.eq0 (Term.app (Term.pd (Γ := Γ)) Term.zero) Term.zero) :=
   let body : Term F (Ty.nat :: Γ) Ty.nat :=
     Term.app3 (.prec Ty.nat) .zero (Term.lam (Term.lam (.var .vz))) (.var .vz)
   let h1 := Term.lam_correct (adm := adm) body Term.zero
@@ -586,7 +586,7 @@ def pd_zero {Γ : Ctx ι} :
 
 /-- pd(Sn) = n. -/
 def pd_succ (n : Term F Γ Ty.nat) :
-    Derivable F EqX (Formula.eq0 (Term.app Term.pd (Term.app Term.succ n)) n) :=
+    Derivable F EqX al (Formula.eq0 (Term.app Term.pd (Term.app Term.succ n)) n) :=
   let body : Term F (Ty.nat :: Γ) Ty.nat :=
     Term.app3 (.prec Ty.nat) .zero (Term.lam (Term.lam (.var .vz))) (.var .vz)
   let step : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat := .var .vz
@@ -601,7 +601,7 @@ def pd_succ (n : Term F Γ Ty.nat) :
 
 /-- x + 0 = x. -/
 def add_zero (x : Term F Γ Ty.nat) :
-    Derivable F EqX (Formula.eq0 (Term.app2 Term.add x Term.zero) x) :=
+    Derivable F EqX al (Formula.eq0 (Term.app2 Term.add x Term.zero) x) :=
   let body : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat :=
     Term.app3 (.prec Ty.nat) (.var (.vs .vz))
       (Term.lam (Term.lam (.app .succ (.var (.vs .vz))))) (.var .vz)
@@ -610,7 +610,7 @@ def add_zero (x : Term F Γ Ty.nat) :
 
 /-- x + Sn = S(x + n). -/
 def add_succ (x n : Term F Γ Ty.nat) :
-    Derivable F EqX (Formula.eq0
+    Derivable F EqX al (Formula.eq0
       (Term.app2 Term.add x (Term.app Term.succ n))
       (Term.app Term.succ (Term.app2 Term.add x n))) :=
   let body : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat :=
@@ -622,7 +622,7 @@ def add_succ (x n : Term F Γ Ty.nat) :
   let h2 := lam2_correct_nf adm step (Term.app3 (.prec Ty.nat) x z n) n
     (step_succ_nf _ _)
   let h3 := lam2_correct_nf adm body x n (add_body_nf x _)
-  let h4 := @qfer_no_premise _ _ EqX _ _ _ _ _
+  let h4 := @qfer_no_premise _ _ EqX al _ _ _ _ _
     (.app .succ (.var .vz)) (.mp h3 (eqAtType_sym adm))
   let c1 := .mp (.mp .rec_succ (.mp h1 and_intro)) (eqAtType_trans adm)
   let c2 := .mp (.mp h2 (.mp c1 and_intro)) (eqAtType_trans adm)
@@ -638,7 +638,7 @@ private theorem mul_add_subst0_l_nf (x t : Term F Γ Ty.nat) :
 
 /-- x · 0 = 0. -/
 def mul_zero (x : Term F Γ Ty.nat) :
-    Derivable F EqX (Formula.eq0 (Term.app2 Term.mul x Term.zero) Term.zero) :=
+    Derivable F EqX al (Formula.eq0 (Term.app2 Term.mul x Term.zero) Term.zero) :=
   let body : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat :=
     Term.app3 (.prec Ty.nat) .zero
       (Term.lam (Term.lam (Term.app2 Term.add (.var (.vs .vz))
@@ -649,7 +649,7 @@ def mul_zero (x : Term F Γ Ty.nat) :
 /-- mul_succ in variable context nat :: nat :: Γ (x = var (vs vz), n = var vz).
     Here step_lam round-trips under substitution because all subst0s are variable-based. -/
 private def mul_succ_var {Γ : Ctx ι} :
-    Derivable F EqX (Formula.eq0
+    Derivable F EqX al (Formula.eq0
       (Term.app2 Term.mul (.var (.vs .vz) : Term F (Ty.nat :: Ty.nat :: Γ) _)
         (Term.app Term.succ (.var .vz)))
       (Term.app2 Term.add
@@ -703,20 +703,20 @@ private theorem mul_succ_formula_nf (x n : Term F Γ Ty.nat) :
 
 /-- x · Sn = (x · n) + x. -/
 def mul_succ (x n : Term F Γ Ty.nat) :
-    Derivable F EqX (Formula.eq0
+    Derivable F EqX al (Formula.eq0
       (Term.app2 Term.mul x (Term.app Term.succ n))
       (Term.app2 Term.add (Term.app2 Term.mul x n) x)) :=
   -- Prove in variable context nat :: nat :: Γ, then transport
-  let h_var := @mul_succ_var _ _ _ adm Γ
+  let h_var := @mul_succ_var _ _ _ _ adm Γ
   let h_all_n := univ_gen h_var
   let h_at_n := .mp h_all_n (.forall_ax n.weaken)
   let h_all_x := univ_gen h_at_n
   let h_at_x := .mp h_all_x (.forall_ax x)
-  Eq.mp (congrArg (Derivable F EqX) (mul_succ_formula_nf x n)) h_at_x
+  Eq.mp (congrArg (Derivable F EqX al) (mul_succ_formula_nf x n)) h_at_x
 
 /-- 0 · y = 0 for all y (by induction on y). -/
 def mul_zero_l (y : Term F Γ Ty.nat) :
-    Derivable F EqX (Formula.eq0 (Term.app2 Term.mul Term.zero y) Term.zero) :=
+    Derivable F EqX al (Formula.eq0 (Term.app2 Term.mul Term.zero y) Term.zero) :=
   let A : Formula F (Ty.nat :: Γ) :=
     Formula.eq0 (Term.app2 Term.mul Term.zero (.var .vz)) Term.zero
   -- Base: A[0] = mul 0 0 = 0. By mul_zero.
@@ -724,14 +724,14 @@ def mul_zero_l (y : Term F Γ Ty.nat) :
       Formula.eq0 (Term.app2 Term.mul Term.zero Term.zero) Term.zero := by
     simp only [A, Formula.subst0, Formula.substF, Term.subst, Term.subst0_map, Term.app2,
       mul_closed_subst']
-  have base : Derivable F EqX (A.subst0 Term.zero) :=
+  have base : Derivable F EqX al (A.subst0 Term.zero) :=
     base_nf ▸ mul_zero adm Term.zero
   -- Step: A(y) → A(Sy). mul 0 (Sy) = add (mul 0 y) 0 = mul 0 y = 0.
   have step_nf : Formula.substVar0 A (.app .succ (.var .vz)) =
       Formula.eq0 (Term.app2 Term.mul Term.zero (.app .succ (.var .vz))) Term.zero := by
     simp only [A, Formula.substVar0, Formula.substF, Term.subst, Term.substVar0_map, Term.app2,
       mul_closed_subst']
-  have step_body : Derivable F EqX (A →ᶠ Formula.substVar0 A (.app .succ (.var .vz))) :=
+  have step_body : Derivable F EqX al (A →ᶠ Formula.substVar0 A (.app .succ (.var .vz))) :=
     step_nf ▸
     -- t1: mul 0 (Sy) = add (mul 0 y) 0
     let t1 := mul_succ adm Term.zero (.var .vz : Term F (Ty.nat :: Γ) _)
@@ -752,7 +752,7 @@ def mul_zero_l (y : Term F Γ Ty.nat) :
 
 /-- x ∸ 0 = x. -/
 def monus_zero (x : Term F Γ Ty.nat) :
-    Derivable F EqX (Formula.eq0 (Term.app2 Term.monus x Term.zero) x) :=
+    Derivable F EqX al (Formula.eq0 (Term.app2 Term.monus x Term.zero) x) :=
   let body : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat :=
     Term.app3 (.prec Ty.nat) (.var (.vs .vz))
       (Term.lam (Term.lam (.app Term.pd (.var (.vs .vz))))) (.var .vz)
@@ -761,7 +761,7 @@ def monus_zero (x : Term F Γ Ty.nat) :
 
 /-- x ∸ Sn = pd(x ∸ n). -/
 def monus_succ (x n : Term F Γ Ty.nat) :
-    Derivable F EqX (Formula.eq0
+    Derivable F EqX al (Formula.eq0
       (Term.app2 Term.monus x (Term.app Term.succ n))
       (Term.app Term.pd (Term.app2 Term.monus x n))) :=
   let body : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat :=
@@ -773,7 +773,7 @@ def monus_succ (x n : Term F Γ Ty.nat) :
   let h2 := lam2_correct_nf adm step
     (Term.app3 (.prec Ty.nat) x z n) n (step_pd_nf _ _)
   let h3 := lam2_correct_nf adm body x n (monus_body_nf x _)
-  let h4 := @qfer_no_premise _ _ EqX _ _ _ _ _
+  let h4 := @qfer_no_premise _ _ EqX al _ _ _ _ _
     (.app Term.pd (.var .vz)) (.mp h3 (eqAtType_sym adm))
   let c1 := .mp (.mp .rec_succ (.mp h1 and_intro)) (eqAtType_trans adm)
   let c2 := .mp (.mp h2 (.mp c1 and_intro)) (eqAtType_trans adm)
@@ -815,37 +815,37 @@ private theorem add_qfer_r_nf {Γ : Ctx ι} (x y s : Term F Γ Ty.nat) :
     Proved by induction: the step case follows directly from succ_ne_zero,
     without using the induction hypothesis. -/
 def eq0_decidable' {Γ : Ctx ι} :
-    Derivable F EqX (Formula.all Ty.nat
+    Derivable F EqX al (Formula.all Ty.nat
       (Formula.eq0 (Γ := Ty.nat :: Γ) (.var .vz) Term.zero ∨ᶠ
        ¬ᶠFormula.eq0 (.var .vz) Term.zero)) :=
   let A : Formula F (Ty.nat :: Γ) :=
     Formula.eq0 (.var .vz) Term.zero ∨ᶠ ¬ᶠFormula.eq0 (.var .vz) Term.zero
-  let base : Derivable F EqX (A.subst0 Term.zero) :=
+  let base : Derivable F EqX al (A.subst0 Term.zero) :=
     .mp (.refl0 (t := Term.zero)) .or_weak
-  let succ_ne : Derivable F EqX
+  let succ_ne : Derivable F EqX al
       (Formula.eq0 (Term.app Term.succ (.var .vz)) Term.zero →ᶠ ⊥ᶠ) :=
-    .mp (@Derivable.succ_ne_zero ι F EqX (Ty.nat :: Γ)) (.forall_ax (.var .vz))
-  let concl : Derivable F EqX (Formula.substVar0 A (Term.app Term.succ (.var .vz))) :=
+    .mp (@Derivable.succ_ne_zero ι F EqX al (Ty.nat :: Γ)) (.forall_ax (.var .vz))
+  let concl : Derivable F EqX al (Formula.substVar0 A (Term.app Term.succ (.var .vz))) :=
     .mp succ_ne or_inr
-  let step_body : Derivable F EqX
+  let step_body : Derivable F EqX al
       ((⊥ᶠ →ᶠ ⊥ᶠ).weakenBy Ty.nat →ᶠ
        A →ᶠ Formula.substVar0 A (Term.app Term.succ (.var .vz))) :=
     weaken_intro_h (weaken_intro_h concl)
-  let step : Derivable F EqX
+  let step : Derivable F EqX al
       (Formula.all Ty.nat (A →ᶠ Formula.substVar0 A (Term.app Term.succ (.var .vz)))) :=
     .mp self_imp_h (.forall_rule step_body)
   .induction base step
 
 -- ── S-congruence helper ───────────────────────────────────────────────────
 private def succ_congr {s t : Term F Γ Ty.nat}
-    (h : Derivable F EqX (Formula.eq0 s t)) :
-    Derivable F EqX (Formula.eq0 (.app .succ s) (.app .succ t)) :=
+    (h : Derivable F EqX al (Formula.eq0 s t)) :
+    Derivable F EqX al (Formula.eq0 (.app .succ s) (.app .succ t)) :=
   qfer_no_premise_nat_nf h (r := .app .succ (.var .vz)) rfl rfl
 
 -- ── add_succ_l ────────────────────────────────────────────────────────────
 /-- Sx + y = S(x + y). By induction on y. -/
 def add_succ_l {Γ : Ctx ι} (x y : Term F Γ Ty.nat) :
-    Derivable F EqX (Formula.eq0
+    Derivable F EqX al (Formula.eq0
       (Term.app2 Term.add (.app .succ x) y)
       (.app .succ (Term.app2 Term.add x y))) :=
   let xw := x.weaken (σ := Ty.nat)
@@ -861,7 +861,7 @@ def add_succ_l {Γ : Ctx ι} (x y : Term F Γ Ty.nat) :
         (.app .succ (Term.app2 Term.add x Term.zero)) := by
     simp only [A, xw, Formula.subst0, Formula.substF, Term.subst, Term.subst0_map, Term.app2,
       add_closed_subst, xw_subst0]
-  have base : Derivable F EqX (A.subst0 Term.zero) := base_nf ▸
+  have base : Derivable F EqX al (A.subst0 Term.zero) := base_nf ▸
     .mp (.mp (succ_congr (.mp (add_zero adm x) .sym0)) (.mp (add_zero adm (.app .succ x)) and_intro)) .trans0
   -- Step: A(y) → A(Sy). add_succ on both sides + S-congruence on IH.
   have step_nf : Formula.substVar0 A (.app .succ (.var .vz)) =
@@ -869,7 +869,7 @@ def add_succ_l {Γ : Ctx ι} (x y : Term F Γ Ty.nat) :
         (.app .succ (Term.app2 Term.add xw (.app .succ (.var .vz)))) := by
     simp only [A, xw, Formula.substVar0, Formula.substF, Term.subst, Term.substVar0_map, Term.app2,
       add_closed_subst, weaken_substVar0]
-  have step_body : Derivable F EqX (A →ᶠ Formula.substVar0 A (.app .succ (.var .vz))) :=
+  have step_body : Derivable F EqX al (A →ᶠ Formula.substVar0 A (.app .succ (.var .vz))) :=
     step_nf ▸
     -- as1: add(Sxw, Sy) = S(add(Sxw, y))
     let as1 := add_succ adm (.app .succ xw) (.var .vz : Term F (Ty.nat :: Γ) _)
@@ -902,40 +902,41 @@ variable {Γ : Ctx ι}
 
 /-- x ≠ 0 → x = S(pd x).  (prop:basic-arithmetic-properties.6) -/
 def ne_zero_eq_succ_pd (x : Term F Γ Ty.nat) :
-    Derivable F EqX
+    Derivable F EqX al
       (¬ᶠFormula.eq0 x Term.zero →ᶠ
        Formula.eq0 x (Term.app Term.succ (Term.app Term.pd x))) :=
   let A : Formula F (Ty.nat :: Γ) :=
     ¬ᶠFormula.eq0 (.var .vz) Term.zero →ᶠ
       Formula.eq0 (.var .vz) (.app .succ (.app Term.pd (.var .vz)))
-  let base : Derivable F EqX (A.subst0 Term.zero) :=
+  let base : Derivable F EqX al (A.subst0 Term.zero) :=
     .syllogism (eval_h I_comb (weaken_intro_h .refl0)) .exfalso
   let pd_sx := pd_succ adm (.var .vz : Term F (Ty.nat :: Γ) Ty.nat)
-  let sx_eq : Derivable F EqX (Formula.eq0
+  let sx_eq : Derivable F EqX al (Formula.eq0
       (.app .succ (.var .vz)) (.app .succ (.app Term.pd (.app .succ (.var .vz))))) :=
-    Derivable.mp (@qfer_no_premise _ _ EqX _ _ _ _ _
+    Derivable.mp (@qfer_no_premise _ _ EqX al _ _ _ _ _
       (.app .succ (.var .vz)) pd_sx) .sym0
-  let step_body : Derivable F EqX
+  let step_body : Derivable F EqX al
       (A →ᶠ Formula.substVar0 A (.app .succ (.var .vz))) :=
     weaken_intro_h (weaken_intro_h sx_eq)
   Derivable.mp (Derivable.induction base (univ_gen step_body)) (.forall_ax x)
 
 /-- x + y = 0 ↔ x = 0 ∧ y = 0.  (prop:basic-arithmetic-properties.1) -/
 def add_eq_zero_iff (x y : Term F Γ Ty.nat) :
-    Derivable F EqX
+    Derivable F EqX al
       ((Formula.eq0 (Term.app2 Term.add x y) Term.zero →ᶠ
         Formula.eq0 x Term.zero ∧ᶠ Formula.eq0 y Term.zero) ∧ᶠ
        (Formula.eq0 x Term.zero ∧ᶠ Formula.eq0 y Term.zero →ᶠ
         Formula.eq0 (Term.app2 Term.add x y) Term.zero)) := by
   -- Backward: x=0 ∧ y=0 → add x y = 0. By qfer + add_zero.
-  have qf_add_l : Derivable F EqX (Formula.eq0 x Term.zero →ᶠ
+  have qf_add_l : Derivable F EqX al (Formula.eq0 x Term.zero →ᶠ
       Formula.eq0 (Term.app2 Term.add x y) (Term.app2 Term.add Term.zero y)) :=
     qfer_nat_nf (by rfl) (by rfl) I_comb (add_qfer_l_nf x y x) (add_qfer_l_nf x y Term.zero)
-  have qf_add_r : Derivable F EqX (Formula.eq0 y Term.zero →ᶠ
+  have qf_add_r : Derivable F EqX al (Formula.eq0 y Term.zero →ᶠ
       Formula.eq0 (Term.app2 Term.add Term.zero y) (Term.app2 Term.add Term.zero Term.zero)) :=
     qfer_nat_nf (by rfl) (by rfl) I_comb (add_qfer_r_nf Term.zero y y) (add_qfer_r_nf Term.zero y Term.zero)
-  have add00 := add_zero adm (Term.zero (F := F) (Γ := Γ))
-  have bwd : Derivable F EqX (Formula.eq0 x Term.zero ∧ᶠ Formula.eq0 y Term.zero →ᶠ
+  have add00 : Derivable F EqX al (Formula.eq0 (Term.app2 Term.add (Term.zero (F := F) (Γ := Γ)) Term.zero) Term.zero) :=
+    add_zero adm (Term.zero (F := F) (Γ := Γ))
+  have bwd : Derivable F EqX al (Formula.eq0 x Term.zero ∧ᶠ Formula.eq0 y Term.zero →ᶠ
       Formula.eq0 (Term.app2 Term.add x y) Term.zero) :=
     Derivable.syllogism
       (pair_h
@@ -958,7 +959,7 @@ def add_eq_zero_iff (x y : Term F Γ Ty.nat) :
     exact congrArg (fun z => (Formula.eq0 (Term.app (Term.app Term.add z) Term.zero) Term.zero →ᶠ
       Formula.eq0 z Term.zero ∧ᶠ Formula.eq0 Term.zero Term.zero)) (weaken_subst0_h x Term.zero)
   -- base proof: add(x,0)=0 → x=0 ∧ 0=0. From add_zero: add(x,0)=x. Sym+trans: x=0. Pair with refl.
-  have base : Derivable F EqX (A.subst0 Term.zero) := base_nf ▸
+  have base : Derivable F EqX al (A.subst0 Term.zero) := base_nf ▸
     Derivable.syllogism
       (pair_h (weaken_intro_h (Derivable.mp (add_zero adm x) .sym0)) I_comb)
       (Derivable.syllogism .trans0 (pair_h I_comb (weaken_intro_h .refl0)))
@@ -977,17 +978,20 @@ def add_eq_zero_iff (x y : Term F Γ Ty.nat) :
     exact congrArg (fun z => (Formula.eq0 (Term.app (Term.app Term.add z) y) Term.zero →ᶠ
       Formula.eq0 z Term.zero ∧ᶠ Formula.eq0 y Term.zero)) (weaken_subst0_h x y)
   -- Step: A(y) → A(Sy). Ignore IH. From add(x',Sy)=0: by add_succ, S(add(x',y))=0, contradiction.
-  have add_succ_w := add_succ adm xw (.var .vz : Term F (Ty.nat :: Γ) Ty.nat)
-  have step_to_bot : Derivable F EqX
+  have add_succ_w : Derivable F EqX al
+      (Formula.eq0 (Term.app2 Term.add xw (.app .succ (.var .vz)))
+        (.app .succ (Term.app2 Term.add xw (.var .vz)))) :=
+    add_succ adm xw (.var .vz : Term F (Ty.nat :: Γ) Ty.nat)
+  have step_to_bot : Derivable F EqX al
       (Formula.eq0 (Term.app2 Term.add xw (.app .succ (.var .vz))) Term.zero →ᶠ ⊥ᶠ) :=
     Derivable.syllogism (pair_h (weaken_intro_h (Derivable.mp add_succ_w .sym0)) I_comb)
       (Derivable.syllogism .trans0 (Derivable.mp .succ_ne_zero
         (.forall_ax (Term.app2 Term.add xw (.var .vz)))))
-  have step_body : Derivable F EqX
+  have step_body : Derivable F EqX al
       (A →ᶠ Formula.substVar0 A (.app .succ (.var .vz))) :=
     step_nf ▸ weaken_intro_h (Derivable.syllogism step_to_bot .exfalso)
   have fwd_all := Derivable.induction base (univ_gen step_body)
-  have fwd : Derivable F EqX (Formula.eq0 (Term.app2 Term.add x y) Term.zero →ᶠ
+  have fwd : Derivable F EqX al (Formula.eq0 (Term.app2 Term.add x y) Term.zero →ᶠ
       Formula.eq0 x Term.zero ∧ᶠ Formula.eq0 y Term.zero) :=
     inst_nf ▸ Derivable.mp fwd_all (.forall_ax y)
   exact .mp bwd (.mp fwd and_intro)
@@ -1007,24 +1011,24 @@ private theorem mul_subst0_l_nf (y t : Term F Γ Ty.nat) :
 
 /-- x · y = 0 ↔ x = 0 ∨ y = 0.  (prop:basic-arithmetic-properties.2) -/
 def mul_eq_zero_iff (x y : Term F Γ Ty.nat) :
-    Derivable F EqX
+    Derivable F EqX al
       ((Formula.eq0 (Term.app2 Term.mul x y) Term.zero →ᶠ
         Formula.eq0 x Term.zero ∨ᶠ Formula.eq0 y Term.zero) ∧ᶠ
        (Formula.eq0 x Term.zero ∨ᶠ Formula.eq0 y Term.zero →ᶠ
         Formula.eq0 (Term.app2 Term.mul x y) Term.zero)) :=
   -- ── Backward: x=0 ∨ y=0 → mul x y = 0 ──
   -- Case y=0: by qfer (y=0 → mul x y = mul x 0) + mul_zero
-  let qf_mul_y0 : Derivable F EqX (Formula.eq0 y Term.zero →ᶠ
+  let qf_mul_y0 : Derivable F EqX al (Formula.eq0 y Term.zero →ᶠ
       Formula.eq0 (Term.app2 Term.mul x y) (Term.app2 Term.mul x Term.zero)) :=
     qfer_nat_nf (by rfl) (by rfl) I_comb (mul_subst0_r_nf x y) (mul_subst0_r_nf x Term.zero)
-  let bwd_y0 : Derivable F EqX (Formula.eq0 y Term.zero →ᶠ
+  let bwd_y0 : Derivable F EqX al (Formula.eq0 y Term.zero →ᶠ
       Formula.eq0 (Term.app2 Term.mul x y) Term.zero) :=
     .syllogism (pair_h qf_mul_y0 (weaken_intro_h (mul_zero adm x))) .trans0
   -- Case x=0: by qfer (x=0 → mul x y = mul 0 y) + mul_zero_l
-  let qf_mul_x0 : Derivable F EqX (Formula.eq0 x Term.zero →ᶠ
+  let qf_mul_x0 : Derivable F EqX al (Formula.eq0 x Term.zero →ᶠ
       Formula.eq0 (Term.app2 Term.mul x y) (Term.app2 Term.mul Term.zero y)) :=
     qfer_nat_nf (by rfl) (by rfl) I_comb (mul_subst0_l_nf y x) (mul_subst0_l_nf y Term.zero)
-  let bwd_x0 : Derivable F EqX (Formula.eq0 x Term.zero →ᶠ
+  let bwd_x0 : Derivable F EqX al (Formula.eq0 x Term.zero →ᶠ
       Formula.eq0 (Term.app2 Term.mul x y) Term.zero) :=
     .syllogism (pair_h qf_mul_x0 (weaken_intro_h (mul_zero_l adm y))) .trans0
   let bwd := or_elim_rule bwd_x0 bwd_y0
@@ -1041,7 +1045,7 @@ def mul_eq_zero_iff (x y : Term F Γ Ty.nat) :
       mul_closed_subst']
     exact congrArg (fun z => Formula.eq0 (Term.app (Term.app Term.mul z) Term.zero) Term.zero →ᶠ
       Formula.eq0 z Term.zero ∨ᶠ Formula.eq0 Term.zero Term.zero) (weaken_subst0_h x Term.zero)
-  have base : Derivable F EqX (A.subst0 Term.zero) :=
+  have base : Derivable F EqX al (A.subst0 Term.zero) :=
     base_nf ▸ weaken_intro_h (.mp .refl0 or_inr)
   -- Step: A(y) → A(Sy). mul(x',Sy)=0 → x'=0 ∨ Sy=0.
   -- From mul_succ: mul(x',Sy) = add(mul(x',y), x'). So add(...)=0. By add_eq_zero_iff: x'=0. Or_weak.
@@ -1050,19 +1054,19 @@ def mul_eq_zero_iff (x y : Term F Γ Ty.nat) :
         Formula.eq0 xw Term.zero ∨ᶠ Formula.eq0 (.app .succ (.var .vz)) Term.zero) := by
     simp only [A, xw, Formula.substVar0, Formula.substF, Term.subst, Term.substVar0_map, Term.app2,
       mul_closed_subst', weaken_substVar0]
-  have step_body : Derivable F EqX (A →ᶠ Formula.substVar0 A (.app .succ (.var .vz))) :=
+  have step_body : Derivable F EqX al (A →ᶠ Formula.substVar0 A (.app .succ (.var .vz))) :=
     step_nf ▸ weaken_intro_h (
     -- Goal: mul(x', Sy) = 0 → x' = 0 ∨ Sy = 0
     -- From mul_succ: mul(x', Sy) = add(mul(x', y), x')
     let ms := mul_succ adm xw (.var .vz : Term F (Ty.nat :: Γ) _)
     -- ms_chain: mul(x',Sy)=0 → add(mul(x',y), x')=0
-    let ms_chain : Derivable F EqX (Formula.eq0 (Term.app2 Term.mul xw (.app .succ (.var .vz))) Term.zero →ᶠ
+    let ms_chain : Derivable F EqX al (Formula.eq0 (Term.app2 Term.mul xw (.app .succ (.var .vz))) Term.zero →ᶠ
         Formula.eq0 (Term.app2 Term.add (Term.app2 Term.mul xw (.var .vz)) xw) Term.zero) :=
       .syllogism (pair_h (weaken_intro_h (.mp ms .sym0)) I_comb) .trans0
     -- add_fwd: add(a, b)=0 → a=0 ∧ b=0
     let add_fwd := (add_eq_zero_iff adm (Term.app2 Term.mul xw (.var .vz)) xw).mp .and_weak
     -- get x'=0
-    let get_x0 : Derivable F EqX (Formula.eq0 (Term.app2 Term.mul xw (.app .succ (.var .vz))) Term.zero →ᶠ
+    let get_x0 : Derivable F EqX al (Formula.eq0 (Term.app2 Term.mul xw (.app .succ (.var .vz))) Term.zero →ᶠ
         Formula.eq0 xw Term.zero) :=
       .syllogism (.syllogism ms_chain add_fwd) (.syllogism .and_perm .and_weak)
     .syllogism get_x0 .or_weak)
@@ -1074,26 +1078,26 @@ def mul_eq_zero_iff (x y : Term F Γ Ty.nat) :
       mul_closed_subst']
     exact congrArg (fun z => Formula.eq0 (Term.app (Term.app Term.mul z) y) Term.zero →ᶠ
       Formula.eq0 z Term.zero ∨ᶠ Formula.eq0 y Term.zero) (weaken_subst0_h x y)
-  let fwd : Derivable F EqX (Formula.eq0 (Term.app2 Term.mul x y) Term.zero →ᶠ
+  let fwd : Derivable F EqX al (Formula.eq0 (Term.app2 Term.mul x y) Term.zero →ᶠ
       Formula.eq0 x Term.zero ∨ᶠ Formula.eq0 y Term.zero) :=
     inst_nf ▸ .mp (Derivable.induction base (univ_gen step_body)) (.forall_ax y)
   .mp bwd (.mp fwd and_intro)
 
 /-- sḡ(x) = 0 ↔ x ≠ 0.  (prop:basic-arithmetic-properties.3) -/
 def sg_bar_eq_zero_iff (x : Term F Γ Ty.nat) :
-    Derivable F EqX
+    Derivable F EqX al
       ((Formula.eq0 (Term.app Term.sg_bar x) Term.zero →ᶠ ¬ᶠFormula.eq0 x Term.zero) ∧ᶠ
        (¬ᶠFormula.eq0 x Term.zero →ᶠ Formula.eq0 (Term.app Term.sg_bar x) Term.zero)) := by
   -- Forward: sg_bar(x) = 0 → x ≠ 0.
   -- If x=0 then sg_bar(x)=sg_bar(0)=S0 by qfer+sg_bar_zero; with sg_bar(x)=0 get S0=0, contradiction.
-  have qf_sgx : Derivable F EqX (Formula.eq0 x Term.zero →ᶠ
+  have qf_sgx : Derivable F EqX al (Formula.eq0 x Term.zero →ᶠ
       Formula.eq0 (Term.app Term.sg_bar x) (Term.app Term.sg_bar Term.zero)) :=
     Derivable.qfer (r := .app Term.sg_bar (.var .vz)) (by rfl) (by rfl) I_comb
-  have x0_to_sgS0 : Derivable F EqX (Formula.eq0 x Term.zero →ᶠ
+  have x0_to_sgS0 : Derivable F EqX al (Formula.eq0 x Term.zero →ᶠ
       Formula.eq0 (Term.app Term.sg_bar x) (.app .succ .zero)) :=
     Derivable.syllogism (pair_h qf_sgx
       (weaken_intro_h (sg_bar_zero (adm := adm) (Γ := Γ)))) .trans0
-  have fwd : Derivable F EqX (Formula.eq0 (Term.app Term.sg_bar x) Term.zero →ᶠ
+  have fwd : Derivable F EqX al (Formula.eq0 (Term.app Term.sg_bar x) Term.zero →ᶠ
       ¬ᶠFormula.eq0 x Term.zero) :=
     .exportation (Derivable.syllogism
       (pair_h (Derivable.syllogism .and_weak .sym0)
@@ -1102,10 +1106,10 @@ def sg_bar_eq_zero_iff (x : Term F Γ Ty.nat) :
         (Derivable.syllogism .sym0 (Derivable.mp .succ_ne_zero (.forall_ax Term.zero)))))
   -- Backward: x ≠ 0 → sg_bar(x) = 0.
   -- By ne_zero_eq_succ_pd: x = S(pd x). Then qfer: sg_bar(x) = sg_bar(S(pd x)) = 0 by sg_bar_succ.
-  have qf_sg : Derivable F EqX (¬ᶠFormula.eq0 x Term.zero →ᶠ
+  have qf_sg : Derivable F EqX al (¬ᶠFormula.eq0 x Term.zero →ᶠ
       Formula.eq0 (Term.app Term.sg_bar x) (Term.app Term.sg_bar (.app .succ (.app Term.pd x)))) :=
     Derivable.qfer (r := .app Term.sg_bar (.var .vz)) (by rfl) (by rfl) (ne_zero_eq_succ_pd adm x)
-  have bwd : Derivable F EqX (¬ᶠFormula.eq0 x Term.zero →ᶠ
+  have bwd : Derivable F EqX al (¬ᶠFormula.eq0 x Term.zero →ᶠ
       Formula.eq0 (Term.app Term.sg_bar x) Term.zero) :=
     Derivable.syllogism (pair_h qf_sg
       (weaken_intro_h (sg_bar_succ adm (Term.app Term.pd x)))) .trans0
@@ -1113,7 +1117,7 @@ def sg_bar_eq_zero_iff (x : Term F Γ Ty.nat) :
 
 /-- sḡ(x) · y = 0 ↔ (x = 0 → y = 0).  (prop:basic-arithmetic-properties.4) -/
 def sg_bar_mul_eq_zero_iff (x y : Term F Γ Ty.nat) :
-    Derivable F EqX
+    Derivable F EqX al
       ((Formula.eq0 (Term.app2 Term.mul (Term.app Term.sg_bar x) y) Term.zero →ᶠ
         Formula.eq0 x Term.zero →ᶠ Formula.eq0 y Term.zero) ∧ᶠ
        ((Formula.eq0 x Term.zero →ᶠ Formula.eq0 y Term.zero) →ᶠ
@@ -1123,11 +1127,11 @@ def sg_bar_mul_eq_zero_iff (x y : Term F Γ Ty.nat) :
   let mul_fwd := .mp (mul_eq_zero_iff adm sx y) .and_weak
   let sgb_fwd := .mp (sg_bar_eq_zero_iff adm x) .and_weak
   -- lift: (x=0→⊥) → (x=0→y=0) via S(K exfalso)(id)
-  let lift : Derivable F EqX (¬ᶠFormula.eq0 x Term.zero →ᶠ
+  let lift : Derivable F EqX al (¬ᶠFormula.eq0 x Term.zero →ᶠ
       Formula.eq0 x Term.zero →ᶠ Formula.eq0 y Term.zero) :=
     .mp (.mp (.exfalso (A := Formula.eq0 y Term.zero)) K_comb) S_comb
   let case_sg := .syllogism sgb_fwd lift
-  let case_y : Derivable F EqX (Formula.eq0 y Term.zero →ᶠ
+  let case_y : Derivable F EqX al (Formula.eq0 y Term.zero →ᶠ
       Formula.eq0 x Term.zero →ᶠ Formula.eq0 y Term.zero) := K_comb
   let fwd := .syllogism mul_fwd (or_elim_rule case_sg case_y)
   -- ── Backward: (x=0→y=0) → sḡ(x)·y=0 ──
@@ -1135,17 +1139,17 @@ def sg_bar_mul_eq_zero_iff (x y : Term F Γ Ty.nat) :
   let sgb_bwd := .mp (sg_bar_eq_zero_iff adm x) (.syllogism .and_perm .and_weak)
   let dec_x := .mp eq0_decidable' (.forall_ax x)
   -- Case x=0: x=0 → (x=0→y=0) → sḡ(x)·y=0
-  let bwd_from_y0 : Derivable F EqX (Formula.eq0 y Term.zero →ᶠ
+  let bwd_from_y0 : Derivable F EqX al (Formula.eq0 y Term.zero →ᶠ
       Formula.eq0 (Term.app2 Term.mul sx y) Term.zero) :=
     .syllogism (pair_h (qfer_nat_nf (by rfl) (by rfl) I_comb
       (mul_subst0_r_nf sx y) (mul_subst0_r_nf sx Term.zero))
       (weaken_intro_h (mul_zero adm sx))) .trans0
-  let case_x0 : Derivable F EqX (Formula.eq0 x Term.zero →ᶠ
+  let case_x0 : Derivable F EqX al (Formula.eq0 x Term.zero →ᶠ
       (Formula.eq0 x Term.zero →ᶠ Formula.eq0 y Term.zero) →ᶠ
       Formula.eq0 (Term.app2 Term.mul sx y) Term.zero) :=
     .exportation (.syllogism (.syllogism .and_perm (.importation mp_form)) bwd_from_y0)
   -- Case x≠0: x≠0 → (x=0→y=0) → sḡ(x)·y=0 (premise unused)
-  let case_xne0 : Derivable F EqX (¬ᶠFormula.eq0 x Term.zero →ᶠ
+  let case_xne0 : Derivable F EqX al (¬ᶠFormula.eq0 x Term.zero →ᶠ
       (Formula.eq0 x Term.zero →ᶠ Formula.eq0 y Term.zero) →ᶠ
       Formula.eq0 (Term.app2 Term.mul sx y) Term.zero) :=
     .syllogism (.syllogism sgb_bwd (.syllogism .or_weak mul_bwd)) K_comb
@@ -1187,19 +1191,19 @@ private theorem monus_subst0_lw_nf (x t : Term F Γ Ty.nat) :
 
 /-- 0 + x = x. By induction on x. -/
 def add_zero_l (y : Term F Γ Ty.nat) :
-    Derivable F EqX (Formula.eq0 (Term.app2 Term.add Term.zero y) y) :=
+    Derivable F EqX al (Formula.eq0 (Term.app2 Term.add Term.zero y) y) :=
   let A : Formula F (Ty.nat :: Γ) :=
     Formula.eq0 (Term.app2 Term.add Term.zero (.var .vz)) (.var .vz)
   have base_nf : A.subst0 Term.zero =
       Formula.eq0 (Term.app2 Term.add Term.zero Term.zero) Term.zero := by
     simp only [A, Formula.subst0, Formula.substF, Term.subst, Term.subst0_map, Term.app2,
       add_closed_subst]
-  have base : Derivable F EqX (A.subst0 Term.zero) := base_nf ▸ add_zero adm Term.zero
+  have base : Derivable F EqX al (A.subst0 Term.zero) := base_nf ▸ add_zero adm Term.zero
   have step_nf : Formula.substVar0 A (.app .succ (.var .vz)) =
       Formula.eq0 (Term.app2 Term.add Term.zero (.app .succ (.var .vz))) (.app .succ (.var .vz)) := by
     simp only [A, Formula.substVar0, Formula.substF, Term.subst, Term.substVar0_map, Term.app2,
       add_closed_subst]
-  have step_body : Derivable F EqX (A →ᶠ Formula.substVar0 A (.app .succ (.var .vz))) :=
+  have step_body : Derivable F EqX al (A →ᶠ Formula.substVar0 A (.app .succ (.var .vz))) :=
     step_nf ▸
     let as := add_succ adm Term.zero (.var .vz : Term F (Ty.nat :: Γ) _)
     -- IH: add 0 y = y. as: add 0 (Sy) = S(add 0 y). S-congr IH: S(add 0 y) = Sy.
@@ -1215,7 +1219,7 @@ def add_zero_l (y : Term F Γ Ty.nat) :
 /-- Step inner: IH@Sk → monus(S(add(k,y)), Sy) = k.
     Chain: add_succ_l congruence + pd congruence + pd_succ + monus_succ + trans. -/
 private def monus_cancel_step_inner {Γ : Ctx ι} :
-    Derivable F EqX
+    Derivable F EqX al
       (Formula.eq0
         (Term.app2 Term.monus
           (Term.app2 Term.add (.app .succ (.var .vz)) (.var (.vs .vz) : Term F (Ty.nat :: Ty.nat :: Γ) _))
@@ -1231,17 +1235,17 @@ private def monus_cancel_step_inner {Γ : Ctx ι} :
   let sky := Term.app Term.succ aky
   let skv := Term.app Term.succ kv
   let IH_Sk := Formula.eq0 (Term.app2 Term.monus (Term.app2 Term.add skv yv) yv) skv
-  let congr1 : Derivable F EqX (Formula.eq0 (Term.app2 Term.monus (Term.app2 Term.add skv yv) yv)
+  let congr1 : Derivable F EqX al (Formula.eq0 (Term.app2 Term.monus (Term.app2 Term.add skv yv) yv)
       (Term.app2 Term.monus sky yv)) :=
     qfer_no_premise_nat_nf (add_succ_l adm kv yv)
       (monus_subst0_lw_nf yv (Term.app2 Term.add skv yv)) (monus_subst0_lw_nf yv sky)
-  let stepA : Derivable F EqX (IH_Sk →ᶠ
+  let stepA : Derivable F EqX al (IH_Sk →ᶠ
       Formula.eq0 (Term.app2 Term.monus sky yv) skv) :=
     .syllogism (pair_h (weaken_intro_h (.mp congr1 .sym0)) I_comb) .trans0
-  let stepB : Derivable F EqX (IH_Sk →ᶠ
+  let stepB : Derivable F EqX al (IH_Sk →ᶠ
       Formula.eq0 (.app Term.pd (Term.app2 Term.monus sky yv)) (.app Term.pd skv)) :=
     .qfer (σ := Ty.nat) (r := .app Term.pd (.var .vz)) (by rfl) (by rfl) stepA
-  let stepD : Derivable F EqX (IH_Sk →ᶠ
+  let stepD : Derivable F EqX al (IH_Sk →ᶠ
       Formula.eq0 (.app Term.pd (Term.app2 Term.monus sky yv)) kv) :=
     .syllogism (pair_h stepB (weaken_intro_h (pd_succ adm kv))) .trans0
   .syllogism (pair_h (weaken_intro_h (monus_succ adm sky yv)) stepD) .trans0
@@ -1253,7 +1257,7 @@ private def monus_cancel_step {Γ : Ctx ι} :
       Formula.eq0 (Term.app2 Term.monus
         (Term.app2 Term.add (.var .vz) (.var (.vs .vz))) (.var (.vs .vz))) (.var .vz)
     let B : Formula F (Ty.nat :: Γ) := Formula.all Ty.nat C
-    Derivable F EqX (B →ᶠ Formula.substVar0 B (.app .succ (.var .vz))) := by
+    Derivable F EqX al (B →ᶠ Formula.substVar0 B (.app .succ (.var .vz))) := by
   intro C B
   let kv : Term F (Ty.nat :: Ty.nat :: Γ) _ := .var .vz
   let yv : Term F (Ty.nat :: Ty.nat :: Γ) _ := .var (.vs .vz)
@@ -1261,17 +1265,17 @@ private def monus_cancel_step {Γ : Ctx ι} :
   let syv := Term.app Term.succ yv
   let skv := Term.app Term.succ kv
   -- congr2: monus(add(k,Sy),Sy) = monus(sky,Sy) via add_succ
-  let congr2 : Derivable F EqX (Formula.eq0 (Term.app2 Term.monus (Term.app2 Term.add kv syv) syv)
+  let congr2 : Derivable F EqX al (Formula.eq0 (Term.app2 Term.monus (Term.app2 Term.add kv syv) syv)
       (Term.app2 Term.monus sky syv)) :=
     qfer_no_premise_nat_nf (add_succ adm kv yv)
       (monus_subst0_lw_nf syv (Term.app2 Term.add kv syv)) (monus_subst0_lw_nf syv sky)
   -- Cast monus_cancel_step_inner to use local let-bound names
-  let inner : Derivable F EqX
+  let inner : Derivable F EqX al
       (Formula.eq0 (Term.app2 Term.monus (Term.app2 Term.add skv yv) yv) skv →ᶠ
        Formula.eq0 (Term.app2 Term.monus sky syv) kv) :=
-    @monus_cancel_step_inner _ _ _ adm Γ
+    @monus_cancel_step_inner _ _ _ _ adm Γ
   -- inner_chain: C(Sk,y) → C(k,Sy)  (= inner + congr2 + trans)
-  let inner_chain : Derivable F EqX
+  let inner_chain : Derivable F EqX al
       (Formula.eq0 (Term.app2 Term.monus (Term.app2 Term.add skv yv) yv) skv →ᶠ
        Formula.eq0 (Term.app2 Term.monus (Term.app2 Term.add kv syv) syv) kv) :=
     .syllogism (pair_h (weaken_intro_h congr2) inner) .trans0
@@ -1291,14 +1295,14 @@ private def monus_cancel_step {Γ : Ctx ι} :
     simp only [C, kv, yv, skv, Formula.substVar0, Formula.substF, Term.subst,
       Term.substVar0_map, Term.app2, monus_closed_subst', add_closed_subst]
   -- forall_inst_succ : B → ∀k. C.substVar0(Sk), cast to B → ∀k. inner_input
-  let fis := Eq.mp (congrArg (Derivable F EqX <| B →ᶠ Formula.all Ty.nat ·) inst_succ_nf)
+  let fis := Eq.mp (congrArg (Derivable F EqX al <| B →ᶠ Formula.all Ty.nat ·) inst_succ_nf)
     forall_inst_succ
   -- forall_map inner_chain : ∀k. inner_input → ∀k. inner_output
   exact .syllogism fis (forall_map inner_chain)
 
 /-- (x + y) ∸ y = x. By induction on y with ∀k bundled. -/
 def monus_cancel (x y : Term F Γ Ty.nat) :
-    Derivable F EqX (Formula.eq0 (Term.app2 Term.monus (Term.app2 Term.add x y) y) x) :=
+    Derivable F EqX al (Formula.eq0 (Term.app2 Term.monus (Term.app2 Term.add x y) y) x) :=
   let C : Formula F (Ty.nat :: Ty.nat :: Γ) :=
     Formula.eq0 (Term.app2 Term.monus
       (Term.app2 Term.add (.var .vz) (.var (.vs .vz))) (.var (.vs .vz))) (.var .vz)
@@ -1309,11 +1313,11 @@ def monus_cancel (x y : Term F Γ Ty.nat) :
     simp only [B, C, Formula.subst0, Formula.substF, Term.subst, Term.Subst.ext, Term.subst0_map,
       Term.app2, monus_closed_subst', add_closed_subst, Term.weaken,
       monus_closed_rename, add_closed_rename]
-  have base : Derivable F EqX (B.subst0 Term.zero) := base_nf ▸
+  have base : Derivable F EqX al (B.subst0 Term.zero) := base_nf ▸
     let kv : Term F (Ty.nat :: Γ) _ := .var .vz
     univ_gen (.mp (.mp (add_zero adm kv)
       (.mp (monus_zero adm (Term.app2 Term.add kv Term.zero)) and_intro)) .trans0)
-  let step := @monus_cancel_step _ _ _ adm Γ
+  let step := @monus_cancel_step _ _ _ _ adm Γ
   -- Normalize B.subst0 y to an explicit ∀k formula
   have B_y_nf : B.subst0 y = Formula.all Ty.nat
       (Formula.eq0 (Term.app2 Term.monus (Term.app2 Term.add (.var .vz) y.weaken) y.weaken)
@@ -1331,15 +1335,15 @@ def monus_cancel (x y : Term F Γ Ty.nat) :
   let ind := Derivable.induction base (univ_gen step)
   let at_y_raw := .mp ind (.forall_ax y)
   -- Cast B.subst0 y to the explicit all-formula
-  let at_y := Eq.mp (congrArg (Derivable F EqX) B_y_nf) at_y_raw
+  let at_y := Eq.mp (congrArg (Derivable F EqX al) B_y_nf) at_y_raw
   -- Apply forall_ax x to the explicit all-formula
   let at_xy := .mp at_y (.forall_ax x)
   -- Cast inner formula to the target
-  Eq.mp (congrArg (Derivable F EqX) inner_x_nf) at_xy
+  Eq.mp (congrArg (Derivable F EqX al) inner_x_nf) at_xy
 
 /-- x ∸ x = 0. From monus_cancel with x = 0 + add_zero_l. -/
 def monus_self (x : Term F Γ Ty.nat) :
-    Derivable F EqX (Formula.eq0 (Term.app2 Term.monus x x) Term.zero) :=
+    Derivable F EqX al (Formula.eq0 (Term.app2 Term.monus x x) Term.zero) :=
   -- monus x x = monus (add 0 x) x [by add_zero_l]
   -- monus (add 0 x) x = 0 [by monus_cancel]
   let h1 := add_zero_l adm x  -- add 0 x = x
@@ -1350,25 +1354,25 @@ def monus_self (x : Term F Γ Ty.nat) :
 
 /-- 0 ∸ y = 0. By induction on y. -/
 def monus_zero_l (y : Term F Γ Ty.nat) :
-    Derivable F EqX (Formula.eq0 (Term.app2 Term.monus Term.zero y) Term.zero) :=
+    Derivable F EqX al (Formula.eq0 (Term.app2 Term.monus Term.zero y) Term.zero) :=
   let A : Formula F (Ty.nat :: Γ) :=
     Formula.eq0 (Term.app2 Term.monus Term.zero (.var .vz)) Term.zero
   have base_nf : A.subst0 Term.zero =
       Formula.eq0 (Term.app2 Term.monus Term.zero Term.zero) Term.zero := by
     simp only [A, Formula.subst0, Formula.substF, Term.subst, Term.subst0_map, Term.app2,
       monus_closed_subst']
-  have base : Derivable F EqX (A.subst0 Term.zero) := base_nf ▸ monus_zero adm Term.zero
+  have base : Derivable F EqX al (A.subst0 Term.zero) := base_nf ▸ monus_zero adm Term.zero
   have step_nf : Formula.substVar0 A (.app .succ (.var .vz)) =
       Formula.eq0 (Term.app2 Term.monus Term.zero (.app .succ (.var .vz))) Term.zero := by
     simp only [A, Formula.substVar0, Formula.substF, Term.subst, Term.substVar0_map, Term.app2,
       monus_closed_subst']
-  have step_body : Derivable F EqX (A →ᶠ Formula.substVar0 A (.app .succ (.var .vz))) :=
+  have step_body : Derivable F EqX al (A →ᶠ Formula.substVar0 A (.app .succ (.var .vz))) :=
     step_nf ▸
     -- monus 0 (Sy) = pd(monus 0 y) [monus_succ]. IH: monus 0 y = 0.
     -- pd(monus 0 y) = pd(0) [pd congruence on IH]. pd(0) = 0 [pd_zero].
     -- Chain: monus 0 (Sy) = pd(monus 0 y) = pd(0) = 0.
     let t1 := monus_succ adm Term.zero (.var .vz : Term F (Ty.nat :: Γ) _)
-    let pd_ih : Derivable F EqX (A →ᶠ Formula.eq0 (.app Term.pd (Term.app2 Term.monus Term.zero (.var .vz)))
+    let pd_ih : Derivable F EqX al (A →ᶠ Formula.eq0 (.app Term.pd (Term.app2 Term.monus Term.zero (.var .vz)))
         (.app Term.pd Term.zero)) :=
       .qfer (σ := Ty.nat) (r := .app Term.pd (.var .vz)) (by rfl) (by rfl) I_comb
     let chain1 := .syllogism (pair_h pd_ih (weaken_intro_h (pd_zero (adm := adm) (Γ := Ty.nat :: Γ)))) .trans0
@@ -1381,7 +1385,7 @@ def monus_zero_l (y : Term F Γ Ty.nat) :
 
 /-- Sx ∸ Sy = x ∸ y. By induction on y (x is a parameter). -/
 def monus_succ_l (x y : Term F Γ Ty.nat) :
-    Derivable F EqX (Formula.eq0
+    Derivable F EqX al (Formula.eq0
       (Term.app2 Term.monus (.app .succ x) (.app .succ y))
       (Term.app2 Term.monus x y)) :=
   let xw := x.weaken (σ := Ty.nat)
@@ -1396,7 +1400,7 @@ def monus_succ_l (x y : Term F Γ Ty.nat) :
         (Term.app2 Term.monus x Term.zero) := by
     simp only [A, xw, Formula.subst0, Formula.substF, Term.subst, Term.subst0_map, Term.app2,
       monus_closed_subst', xw_subst0]
-  have base : Derivable F EqX (A.subst0 Term.zero) := base_nf ▸
+  have base : Derivable F EqX al (A.subst0 Term.zero) := base_nf ▸
     -- monus(Sx,S0) = pd(monus(Sx,0)) [monus_succ] = pd(Sx) [pd congr monus_zero] = x [pd_succ]
     -- monus(x,0) = x [monus_zero]. Chain both to x, then sym+trans.
     let ms := monus_succ adm (.app .succ x) Term.zero
@@ -1416,7 +1420,7 @@ def monus_succ_l (x y : Term F Γ Ty.nat) :
         (Term.app2 Term.monus xw (.app .succ (.var .vz))) := by
     simp only [A, xw, Formula.substVar0, Formula.substF, Term.subst, Term.substVar0_map, Term.app2,
       monus_closed_subst', weaken_substVar0]
-  have step_body : Derivable F EqX (A →ᶠ Formula.substVar0 A (.app .succ (.var .vz))) :=
+  have step_body : Derivable F EqX al (A →ᶠ Formula.substVar0 A (.app .succ (.var .vz))) :=
     step_nf ▸
     let ms1 := monus_succ adm (.app .succ xw) (.app .succ (.var .vz) : Term F (Ty.nat :: Γ) _)
     let ms2 := monus_succ adm xw (.var .vz : Term F (Ty.nat :: Γ) _)
@@ -1439,14 +1443,14 @@ private def monus_antisym_case_y0 {Γ : Ctx ι} :
     let xv : Term F (Ty.nat :: Ty.nat :: Γ) _ := .var (.vs .vz)
     let yv : Term F (Ty.nat :: Ty.nat :: Γ) _ := .var .vz
     let sxv := Term.app Term.succ xv
-    Derivable F EqX (Formula.eq0 yv Term.zero →ᶠ
+    Derivable F EqX al (Formula.eq0 yv Term.zero →ᶠ
       Formula.eq0 (Term.app2 Term.monus sxv yv) Term.zero ∧ᶠ
       Formula.eq0 (Term.app2 Term.monus yv sxv) Term.zero →ᶠ Formula.eq0 sxv yv) :=
   let xv : Term F (Ty.nat :: Ty.nat :: Γ) _ := .var (.vs .vz)
   let yv : Term F (Ty.nat :: Ty.nat :: Γ) _ := .var .vz
   let sxv := Term.app Term.succ xv
-  let succ_ne : Derivable F EqX (Formula.eq0 sxv Term.zero →ᶠ ⊥ᶠ) :=
-    .mp (@Derivable.succ_ne_zero _ _ EqX (Ty.nat :: Ty.nat :: Γ)) (.forall_ax xv)
+  let succ_ne : Derivable F EqX al (Formula.eq0 sxv Term.zero →ᶠ ⊥ᶠ) :=
+    .mp (@Derivable.succ_ne_zero _ _ EqX al (Ty.nat :: Ty.nat :: Γ)) (.forall_ax xv)
   -- qf_mz: y=0 → monus(Sx,y) = monus(Sx,0)
   let qf_mz := qfer_nat_nf (by rfl) (by rfl) (I_comb (EqX := EqX))
     (monus_subst0_rw_nf sxv yv) (monus_subst0_rw_nf sxv Term.zero)
@@ -1472,7 +1476,7 @@ private def monus_antisym_case_yne0 {Γ : Ctx ι} :
     let sxv := Term.app Term.succ xv
     let IH_pdy := Formula.eq0 (Term.app2 Term.monus xv pdy) Term.zero ∧ᶠ
        Formula.eq0 (Term.app2 Term.monus pdy xv) Term.zero →ᶠ Formula.eq0 xv pdy
-    Derivable F EqX (IH_pdy →ᶠ ¬ᶠFormula.eq0 yv Term.zero →ᶠ
+    Derivable F EqX al (IH_pdy →ᶠ ¬ᶠFormula.eq0 yv Term.zero →ᶠ
       Formula.eq0 (Term.app2 Term.monus sxv yv) Term.zero ∧ᶠ
       Formula.eq0 (Term.app2 Term.monus yv sxv) Term.zero →ᶠ Formula.eq0 sxv yv) :=
   -- Triple importation: IH ∧ y≠0 ∧ (P∧Q) → Sx=y. Then triple exportation.
@@ -1482,9 +1486,9 @@ private def monus_antisym_case_yne0 {Γ : Ctx ι} :
   let pdy := Term.app Term.pd yv
   let spdy := Term.app Term.succ pdy
   let ne_succ := ne_zero_eq_succ_pd adm yv
-  let msl1' : Derivable F EqX (Formula.eq0 (Term.app2 Term.monus sxv spdy) (Term.app2 Term.monus xv pdy)) :=
+  let msl1' : Derivable F EqX al (Formula.eq0 (Term.app2 Term.monus sxv spdy) (Term.app2 Term.monus xv pdy)) :=
     monus_succ_l adm xv pdy
-  let msl2' : Derivable F EqX (Formula.eq0 (Term.app2 Term.monus spdy sxv) (Term.app2 Term.monus pdy xv)) :=
+  let msl2' : Derivable F EqX al (Formula.eq0 (Term.app2 Term.monus spdy sxv) (Term.app2 Term.monus pdy xv)) :=
     monus_succ_l adm pdy xv
   let qf1 := qfer_nat_nf (by rfl) (by rfl) ne_succ
     (monus_subst0_rw_nf sxv yv) (monus_subst0_rw_nf sxv spdy)
@@ -1492,10 +1496,10 @@ private def monus_antisym_case_yne0 {Γ : Ctx ι} :
     (monus_subst0_lw_nf sxv yv) (monus_subst0_lw_nf sxv spdy)
   let reduce1 := .syllogism (pair_h qf1 (weaken_intro_h msl1')) .trans0
   let reduce2 := .syllogism (pair_h qf2 (weaken_intro_h msl2')) .trans0
-  let succ_imp : Derivable F EqX (Formula.eq0 xv pdy →ᶠ Formula.eq0 sxv spdy) :=
+  let succ_imp : Derivable F EqX al (Formula.eq0 xv pdy →ᶠ Formula.eq0 sxv spdy) :=
     .qfer (σ := Ty.nat) (r := .app .succ (.var .vz)) (by rfl) (by rfl) I_comb
   -- Projections from IH ∧ (NE ∧ (P ∧ Q))
-  let get_IH := @Derivable.and_weak _ _ EqX _ _ _  -- → IH
+  let get_IH := @Derivable.and_weak _ _ EqX al _ _ _  -- → IH
   let get_NE := .syllogism (.syllogism .and_perm .and_weak) .and_weak  -- → NE
   let get_PQ := .syllogism (.syllogism .and_perm .and_weak) (.syllogism .and_perm .and_weak)  -- → P∧Q
   let get_P := .syllogism get_PQ .and_weak  -- → P
@@ -1511,7 +1515,7 @@ private def monus_antisym_case_yne0 {Γ : Ctx ι} :
   -- final: IH ∧ (NE ∧ PQ) → Sx=y
   let final := .syllogism (pair_h (.syllogism apply_IH succ_imp) ne_sym) .trans0
   -- Re-associate: (IH ∧ NE) ∧ PQ → IH ∧ (NE ∧ PQ)
-  let reassoc : Derivable F EqX (_ ∧ᶠ _ →ᶠ _) :=
+  let reassoc : Derivable F EqX al (_ ∧ᶠ _ →ᶠ _) :=
     pair_h (.syllogism .and_weak .and_weak)
       (pair_h (.syllogism .and_weak (.syllogism .and_perm .and_weak)) (.syllogism .and_perm .and_weak))
   -- (IH ∧ NE) ∧ PQ → Sx=y
@@ -1532,7 +1536,7 @@ private def monus_antisym_step_body {Γ : Ctx ι} :
     let C_step := Formula.eq0 (Term.app2 Term.monus (.app .succ (.var (.vs .vz))) (.var .vz)) Term.zero ∧ᶠ
        Formula.eq0 (Term.app2 Term.monus (.var .vz) (.app .succ (.var (.vs .vz)))) Term.zero →ᶠ
        Formula.eq0 (.app .succ (.var (.vs .vz))) (.var .vz)
-    Derivable F EqX (B.weakenBy Ty.nat →ᶠ C_step) :=
+    Derivable F EqX al (B.weakenBy Ty.nat →ᶠ C_step) :=
   let yv : Term F (Ty.nat :: Ty.nat :: Γ) _ := .var .vz
   let pdy := Term.app Term.pd yv
   let C : Formula F (Ty.nat :: Ty.nat :: Γ) :=
@@ -1547,10 +1551,10 @@ private def monus_antisym_step_body {Γ : Ctx ι} :
     simp only [C, pdy, Formula.subst0, Formula.substF, Formula.renameF, Term.subst, Term.rename,
       Term.Subst.ext, Term.subst0_map, Renaming.ext, Renaming.shift, Term.app2,
       monus_closed_rename, monus_closed_subst']
-  let ih_inst := Eq.mp (congrArg (fun f => Derivable F EqX (B.weakenBy Ty.nat →ᶠ f)) ih_nf)
+  let ih_inst := Eq.mp (congrArg (fun f => Derivable F EqX al (B.weakenBy Ty.nat →ᶠ f)) ih_nf)
     (Derivable.forall_ax pdy)
-  let case_yne0 := @monus_antisym_case_yne0 _ _ _ adm Γ
-  let case_y0 := @monus_antisym_case_y0 _ _ _ adm Γ
+  let case_yne0 := @monus_antisym_case_yne0 _ _ _ _ adm Γ
+  let case_y0 := @monus_antisym_case_y0 _ _ _ _ adm Γ
   let dec_y := .mp eq0_decidable' (.forall_ax yv)
   -- f: y=0 → (B_w∧PQ → Sx=y)
   let f := .exportation (.syllogism
@@ -1558,7 +1562,7 @@ private def monus_antisym_step_body {Γ : Ctx ι} :
     (.importation case_y0))
   -- g: y≠0 → (B_w∧PQ → Sx=y)
   let get_bw := .syllogism (.syllogism .and_perm .and_weak) .and_weak
-  let get_ne : Derivable F EqX (_ →ᶠ _) := .and_weak
+  let get_ne : Derivable F EqX al (_ →ᶠ _) := .and_weak
   let get_pq := .syllogism (.syllogism .and_perm .and_weak) (.syllogism .and_perm .and_weak)
   -- g: y≠0 → (B_w∧PQ → Sx=y)
   -- From y≠0 ∧ (B_w ∧ PQ):
@@ -1579,7 +1583,7 @@ private def monus_antisym_step {Γ : Ctx ι} :
       Formula.eq0 (Term.app2 Term.monus (.var .vz) (.var (.vs .vz))) Term.zero →ᶠ
       Formula.eq0 (.var (.vs .vz)) (.var .vz)
     let B : Formula F (Ty.nat :: Γ) := Formula.all Ty.nat C
-    Derivable F EqX (B →ᶠ Formula.substVar0 B (.app .succ (.var .vz))) := by
+    Derivable F EqX al (B →ᶠ Formula.substVar0 B (.app .succ (.var .vz))) := by
   intro C B
   have step_nf : Formula.substVar0 B (.app .succ (.var .vz)) = Formula.all Ty.nat
       (Formula.eq0 (Term.app2 Term.monus (.app .succ (.var (.vs .vz))) (.var .vz)) Term.zero ∧ᶠ
@@ -1591,7 +1595,7 @@ private def monus_antisym_step {Γ : Ctx ι} :
   exact .forall_rule (monus_antisym_step_body (adm := adm) (Γ := Γ))
 
 def monus_eq_zero_antisym (x y : Term F Γ Ty.nat) :
-    Derivable F EqX (Formula.eq0 (Term.app2 Term.monus x y) Term.zero ∧ᶠ
+    Derivable F EqX al (Formula.eq0 (Term.app2 Term.monus x y) Term.zero ∧ᶠ
       Formula.eq0 (Term.app2 Term.monus y x) Term.zero →ᶠ Formula.eq0 x y) :=
   let C : Formula F (Ty.nat :: Ty.nat :: Γ) :=
     Formula.eq0 (Term.app2 Term.monus (.var (.vs .vz)) (.var .vz)) Term.zero ∧ᶠ
@@ -1606,7 +1610,7 @@ def monus_eq_zero_antisym (x y : Term F Γ Ty.nat) :
        Formula.eq0 Term.zero (.var .vz)) := by
     simp only [B, C, Formula.subst0, Formula.substF, Term.subst, Term.Subst.ext, Term.subst0_map,
       Term.app2, monus_closed_subst', Term.weaken]
-  have base : Derivable F EqX (B.subst0 Term.zero) := base_nf ▸
+  have base : Derivable F EqX al (B.subst0 Term.zero) := base_nf ▸
     let kv : Term F (Ty.nat :: Γ) _ := .var .vz
     -- From premise: monus(y,0)=0. monus_zero y: monus(y,0)=y. Trans: y=0. Sym: 0=y.
     -- From monus(y,0)=0 ∧ monus(0,y)=0: extract monus(y,0)=0.
@@ -1616,7 +1620,7 @@ def monus_eq_zero_antisym (x y : Term F Γ Ty.nat) :
     univ_gen (.syllogism (pair_h (weaken_intro_h (.mp (monus_zero adm kv) .sym0))
       (.syllogism .and_perm .and_weak)) (.syllogism .trans0 .sym0))
   -- Step: monus_antisym_step
-  let step := @monus_antisym_step _ _ _ adm Γ
+  let step := @monus_antisym_step _ _ _ _ adm Γ
   -- Normalize B.subst0 y
   have B_y_nf : B.subst0 y = Formula.all Ty.nat
       (Formula.eq0 (Term.app2 Term.monus y.weaken (.var .vz)) Term.zero ∧ᶠ
@@ -1636,10 +1640,10 @@ def monus_eq_zero_antisym (x y : Term F Γ Ty.nat) :
     have hw := Term.weaken_subst0 y x; simp only [Term.subst0] at hw; rw [hw]
   let ind := Derivable.induction base (univ_gen step)
   let at_y_raw := .mp ind (.forall_ax y)
-  let at_y := Eq.mp (congrArg (Derivable F EqX) B_y_nf) at_y_raw
+  let at_y := Eq.mp (congrArg (Derivable F EqX al) B_y_nf) at_y_raw
   let at_xy := .mp at_y (.forall_ax x)
   -- at_xy_typed : monus(y,x)=0 ∧ monus(x,y)=0 → y=x
-  let at_xy_typed := Eq.mp (congrArg (Derivable F EqX) inner_x_nf) at_xy
+  let at_xy_typed := Eq.mp (congrArg (Derivable F EqX al) inner_x_nf) at_xy
   -- Convert: swap conjunction with and_perm, swap conclusion with sym0
   .syllogism .and_perm (.syllogism at_xy_typed .sym0)
 
@@ -1666,7 +1670,7 @@ private theorem add_monus_subst0_nf (x t : Term F Γ Ty.nat) :
   have hw := Term.weaken_subst0 x t; simp only [Term.subst0] at hw; rw [hw]
 
 def abs_diff_eq_zero_iff (x y : Term F Γ Ty.nat) :
-    Derivable F EqX
+    Derivable F EqX al
       ((Formula.eq0 (Term.app2 Term.abs_diff x y) Term.zero →ᶠ Formula.eq0 x y) ∧ᶠ
        (Formula.eq0 x y →ᶠ Formula.eq0 (Term.app2 Term.abs_diff x y) Term.zero)) :=
   let body : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat :=
@@ -1679,11 +1683,11 @@ def abs_diff_eq_zero_iff (x y : Term F Γ Ty.nat) :
   -- add(monus x y)(monus y x) = 0 → monus x y = 0 ∧ monus y x = 0 → x = y
   let add_fwd := .mp (add_eq_zero_iff adm (Term.app2 Term.monus x y) (Term.app2 Term.monus y x)) .and_weak
   -- unfold_eq0: abs_diff x y = add(...) as eq0
-  let unfold_eq0 : Derivable F EqX (Formula.eq0 (Term.app2 Term.abs_diff x y)
+  let unfold_eq0 : Derivable F EqX al (Formula.eq0 (Term.app2 Term.abs_diff x y)
       (Term.app2 Term.add (Term.app2 Term.monus x y) (Term.app2 Term.monus y x))) := unfold
   -- fwd: abs_diff x y = 0 → abs_diff = add(...) [sym] ∧ add(...)=0 → 0=add(...) → chain
   -- abs_diff=0 → add(...)=0: chain sym(unfold) with the premise via trans
-  let unfold_sym : Derivable F EqX (Formula.eq0
+  let unfold_sym : Derivable F EqX al (Formula.eq0
       (Term.app2 Term.add (Term.app2 Term.monus x y) (Term.app2 Term.monus y x))
       (Term.app2 Term.abs_diff x y)) := .mp unfold_eq0 .sym0
   let abs_to_add := .syllogism (pair_h (weaken_intro_h unfold_sym) I_comb) .trans0
@@ -1719,7 +1723,7 @@ end ArithProps
 -- This is proved by induction and does NOT require the arithmetic infrastructure.
 
 def eq0_decidable {Γ : Ctx ι} :
-    Derivable F EqX (Formula.all Ty.nat
+    Derivable F EqX al (Formula.all Ty.nat
       (Formula.eq0 (Γ := Ty.nat :: Γ) (.var .vz) Term.zero ∨ᶠ
        ¬ᶠFormula.eq0 (.var .vz) Term.zero)) :=
   eq0_decidable'
@@ -1752,15 +1756,15 @@ def qf_term {Γ : Ctx ι} : Formula F Γ → Term F Γ Ty.nat
 /-- The decision term correctly encodes A₀: qf_term A₀ =₀ 0 ↔ A₀.
     Proved by structural induction on A₀ (using the arithmetic properties from §5). -/
 def qf_term_correct {Γ : Ctx ι} {A : Formula F Γ} (hqf : A.isQF = true) :
-    Derivable F EqX
+    Derivable F EqX al
       ((Formula.eq0 (qf_term A) Term.zero →ᶠ A) ∧ᶠ (A →ᶠ Formula.eq0 (qf_term A) Term.zero)) :=
   match A with
   | .bot =>
     -- qf_term ⊥ = S0.  S0 =₀ 0 ↔ ⊥.
     -- Forward: eq0(S0)0 → ⊥ from succ_ne_zero at 0.  Backward: exfalso.
-    let fwd : Derivable F EqX (Formula.eq0 (Term.app Term.succ Term.zero) Term.zero →ᶠ ⊥ᶠ) :=
+    let fwd : Derivable F EqX al (Formula.eq0 (Term.app Term.succ Term.zero) Term.zero →ᶠ ⊥ᶠ) :=
       .mp .succ_ne_zero (.forall_ax Term.zero)
-    let bwd : Derivable F EqX (⊥ᶠ →ᶠ Formula.eq0 (Term.app Term.succ Term.zero) Term.zero) :=
+    let bwd : Derivable F EqX al (⊥ᶠ →ᶠ Formula.eq0 (Term.app Term.succ Term.zero) Term.zero) :=
       .exfalso
     .mp bwd (.mp fwd and_intro)
   | .eq0 s t =>
@@ -1823,7 +1827,7 @@ def qf_term_correct {Γ : Ctx ι} {A : Formula F Γ} (hqf : A.isQF = true) :
     let ihB_bwd := Derivable.mp ihB and_proj2             -- B → tB=0
     -- Forward: sḡ(tA)·tB=0 → (tA=0→tB=0) → (A→B)
     -- (tA=0→tB=0) ∧ A → tA=0 ∧ (tA=0→tB=0) → tB=0 → B
-    let fwd_inner : Derivable F EqX
+    let fwd_inner : Derivable F EqX al
         ((Formula.eq0 (qf_term A) Term.zero →ᶠ Formula.eq0 (qf_term B) Term.zero) →ᶠ A →ᶠ B) :=
       .exportation (.syllogism
         (.syllogism (pair_h (.syllogism and_proj2 ihA_bwd) .and_weak)
@@ -1831,7 +1835,7 @@ def qf_term_correct {Γ : Ctx ι} {A : Formula F Γ} (hqf : A.isQF = true) :
         ihB_fwd)
     let fwd := .syllogism sgm_fwd fwd_inner
     -- Backward: (A→B) → (tA=0→tB=0) → sḡ(tA)·tB=0
-    let bwd_inner : Derivable F EqX
+    let bwd_inner : Derivable F EqX al
         ((A →ᶠ B) →ᶠ Formula.eq0 (qf_term A) Term.zero →ᶠ Formula.eq0 (qf_term B) Term.zero) :=
       .exportation (.syllogism
         (.syllogism (pair_h (.syllogism and_proj2 ihA_fwd) .and_weak)
@@ -1856,20 +1860,20 @@ section QFLEM
     By eq0_decidable, ⊢ t_{A₀} = 0 ∨ t_{A₀} ≠ 0.
     Substituting the equivalence gives A₀ ∨ ¬A₀. -/
 def qf_lem {Γ : Ctx ι} {A : Formula F Γ} (hqf : A.isQF = true) :
-    Derivable F EqX (A ∨ᶠ ¬ᶠA) :=
+    Derivable F EqX al (A ∨ᶠ ¬ᶠA) :=
   -- qf_term_correct: eq0(t_A, 0) ↔ A
   let corr := qf_term_correct (adm := adm) hqf
-  let fwd : Derivable F EqX (Formula.eq0 (qf_term A) Term.zero →ᶠ A) :=
+  let fwd : Derivable F EqX al (Formula.eq0 (qf_term A) Term.zero →ᶠ A) :=
     .mp corr .and_weak
-  let bwd : Derivable F EqX (A →ᶠ Formula.eq0 (qf_term A) Term.zero) :=
+  let bwd : Derivable F EqX al (A →ᶠ Formula.eq0 (qf_term A) Term.zero) :=
     .mp corr and_proj2
   -- eq0_decidable instantiated at qf_term A: ⊢ eq0(t_A, 0) ∨ ¬eq0(t_A, 0)
-  let dec := @eq0_decidable ι F EqX Γ
+  let dec := @eq0_decidable ι F EqX al Γ
   let dec_at := .mp dec (.forall_ax (qf_term A))
   -- Two cases from the decidability
-  let case_t : Derivable F EqX (Formula.eq0 (qf_term A) Term.zero →ᶠ A ∨ᶠ ¬ᶠA) :=
+  let case_t : Derivable F EqX al (Formula.eq0 (qf_term A) Term.zero →ᶠ A ∨ᶠ ¬ᶠA) :=
     .syllogism fwd .or_weak
-  let case_f : Derivable F EqX (¬ᶠFormula.eq0 (qf_term A) Term.zero →ᶠ A ∨ᶠ ¬ᶠA) :=
+  let case_f : Derivable F EqX al (¬ᶠFormula.eq0 (qf_term A) Term.zero →ᶠ A ∨ᶠ ¬ᶠA) :=
     .syllogism (contrapositive bwd) or_inr
   .mp dec_at (or_elim_rule case_t case_f)
 
@@ -1878,13 +1882,13 @@ def qf_lem {Γ : Ctx ι} {A : Formula F Γ} (hqf : A.isQF = true) :
     Proof: from qf_lem, we have A₀ ∨ ¬A₀.
     Use or-elimination: if A₀, done; if ¬A₀, then ¬¬A₀ gives ⊥ by mp, then A₀ by exfalso. -/
 def qf_double_neg_elim {Γ : Ctx ι} {A : Formula F Γ} (hqf : A.isQF = true) :
-    Derivable F EqX (¬ᶠ¬ᶠA →ᶠ A) :=
+    Derivable F EqX al (¬ᶠ¬ᶠA →ᶠ A) :=
   let lem := qf_lem (adm := adm) hqf
   -- Case A: from A ignore ¬¬A and return A (K combinator)
-  let case_A : Derivable F EqX (A →ᶠ ¬ᶠ¬ᶠA →ᶠ A) :=
+  let case_A : Derivable F EqX al (A →ᶠ ¬ᶠ¬ᶠA →ᶠ A) :=
     .exportation .and_weak
   -- Case ¬A: from ¬A ∧ ¬¬A derive ⊥ via eval_h, then A via exfalso
-  let case_neg_A : Derivable F EqX (¬ᶠA →ᶠ ¬ᶠ¬ᶠA →ᶠ A) :=
+  let case_neg_A : Derivable F EqX al (¬ᶠA →ᶠ ¬ᶠ¬ᶠA →ᶠ A) :=
     .exportation (.syllogism
       (eval_h (.syllogism .and_perm .and_weak) .and_weak)
       .exfalso)
