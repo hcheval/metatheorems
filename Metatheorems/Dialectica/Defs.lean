@@ -55,6 +55,43 @@ def dialecticaCounter {ι : Type} (X : ι → Type) {F : ι → Ty ι} {Γ : Ctx
 end
 
 -- ============================================================================
+-- Default inhabitants (computable; replace Nonempty.some)
+-- ============================================================================
+
+/-- Every `interpTy X ρ` has a computable default: 0 for Nat, zeroInterp for base types,
+    constant function for arrow types. -/
+def interpTy_default {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    (si : SpaceInterp X F) : (ρ : Ty ι) → interpTy X ρ
+  | .nat    => Nat.zero
+  | .base i => si.zeroInterp i
+  | .arr ρ τ => fun _ => interpTy_default si τ
+
+mutual
+/-- Computable default witness for any formula's Dialectica translation. -/
+def dialecticaDefaultWitness {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    (si : SpaceInterp X F) {Γ : Ctx ι} : (A : Formula F Γ) → dialecticaWitness X A
+  | .bot      => ()
+  | .eq0 _ _  => ()
+  | .and A B  => (dialecticaDefaultWitness si A, dialecticaDefaultWitness si B)
+  | .or  A B  => (true, dialecticaDefaultWitness si A, dialecticaDefaultWitness si B)
+  | .imp A B  => (fun _ => dialecticaDefaultWitness si B,
+                  fun _ _ => dialecticaDefaultCounter si A)
+  | .ex  ρ A  => (interpTy_default si ρ, dialecticaDefaultWitness si A)
+  | .all _ A  => fun _ => dialecticaDefaultWitness si A
+
+/-- Computable default counter for any formula's Dialectica translation. -/
+def dialecticaDefaultCounter {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    (si : SpaceInterp X F) {Γ : Ctx ι} : (A : Formula F Γ) → dialecticaCounter X A
+  | .bot      => ()
+  | .eq0 _ _  => ()
+  | .and A B  => (dialecticaDefaultCounter si A, dialecticaDefaultCounter si B)
+  | .or  A B  => (dialecticaDefaultCounter si A, dialecticaDefaultCounter si B)
+  | .imp A B  => (dialecticaDefaultWitness si A, dialecticaDefaultCounter si B)
+  | .ex  _ A  => dialecticaDefaultCounter si A
+  | .all ρ A  => (interpTy_default si ρ, dialecticaDefaultCounter si A)
+end
+
+-- ============================================================================
 -- The quantifier-free matrix (Definition 3.0.1)
 -- ============================================================================
 

@@ -277,54 +277,37 @@ private abbrev lift {ι : Type} {F : ι → Ty ι}
     Step (∀x.B): NT(∀x.B) = ¬¬∀x.¬¬B.kurodaInner.
     Forward: ∀x.B → ∀x.NT(B) (IH + forall_map) → ¬¬∀x.NT(B) (dnn_intro) = NT(∀x.B).
     Backward: NT(∀x.B) → ∀x.¬¬B.kurodaInner (nn_all_nn) → ∀x.B (IH backward + forall_map). -/
-noncomputable def negTrans_iff_pu {ι : Type} {F : ι → Ty ι}
+def negTrans_iff_pu {ι : Type} {F : ι → Ty ι}
     {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
     (adm : AdmissibleEqX EqX)
     {Γ : Ctx ι} (A : Formula F Γ) (hpu : A.isPurelyUniversal = true) :
     Derivable F EqX a (A →ᶠ A.negTrans) ×
-    Derivable F EqX a (A.negTrans →ᶠ A) := by
-  induction A with
-  | bot =>
-    -- NT(⊥) = ¬¬⊥. Forward: dnn_intro. Backward: ¬¬⊥ = ((⊥→⊥)→⊥) → ⊥: apply to I.
-    exact ⟨dnn_intro, .syllogism (pair_h self_imp (weaken_intro self_imp)) (.importation mp_form)⟩
-  | eq0 s t =>
-    -- QF: kurodaInner is identity, NT(A) = ¬¬A
-    exact ⟨dnn_intro, qf_double_neg_elim adm (by rfl)⟩
-  | and A B ihA ihB =>
-    simp only [Formula.isPurelyUniversal, Formula.isQF, Bool.and_eq_true] at hpu
-    -- QF: kurodaInner is identity
-    have hqf : (A.and B).isQF = true := by simp [Formula.isQF, hpu.1, hpu.2]
+    Derivable F EqX a (A.negTrans →ᶠ A) :=
+  match A, hpu with
+  | .bot, _ =>
+    ⟨dnn_intro, .syllogism (pair_h self_imp (weaken_intro self_imp)) (.importation mp_form)⟩
+  | .eq0 .., _ =>
+    ⟨dnn_intro, qf_double_neg_elim adm (by rfl)⟩
+  | .and A B, hpu => by
+    have hqf : (A.and B).isQF = true := hpu
     have hki := kurodaInner_qf (A.and B) hqf
     simp only [Formula.negTrans, hki]
     exact ⟨dnn_intro, qf_double_neg_elim adm hqf⟩
-  | or A B ihA ihB =>
-    simp only [Formula.isPurelyUniversal, Formula.isQF, Bool.and_eq_true] at hpu
-    have hqf : (A.or B).isQF = true := by simp [Formula.isQF, hpu.1, hpu.2]
+  | .or A B, hpu => by
+    have hqf : (A.or B).isQF = true := hpu
     have hki := kurodaInner_qf (A.or B) hqf
     simp only [Formula.negTrans, hki]
     exact ⟨dnn_intro, qf_double_neg_elim adm hqf⟩
-  | imp A B ihA ihB =>
-    simp only [Formula.isPurelyUniversal, Formula.isQF, Bool.and_eq_true] at hpu
-    have hqf : (A.imp B).isQF = true := by simp [Formula.isQF, hpu.1, hpu.2]
+  | .imp A B, hpu => by
+    have hqf : (A.imp B).isQF = true := hpu
     have hki := kurodaInner_qf (A.imp B) hqf
     simp only [Formula.negTrans, hki]
     exact ⟨dnn_intro, qf_double_neg_elim adm hqf⟩
-  | ex _ _ _ =>
-    simp [Formula.isPurelyUniversal, Formula.isQF] at hpu
-  | all ρ B ih =>
-    simp only [Formula.isPurelyUniversal] at hpu
-    -- IH: B ↔ NT(B) = ¬¬B.kurodaInner
-    have ⟨ih_fwd, ih_bwd⟩ := ih hpu
-    -- NT(∀x.B) = ¬¬∀x.¬¬B.kurodaInner
-    show Derivable F EqX a (Formula.all ρ B →ᶠ ¬ᶠ¬ᶠFormula.all ρ (¬ᶠ¬ᶠB.kurodaInner)) ×
-         Derivable F EqX a (¬ᶠ¬ᶠFormula.all ρ (¬ᶠ¬ᶠB.kurodaInner) →ᶠ Formula.all ρ B)
-    -- Forward: ∀x.B → ∀x.¬¬B.kurodaInner (forall_map ih_fwd) → ¬¬∀x.¬¬B.kurodaInner (dnn_intro)
-    -- (ih_fwd : B → ¬¬B.kurodaInner = B → NT(B))
-    let fwd := Derivable.syllogism (forall_map ih_fwd) dnn_intro
-    -- Backward: ¬¬∀x.¬¬B.kurodaInner → ∀x.¬¬B.kurodaInner (nn_all_nn) → ∀x.B (forall_map ih_bwd)
-    -- (ih_bwd : ¬¬B.kurodaInner → B = NT(B) → B)
-    let bwd := Derivable.syllogism nn_all_nn (forall_map ih_bwd)
-    exact ⟨fwd, bwd⟩
+  | .ex .., hpu => absurd hpu (by simp [Formula.isPurelyUniversal, Formula.isQF])
+  | .all ρ B, hpu =>
+    let ⟨ih_fwd, ih_bwd⟩ := negTrans_iff_pu adm B hpu
+    ⟨Derivable.syllogism (forall_map ih_fwd) dnn_intro,
+     Derivable.syllogism nn_all_nn (forall_map ih_bwd)⟩
 
 -- ============================================================================
 -- Per-axiom/rule soundness definitions
@@ -731,7 +714,7 @@ def negTrans_exist_ax {Γ : Ctx ι} {ρ : Ty ι} {A : Formula F (ρ :: Γ)}
 
 /-- NT of a purely universal axiom: from ⊢ A (axiom), derive ⊢ NT(A)
     using negTrans_iff_pu. -/
-private noncomputable def negTrans_pu_axiom {a : Allowed} (adm : AdmissibleEqX EqX) {Γ : Ctx ι}
+private def negTrans_pu_axiom {a : Allowed} (adm : AdmissibleEqX EqX) {Γ : Ctx ι}
     {A : Formula F Γ} (hpu : A.isPurelyUniversal = true)
     (h : Derivable F EqX a A) : Derivable F EqX a A.negTrans :=
   .mp h (negTrans_iff_pu adm A hpu).1
@@ -745,12 +728,12 @@ private theorem eqAtType_isPU (adm : AdmissibleEqX EqX) (ρ : Ty ι)
   | base i => exact adm.eqx_pu i s t
   | arr ρ τ ih_ρ ih_τ => simp only [eqAtType, Formula.isPurelyUniversal]; exact ih_τ _ _
 
-noncomputable def negTrans_proj_ax (adm : AdmissibleEqX EqX)
+def negTrans_proj_ax (adm : AdmissibleEqX EqX)
     {Γ : Ctx ι} {ρ τ : Ty ι} {s : Term F Γ ρ} {t : Term F Γ τ} :
     Derivable F EqX Allowed.nt_target (eqAtType EqX ρ (Term.app2 (Term.proj ρ τ) s t) s).negTrans :=
   negTrans_pu_axiom adm (eqAtType_isPU adm ρ _ _) .proj_ax
 
-noncomputable def negTrans_comb_ax (adm : AdmissibleEqX EqX)
+def negTrans_comb_ax (adm : AdmissibleEqX EqX)
     {Γ : Ctx ι} {δ ρ τ : Ty ι}
     {f : Term F Γ (δ →ₜ ρ →ₜ τ)} {g : Term F Γ (δ →ₜ ρ)} {x : Term F Γ δ} :
     Derivable F EqX Allowed.nt_target (eqAtType EqX τ
@@ -758,13 +741,13 @@ noncomputable def negTrans_comb_ax (adm : AdmissibleEqX EqX)
       (Term.app (Term.app f x) (Term.app g x))).negTrans :=
   negTrans_pu_axiom adm (eqAtType_isPU adm τ _ _) .comb_ax
 
-noncomputable def negTrans_rec_zero (adm : AdmissibleEqX EqX)
+def negTrans_rec_zero (adm : AdmissibleEqX EqX)
     {Γ : Ctx ι} {ρ : Ty ι}
     {y : Term F Γ ρ} {z : Term F Γ (ρ →ₜ Ty.nat →ₜ ρ)} :
     Derivable F EqX Allowed.nt_target (eqAtType EqX ρ (Term.app3 (Term.prec ρ) y z Term.zero) y).negTrans :=
   negTrans_pu_axiom adm (eqAtType_isPU adm ρ _ _) .rec_zero
 
-noncomputable def negTrans_rec_succ (adm : AdmissibleEqX EqX)
+def negTrans_rec_succ (adm : AdmissibleEqX EqX)
     {Γ : Ctx ι} {ρ : Ty ι}
     {y : Term F Γ ρ} {z : Term F Γ (ρ →ₜ Ty.nat →ₜ ρ)} {x : Term F Γ Ty.nat} :
     Derivable F EqX Allowed.nt_target (eqAtType EqX ρ
@@ -778,7 +761,7 @@ noncomputable def negTrans_rec_succ (adm : AdmissibleEqX EqX)
     From ⊢ A₀ → s =_ρ t (Derivable), derive ⊢ NT(A₀ → r[s] =_σ r[t]).
     Proof: extract A₀ → s=t (by negTrans backward on PU equality),
     apply QF-ER, then lift back via negTrans forward. -/
-noncomputable def negTrans_qfer {a : Allowed} (adm : AdmissibleEqX EqX) {Γ : Ctx ι} {ρ σ : Ty ι}
+def negTrans_qfer {a : Allowed} (adm : AdmissibleEqX EqX) {Γ : Ctx ι} {ρ σ : Ty ι}
     {A₀ : Formula F Γ} {s t : Term F Γ ρ} {r : Term F (ρ :: Γ) σ}
     (hqf : A₀.isQF = true) (hvf : A₀.isVFree = true)
     (h_inner : Derivable F EqX a (A₀ →ᶠ eqAtType EqX ρ s t)) :
@@ -813,7 +796,7 @@ noncomputable def negTrans_qfer {a : Allowed} (adm : AdmissibleEqX EqX) {Γ : Ct
 
     Proof: Markov eliminates ¬¬∃ under ∀, QF-AC gives the choice function,
     then dnn_intro strengthens the conclusion. -/
-noncomputable def negTrans_qfac (adm : AdmissibleEqX EqX)
+def negTrans_qfac (adm : AdmissibleEqX EqX)
     {Γ : Ctx ι} {ρ τ : Ty ι} {A₀ : Formula F (τ :: ρ :: Γ)}
     (hqf : A₀.isQF = true) (hvf : Formula.isVFree A₀ = true) :
     Derivable F EqX Allowed.nt_target
@@ -876,7 +859,7 @@ variable {ι : Type} {F : ι → Ty ι}
 
     Composed with `dialectica_soundness`, this gives the ND interpretation:
     from a classical proof, extract Lean-computable witnesses. -/
-noncomputable def negTrans_sound {Γ : Ctx ι} {A : Formula F Γ}
+def negTrans_sound {Γ : Ctx ι} {A : Formula F Γ}
     (h : Derivable F EqX Allowed.classical A) : Derivable F EqX Allowed.nt_target A.negTrans :=
   match h with
   -- Simple propositional axioms: wrap in ¬¬ via dnn_intro

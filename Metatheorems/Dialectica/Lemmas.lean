@@ -225,39 +225,40 @@ private lemma dialecticaWitness_eqAtType_ss (eqxi : EqXInterp X F si EqX) (ρ : 
       (ih_τ (Term.app s.weaken (.var .vz)) (Term.app t.weaken (.var .vz))).elim (f z) (g z))⟩
 
 /-- Extract semantic equality from a full realizer for `eqAtType EqX ρ s t`. -/
-private noncomputable def eqAtType_to_semEq {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
+private def eqAtType_to_semEq {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
     (env : interpCtx X Γ) (h : dialecticaRealizerCtx si (eqAtType EqX ρ s t) env) :
-    interpTerm si s env = interpTerm si t env := by
-  induction ρ generalizing Γ env with
-  | nat    => exact h.property ()
-  | base i => exact eqxi.extract i s t env h
-  | arr ρ' τ _ ih_τ =>
+    interpTerm si s env = interpTerm si t env :=
+  match ρ, s, t, env, h with
+  | .nat, s, t, env, h => h.property ()
+  | .base i, s, t, env, h => eqxi.extract i s t env h
+  | .arr ρ' τ, s, t, env, h => by
       funext z
       have hz : dialecticaRealizerCtx si
           (eqAtType EqX τ (Term.app s.weaken (.var .vz)) (Term.app t.weaken (.var .vz)))
           (z, env) :=
         ⟨h.val z, fun yτ => h.property (z, yτ)⟩
-      have heq := ih_τ (Term.app s.weaken (.var .vz)) (Term.app t.weaken (.var .vz)) (z, env) hz
+      have heq := eqAtType_to_semEq τ
+          (Term.app s.weaken (.var .vz)) (Term.app t.weaken (.var .vz)) (z, env) hz
       simp only [interpTerm, interpTerm_weaken, lookupVar] at heq
       exact heq
 
 /-- Build a full realizer for `eqAtType EqX ρ s t` from a semantic equality.
     The `base i` case uses `eqxi.realize`, which encodes the semantic correctness
     of the base-type equality predicate `EqX i`. -/
-private noncomputable def eqAtType_from_semEq {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
+private def eqAtType_from_semEq {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
     (env : interpCtx X Γ) (h : interpTerm si s env = interpTerm si t env) :
-    dialecticaRealizerCtx si (eqAtType EqX ρ s t) env := by
-  induction ρ generalizing Γ env with
-  | nat    => exact ⟨(), fun () => h⟩
-  | base i => exact eqxi.realize i s t env h
-  | arr ρ' τ _ ih_τ =>
+    dialecticaRealizerCtx si (eqAtType EqX ρ s t) env :=
+  match ρ, s, t, env, h with
+  | .nat, s, t, env, h => ⟨(), fun () => h⟩
+  | .base i, s, t, env, h => eqxi.realize i s t env h
+  | .arr ρ' τ, s, t, env, h =>
       have eq_z : ∀ z : interpTy X ρ',
           interpTerm si (Term.app s.weaken (.var .vz)) (z, env) =
           interpTerm si (Term.app t.weaken (.var .vz)) (z, env) := fun z => by
         simp only [interpTerm, interpTerm_weaken, lookupVar]; exact congr_fun h z
-      exact ⟨fun z => (ih_τ (Term.app s.weaken (.var .vz)) (Term.app t.weaken (.var .vz))
+      ⟨fun z => (eqAtType_from_semEq τ (Term.app s.weaken (.var .vz)) (Term.app t.weaken (.var .vz))
                            (z, env) (eq_z z)).val,
-             fun (z, yτ) => (ih_τ (Term.app s.weaken (.var .vz)) (Term.app t.weaken (.var .vz))
+       fun (z, yτ) => (eqAtType_from_semEq τ (Term.app s.weaken (.var .vz)) (Term.app t.weaken (.var .vz))
                                   (z, env) (eq_z z)).property yτ⟩
 
 /-- Dialectica soundness for the QF-ER (qfer) rule.
@@ -265,7 +266,7 @@ private noncomputable def eqAtType_from_semEq {Γ : Ctx ι} (ρ : Ty ι) (s t : 
     subsingleton; this lets us lift a single-counter hypothesis to a full
     realizer for `eqAtType EqX ρ s t`, extract the semantic equality, and then
     rebuild the conclusion's realizer using `eqxi`. -/
-noncomputable def dialectica_qfer {Γ : Ctx ι} {A₀ : Formula F Γ} {ρ σ : Ty ι}
+def dialectica_qfer {Γ : Ctx ι} {A₀ : Formula F Γ} {ρ σ : Ty ι}
     {s t : Term F Γ ρ} {r : Term F (ρ :: Γ) σ}
     (hqf : A₀.isQF = true) (hvf : A₀.isVFree = true)
     (ih : ∀ env, dialecticaRealizerCtx si (A₀ →ᶠ eqAtType EqX ρ s t) env) :
@@ -594,83 +595,76 @@ def dialectica_ac {Γ : Ctx ι} {ρ τ : Ty ι} {A : Formula F (τ :: ρ :: Γ)}
 -- ============================================================================
 
 /-- Generalized Dialectica realizer for any context and environment.
-    Matches on all constructors of `Derivable F EqX Allowed.extended`. -/
-noncomputable def dialectica_soundness_ctx' {Γ : Ctx ι} (A : Formula F Γ) (env : interpCtx X Γ)
-    (h : @Derivable ι F EqX Allowed.extended Γ A) : dialecticaRealizerCtx si A env := by
-  suffices h_all : ∀ env' : interpCtx X Γ, dialecticaRealizerCtx si A env' from h_all env
-  clear env
-  induction h with
+    Returns a realizer for all environments; structural recursion on the derivation. -/
+def dialectica_soundness_ctx' {Γ : Ctx ι} {A : Formula F Γ}
+    (h : @Derivable ι F EqX Allowed.extended Γ A) :
+    ∀ env : interpCtx X Γ, dialecticaRealizerCtx si A env :=
+  match h with
   -- Base constructors
-  | or_contract   => intro env; exact dialectica_or_contract si env
-  | and_contract  => intro env; exact dialectica_and_contract si env
-  | or_weak       => intro env
-                     exact dialectica_or_weak si env (dialectica_nonempty si _).1.some
-  | and_weak      => intro env
-                     exact dialectica_and_weak si env (dialectica_nonempty si _).2.some
-  | or_perm       => intro env; exact dialectica_or_perm si env
-  | and_perm      => intro env; exact dialectica_and_perm si env
-  | exfalso       => intro env
-                     exact dialectica_exfalso si env
-                       (dialectica_nonempty si _).1.some
-                       (dialectica_nonempty si _).2.some
-  | forall_ax t   => intro env; exact dialectica_forall_ax si env t
-  | exist_ax t _  => intro env; exact dialectica_exist_ax si env t
-  | mp _ _ iha ihab =>
-    intro env; exact dialectica_mp si env (iha env) (ihab env)
-  | syllogism _ _ ihAB ihBC =>
-    intro env; exact dialectica_syllogism si env (ihAB env) (ihBC env)
-  | exportation _ ih =>
-    intro env; exact dialectica_exportation si env (ih env)
-  | importation _ ih =>
-    intro env; exact dialectica_importation si env (ih env)
-  | expansion _ ih =>
-    intro env; exact dialectica_expansion si env (ih env)
-  | forall_rule _ ih => exact dialectica_forall_rule si ih
-  | exist_rule _ ih  => exact dialectica_exist_rule si ih
-  | univ_gen _ ih =>
-    intro env; exact dialectica_univ_gen si env (ih env)
-  | succ_ne_zero =>
-    intro env
-    exact ⟨fun _ => ⟨id, fun _ _ => ()⟩,
-           fun ⟨n, (), ()⟩ h => by
-             simp only [dialecticaMatrix, interpTerm, lookupVar] at h ⊢
-             exact Nat.succ_ne_zero n h⟩
-  | succ_inj =>
-    intro env
-    exact ⟨fun _ _ => ⟨id, fun _ _ => ()⟩,
-           fun ⟨m, n, (), ()⟩ h => by
-             simp only [dialecticaMatrix, interpTerm, lookupVar] at h ⊢
-             exact Nat.succ.inj h⟩
-  | proj_ax =>
-    intro env
-    exact eqAtType_from_semEq si eqxi _ _ _ env (by simp [interpTerm, Term.app2])
-  | comb_ax =>
-    intro env
-    exact eqAtType_from_semEq si eqxi _ _ _ env (by simp [interpTerm, Term.app3])
-  | rec_zero =>
-    intro env
-    exact eqAtType_from_semEq si eqxi _ _ _ env (by simp [interpTerm, Term.app3]; rfl)
-  | rec_succ =>
-    intro env
-    exact eqAtType_from_semEq si eqxi _ _ _ env (by simp [interpTerm, Term.app3, Term.app2])
-  | refl0  => intro env; exact dialectica_refl0 si env
-  | sym0   => intro env; exact dialectica_sym0 si env
-  | trans0 => intro env; exact dialectica_trans0 si env
-  | qfer hqf hvf _ ih =>
-    intro env; exact dialectica_qfer si eqxi hqf hvf ih env
-  | «induction» _ _ ih_base ih_step =>
-    intro env
-    exact dialectica_induction si env (ih_base env) (ih_step env)
+  | .or_contract   => fun env => dialectica_or_contract si env
+  | .and_contract  => fun env => dialectica_and_contract si env
+  | .or_weak       => fun env => dialectica_or_weak si env (dialecticaDefaultWitness si _)
+  | .and_weak      => fun env => dialectica_and_weak si env (dialecticaDefaultCounter si _)
+  | .or_perm       => fun env => dialectica_or_perm si env
+  | .and_perm      => fun env => dialectica_and_perm si env
+  | .exfalso       => fun env => dialectica_exfalso si env
+                        (dialecticaDefaultWitness si _)
+                        (dialecticaDefaultCounter si _)
+  | .forall_ax t   => fun env => dialectica_forall_ax si env t
+  | .exist_ax t _  => fun env => dialectica_exist_ax si env t
+  | .mp hA hAB     => fun env => dialectica_mp si env
+                        (dialectica_soundness_ctx' hA env)
+                        (dialectica_soundness_ctx' hAB env)
+  | .syllogism hAB hBC => fun env => dialectica_syllogism si env
+                        (dialectica_soundness_ctx' hAB env)
+                        (dialectica_soundness_ctx' hBC env)
+  | .exportation h' => fun env => dialectica_exportation si env
+                        (dialectica_soundness_ctx' h' env)
+  | .importation h' => fun env => dialectica_importation si env
+                        (dialectica_soundness_ctx' h' env)
+  | .expansion h'   => fun env => dialectica_expansion si env
+                        (dialectica_soundness_ctx' h' env)
+  | .forall_rule h' => dialectica_forall_rule si (dialectica_soundness_ctx' h')
+  | .exist_rule h'  => dialectica_exist_rule si (dialectica_soundness_ctx' h')
+  | .univ_gen h'    => fun env => dialectica_univ_gen si env
+                        (dialectica_soundness_ctx' h' env)
+  | .succ_ne_zero   => fun env =>
+      ⟨fun _ => ⟨id, fun _ _ => ()⟩,
+       fun ⟨n, (), ()⟩ h => by
+         simp only [dialecticaMatrix, interpTerm, lookupVar] at h ⊢
+         exact Nat.succ_ne_zero n h⟩
+  | .succ_inj       => fun env =>
+      ⟨fun _ _ => ⟨id, fun _ _ => ()⟩,
+       fun ⟨m, n, (), ()⟩ h => by
+         simp only [dialecticaMatrix, interpTerm, lookupVar] at h ⊢
+         exact Nat.succ.inj h⟩
+  | .proj_ax   => fun env =>
+      eqAtType_from_semEq si eqxi _ _ _ env (by simp [interpTerm, Term.app2])
+  | .comb_ax   => fun env =>
+      eqAtType_from_semEq si eqxi _ _ _ env (by simp [interpTerm, Term.app3])
+  | .rec_zero  => fun env =>
+      eqAtType_from_semEq si eqxi _ _ _ env (by simp [interpTerm, Term.app3]; rfl)
+  | .rec_succ  => fun env =>
+      eqAtType_from_semEq si eqxi _ _ _ env (by simp [interpTerm, Term.app3, Term.app2])
+  | .refl0     => fun env => dialectica_refl0 si env
+  | .sym0      => fun env => dialectica_sym0 si env
+  | .trans0    => fun env => dialectica_trans0 si env
+  | .qfer hqf hvf h' => fun env =>
+      dialectica_qfer si eqxi hqf hvf (dialectica_soundness_ctx' h') env
+  | .induction h_base h_step => fun env =>
+      dialectica_induction si env
+        (dialectica_soundness_ctx' h_base env)
+        (dialectica_soundness_ctx' h_step env)
   -- Extension constructors
-  | markov _ hqf hvf   => intro env; exact dialectica_markov si hqf hvf env
-  | ip _ hqf hvf       => intro env; exact dialectica_ip si hqf hvf env
-  | ac _               => intro env; exact dialectica_ac si env
+  | .markov _ hqf hvf => fun env => dialectica_markov si hqf hvf env
+  | .ip _ hqf hvf     => fun env => dialectica_ip si hqf hvf env
+  | .ac _             => fun env => dialectica_ac si env
   -- QF-AC: same Dialectica as full AC (QF restriction is only on the proof rule)
-  | qfac _ _           => intro env; exact dialectica_ac si env
+  | .qfac _ _ _       => fun env => dialectica_ac si env
   -- Impossible (Allowed.extended.lem = false)
-  | lem h_lem          => exact absurd h_lem (by decide)
+  | .lem h_lem        => absurd h_lem (by decide)
 
 /-- **Dialectica Soundness Theorem** (Theorem 3.0.7). -/
-noncomputable def dialectica_soundness' (A : Formula F ([] : Ctx ι))
+def dialectica_soundness' (A : Formula F ([] : Ctx ι))
     (h : @Derivable ι F EqX Allowed.extended [] A) : dialecticaRealizer si A :=
-  dialectica_soundness_ctx' si eqxi A () h
+  dialectica_soundness_ctx' si eqxi h ()

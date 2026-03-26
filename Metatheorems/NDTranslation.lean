@@ -26,7 +26,7 @@ open Formula
 
 /-- **ND-Interpretation**: from a classical derivation of `A`,
     extract a Lean-computable Dialectica realizer for `NT(A)`. -/
-noncomputable def nd_soundness
+def nd_soundness
     {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     (si : SpaceInterp X F)
     {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
@@ -40,7 +40,7 @@ noncomputable def nd_soundness
     ((negTrans_sound adm h).castAllowed (by constructor <;> decide))
 
 /-- Closed-formula variant: the realizer lives at the empty environment. -/
-noncomputable def nd_soundness_closed
+def nd_soundness_closed
     {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     (si : SpaceInterp X F)
     {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
@@ -50,4 +50,4 @@ noncomputable def nd_soundness_closed
     (h : Derivable F EqX Allowed.classical A)
     : dialecticaRealizer si A.negTrans :=
   nd_soundness si eqxi adm h ()
-
+#print axioms nd_soundness 
