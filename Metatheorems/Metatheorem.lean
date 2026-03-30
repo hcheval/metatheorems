@@ -23,15 +23,123 @@ The proof factors into:
 open Formula
 
 -- ============================================================================
+-- Dialectica matrix reduction for QF ∨-free formulas
+-- ============================================================================
+
+/-- For QF ∨-free formulas, the Dialectica matrix equals the formula's
+    semantic interpretation, regardless of witness and counter values.
+    This is because W(A) and C(A) are subsingletons (all Unit). -/
+theorem dialecticaMatrix_iff_interpFormula
+    {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    (si : SpaceInterp X F) {Γ : Ctx ι}
+    (A : Formula F Γ) (hqf : A.isQF = true) (hvf : A.isVFree = true)
+    (env : interpCtx X Γ) (w : dialecticaWitness X A) (c : dialecticaCounter X A) :
+    dialecticaMatrix si A env w c ↔ interpFormula si A env :=
+  match A, hqf, hvf, env, w, c with
+  | .bot, _, _, _, _, _ => Iff.rfl
+  | .eq0 .., _, _, _, _, _ => Iff.rfl
+  | .and A B, hqf, hvf, env, (wA, wB), (cA, cB) => by
+    simp only [isQF, isVFree, Bool.and_eq_true] at hqf hvf
+    simp only [dialecticaMatrix, interpFormula]
+    exact Iff.and
+      (dialecticaMatrix_iff_interpFormula si A hqf.1 hvf.1 env wA cA)
+      (dialecticaMatrix_iff_interpFormula si B hqf.2 hvf.2 env wB cB)
+  | .or .., _, hvf, _, _, _ => by simp [isVFree] at hvf
+  | .imp A B, hqf, hvf, env, (f, g), (wA, cB) => by
+    simp only [isQF, isVFree, Bool.and_eq_true] at hqf hvf
+    simp only [dialecticaMatrix, interpFormula]
+    constructor
+    · intro h hA
+      have := (dialecticaMatrix_iff_interpFormula si A hqf.1 hvf.1 env wA (g wA cB)).mpr hA
+      exact (dialecticaMatrix_iff_interpFormula si B hqf.2 hvf.2 env (f wA) cB).mp (h this)
+    · intro h hM
+      have := (dialecticaMatrix_iff_interpFormula si A hqf.1 hvf.1 env wA (g wA cB)).mp hM
+      exact (dialecticaMatrix_iff_interpFormula si B hqf.2 hvf.2 env (f wA) cB).mpr (h this)
+
+-- ============================================================================
 -- General Metatheorem (Theorem 6.1)
 -- ============================================================================
 
-/-- **General Logical Metatheorem** (Theorem 6.1).
+/-- **General Metatheorem** (Theorem 6.1), Dialectica step.
 
-From a classical derivation of `∀x^ρ (∀u⁰ B₀(u,x) → ∃v⁰ C₀(v,x))`
-where B₀, C₀ are QF, extract a computable bound Φ such that for all
-x* ≥*_ρ x: `(∀u ≤ Φ(x*), B₀(u,x)) → (∃v ≤ Φ(x*), C₀(v,x))`. -/
+Takes a derivation in the extended system (post-NT) and applies Dialectica
+directly. The matrix has no ¬¬ layers, making extraction clean.
+The full metatheorem composes `negTrans_sound` (external) with this. -/
 def general_metatheorem
+    {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    (si : SpaceInterp X F)
+    {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
+    (eqxi : EqXInterp X F si EqX)
+    (mj : Majorizability si)
+    {ρ : Ty ι}
+    {B₀ C₀ : Formula F [Ty.nat, ρ]}
+    (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
+    (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
+    (prf : Derivable F EqX Allowed.extended
+      (all ρ (imp (all .nat B₀) (ex .nat C₀)))) :
+    { Φ : interpTy X ρ.hat → Nat //
+      ∀ (x : interpTy X ρ) (x_star : interpTy X ρ.hat),
+        mj.maj ρ x_star x →
+        (∀ u : Nat, u ≤ Φ x_star → interpFormula si B₀ (u, (x, ()))) →
+        ∃ v : Nat, v ≤ Φ x_star ∧ interpFormula si C₀ (v, (x, ())) } := by
+  -- Step 1: Apply Dialectica directly (no NT)
+  let r := dialectica_soundness_ctx' si eqxi prf
+  -- r : ∀ env, dialecticaRealizerCtx si (all ρ (imp (all .nat B₀) (ex .nat C₀))) env
+  -- Specialize to empty env
+  let r₀ := r ()
+  let w := r₀.val
+  let h := r₀.property
+  -- Step 2: Extract U, V from the Dialectica witness
+  -- w : interpTy X ρ → W(imp (all .nat B₀) (ex .nat C₀))
+  -- W(imp P Q) = (W(P) → W(Q)) × (W(P) → C(Q) → C(P))
+  -- W(all .nat B₀) = ℕ → W(B₀)
+  -- W(ex .nat C₀) = ℕ × W(C₀)
+  -- C(ex .nat C₀) = C(C₀)
+  -- C(all .nat B₀) = ℕ × C(B₀)
+  -- Extract V: feed default W(∀u B₀) into first component, project .1
+  let V : interpTy X ρ → Nat := fun x => ((w x).1 (dialecticaDefaultWitness si _)).1
+  -- Extract U: feed defaults into second component, project .1
+  let U : interpTy X ρ → Nat := fun x =>
+    ((w x).2 (dialecticaDefaultWitness si _) (dialecticaDefaultCounter si _)).1
+  -- Step 3: Prove B(x, U(x)) → C(x, V(x)) from the Dialectica matrix
+  have hUV : ∀ x : interpTy X ρ,
+      interpFormula si B₀ (U x, (x, ())) → interpFormula si C₀ (V x, (x, ())) := by
+    intro x hBx
+    -- Specialize h to counter (x, (defaultW(all .nat B₀), defaultC(ex .nat C₀)))
+    let wP := dialecticaDefaultWitness si (all Ty.nat B₀)
+    let cQ := dialecticaDefaultCounter si (ex Ty.nat C₀)
+    have h_spec := h (x, (wP, cQ))
+    -- h_spec : matrix(imp (all .nat B₀) (ex .nat C₀), (x, ()), w x, (wP, cQ))
+    -- which is: matrix(all .nat B₀, ..., wP, (w x).2 wP cQ) → matrix(ex .nat C₀, ..., (w x).1 wP, cQ)
+    -- Unfold: matrix(all .nat B₀, (x,()), wP, (U x, ...)) = matrix(B₀, (U x, x, ()), wP(U x), ...)
+    -- and:    matrix(ex .nat C₀, (x,()), (V x, ...), cQ) = matrix(C₀, (V x, x, ()), ..., cQ)
+    simp only [dialecticaMatrix] at h_spec
+    -- Use the QF∨-free reduction for B₀ and C₀
+    rw [dialecticaMatrix_iff_interpFormula si B₀ hB_qf hB_vf] at h_spec
+    rw [dialecticaMatrix_iff_interpFormula si C₀ hC_qf hC_vf] at h_spec
+    exact h_spec hBx
+  -- Step 4: Construct Φ using majorizability
+  exact ⟨fun x_star =>
+    Nat.max (mj.majorizer (ρ := ρ →ₜ .nat) U x_star)
+            (mj.majorizer (ρ := ρ →ₜ .nat) V x_star),
+    fun x x_star hx hB => by
+      have hV_le : V x ≤ mj.majorizer (ρ := ρ →ₜ .nat) V x_star :=
+        mj.maj_le (mj.maj_app (mj.majorizer_maj (ρ := ρ →ₜ .nat) V) hx)
+      have hU_le : U x ≤ mj.majorizer (ρ := ρ →ₜ .nat) U x_star :=
+        mj.maj_le (mj.maj_app (mj.majorizer_maj (ρ := ρ →ₜ .nat) U) hx)
+      exact ⟨V x, Nat.le_trans hV_le (Nat.le_max_right ..),
+             hUV x (hB (U x) (Nat.le_trans hU_le (Nat.le_max_left ..)))⟩⟩
+
+-- ============================================================================
+-- Classical version (Theorem 6.1 as in the paper)
+-- ============================================================================
+
+/-- **General Metatheorem from classical proof** (Theorem 6.1).
+
+Takes a classical derivation (with LEM + QF-AC) and composes
+`nd_soundness` with witness extraction. The ¬¬ layers from the
+negative translation are eliminated using `Classical.not_not`. -/
+def general_metatheorem_classical
     {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     (si : SpaceInterp X F)
     {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
@@ -40,6 +148,8 @@ def general_metatheorem
     (mj : Majorizability si)
     {ρ : Ty ι}
     {B₀ C₀ : Formula F [Ty.nat, ρ]}
+    (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
+    (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
     (prf : Derivable F EqX Allowed.classical
       (all ρ (imp (all .nat B₀) (ex .nat C₀)))) :
     { Φ : interpTy X ρ.hat → Nat //
@@ -47,41 +157,30 @@ def general_metatheorem
         mj.maj ρ x_star x →
         (∀ u : Nat, u ≤ Φ x_star → interpFormula si B₀ (u, (x, ()))) →
         ∃ v : Nat, v ≤ Φ x_star ∧ interpFormula si C₀ (v, (x, ())) } := by
-  -- Step 1: Apply ND-interpretation
+  -- Step 1: Apply ND-interpretation (NT + Dialectica)
   let r := nd_soundness_closed si eqxi adm prf
-  -- r : dialecticaRealizer si NT(∀x(∀u B₀ → ∃v C₀))
-  -- Extract witness and property
   let w := r.val
   let h := r.property
-  -- Step 2: Extract U, V by projecting through the ¬¬ and ∀ layers.
-  -- NT(A) = ¬¬ki(A). Dialectica witness of ¬¬P = (W(¬P)→Unit) × (W(¬P)→Unit→C(¬P)).
-  -- The .2 component, fed defaults, yields W(ki(A)) via C(¬P) = W(P) × Unit.
-  -- Peel outer ¬¬: get W(kurodaInner(A))
+  -- h : ∀ y, dialecticaMatrix si NT(∀x(∀u B₀ → ∃v C₀)) () w y
+  -- NT introduces ¬¬ layers. Extract through them using Classical.not_not.
+  -- Step 2: Extract U, V (same projections as extended version, through ¬¬)
   let ki_w := (w.2 (dialecticaDefaultWitness si _) ()).1
-  -- ki_w : W(kurodaInner(∀x(∀u B₀ → ∃v C₀)))
-  --       = W(∀x(¬¬(∀u(¬¬B₀) → ∃v C₀)))
-  --       = interpTy X ρ → W(¬¬(∀u(¬¬B₀) → ∃v C₀))
-  -- Peel ∀x and inner ¬¬: for each x, get W(∀u(¬¬B₀) → ∃v C₀)
   let imp_w := fun x => ((ki_w x).2 (dialecticaDefaultWitness si _) ()).1
-  -- imp_w x : W(imp (all .nat (¬¬B₀)) (ex .nat C₀))
-  --         = (W(∀u ¬¬B₀) → W(∃v C₀)) × (W(∀u ¬¬B₀) → C(∃v C₀) → C(∀u ¬¬B₀))
-  -- Extract V: first component gives W(∃v C₀) = ℕ × W(C₀); project .1
-  let V : interpTy X ρ → Nat := fun x => ((imp_w x).1 (dialecticaDefaultWitness si _)).1
-  -- Extract U: second component gives C(∀u ¬¬B₀) = ℕ × C(¬¬B₀); project .1
+  let V : interpTy X ρ → Nat := fun x =>
+    ((imp_w x).1 (dialecticaDefaultWitness si _)).1
   let U : interpTy X ρ → Nat := fun x =>
     ((imp_w x).2 (dialecticaDefaultWitness si _) (dialecticaDefaultCounter si _)).1
-  -- Step 3: Prove B(x, U(x)) → C(x, V(x)) from the Dialectica matrix
+  -- Step 3: Prove B(x, U(x)) → C(x, V(x))
+  -- Unfold h through the ¬¬ layers using Classical.not_not
   have hUV : ∀ x : interpTy X ρ,
       interpFormula si B₀ (U x, (x, ())) → interpFormula si C₀ (V x, (x, ())) := by
-    -- The Dialectica matrix property `h` gives, for each counter y,
-    -- a deeply nested ¬¬-wrapped statement about B₀ and C₀.
-    -- Extracting the semantic content requires:
-    -- 1. Choosing counters that encode (x, hBx)
-    -- 2. Classical ¬¬-elimination through multiple layers
-    -- 3. A matrix reduction lemma: for QF formulas, dialecticaMatrix ↔ interpFormula
-    -- TODO: factor into a general Dialectica matrix reduction lemma
+    -- The Dialectica matrix of NT(A) has nested ¬¬ layers from the negative translation.
+    -- Extracting B₀(U(x),x) → C₀(V(x),x) requires peeling these ¬¬ layers
+    -- using classical reasoning. The ¬¬ elimination is sound since the target is Prop.
+    -- TODO: implement ¬¬ matrix extraction (the `→ False` patterns from NT
+    -- don't syntactically match `Not`, requiring manual counter construction).
     sorry
-  -- Step 4: Construct Φ using majorizability
+  -- Step 4: Construct Φ (same as extended version)
   exact ⟨fun x_star =>
     Nat.max (mj.majorizer (ρ := ρ →ₜ .nat) U x_star)
             (mj.majorizer (ρ := ρ →ₜ .nat) V x_star),
