@@ -36,7 +36,7 @@ theorem dialecticaMatrix_iff_interpFormula
     {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     (si : SpaceInterp X F) {Γ : Ctx ι}
     (A : Formula F Γ) (hqf : A.isQF = true) (hvf : A.isVFree = true)
-    (env : Ctx.interpret X Γ) (w : dialecticaWitness X A) (c : dialecticaCounter X A) :
+    (env : Ctx.interpret X Γ) (w : 𝕎 X A) (c : ℂ X A) :
     dialecticaMatrix si A env w c ↔ Formula.interpret si A env :=
   match A, hqf, hvf, env, w, c with
   | .bot, _, _, _, _, _ => Iff.rfl

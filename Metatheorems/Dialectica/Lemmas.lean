@@ -44,7 +44,7 @@ def dialectica_mp {Γ : Ctx ι} {A B : Formula F Γ} (env : Ctx.interpret X Γ)
 -- ============================================================================
 
 def dialectica_exfalso {Γ : Ctx ι} {A : Formula F Γ} (env : Ctx.interpret X Γ)
-    (inhW : dialecticaWitness X A) (inhC : dialecticaCounter X A) :
+    (inhW : 𝕎 X A) (inhC : ℂ X A) :
     dialecticaRealizerCtx si (⊥ᶠ →ᶠ A) env :=
   ⟨⟨fun _ => inhW, fun _ _ => ()⟩, fun ⟨(), _⟩ h => absurd h id⟩
 
@@ -53,7 +53,7 @@ def dialectica_exfalso {Γ : Ctx ι} {A : Formula F Γ} (env : Ctx.interpret X �
 -- ============================================================================
 
 def dialectica_and_weak {Γ : Ctx ι} {A B : Formula F Γ} (env : Ctx.interpret X Γ)
-    (inhC : dialecticaCounter X B) :
+    (inhC : ℂ X B) :
     dialecticaRealizerCtx si (A ∧ᶠ B →ᶠ A) env :=
   ⟨⟨fun xAB => xAB.1, fun _ yA => (yA, inhC)⟩, fun ⟨⟨_, _⟩, _⟩ h => h.1⟩
 
@@ -71,7 +71,7 @@ def dialectica_and_perm {Γ : Ctx ι} {A B : Formula F Γ} (env : Ctx.interpret 
 -- ============================================================================
 
 def dialectica_or_weak {Γ : Ctx ι} {A B : Formula F Γ} (env : Ctx.interpret X Γ)
-    (inhW : dialecticaWitness X B) :
+    (inhW : 𝕎 X B) :
     dialecticaRealizerCtx si (A →ᶠ A ∨ᶠ B) env :=
   ⟨⟨fun xA => (true, xA, inhW), fun _ yAB => yAB.1⟩,
    fun ⟨_, ⟨yA, _⟩⟩ h => ⟨fun _ => h, fun hf => Bool.noConfusion hf⟩⟩
@@ -194,7 +194,7 @@ private def Ty.interpret_default' {ι : Type} {X : ι → Type} {F : ι → Ty �
 
 /-- A canonical counter for `eqAtType EqX ρ s t`. -/
 private def eqAtType_default_ctr {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ) :
-    dialecticaCounter X (eqAtType EqX ρ s t) :=
+    ℂ X (eqAtType EqX ρ s t) :=
   match ρ, s, t with
   | .nat,      _, _  => ()
   | .base i,   s, t  => eqxi.counterDefault i s t
@@ -204,7 +204,7 @@ private def eqAtType_default_ctr {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
 
 /-- A canonical witness for `eqAtType EqX ρ s t`. -/
 private def eqAtType_default_wit {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ) :
-    dialecticaWitness X (eqAtType EqX ρ s t) :=
+    𝕎 X (eqAtType EqX ρ s t) :=
   match ρ, s, t with
   | .nat,      _, _  => ()
   | .base i,   s, t  => eqxi.witnessDefault i s t
@@ -217,7 +217,7 @@ private def eqAtType_default_wit {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
     is a function into a subsingleton, which is again a subsingleton. -/
 private lemma dialecticaWitness_eqAtType_ss (eqxi : EqXInterp X F si EqX) (ρ : Ty ι) :
     ∀ {Γ : Ctx ι} (s t : Term F Γ ρ),
-    Subsingleton (dialecticaWitness X (eqAtType EqX ρ s t)) := by
+    Subsingleton (𝕎 X (eqAtType EqX ρ s t)) := by
   induction ρ with
   | nat    => intro Γ s t; simp only [eqAtType, dialecticaWitness]; exact ⟨fun _ _ => rfl⟩
   | base i => intro Γ s t; exact eqxi.witnessSubsingleton i s t
@@ -265,7 +265,7 @@ private def eqAtType_from_semEq {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
                                   (z, env) (eq_z z)).property yτ⟩
 
 /-- Dialectica soundness for the QF-ER (qfer) rule.
-    Requires A₀ to be QF and ∨-free so that `dialecticaCounter X A₀` is a
+    Requires A₀ to be QF and ∨-free so that `ℂ X A₀` is a
     subsingleton; this lets us lift a single-counter hypothesis to a full
     realizer for `eqAtType EqX ρ s t`, extract the semantic equality, and then
     rebuild the conclusion's realizer using `eqxi`. -/
@@ -275,9 +275,9 @@ def dialectica_qfer {Γ : Ctx ι} {A₀ : Formula F Γ} {ρ σ : Ty ι}
     (ih : ∀ env, dialecticaRealizerCtx si (A₀ →ᶠ eqAtType EqX ρ s t) env) :
     ∀ env, dialecticaRealizerCtx si (A₀ →ᶠ eqAtType EqX σ (r.subst0 s) (r.subst0 t)) env := by
   intro env
-  have ssC : Subsingleton (dialecticaCounter X A₀) :=
+  have ssC : Subsingleton (ℂ X A₀) :=
     (dialecticaWitness_subsingleton A₀ hqf hvf).2
-  have ssW_σ : Subsingleton (dialecticaWitness X (eqAtType EqX σ (r.subst0 s) (r.subst0 t))) :=
+  have ssW_σ : Subsingleton (𝕎 X (eqAtType EqX σ (r.subst0 s) (r.subst0 t))) :=
     dialecticaWitness_eqAtType_ss si eqxi σ (r.subst0 s) (r.subst0 t)
   let yρ_default := eqAtType_default_ctr si eqxi ρ s t
   let wσ_default := eqAtType_default_wit si eqxi σ (r.subst0 s) (r.subst0 t)
@@ -402,15 +402,15 @@ def dialectica_induction {Γ : Ctx ι} {A : Formula F (Ty.nat :: Γ)} (env : Ctx
     dialecticaRealizerCtx si (Formula.all Ty.nat A) env := by
   have hW0  := dialecticaWitness_subst0 (X := X) A Term.zero
   have hC0  := dialecticaCounter_subst0 (X := X) A Term.zero
-  have hW_sv : dialecticaWitness X (A.substVar0 (Term.app Term.succ (.var .vz))) =
-               dialecticaWitness X A :=
+  have hW_sv : 𝕎 X (A.substVar0 (Term.app Term.succ (.var .vz))) =
+               𝕎 X A :=
     (dialectica_types_substF (X := X) A (Formula.Term.substVar0_map _)).1
-  have hC_sv : dialecticaCounter X (A.substVar0 (Term.app Term.succ (.var .vz))) =
-               dialecticaCounter X A :=
+  have hC_sv : ℂ X (A.substVar0 (Term.app Term.succ (.var .vz))) =
+               ℂ X A :=
     (dialectica_types_substF (X := X) A (Formula.Term.substVar0_map _)).2
   -- Base witness w₀ : dW(A)
-  let w₀ : dialecticaWitness X A := cast hW0 hbase.val
-  have hbase_A : ∀ y : dialecticaCounter X A,
+  let w₀ : 𝕎 X A := cast hW0 hbase.val
+  have hbase_A : ∀ y : ℂ X A,
       dialecticaMatrix si A (Nat.zero, env) w₀ y := by
     intro y
     have hcc : cast hW0.symm w₀ = hbase.val :=
@@ -424,11 +424,11 @@ def dialectica_induction {Γ : Ctx ι} {A : Formula F (Ty.nat :: Γ)} (env : Ctx
   -- Step witness
   let U := hstep.val
   -- Full witness by nat.rec
-  let W : ℕ → dialecticaWitness X A :=
+  let W : ℕ → 𝕎 X A :=
     fun n => Nat.rec w₀ (fun n ih => cast hW_sv ((U n).1 ih)) n
   refine ⟨W, fun ⟨n, y⟩ => ?_⟩
   change dialecticaMatrix si A (n, env) (W n) y
-  suffices h : ∀ m (y : dialecticaCounter X A),
+  suffices h : ∀ m (y : ℂ X A),
       dialecticaMatrix si A (m, env) (W m) y from h n y
   intro m
   induction m with
@@ -461,10 +461,10 @@ private lemma Ty.interpret_nonempty {ι : Type} {X : ι → Type} {F : ι → Ty
   | base i => exact ⟨si.zeroInterp i⟩
   | arr _ _ _ ihτ => exact ⟨fun _ => ihτ.some⟩
 
-/-- Both `dialecticaWitness X A` and `dialecticaCounter X A` are nonempty. -/
+/-- Both `𝕎 X A` and `ℂ X A` are nonempty. -/
 private lemma dialectica_nonempty {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     (si : SpaceInterp X F) {Γ : Ctx ι} (A : Formula F Γ) :
-    Nonempty (dialecticaWitness X A) ∧ Nonempty (dialecticaCounter X A) := by
+    Nonempty (𝕎 X A) ∧ Nonempty (ℂ X A) := by
   induction A with
   | bot     => exact ⟨⟨()⟩, ⟨()⟩⟩
   | eq0 _ _ => exact ⟨⟨()⟩, ⟨()⟩⟩
@@ -488,10 +488,10 @@ def dialectica_markov {Γ : Ctx ι} {ρ : Ty ι} {A₀ : Formula F (ρ :: Γ)}
     (env : Ctx.interpret X Γ) :
     dialecticaRealizerCtx si (¬ᶠ(¬ᶠ(Formula.ex ρ A₀)) →ᶠ Formula.ex ρ A₀) env := by
   have hss := dialecticaWitness_subsingleton (X := X) A₀ hqf hvf
-  have ssW : Subsingleton (dialecticaWitness X A₀) := hss.1
-  have ssC : Subsingleton (dialecticaCounter X A₀) := hss.2
+  have ssW : Subsingleton (𝕎 X A₀) := hss.1
+  have ssC : Subsingleton (ℂ X A₀) := hss.2
   set dfl := dialecticaDefault (X := X) A₀ hqf hvf
-  set xN₀ : dialecticaWitness X (Formula.ex ρ A₀ →ᶠ ⊥ᶠ) :=
+  set xN₀ : 𝕎 X (Formula.ex ρ A₀ →ᶠ ⊥ᶠ) :=
     (fun _ => (), fun _ _ => dfl.2)
   refine ⟨⟨fun xP => ((xP.2 xN₀ ()).1.1, dfl.1),
            fun _ _ => (xN₀, ())⟩, ?_⟩
@@ -515,12 +515,12 @@ def dialectica_ip {Γ : Ctx ι} {ρ σ : Ty ι}
       ((Formula.all σ A₀ →ᶠ Formula.ex ρ B) →ᶠ
        Formula.ex ρ ((Formula.all σ A₀).weakenBy ρ →ᶠ B)) env := by
   have hss := dialecticaWitness_subsingleton (X := X) A₀ hqf hvf
-  have ssW : Subsingleton (dialecticaWitness X A₀) := hss.1
-  have ssC : Subsingleton (dialecticaCounter X A₀) := hss.2
+  have ssW : Subsingleton (𝕎 X A₀) := hss.1
+  have ssC : Subsingleton (ℂ X A₀) := hss.2
   set dfl := dialecticaDefault (X := X) A₀ hqf hvf
-  have ssWAll : Subsingleton (dialecticaWitness X (Formula.all σ A₀)) :=
+  have ssWAll : Subsingleton (𝕎 X (Formula.all σ A₀)) :=
     ⟨fun f g => funext (fun _ => ssW.elim _ _)⟩
-  set w₀ : dialecticaWitness X (Formula.all σ A₀) := fun _ => dfl.1
+  set w₀ : 𝕎 X (Formula.all σ A₀) := fun _ => dfl.1
   set hWA := dialecticaWitness_weaken (X := X) ρ (Formula.all σ A₀)
   set hCA := dialecticaCounter_weaken (X := X) ρ (Formula.all σ A₀)
   refine ⟨⟨fun xH =>
