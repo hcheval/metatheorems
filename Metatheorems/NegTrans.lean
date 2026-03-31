@@ -873,11 +873,11 @@ variable {ι : Type} {F : ι → Ty ι}
     Composed with `dialectica_soundness`, this gives the ND interpretation:
     from a classical proof, extract Lean-computable witnesses. -/
 def negTrans_sound {Γ : Ctx ι} {A : Formula F Γ}
-    (h : Derivable F EqX Allowed.classical Premises A) : Derivable F EqX Allowed.nt_target Premises A.negTrans :=
+    (h : Derivable F EqX Allowed.classical Premises A) : Derivable F EqX Allowed.nt_target Premises Aᴺᵀ :=
   match h with
-  -- Premises: the NT of a premise is proved using negTrans_iff_pu if PU,
-  -- or left as sorry for general premises.
-  | .premise hp   => sorry -- TODO: NT of premises (requires PU assumption on premises)
+  -- Premises: since premises are PU (by the constructor), A ↔ NT(A) by negTrans_iff_pu.
+  | .premise ⟨hpu, hp⟩ =>
+      Derivable.mp (.premise (And.intro hpu hp)) (negTrans_iff_pu (Premises := Premises) adm _ hpu).1
   -- Simple propositional axioms: wrap in ¬¬ via dnn_intro
   | .or_contract  => .mp .or_contract  dnn_intro
   | .and_contract => .mp .and_contract dnn_intro
