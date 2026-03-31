@@ -195,7 +195,7 @@ def general_metatheorem_classical
              hUV x (hB (U x) (Nat.le_trans hU_le (Nat.le_max_left ..)))⟩⟩
 
 -- ============================================================================
--- Core bound construction (Theorem 6.1, step 3–5) 
+-- Core bound construction (Theorem 6.1, step 3–5)
 -- ============================================================================
 
 /-- **Core of the General Metatheorem** (Theorem 6.1).

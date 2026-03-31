@@ -57,8 +57,8 @@ def dialecticaCounter {ι : Type} (X : ι → Type) {F : ι → Ty ι} {Γ : Ctx
 
 end
 
-prefix:max "𝕎 " => dialecticaWitness _
-prefix:max "ℂ " => dialecticaCounter _
+-- Notation candidates for 𝕎/ℂ were tried but conflict with Lean's bracket syntax.
+-- Use `dialecticaWitness X A` and `dialecticaCounter X A` directly.
 
 -- ============================================================================
 -- Default inhabitants (computable; replace Nonempty.some)

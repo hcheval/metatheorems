@@ -38,8 +38,8 @@ def nd_soundness
     {Γ : Ctx ι} {A : Formula F Γ}
     (h : Derivable F EqX Allowed.classical A)
     (env : Ctx.interpret X Γ)
-    : dialecticaRealizerCtx si A.negTrans env :=
-  dialectica_soundness_ctx si eqxi A.negTrans env
+    : dialecticaRealizerCtx si Aᴺᵀ env :=
+  dialectica_soundness_ctx si eqxi Aᴺᵀ env
     ((negTrans_sound adm h).castAllowed (by constructor <;> decide))
 
 /-- Closed-formula variant: the realizer lives at the empty environment. -/
@@ -51,7 +51,7 @@ def nd_soundness_closed
     (adm : AdmissibleEqX EqX)
     {A : Formula F ([] : Ctx ι)}
     (h : Derivable F EqX Allowed.classical A)
-    : dialecticaRealizer si A.negTrans :=
+    : dialecticaRealizer si Aᴺᵀ :=
   nd_soundness si eqxi adm h ()
 #print axioms nd_soundness 
 
