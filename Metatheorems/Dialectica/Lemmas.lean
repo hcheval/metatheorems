@@ -5,6 +5,9 @@ Authors: Horatiu
 -/
 import Metatheorems.Dialectica.Defs
 
+
+namespace Metatheorems
+
 /-!
 # Dialectica Soundness Lemmas
 
@@ -14,7 +17,7 @@ the main soundness proof in `dialectica_soundness`.
 
 Each lemma constructs the witness values explicitly. All lemmas are
 generalized to work for arbitrary contexts `Γ` and environments
-`env : interpCtx X Γ`, returning a `dialecticaRealizerCtx` (a subtype
+`env : Ctx.interpret X Γ`, returning a `dialecticaRealizerCtx` (a subtype
 living in `Type`, not `Prop`). The witness can be extracted computably
 via `.val`.
 -/
@@ -30,7 +33,7 @@ variable (eqxi : EqXInterp X F si EqX)
 -- Modus ponens
 -- ============================================================================
 
-def dialectica_mp {Γ : Ctx ι} {A B : Formula F Γ} (env : interpCtx X Γ)
+def dialectica_mp {Γ : Ctx ι} {A B : Formula F Γ} (env : Ctx.interpret X Γ)
     (hA : dialecticaRealizerCtx si A env)
     (hAB : dialecticaRealizerCtx si (A →ᶠ B) env) :
     dialecticaRealizerCtx si B env :=
@@ -40,7 +43,7 @@ def dialectica_mp {Γ : Ctx ι} {A B : Formula F Γ} (env : interpCtx X Γ)
 -- Ex falso quodlibet
 -- ============================================================================
 
-def dialectica_exfalso {Γ : Ctx ι} {A : Formula F Γ} (env : interpCtx X Γ)
+def dialectica_exfalso {Γ : Ctx ι} {A : Formula F Γ} (env : Ctx.interpret X Γ)
     (inhW : dialecticaWitness X A) (inhC : dialecticaCounter X A) :
     dialecticaRealizerCtx si (⊥ᶠ →ᶠ A) env :=
   ⟨⟨fun _ => inhW, fun _ _ => ()⟩, fun ⟨(), _⟩ h => absurd h id⟩
@@ -49,7 +52,7 @@ def dialectica_exfalso {Γ : Ctx ι} {A : Formula F Γ} (env : interpCtx X Γ)
 -- ∧-weakening: A ∧ B → A
 -- ============================================================================
 
-def dialectica_and_weak {Γ : Ctx ι} {A B : Formula F Γ} (env : interpCtx X Γ)
+def dialectica_and_weak {Γ : Ctx ι} {A B : Formula F Γ} (env : Ctx.interpret X Γ)
     (inhC : dialecticaCounter X B) :
     dialecticaRealizerCtx si (A ∧ᶠ B →ᶠ A) env :=
   ⟨⟨fun xAB => xAB.1, fun _ yA => (yA, inhC)⟩, fun ⟨⟨_, _⟩, _⟩ h => h.1⟩
@@ -58,7 +61,7 @@ def dialectica_and_weak {Γ : Ctx ι} {A B : Formula F Γ} (env : interpCtx X Γ
 -- ∧-permutation: A ∧ B → B ∧ A
 -- ============================================================================
 
-def dialectica_and_perm {Γ : Ctx ι} {A B : Formula F Γ} (env : interpCtx X Γ) :
+def dialectica_and_perm {Γ : Ctx ι} {A B : Formula F Γ} (env : Ctx.interpret X Γ) :
     dialecticaRealizerCtx si (A ∧ᶠ B →ᶠ B ∧ᶠ A) env :=
   ⟨⟨fun xAB => (xAB.2, xAB.1), fun _ yBA => (yBA.2, yBA.1)⟩,
    fun ⟨⟨_, _⟩, ⟨_, _⟩⟩ h => ⟨h.2, h.1⟩⟩
@@ -67,7 +70,7 @@ def dialectica_and_perm {Γ : Ctx ι} {A B : Formula F Γ} (env : interpCtx X Γ
 -- ∨-weakening: A → A ∨ B
 -- ============================================================================
 
-def dialectica_or_weak {Γ : Ctx ι} {A B : Formula F Γ} (env : interpCtx X Γ)
+def dialectica_or_weak {Γ : Ctx ι} {A B : Formula F Γ} (env : Ctx.interpret X Γ)
     (inhW : dialecticaWitness X B) :
     dialecticaRealizerCtx si (A →ᶠ A ∨ᶠ B) env :=
   ⟨⟨fun xA => (true, xA, inhW), fun _ yAB => yAB.1⟩,
@@ -77,7 +80,7 @@ def dialectica_or_weak {Γ : Ctx ι} {A B : Formula F Γ} (env : interpCtx X Γ)
 -- ∨-permutation: A ∨ B → B ∨ A
 -- ============================================================================
 
-def dialectica_or_perm {Γ : Ctx ι} {A B : Formula F Γ} (env : interpCtx X Γ) :
+def dialectica_or_perm {Γ : Ctx ι} {A B : Formula F Γ} (env : Ctx.interpret X Γ) :
     dialecticaRealizerCtx si (A ∨ᶠ B →ᶠ B ∨ᶠ A) env :=
   ⟨⟨fun xAB => (!xAB.1, xAB.2.2, xAB.2.1), fun _ yBA => (yBA.2, yBA.1)⟩,
    fun ⟨⟨z, _, _⟩, ⟨_, _⟩⟩ ⟨hT, hF⟩ =>
@@ -88,7 +91,7 @@ def dialectica_or_perm {Γ : Ctx ι} {A B : Formula F Γ} (env : interpCtx X Γ)
 -- ∨-contraction: A ∨ A → A
 -- ============================================================================
 
-def dialectica_or_contract {Γ : Ctx ι} {A : Formula F Γ} (env : interpCtx X Γ) :
+def dialectica_or_contract {Γ : Ctx ι} {A : Formula F Γ} (env : Ctx.interpret X Γ) :
     dialecticaRealizerCtx si (A ∨ᶠ A →ᶠ A) env :=
   ⟨⟨fun xAA => if xAA.1 then xAA.2.1 else xAA.2.2, fun _ yA => (yA, yA)⟩,
    fun ⟨⟨z, _, _⟩, yA⟩ h => by cases z <;> simp_all [dialecticaMatrix]⟩
@@ -97,7 +100,7 @@ def dialectica_or_contract {Γ : Ctx ι} {A : Formula F Γ} (env : interpCtx X �
 -- ∧-contraction: A → A ∧ A
 -- ============================================================================
 
-def dialectica_and_contract {Γ : Ctx ι} {A : Formula F Γ} (env : interpCtx X Γ) :
+def dialectica_and_contract {Γ : Ctx ι} {A : Formula F Γ} (env : Ctx.interpret X Γ) :
     dialecticaRealizerCtx si (A →ᶠ A ∧ᶠ A) env :=
   ⟨⟨fun xA => (xA, xA),
     fun xA ⟨y1, y2⟩ =>
@@ -114,7 +117,7 @@ def dialectica_and_contract {Γ : Ctx ι} {A : Formula F Γ} (env : interpCtx X 
 -- Syllogism
 -- ============================================================================
 
-def dialectica_syllogism {Γ : Ctx ι} {A B C : Formula F Γ} (env : interpCtx X Γ)
+def dialectica_syllogism {Γ : Ctx ι} {A B C : Formula F Γ} (env : Ctx.interpret X Γ)
     (hAB : dialecticaRealizerCtx si (A →ᶠ B) env)
     (hBC : dialecticaRealizerCtx si (B →ᶠ C) env) :
     dialecticaRealizerCtx si (A →ᶠ C) env :=
@@ -127,7 +130,7 @@ def dialectica_syllogism {Γ : Ctx ι} {A B C : Formula F Γ} (env : interpCtx X
 -- Exportation: A ∧ B → C implies A → (B → C)
 -- ============================================================================
 
-def dialectica_exportation {Γ : Ctx ι} {A B C : Formula F Γ} (env : interpCtx X Γ)
+def dialectica_exportation {Γ : Ctx ι} {A B C : Formula F Γ} (env : Ctx.interpret X Γ)
     (h : dialecticaRealizerCtx si (A ∧ᶠ B →ᶠ C) env) :
     dialecticaRealizerCtx si (A →ᶠ B →ᶠ C) env :=
   let ⟨⟨V, Z⟩, hV⟩ := h
@@ -139,7 +142,7 @@ def dialectica_exportation {Γ : Ctx ι} {A B C : Formula F Γ} (env : interpCtx
 -- Importation: A → (B → C) implies A ∧ B → C
 -- ============================================================================
 
-def dialectica_importation {Γ : Ctx ι} {A B C : Formula F Γ} (env : interpCtx X Γ)
+def dialectica_importation {Γ : Ctx ι} {A B C : Formula F Γ} (env : Ctx.interpret X Γ)
     (h : dialecticaRealizerCtx si (A →ᶠ B →ᶠ C) env) :
     dialecticaRealizerCtx si (A ∧ᶠ B →ᶠ C) env :=
   let ⟨⟨U, Y⟩, hU⟩ := h
@@ -150,7 +153,7 @@ def dialectica_importation {Γ : Ctx ι} {A B C : Formula F Γ} (env : interpCtx
 -- Expansion: A → B implies C ∨ A → C ∨ B
 -- ============================================================================
 
-def dialectica_expansion {Γ : Ctx ι} {A B C : Formula F Γ} (env : interpCtx X Γ)
+def dialectica_expansion {Γ : Ctx ι} {A B C : Formula F Γ} (env : Ctx.interpret X Γ)
     (h : dialecticaRealizerCtx si (A →ᶠ B) env) :
     dialecticaRealizerCtx si (C ∨ᶠ A →ᶠ C ∨ᶠ B) env :=
   let ⟨⟨U_AB, Y_AB⟩, h_AB⟩ := h
@@ -162,15 +165,15 @@ def dialectica_expansion {Γ : Ctx ι} {A B C : Formula F Γ} (env : interpCtx X
 -- Equality axioms
 -- ============================================================================
 
-def dialectica_refl0 {Γ : Ctx ι} {t : Term F Γ Ty.nat} (env : interpCtx X Γ) :
+def dialectica_refl0 {Γ : Ctx ι} {t : Term F Γ Ty.nat} (env : Ctx.interpret X Γ) :
     dialecticaRealizerCtx si (.eq0 t t) env :=
   ⟨(), fun () => rfl⟩
 
-def dialectica_sym0 {Γ : Ctx ι} {s t : Term F Γ Ty.nat} (env : interpCtx X Γ) :
+def dialectica_sym0 {Γ : Ctx ι} {s t : Term F Γ Ty.nat} (env : Ctx.interpret X Γ) :
     dialecticaRealizerCtx si (.eq0 s t →ᶠ .eq0 t s) env :=
   ⟨⟨fun _ => (), fun _ _ => ()⟩, fun ⟨(), ()⟩ h => h.symm⟩
 
-def dialectica_trans0 {Γ : Ctx ι} {s t u : Term F Γ Ty.nat} (env : interpCtx X Γ) :
+def dialectica_trans0 {Γ : Ctx ι} {s t u : Term F Γ Ty.nat} (env : Ctx.interpret X Γ) :
     dialecticaRealizerCtx si (.eq0 s t ∧ᶠ .eq0 t u →ᶠ .eq0 s u) env :=
   ⟨⟨fun _ => (), fun _ _ => ((), ())⟩, fun ⟨((), ()), ()⟩ ⟨h1, h2⟩ => h1.trans h2⟩
 
@@ -178,12 +181,12 @@ def dialectica_trans0 {Γ : Ctx ι} {s t u : Term F Γ Ty.nat} (env : interpCtx 
 -- QF-ER (qfer): A₀ →ᶠ eqAtType EqX ρ s t  implies  A₀ →ᶠ eqAtType EqX σ (r.subst0 s) (r.subst0 t)
 -- ============================================================================
 
-/-- A canonical element of `interpTy X ρ`, using `si.zeroInterp` at base types. -/
-private def interpTy_default' {ι : Type} {X : ι → Type} {F : ι → Ty ι}
-    (si : SpaceInterp X F) : ∀ (ρ : Ty ι), interpTy X ρ
+/-- A canonical element of `Ty.interpret X ρ`, using `si.zeroInterp` at base types. -/
+private def Ty.interpret_default' {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    (si : SpaceInterp X F) : ∀ (ρ : Ty ι), Ty.interpret X ρ
   | .nat    => Nat.zero
   | .base i => si.zeroInterp i
-  | .arr _ τ => fun _ => interpTy_default' si τ
+  | .arr _ τ => fun _ => Ty.interpret_default' si τ
 
 -- The QF-ER helpers below use section variables {EqX} and (eqxi) automatically.
 -- They avoid `induction` in `def` bodies to prevent the "code generator does not
@@ -196,7 +199,7 @@ private def eqAtType_default_ctr {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
   | .nat,      _, _  => ()
   | .base i,   s, t  => eqxi.counterDefault i s t
   | .arr ρ' τ, s, t  =>
-    (interpTy_default' si ρ',
+    (Ty.interpret_default' si ρ',
      eqAtType_default_ctr τ (s.weaken.app (.var .vz)) (t.weaken.app (.var .vz)))
 
 /-- A canonical witness for `eqAtType EqX ρ s t`. -/
@@ -226,8 +229,8 @@ private lemma dialecticaWitness_eqAtType_ss (eqxi : EqXInterp X F si EqX) (ρ : 
 
 /-- Extract semantic equality from a full realizer for `eqAtType EqX ρ s t`. -/
 private def eqAtType_to_semEq {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
-    (env : interpCtx X Γ) (h : dialecticaRealizerCtx si (eqAtType EqX ρ s t) env) :
-    interpTerm si s env = interpTerm si t env :=
+    (env : Ctx.interpret X Γ) (h : dialecticaRealizerCtx si (eqAtType EqX ρ s t) env) :
+    Term.interpret si s env = Term.interpret si t env :=
   match ρ, s, t, env, h with
   | .nat, s, t, env, h => h.property ()
   | .base i, s, t, env, h => eqxi.extract i s t env h
@@ -239,23 +242,23 @@ private def eqAtType_to_semEq {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
         ⟨h.val z, fun yτ => h.property (z, yτ)⟩
       have heq := eqAtType_to_semEq τ
           (Term.app s.weaken (.var .vz)) (Term.app t.weaken (.var .vz)) (z, env) hz
-      simp only [interpTerm, interpTerm_weaken, lookupVar] at heq
+      simp only [Term.interpret, Term.interpret_weaken, Ctx.lookup] at heq
       exact heq
 
 /-- Build a full realizer for `eqAtType EqX ρ s t` from a semantic equality.
     The `base i` case uses `eqxi.realize`, which encodes the semantic correctness
     of the base-type equality predicate `EqX i`. -/
 private def eqAtType_from_semEq {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
-    (env : interpCtx X Γ) (h : interpTerm si s env = interpTerm si t env) :
+    (env : Ctx.interpret X Γ) (h : Term.interpret si s env = Term.interpret si t env) :
     dialecticaRealizerCtx si (eqAtType EqX ρ s t) env :=
   match ρ, s, t, env, h with
   | .nat, s, t, env, h => ⟨(), fun () => h⟩
   | .base i, s, t, env, h => eqxi.realize i s t env h
   | .arr ρ' τ, s, t, env, h =>
-      have eq_z : ∀ z : interpTy X ρ',
-          interpTerm si (Term.app s.weaken (.var .vz)) (z, env) =
-          interpTerm si (Term.app t.weaken (.var .vz)) (z, env) := fun z => by
-        simp only [interpTerm, interpTerm_weaken, lookupVar]; exact congr_fun h z
+      have eq_z : ∀ z : Ty.interpret X ρ',
+          Term.interpret si (Term.app s.weaken (.var .vz)) (z, env) =
+          Term.interpret si (Term.app t.weaken (.var .vz)) (z, env) := fun z => by
+        simp only [Term.interpret, Term.interpret_weaken, Ctx.lookup]; exact congr_fun h z
       ⟨fun z => (eqAtType_from_semEq τ (Term.app s.weaken (.var .vz)) (Term.app t.weaken (.var .vz))
                            (z, env) (eq_z z)).val,
        fun (z, yτ) => (eqAtType_from_semEq τ (Term.app s.weaken (.var .vz)) (Term.app t.weaken (.var .vz))
@@ -287,10 +290,10 @@ def dialectica_qfer {Γ : Ctx ι} {A₀ : Formula F Γ} {ρ σ : Ty ι}
       exact hprop (xA₀, yρ) (by
         show dialecticaMatrix si A₀ env xA₀ (Y₀ xA₀ yρ)
         rw [hcc]; exact hA₀)⟩
-  have hsem : interpTerm si s env = interpTerm si t env :=
+  have hsem : Term.interpret si s env = Term.interpret si t env :=
     eqAtType_to_semEq si eqxi ρ s t env hfull
-  have hsem_r : interpTerm si (r.subst0 s) env = interpTerm si (r.subst0 t) env := by
-    rw [interpTerm_subst0, interpTerm_subst0, hsem]
+  have hsem_r : Term.interpret si (r.subst0 s) env = Term.interpret si (r.subst0 t) env := by
+    rw [Term.interpret_subst0, Term.interpret_subst0, hsem]
   have hrσ := eqAtType_from_semEq si eqxi σ (r.subst0 s) (r.subst0 t) env hsem_r
   have hwW : hrσ.val = wσ_default := ssW_σ.elim _ _
   rw [← hwW]
@@ -301,15 +304,15 @@ def dialectica_qfer {Γ : Ctx ι} {A₀ : Formula F Γ} {ρ σ : Ty ι}
 -- ============================================================================
 
 def dialectica_forall_ax {Γ : Ctx ι} {ρ : Ty ι} {A : Formula F (ρ :: Γ)}
-    (env : interpCtx X Γ) (t : Term F Γ ρ) :
+    (env : Ctx.interpret X Γ) (t : Term F Γ ρ) :
     dialecticaRealizerCtx si (Formula.all ρ A →ᶠ A.subst0 t) env :=
   let hW := dialecticaWitness_subst0 (X := X) A t
   let hC := dialecticaCounter_subst0 (X := X) A t
-  ⟨⟨fun f => cast hW.symm (f (interpTerm si t env)),
-    fun _ zc => (interpTerm si t env, cast hC zc)⟩,
+  ⟨⟨fun f => cast hW.symm (f (Term.interpret si t env)),
+    fun _ zc => (Term.interpret si t env, cast hC zc)⟩,
    fun ⟨f, zc⟩ hyp => by
      have key := (dialecticaMatrix_subst0 si A t env
-       (f (interpTerm si t env)) (cast hC zc)).mpr hyp
+       (f (Term.interpret si t env)) (cast hC zc)).mpr hyp
      rwa [cast_cancel hC] at key⟩
 
 -- ============================================================================
@@ -317,11 +320,11 @@ def dialectica_forall_ax {Γ : Ctx ι} {ρ : Ty ι} {A : Formula F (ρ :: Γ)}
 -- ============================================================================
 
 def dialectica_exist_ax {Γ : Ctx ι} {ρ : Ty ι} {A : Formula F (ρ :: Γ)}
-    (env : interpCtx X Γ) (t : Term F Γ ρ) :
+    (env : Ctx.interpret X Γ) (t : Term F Γ ρ) :
     dialecticaRealizerCtx si (A.subst0 t →ᶠ Formula.ex ρ A) env :=
   let hW := dialecticaWitness_subst0 (X := X) A t
   let hC := dialecticaCounter_subst0 (X := X) A t
-  ⟨⟨fun w => (interpTerm si t env, cast hW w), fun _ yA => cast hC.symm yA⟩,
+  ⟨⟨fun w => (Term.interpret si t env, cast hW w), fun _ yA => cast hC.symm yA⟩,
    fun ⟨w, yA⟩ hyp => by
      have key := (dialecticaMatrix_subst0 si A t env (cast hW w) yA).mp
      rw [cast_cancel hW w] at key
@@ -379,7 +382,7 @@ def dialectica_exist_rule
 -- ============================================================================
 
 def dialectica_univ_gen {Γ : Ctx ι} {ρ : Ty ι} {A : Formula F Γ}
-    (env : interpCtx X Γ)
+    (env : Ctx.interpret X Γ)
     (hA : dialecticaRealizerCtx si A env) :
     dialecticaRealizerCtx si (Formula.all ρ (A.weakenBy ρ)) env :=
   let hW := dialecticaWitness_weaken (X := X) ρ A
@@ -392,7 +395,7 @@ def dialectica_univ_gen {Γ : Ctx ι} {ρ : Ty ι} {A : Formula F Γ}
 -- Induction
 -- ============================================================================
 
-def dialectica_induction {Γ : Ctx ι} {A : Formula F (Ty.nat :: Γ)} (env : interpCtx X Γ)
+def dialectica_induction {Γ : Ctx ι} {A : Formula F (Ty.nat :: Γ)} (env : Ctx.interpret X Γ)
     (hbase : dialecticaRealizerCtx si (A.subst0 Term.zero) env)
     (hstep : dialecticaRealizerCtx si (Formula.all Ty.nat
       (A →ᶠ Formula.substVar0 A (Term.app Term.succ (.var .vz)))) env) :
@@ -415,7 +418,7 @@ def dialectica_induction {Γ : Ctx ι} {A : Formula F (Ty.nat :: Γ)} (env : int
     have key : dialecticaMatrix si (A.subst0 Term.zero) env (cast hW0.symm w₀) (cast hC0.symm y) →
         dialecticaMatrix si A (Nat.zero, env) w₀ y := by
       have h := (dialecticaMatrix_subst0 si A Term.zero env w₀ y).mp
-      simp only [interpTerm] at h; exact h
+      simp only [Term.interpret] at h; exact h
     apply key; rw [hcc]
     exact hbase.property (cast hC0.symm y)
   -- Step witness
@@ -442,7 +445,7 @@ def dialectica_induction {Γ : Ctx ι} {A : Formula F (Ty.nat :: Γ)} (env : int
       have hcc_W : cast hW_sv.symm (cast hW_sv ((U m).1 (W m))) = (U m).1 (W m) :=
         eq_of_heq ((cast_heq _ _).trans (cast_heq _ _))
       rw [hcc_W] at h
-      simp only [interpTerm, lookupVar] at h
+      simp only [Term.interpret, Ctx.lookup] at h
       exact h
     exact iff_step.mp hconc
 
@@ -450,9 +453,9 @@ def dialectica_induction {Γ : Ctx ι} {A : Formula F (Ty.nat :: Γ)} (env : int
 -- Nonemptiness helpers (needed for exfalso / and_weak / or_weak)
 -- ============================================================================
 
-/-- `interpTy X ρ` is always nonempty given a `SpaceInterp`. -/
-private lemma interpTy_nonempty {ι : Type} {X : ι → Type} {F : ι → Ty ι}
-    (si : SpaceInterp X F) (ρ : Ty ι) : Nonempty (interpTy X ρ) := by
+/-- `Ty.interpret X ρ` is always nonempty given a `SpaceInterp`. -/
+private lemma Ty.interpret_nonempty {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    (si : SpaceInterp X F) (ρ : Ty ι) : Nonempty (Ty.interpret X ρ) := by
   induction ρ with
   | nat    => exact ⟨Nat.zero⟩
   | base i => exact ⟨si.zeroInterp i⟩
@@ -472,9 +475,9 @@ private lemma dialectica_nonempty {ι : Type} {X : ι → Type} {F : ι → Ty �
   | imp _ _ ihA ihB =>
     exact ⟨⟨fun _ => ihB.1.some, fun _ _ => ihA.2.some⟩, ⟨ihA.1.some, ihB.2.some⟩⟩
   | all ρ _ ihA =>
-    exact ⟨⟨fun _ => ihA.1.some⟩, ⟨(interpTy_nonempty si ρ).some, ihA.2.some⟩⟩
+    exact ⟨⟨fun _ => ihA.1.some⟩, ⟨(Ty.interpret_nonempty si ρ).some, ihA.2.some⟩⟩
   | ex  ρ _ ihA =>
-    exact ⟨⟨(interpTy_nonempty si ρ).some, ihA.1.some⟩, ⟨ihA.2.some⟩⟩
+    exact ⟨⟨(Ty.interpret_nonempty si ρ).some, ihA.1.some⟩, ⟨ihA.2.some⟩⟩
 
 -- ============================================================================
 -- Markov's principle
@@ -482,7 +485,7 @@ private lemma dialectica_nonempty {ι : Type} {X : ι → Type} {F : ι → Ty �
 
 def dialectica_markov {Γ : Ctx ι} {ρ : Ty ι} {A₀ : Formula F (ρ :: Γ)}
     (hqf : A₀.isQF = true) (hvf : A₀.isVFree = true)
-    (env : interpCtx X Γ) :
+    (env : Ctx.interpret X Γ) :
     dialecticaRealizerCtx si (¬ᶠ(¬ᶠ(Formula.ex ρ A₀)) →ᶠ Formula.ex ρ A₀) env := by
   have hss := dialecticaWitness_subsingleton (X := X) A₀ hqf hvf
   have ssW : Subsingleton (dialecticaWitness X A₀) := hss.1
@@ -507,7 +510,7 @@ def dialectica_markov {Γ : Ctx ι} {ρ : Ty ι} {A₀ : Formula F (ρ :: Γ)}
 def dialectica_ip {Γ : Ctx ι} {ρ σ : Ty ι}
     {A₀ : Formula F (σ :: Γ)} {B : Formula F (ρ :: Γ)}
     (hqf : A₀.isQF = true) (hvf : A₀.isVFree = true)
-    (env : interpCtx X Γ) :
+    (env : Ctx.interpret X Γ) :
     dialecticaRealizerCtx si
       ((Formula.all σ A₀ →ᶠ Formula.ex ρ B) →ᶠ
        Formula.ex ρ ((Formula.all σ A₀).weakenBy ρ →ᶠ B)) env := by
@@ -551,29 +554,29 @@ def dialectica_ip {Γ : Ctx ι} {ρ σ : Ty ι}
 -- ============================================================================
 
 def dialectica_ac {Γ : Ctx ι} {ρ τ : Ty ι} {A : Formula F (τ :: ρ :: Γ)}
-    (env : interpCtx X Γ) :
+    (env : Ctx.interpret X Γ) :
     dialecticaRealizerCtx si
       ((Formula.all ρ (Formula.ex τ A)) →ᶠ
        Formula.ex (ρ →ₜ τ) (Formula.all ρ (Formula.substF Formula.acSubst A))) env := by
   have hwA := (dialectica_types_substF (X := X) A (Formula.acSubst (ρ := ρ) (τ := τ))).1
   have hcA := (dialectica_types_substF (X := X) A (Formula.acSubst (ρ := ρ) (τ := τ))).2
-  have acSubst_env : ∀ (x : interpTy X ρ) (Y : interpTy X ρ → interpTy X τ),
-      interpCtxSubst si (Formula.acSubst (ρ := ρ) (τ := τ) (F := F) (Γ := Γ))
+  have acSubst_env : ∀ (x : Ty.interpret X ρ) (Y : Ty.interpret X ρ → Ty.interpret X τ),
+      Ctx.interpretSubst si (Formula.acSubst (ρ := ρ) (τ := τ) (F := F) (Γ := Γ))
         (x, Y, env) = (Y x, x, env) := fun x Y => by
-    simp only [Formula.acSubst, interpCtxSubst, interpTerm, lookupVar]
+    simp only [Formula.acSubst, Ctx.interpretSubst, Term.interpret, Ctx.lookup]
     refine Prod.ext rfl (Prod.ext rfl ?_)
     have h1 : (fun {τ' : Ty ι} (v : Var Γ τ') =>
                 (Term.var (Var.vs (Var.vs v)) : Term F (ρ :: (ρ →ₜ τ) :: Γ) τ')) =
               (fun {τ' : Ty ι} (v : Var Γ τ') =>
                 (Term.var (Var.vs v) : Term F ((ρ →ₜ τ) :: Γ) τ').weaken) := by
       funext τ' v; rfl
-    rw [h1, interpCtxSubst_weaken_eq]
+    rw [h1, Ctx.interpretSubst_weaken_eq]
     have h2 : (fun {τ' : Ty ι} (v : Var Γ τ') =>
                 (Term.var (Var.vs v) : Term F ((ρ →ₜ τ) :: Γ) τ')) =
               (fun {τ' : Ty ι} (v : Var Γ τ') =>
                 (Term.var v : Term F Γ τ').weaken) := by
       funext τ' v; rfl
-    rw [h2, interpCtxSubst_weaken_eq, interpCtxSubst_id]
+    rw [h2, Ctx.interpretSubst_weaken_eq, Ctx.interpretSubst_id]
   exact ⟨⟨
     fun fp => ((fun x => (fp x).1), fun x => cast hwA.symm (fp x).2),
     fun fp xc => (xc.1, cast hcA xc.2)
@@ -598,7 +601,7 @@ def dialectica_ac {Γ : Ctx ι} {ρ τ : Ty ι} {A : Formula F (τ :: ρ :: Γ)}
     Returns a realizer for all environments; structural recursion on the derivation. -/
 def dialectica_soundness_ctx' {Γ : Ctx ι} {A : Formula F Γ}
     (h : @Derivable ι F EqX Allowed.extended Γ A) :
-    ∀ env : interpCtx X Γ, dialecticaRealizerCtx si A env :=
+    ∀ env : Ctx.interpret X Γ, dialecticaRealizerCtx si A env :=
   match h with
   -- Base constructors
   | .or_contract   => fun env => dialectica_or_contract si env
@@ -631,21 +634,21 @@ def dialectica_soundness_ctx' {Γ : Ctx ι} {A : Formula F Γ}
   | .succ_ne_zero   => fun env =>
       ⟨fun _ => ⟨id, fun _ _ => ()⟩,
        fun ⟨n, (), ()⟩ h => by
-         simp only [dialecticaMatrix, interpTerm, lookupVar] at h ⊢
+         simp only [dialecticaMatrix, Term.interpret, Ctx.lookup] at h ⊢
          exact Nat.succ_ne_zero n h⟩
   | .succ_inj       => fun env =>
       ⟨fun _ _ => ⟨id, fun _ _ => ()⟩,
        fun ⟨m, n, (), ()⟩ h => by
-         simp only [dialecticaMatrix, interpTerm, lookupVar] at h ⊢
+         simp only [dialecticaMatrix, Term.interpret, Ctx.lookup] at h ⊢
          exact Nat.succ.inj h⟩
   | .proj_ax   => fun env =>
-      eqAtType_from_semEq si eqxi _ _ _ env (by simp [interpTerm, Term.app2])
+      eqAtType_from_semEq si eqxi _ _ _ env (by simp [Term.interpret, Term.app2])
   | .comb_ax   => fun env =>
-      eqAtType_from_semEq si eqxi _ _ _ env (by simp [interpTerm, Term.app3])
+      eqAtType_from_semEq si eqxi _ _ _ env (by simp [Term.interpret, Term.app3])
   | .rec_zero  => fun env =>
-      eqAtType_from_semEq si eqxi _ _ _ env (by simp [interpTerm, Term.app3]; rfl)
+      eqAtType_from_semEq si eqxi _ _ _ env (by simp [Term.interpret, Term.app3]; rfl)
   | .rec_succ  => fun env =>
-      eqAtType_from_semEq si eqxi _ _ _ env (by simp [interpTerm, Term.app3, Term.app2])
+      eqAtType_from_semEq si eqxi _ _ _ env (by simp [Term.interpret, Term.app3, Term.app2])
   | .refl0     => fun env => dialectica_refl0 si env
   | .sym0      => fun env => dialectica_sym0 si env
   | .trans0    => fun env => dialectica_trans0 si env
@@ -668,3 +671,5 @@ def dialectica_soundness_ctx' {Γ : Ctx ι} {A : Formula F Γ}
 def dialectica_soundness' (A : Formula F ([] : Ctx ι))
     (h : @Derivable ι F EqX Allowed.extended [] A) : dialecticaRealizer si A :=
   dialectica_soundness_ctx' si eqxi h ()
+
+end Metatheorems

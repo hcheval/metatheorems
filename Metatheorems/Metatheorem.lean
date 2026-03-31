@@ -6,6 +6,9 @@ Authors: Horatiu
 import Metatheorems.StrongMajorizability
 import Metatheorems.NDTranslation
 
+
+namespace Metatheorems
+
 /-!
 # General Logical Metatheorem (Theorem 6.1)
 
@@ -33,21 +36,21 @@ theorem dialecticaMatrix_iff_interpFormula
     {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     (si : SpaceInterp X F) {Γ : Ctx ι}
     (A : Formula F Γ) (hqf : A.isQF = true) (hvf : A.isVFree = true)
-    (env : interpCtx X Γ) (w : dialecticaWitness X A) (c : dialecticaCounter X A) :
-    dialecticaMatrix si A env w c ↔ interpFormula si A env :=
+    (env : Ctx.interpret X Γ) (w : dialecticaWitness X A) (c : dialecticaCounter X A) :
+    dialecticaMatrix si A env w c ↔ Formula.interpret si A env :=
   match A, hqf, hvf, env, w, c with
   | .bot, _, _, _, _, _ => Iff.rfl
   | .eq0 .., _, _, _, _, _ => Iff.rfl
   | .and A B, hqf, hvf, env, (wA, wB), (cA, cB) => by
     simp only [isQF, isVFree, Bool.and_eq_true] at hqf hvf
-    simp only [dialecticaMatrix, interpFormula]
+    simp only [dialecticaMatrix, Formula.interpret]
     exact Iff.and
       (dialecticaMatrix_iff_interpFormula si A hqf.1 hvf.1 env wA cA)
       (dialecticaMatrix_iff_interpFormula si B hqf.2 hvf.2 env wB cB)
   | .or .., _, hvf, _, _, _ => by simp [isVFree] at hvf
   | .imp A B, hqf, hvf, env, (f, g), (wA, cB) => by
     simp only [isQF, isVFree, Bool.and_eq_true] at hqf hvf
-    simp only [dialecticaMatrix, interpFormula]
+    simp only [dialecticaMatrix, Formula.interpret]
     constructor
     · intro h hA
       have := (dialecticaMatrix_iff_interpFormula si A hqf.1 hvf.1 env wA (g wA cB)).mpr hA
@@ -77,11 +80,11 @@ def general_metatheorem
     (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
     (prf : Derivable F EqX Allowed.extended
       (all ρ (imp (all .nat B₀) (ex .nat C₀)))) :
-    { Φ : interpTy X ρ.hat → Nat //
-      ∀ (x : interpTy X ρ) (x_star : interpTy X ρ.hat),
+    { Φ : Ty.interpret X ρ.hat → Nat //
+      ∀ (x : Ty.interpret X ρ) (x_star : Ty.interpret X ρ.hat),
         mj.maj ρ x_star x →
-        (∀ u : Nat, u ≤ Φ x_star → interpFormula si B₀ (u, (x, ()))) →
-        ∃ v : Nat, v ≤ Φ x_star ∧ interpFormula si C₀ (v, (x, ())) } := by
+        (∀ u : Nat, u ≤ Φ x_star → Formula.interpret si B₀ (u, (x, ()))) →
+        ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret si C₀ (v, (x, ())) } := by
   -- Step 1: Apply Dialectica directly (no NT)
   let r := dialectica_soundness_ctx' si eqxi prf
   -- r : ∀ env, dialecticaRealizerCtx si (all ρ (imp (all .nat B₀) (ex .nat C₀))) env
@@ -90,20 +93,20 @@ def general_metatheorem
   let w := r₀.val
   let h := r₀.property
   -- Step 2: Extract U, V from the Dialectica witness
-  -- w : interpTy X ρ → W(imp (all .nat B₀) (ex .nat C₀))
+  -- w : Ty.interpret X ρ → W(imp (all .nat B₀) (ex .nat C₀))
   -- W(imp P Q) = (W(P) → W(Q)) × (W(P) → C(Q) → C(P))
   -- W(all .nat B₀) = ℕ → W(B₀)
   -- W(ex .nat C₀) = ℕ × W(C₀)
   -- C(ex .nat C₀) = C(C₀)
   -- C(all .nat B₀) = ℕ × C(B₀)
   -- Extract V: feed default W(∀u B₀) into first component, project .1
-  let V : interpTy X ρ → Nat := fun x => ((w x).1 (dialecticaDefaultWitness si _)).1
+  let V : Ty.interpret X ρ → Nat := fun x => ((w x).1 (dialecticaDefaultWitness si _)).1
   -- Extract U: feed defaults into second component, project .1
-  let U : interpTy X ρ → Nat := fun x =>
+  let U : Ty.interpret X ρ → Nat := fun x =>
     ((w x).2 (dialecticaDefaultWitness si _) (dialecticaDefaultCounter si _)).1
   -- Step 3: Prove B(x, U(x)) → C(x, V(x)) from the Dialectica matrix
-  have hUV : ∀ x : interpTy X ρ,
-      interpFormula si B₀ (U x, (x, ())) → interpFormula si C₀ (V x, (x, ())) := by
+  have hUV : ∀ x : Ty.interpret X ρ,
+      Formula.interpret si B₀ (U x, (x, ())) → Formula.interpret si C₀ (V x, (x, ())) := by
     intro x hBx
     -- Specialize h to counter (x, (defaultW(all .nat B₀), defaultC(ex .nat C₀)))
     let wP := dialecticaDefaultWitness si (all Ty.nat B₀)
@@ -152,11 +155,11 @@ def general_metatheorem_classical
     (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
     (prf : Derivable F EqX Allowed.classical
       (all ρ (imp (all .nat B₀) (ex .nat C₀)))) :
-    { Φ : interpTy X ρ.hat → Nat //
-      ∀ (x : interpTy X ρ) (x_star : interpTy X ρ.hat),
+    { Φ : Ty.interpret X ρ.hat → Nat //
+      ∀ (x : Ty.interpret X ρ) (x_star : Ty.interpret X ρ.hat),
         mj.maj ρ x_star x →
-        (∀ u : Nat, u ≤ Φ x_star → interpFormula si B₀ (u, (x, ()))) →
-        ∃ v : Nat, v ≤ Φ x_star ∧ interpFormula si C₀ (v, (x, ())) } := by
+        (∀ u : Nat, u ≤ Φ x_star → Formula.interpret si B₀ (u, (x, ()))) →
+        ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret si C₀ (v, (x, ())) } := by
   -- Step 1: Apply ND-interpretation (NT + Dialectica)
   let r := nd_soundness_closed si eqxi adm prf
   let w := r.val
@@ -166,14 +169,14 @@ def general_metatheorem_classical
   -- Step 2: Extract U, V (same projections as extended version, through ¬¬)
   let ki_w := (w.2 (dialecticaDefaultWitness si _) ()).1
   let imp_w := fun x => ((ki_w x).2 (dialecticaDefaultWitness si _) ()).1
-  let V : interpTy X ρ → Nat := fun x =>
+  let V : Ty.interpret X ρ → Nat := fun x =>
     ((imp_w x).1 (dialecticaDefaultWitness si _)).1
-  let U : interpTy X ρ → Nat := fun x =>
+  let U : Ty.interpret X ρ → Nat := fun x =>
     ((imp_w x).2 (dialecticaDefaultWitness si _) (dialecticaDefaultCounter si _)).1
   -- Step 3: Prove B(x, U(x)) → C(x, V(x))
   -- Unfold h through the ¬¬ layers using Classical.not_not
-  have hUV : ∀ x : interpTy X ρ,
-      interpFormula si B₀ (U x, (x, ())) → interpFormula si C₀ (V x, (x, ())) := by
+  have hUV : ∀ x : Ty.interpret X ρ,
+      Formula.interpret si B₀ (U x, (x, ())) → Formula.interpret si C₀ (V x, (x, ())) := by
     -- Need to construct a counter for h that embeds x at the ∀ρ position,
     -- peel ¬¬ layers with Classical.not_not, then apply QF∨-free matrix reduction.
     -- The witnesses U, V extracted here may differ from those used for Φ;
@@ -192,12 +195,12 @@ def general_metatheorem_classical
              hUV x (hB (U x) (Nat.le_trans hU_le (Nat.le_max_left ..)))⟩⟩
 
 -- ============================================================================
--- Core bound construction (Theorem 6.1, step 3–5)
+-- Core bound construction (Theorem 6.1, step 3–5) 
 -- ============================================================================
 
 /-- **Core of the General Metatheorem** (Theorem 6.1).
 
-Given semantic witness functions `U V : interpTy X ρ → ℕ` satisfying
+Given semantic witness functions `U V : Ty.interpret X ρ → ℕ` satisfying
 `∀x, B(x, U(x)) → C(x, V(x))` (the "extracted content" from the
 ND-interpretation), construct a computable bound Φ such that for all
 `x* ≥*_ρ x`: `(∀u ≤ Φ(x*), B(x,u)) → (∃v ≤ Φ(x*), C(x,v))`. -/
@@ -206,11 +209,11 @@ theorem metatheorem_core
     {si : SpaceInterp X F}
     (mj : Majorizability si)
     {ρ : Ty ι}
-    (B C : interpTy X ρ → Nat → Prop)
-    (U V : interpTy X ρ → Nat)
-    (hUV : ∀ x : interpTy X ρ, B x (U x) → C x (V x)) :
-    ∃ Φ : interpTy X ρ.hat → Nat,
-    ∀ (x : interpTy X ρ) (x_star : interpTy X ρ.hat),
+    (B C : Ty.interpret X ρ → Nat → Prop)
+    (U V : Ty.interpret X ρ → Nat)
+    (hUV : ∀ x : Ty.interpret X ρ, B x (U x) → C x (V x)) :
+    ∃ Φ : Ty.interpret X ρ.hat → Nat,
+    ∀ (x : Ty.interpret X ρ) (x_star : Ty.interpret X ρ.hat),
       mj.maj ρ x_star x →
       (∀ u : Nat, u ≤ Φ x_star → B x u) →
       ∃ v : Nat, v ≤ Φ x_star ∧ C x v := by
@@ -229,3 +232,5 @@ theorem metatheorem_core
   have hBU : B x (U x) := hB (U x) (Nat.le_trans hU_le (Nat.le_max_left ..))
   -- C(x, V(x)) holds by the semantic content
   exact ⟨V x, Nat.le_trans hV_le (Nat.le_max_right ..), hUV x hBU⟩
+
+end Metatheorems

@@ -6,6 +6,9 @@
 import Metatheorems.Derivable
 import Metatheorems.PropositionalLemmas
 
+
+namespace Metatheorems
+
 open Formula
 
 variable {ι : Type} {F : ι → Ty ι}
@@ -148,3 +151,5 @@ def exist_map {Γ : Ctx ι} {ρ : Ty ι} {P Q : Formula F (ρ :: Γ)}
     (h : Derivable F EqX a (P →ᶠ Q)) :
     Derivable F EqX a (Formula.ex ρ P →ᶠ Formula.ex ρ Q) :=
   .exist_rule (.syllogism h exist_ax_vz)
+
+end Metatheorems

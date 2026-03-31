@@ -6,6 +6,9 @@ Authors: Horatiu
 import Metatheorems.Dialectica
 import Metatheorems.NegTrans
 
+
+namespace Metatheorems
+
 /-!
 # ND-Interpretation (Negative + Dialectica)
 
@@ -34,7 +37,7 @@ def nd_soundness
     (adm : AdmissibleEqX EqX)
     {Γ : Ctx ι} {A : Formula F Γ}
     (h : Derivable F EqX Allowed.classical A)
-    (env : interpCtx X Γ)
+    (env : Ctx.interpret X Γ)
     : dialecticaRealizerCtx si A.negTrans env :=
   dialectica_soundness_ctx si eqxi A.negTrans env
     ((negTrans_sound adm h).castAllowed (by constructor <;> decide))
@@ -51,3 +54,5 @@ def nd_soundness_closed
     : dialecticaRealizer si A.negTrans :=
   nd_soundness si eqxi adm h ()
 #print axioms nd_soundness 
+
+end Metatheorems

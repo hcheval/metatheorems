@@ -5,6 +5,9 @@ Authors: Horatiu
 -/
 import Metatheorems.Derivable
 
+
+namespace Metatheorems
+
 /-!
 # Propositional Lemmas for WE-HA^{ω,X}
 
@@ -378,3 +381,5 @@ def dnn_lem : Derivable F EqX a (¬ᶠ¬ᶠ(A ∨ᶠ ¬ᶠA)) :=
   Derivable.syllogism (pair_h I_comb or_inr_A) eval_K
 
 end PropositionalLemmas
+
+end Metatheorems

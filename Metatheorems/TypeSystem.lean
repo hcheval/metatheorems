@@ -19,6 +19,9 @@ and function types (arrow types).
 * `Ty.ground` — The unique ground type ρ₀ of a type (Notation 1.0.10).
 -/
 
+
+namespace Metatheorems
+
 /-- The type system T^X (Definition 1.0.1).
 
 Given an index family `{X_i}_{i ∈ ι}`, the set of all finite types over ℕ and X
@@ -121,3 +124,5 @@ def degree : Ty ι → Nat
   | .arr ρ τ  => max ρ.degree (τ.degree + 1)
 
 end Ty
+
+end Metatheorems

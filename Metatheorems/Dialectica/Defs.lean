@@ -6,6 +6,9 @@ Authors: Horatiu
 import Metatheorems.Semantics
 import Metatheorems.Derivable
 
+
+namespace Metatheorems
+
 /-!
 # Dialectica Definitions and Matrix Lemmas
 
@@ -38,8 +41,8 @@ def dialecticaWitness {ι : Type} (X : ι → Type) {F : ι → Ty ι} {Γ : Ctx
   | .or  A B    => Bool × dialecticaWitness X A × dialecticaWitness X B
   | .imp A B    => (dialecticaWitness X A → dialecticaWitness X B) ×
                    (dialecticaWitness X A → dialecticaCounter X B → dialecticaCounter X A)
-  | .ex  ρ A    => interpTy X ρ × dialecticaWitness X A
-  | .all ρ A    => interpTy X ρ → dialecticaWitness X A
+  | .ex  ρ A    => Ty.interpret X ρ × dialecticaWitness X A
+  | .all ρ A    => Ty.interpret X ρ → dialecticaWitness X A
 
 /-- The Lean type of counters for A's Dialectica translation (Def. 3.0.1). -/
 def dialecticaCounter {ι : Type} (X : ι → Type) {F : ι → Ty ι} {Γ : Ctx ι} :
@@ -50,21 +53,24 @@ def dialecticaCounter {ι : Type} (X : ι → Type) {F : ι → Ty ι} {Γ : Ctx
   | .or  A B    => dialecticaCounter X A × dialecticaCounter X B
   | .imp A B    => dialecticaWitness X A × dialecticaCounter X B
   | .ex  _ A    => dialecticaCounter X A
-  | .all ρ A    => interpTy X ρ × dialecticaCounter X A
+  | .all ρ A    => Ty.interpret X ρ × dialecticaCounter X A
 
 end
+
+prefix:max "𝕎 " => dialecticaWitness _
+prefix:max "ℂ " => dialecticaCounter _
 
 -- ============================================================================
 -- Default inhabitants (computable; replace Nonempty.some)
 -- ============================================================================
 
-/-- Every `interpTy X ρ` has a computable default: 0 for Nat, zeroInterp for base types,
+/-- Every `Ty.interpret X ρ` has a computable default: 0 for Nat, zeroInterp for base types,
     constant function for arrow types. -/
-def interpTy_default {ι : Type} {X : ι → Type} {F : ι → Ty ι}
-    (si : SpaceInterp X F) : (ρ : Ty ι) → interpTy X ρ
+def Ty.interpret_default {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    (si : SpaceInterp X F) : (ρ : Ty ι) → Ty.interpret X ρ
   | .nat    => Nat.zero
   | .base i => si.zeroInterp i
-  | .arr ρ τ => fun _ => interpTy_default si τ
+  | .arr ρ τ => fun _ => Ty.interpret_default si τ
 
 mutual
 /-- Computable default witness for any formula's Dialectica translation. -/
@@ -76,7 +82,7 @@ def dialecticaDefaultWitness {ι : Type} {X : ι → Type} {F : ι → Ty ι}
   | .or  A B  => (true, dialecticaDefaultWitness si A, dialecticaDefaultWitness si B)
   | .imp A B  => (fun _ => dialecticaDefaultWitness si B,
                   fun _ _ => dialecticaDefaultCounter si A)
-  | .ex  ρ A  => (interpTy_default si ρ, dialecticaDefaultWitness si A)
+  | .ex  ρ A  => (Ty.interpret_default si ρ, dialecticaDefaultWitness si A)
   | .all _ A  => fun _ => dialecticaDefaultWitness si A
 
 /-- Computable default counter for any formula's Dialectica translation. -/
@@ -88,7 +94,7 @@ def dialecticaDefaultCounter {ι : Type} {X : ι → Type} {F : ι → Ty ι}
   | .or  A B  => (dialecticaDefaultCounter si A, dialecticaDefaultCounter si B)
   | .imp A B  => (dialecticaDefaultWitness si A, dialecticaDefaultCounter si B)
   | .ex  _ A  => dialecticaDefaultCounter si A
-  | .all ρ A  => (interpTy_default si ρ, dialecticaDefaultCounter si A)
+  | .all ρ A  => (Ty.interpret_default si ρ, dialecticaDefaultCounter si A)
 end
 
 -- ============================================================================
@@ -97,14 +103,14 @@ end
 
 /-- The Dialectica matrix A_D as a Lean proposition (Def. 3.0.1).
 
-Takes an environment `env : interpCtx X Γ` to evaluate the formula's free
+Takes an environment `env : Ctx.interpret X Γ` to evaluate the formula's free
 variables, witnesses, and counters. -/
 def dialecticaMatrix {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     (si : SpaceInterp X F) :
-    {Γ : Ctx ι} → (A : Formula F Γ) → interpCtx X Γ →
+    {Γ : Ctx ι} → (A : Formula F Γ) → Ctx.interpret X Γ →
     dialecticaWitness X A → dialecticaCounter X A → Prop
   | _, .bot,      _,   _,  _  => False
-  | _, .eq0 s t,  env, _,  _  => interpTerm si s env = interpTerm si t env
+  | _, .eq0 s t,  env, _,  _  => Term.interpret si s env = Term.interpret si t env
   | _, .and A B,  env, xw, yc =>
       dialecticaMatrix si A env xw.1 yc.1 ∧ dialecticaMatrix si B env xw.2 yc.2
   | _, .or  A B,  env, xw, yc =>
@@ -132,7 +138,7 @@ def dialecticaMatrix {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     `A`'s type and changes in the `all`/`ex` arms. -/
 instance dialecticaMatrix_decidable {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     (si : SpaceInterp X F) {Γ : Ctx ι} (A : Formula F Γ)
-    (env : interpCtx X Γ) (w : dialecticaWitness X A) (y : dialecticaCounter X A) :
+    (env : Ctx.interpret X Γ) (w : dialecticaWitness X A) (y : dialecticaCounter X A) :
     Decidable (dialecticaMatrix si A env w y) :=
   match A, env, w, y with
   | .bot,     _, _, _ => isFalse id
@@ -176,7 +182,7 @@ instance dialecticaMatrix_decidable {ι : Type} {X : ι → Type} {F : ι → Ty
     a proof it satisfies the matrix for all counters. Because `dialecticaRealizerCtx`
     lives in `Type`, the witness can be extracted computably via `.val`. -/
 def dialecticaRealizerCtx {ι : Type} {X : ι → Type} {F : ι → Ty ι}
-    (si : SpaceInterp X F) {Γ : Ctx ι} (A : Formula F Γ) (env : interpCtx X Γ) : Type :=
+    (si : SpaceInterp X F) {Γ : Ctx ι} (A : Formula F Γ) (env : Ctx.interpret X Γ) : Type :=
   { x : dialecticaWitness X A //
     ∀ (y : dialecticaCounter X A), dialecticaMatrix si A env x y }
 
@@ -394,22 +400,22 @@ lemma cast_cancel {α β : Type} (h : α = β) (a : α) :
     cast h.symm (cast h a) = a :=
   eq_of_heq ((cast_heq h.symm (cast h a)).trans (cast_heq h a))
 
-/-- Evaluate interpCtxSubst for Renaming.ext applied to var-renaming. -/
-private lemma interpCtxSubst_ext_var {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+/-- Evaluate Ctx.interpretSubst for Renaming.ext applied to var-renaming. -/
+private lemma Ctx.interpretSubst_ext_var {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     (si : SpaceInterp X F) {Γ Δ : Ctx ι} {ρ' : Ty ι}
-    (r : Renaming Γ Δ) (z : interpTy X ρ') (env : interpCtx X Δ) :
-    interpCtxSubst si
+    (r : Renaming Γ Δ) (z : Ty.interpret X ρ') (env : Ctx.interpret X Δ) :
+    Ctx.interpretSubst si
       (fun v => Term.var ((Renaming.ext r) v) :
         Term.Subst F (ρ' :: Γ) (ρ' :: Δ)) (z, env) =
-    (z, interpCtxSubst si
+    (z, Ctx.interpretSubst si
       (fun v => Term.var (r v) : Term.Subst F Γ Δ) env) := by
-  simp only [interpCtxSubst, Renaming.ext, interpTerm, lookupVar]
+  simp only [Ctx.interpretSubst, Renaming.ext, Term.interpret, Ctx.lookup]
   congr 1
   have h1 : (fun {τ : Ty ι} (w : Var Γ τ) => (Term.var (Var.vs (r w)) : Term F (ρ' :: Δ) τ)) =
              (fun {τ : Ty ι} (w : Var Γ τ) => (Term.var (r w) : Term F Δ τ).weaken) := by
     funext τ w; rfl
   rw [h1]
-  exact interpCtxSubst_weaken_eq si (fun v => Term.var (r v)) env z
+  exact Ctx.interpretSubst_weaken_eq si (fun v => Term.var (r v)) env z
 
 /-- The Dialectica matrix commutes with formula renaming.
     Key lemma needed for forall-rule, exists-rule, and weakening.
@@ -420,11 +426,11 @@ private lemma interpCtxSubst_ext_var {ι : Type} {X : ι → Type} {F : ι → T
     structurally on `A.renameF r` and `A` in the same way. -/
 theorem dialecticaMatrix_renameF {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     (si : SpaceInterp X F) {Γ : Ctx ι} (A : Formula F Γ) :
-    ∀ {Δ : Ctx ι} (r : Renaming Γ Δ) (env : interpCtx X Δ)
+    ∀ {Δ : Ctx ι} (r : Renaming Γ Δ) (env : Ctx.interpret X Δ)
       (w : dialecticaWitness X (A.renameF r))
       (y : dialecticaCounter X (A.renameF r)),
     dialecticaMatrix si (A.renameF r) env w y ↔
-    dialecticaMatrix si A (interpCtxSubst si (fun v => .var (r v)) env)
+    dialecticaMatrix si A (Ctx.interpretSubst si (fun v => .var (r v)) env)
       (cast (dialectica_types_renameF (X := X) A r).1 w)
       (cast (dialectica_types_renameF (X := X) A r).2 y) := by
   induction A with
@@ -432,7 +438,7 @@ theorem dialecticaMatrix_renameF {ι : Type} {X : ι → Type} {F : ι → Ty ι
   | eq0 a b =>
     intro Δ r env _ _
     simp only [Formula.renameF, dialecticaMatrix, cast_eq]
-    rw [interpTerm_rename, interpTerm_rename]
+    rw [Term.interpret_rename, Term.interpret_rename]
   | and A1 A2 ihA ihB =>
     intro Δ r env w y
     -- LHS unfolds: dM(A1.ren, env, w.1, y.1) ∧ dM(A2.ren, env, w.2, y.2)
@@ -507,7 +513,7 @@ theorem dialecticaMatrix_renameF {ι : Type} {X : ι → Type} {F : ι → Ty ι
       cast_fun_apply _ (dialectica_types_renameF (X := X) A' (Renaming.ext r)).1,
       cast_eq]
     rw [ihA (Renaming.ext r) (y.1, env) (w y.1) y.2]
-    rw [interpCtxSubst_ext_var]
+    rw [Ctx.interpretSubst_ext_var]
   | ex ρ' A' ihA =>
     intro Δ r env w y
     simp only [Formula.renameF, dialecticaMatrix,
@@ -515,7 +521,7 @@ theorem dialecticaMatrix_renameF {ι : Type} {X : ι → Type} {F : ι → Ty ι
       cast_prod_snd _ rfl (dialectica_types_renameF (X := X) A' (Renaming.ext r)).1,
       cast_eq]
     rw [ihA (Renaming.ext r) (w.1, env) w.2 y]
-    rw [interpCtxSubst_ext_var]
+    rw [Ctx.interpretSubst_ext_var]
 
 -- ============================================================================
 -- Matrix commutativity under substitution
@@ -525,20 +531,20 @@ theorem dialecticaMatrix_renameF {ι : Type} {X : ι → Type} {F : ι → Ty ι
     Key: cast witnesses/counters via the type invariance equalities. -/
 theorem dialecticaMatrix_substF {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     (si : SpaceInterp X F) {Γ : Ctx ι} (A : Formula F Γ) :
-    ∀ {Δ : Ctx ι} (s : Term.Subst F Γ Δ) (env : interpCtx X Δ)
+    ∀ {Δ : Ctx ι} (s : Term.Subst F Γ Δ) (env : Ctx.interpret X Δ)
       (w : dialecticaWitness X A) (y : dialecticaCounter X A),
     dialecticaMatrix si (A.substF s) env
       (cast (dialectica_types_substF A s).1.symm w)
       (cast (dialectica_types_substF A s).2.symm y) ↔
-    dialecticaMatrix si A (interpCtxSubst si s env) w y := by
+    dialecticaMatrix si A (Ctx.interpretSubst si s env) w y := by
   induction A with
   | bot => intro Δ s env w y; exact Iff.rfl
   | eq0 a b =>
     intro Δ s env _ _
     simp only [Formula.substF, dialecticaMatrix, cast_eq]
     constructor
-    · intro h; rwa [interpTerm_substF, interpTerm_substF] at h
-    · intro h; rwa [interpTerm_substF, interpTerm_substF]
+    · intro h; rwa [Term.interpret_substF, Term.interpret_substF] at h
+    · intro h; rwa [Term.interpret_substF, Term.interpret_substF]
   | and A1 A2 ihA ihB =>
     intro Δ s env w y
     set_option linter.unusedSimpArgs false in
@@ -611,7 +617,7 @@ theorem dialecticaMatrix_substF {ι : Type} {X : ι → Type} {F : ι → Ty ι}
       cast_fun_apply _ (dialectica_types_substF A' (Term.Subst.ext s)).1.symm,
       cast_eq]
     have key := ihA (Term.Subst.ext s) (y.1, env) (w y.1) y.2
-    rw [interpCtxSubst_ext] at key
+    rw [Ctx.interpretSubst_ext] at key
     exact key
   | ex ρ A' ihA =>
     intro Δ s env w y
@@ -620,31 +626,31 @@ theorem dialecticaMatrix_substF {ι : Type} {X : ι → Type} {F : ι → Ty ι}
       cast_prod_snd _ rfl (dialectica_types_substF A' (Term.Subst.ext s)).1.symm,
       cast_eq]
     have key := ihA (Term.Subst.ext s) (w.1, env) w.2 y
-    rw [interpCtxSubst_ext] at key
+    rw [Ctx.interpretSubst_ext] at key
     exact key
 
 theorem dialecticaMatrix_subst0 {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     (si : SpaceInterp X F) {Γ : Ctx ι} {ρ : Ty ι}
-    (A : Formula F (ρ :: Γ)) (t : Term F Γ ρ) (env : interpCtx X Γ)
+    (A : Formula F (ρ :: Γ)) (t : Term F Γ ρ) (env : Ctx.interpret X Γ)
     (w : dialecticaWitness X A) (y : dialecticaCounter X A) :
     dialecticaMatrix si (A.subst0 t) env
       (cast (dialecticaWitness_subst0 A t).symm w)
       (cast (dialecticaCounter_subst0 A t).symm y) ↔
-    dialecticaMatrix si A (interpTerm si t env, env) w y := by
+    dialecticaMatrix si A (Term.interpret si t env, env) w y := by
   have h := dialecticaMatrix_substF si A (Term.subst0_map t) env w y
-  rwa [interpCtxSubst_subst0_map] at h
+  rwa [Ctx.interpretSubst_subst0_map] at h
 
 theorem dialecticaMatrix_substVar0 {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     (si : SpaceInterp X F) {Γ : Ctx ι} {ρ : Ty ι}
     (A : Formula F (ρ :: Γ)) (t : Term F (ρ :: Γ) ρ)
-    (v : interpTy X ρ) (env : interpCtx X Γ)
+    (v : Ty.interpret X ρ) (env : Ctx.interpret X Γ)
     (w : dialecticaWitness X A) (y : dialecticaCounter X A) :
     dialecticaMatrix si (A.substVar0 t) (v, env)
       (cast (dialectica_types_substF A (Term.substVar0_map t)).1.symm w)
       (cast (dialectica_types_substF A (Term.substVar0_map t)).2.symm y) ↔
-    dialecticaMatrix si A (interpTerm si t (v, env), env) w y := by
+    dialecticaMatrix si A (Term.interpret si t (v, env), env) w y := by
   have h := dialecticaMatrix_substF si A (Term.substVar0_map t) (v, env) w y
-  rwa [interpCtxSubst_substVar0_map] at h
+  rwa [Ctx.interpretSubst_substVar0_map] at h
 
 -- ============================================================================
 -- Matrix commutativity under weakening (needed for ∀/∃-rule)
@@ -655,7 +661,7 @@ theorem dialecticaMatrix_substVar0 {ι : Type} {X : ι → Type} {F : ι → Ty 
     and the matrix value at (v, env) equals that at env. -/
 theorem dialecticaMatrix_weaken {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     (si : SpaceInterp X F) {Γ : Ctx ι} {ρ : Ty ι} (A : Formula F Γ)
-    (env : interpCtx X Γ) (v : interpTy X ρ)
+    (env : Ctx.interpret X Γ) (v : Ty.interpret X ρ)
     (w : dialecticaWitness X (A.weakenBy ρ))
     (y : dialecticaCounter X (A.weakenBy ρ)) :
     dialecticaMatrix si (A.weakenBy ρ) (v, env) w y ↔
@@ -667,9 +673,9 @@ theorem dialecticaMatrix_weaken {ι : Type} {X : ι → Type} {F : ι → Ty ι}
   -- weakenBy ρ A = A.renameF Renaming.shift definitionally
   -- Apply dialecticaMatrix_renameF with r = Renaming.shift
   have key := dialecticaMatrix_renameF si A (Renaming.shift (σ := ρ)) (v, env) w y
-  -- key : ... ↔ dialecticaMatrix si A (interpCtxSubst ... (v, env)) (cast ... w) (cast ... y)
-  -- Need: interpCtxSubst si (fun v => .var (Var.vs v)) (v, env) = env
-  have henv : interpCtxSubst si
+  -- key : ... ↔ dialecticaMatrix si A (Ctx.interpretSubst ... (v, env)) (cast ... w) (cast ... y)
+  -- Need: Ctx.interpretSubst si (fun v => .var (Var.vs v)) (v, env) = env
+  have henv : Ctx.interpretSubst si
       (fun {τ} (x : Var Γ τ) =>
         Term.var (Renaming.shift x) : Term.Subst F Γ (ρ :: Γ))
       (v, env) = env := by
@@ -679,7 +685,7 @@ theorem dialecticaMatrix_weaken {ι : Type} {X : ι → Type} {F : ι → Ty ι}
               (fun {τ : Ty ι} (x : Var Γ τ) =>
                 (Term.var x : Term F Γ τ).weaken) := by
       funext τ x; rfl
-    rw [h1, interpCtxSubst_weaken_eq, interpCtxSubst_id]
+    rw [h1, Ctx.interpretSubst_weaken_eq, Ctx.interpretSubst_id]
   rw [henv] at key
   exact key
 
@@ -716,11 +722,12 @@ structure EqXInterp {ι : Type} (X : ι → Type) (F : ι → Ty ι)
   counterDefault : ∀ (i : ι) {Γ : Ctx ι} (s t : Term F Γ (Ty.base i)),
       dialecticaCounter X (EqX i s t)
   /-- From semantic equality, build a Dialectica realizer for `EqX i s t`. -/
-  realize : ∀ (i : ι) {Γ : Ctx ι} (s t : Term F Γ (Ty.base i)) (env : interpCtx X Γ),
-      interpTerm si s env = interpTerm si t env →
+  realize : ∀ (i : ι) {Γ : Ctx ι} (s t : Term F Γ (Ty.base i)) (env : Ctx.interpret X Γ),
+      Term.interpret si s env = Term.interpret si t env →
       dialecticaRealizerCtx si (EqX i s t) env
   /-- From a Dialectica realizer for `EqX i s t`, recover semantic equality. -/
-  extract : ∀ (i : ι) {Γ : Ctx ι} (s t : Term F Γ (Ty.base i)) (env : interpCtx X Γ),
+  extract : ∀ (i : ι) {Γ : Ctx ι} (s t : Term F Γ (Ty.base i)) (env : Ctx.interpret X Γ),
       dialecticaRealizerCtx si (EqX i s t) env →
-      interpTerm si s env = interpTerm si t env
+      Term.interpret si s env = Term.interpret si t env
 
+end Metatheorems

@@ -7,6 +7,9 @@ import Metatheorems.Derivable
 import Metatheorems.PropositionalLemmas
 import Metatheorems.PureFOLLemmas
 
+
+namespace Metatheorems
+
 /-!
 # Arithmetic in WE-HA^{ω,X}
 
@@ -1895,3 +1898,5 @@ def qf_double_neg_elim {Γ : Ctx ι} {A : Formula F Γ} (hqf : A.isQF = true) :
   .mp lem (or_elim_rule case_A case_neg_A)
 
 end QFLEM
+
+end Metatheorems

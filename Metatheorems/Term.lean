@@ -5,6 +5,9 @@ Authors: Horatiu
 -/
 import Metatheorems.TypeSystem
 
+
+namespace Metatheorems
+
 /-!
 # Terms of WE-HA^{ω,X}
 
@@ -153,3 +156,5 @@ def lam {ρ : Ty ι} : Term F (ρ :: Γ) τ → Term F Γ (ρ →ₜ τ)
   | .zeroX i       => (Term.proj _ ρ).app (.zeroX i)
 
 end Term
+
+end Metatheorems

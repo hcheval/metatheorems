@@ -5,6 +5,9 @@ Authors: Horatiu
 -/
 import Metatheorems.Subst
 
+
+namespace Metatheorems
+
 /-!
 # Formulas of WE-HA^{ω,X}
 
@@ -238,3 +241,5 @@ def eqAtType {ι : Type} {F : ι → Ty ι}
       Formula.all ρ (eqAtType EqX τ
         (Term.app s.weaken (.var .vz))
         (Term.app t.weaken (.var .vz)))
+
+end Metatheorems

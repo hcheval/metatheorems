@@ -5,6 +5,9 @@ Authors: Horatiu
 -/
 import Metatheorems.Language
 
+
+namespace Metatheorems
+
 /-!
 # Proof System for WE-HA^{ω,X}
 
@@ -288,3 +291,5 @@ structure AdmissibleEqX {ι : Type} {F : ι → Ty ι}
       needed by the negative translation (lem:negative-forall-equiv). -/
   eqx_pu : ∀ (i : ι) {Γ : Ctx ι} (s t : Term F Γ (Ty.base i)),
       (EqX i s t).isPurelyUniversal = true
+
+end Metatheorems

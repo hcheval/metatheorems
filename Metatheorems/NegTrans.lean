@@ -8,6 +8,9 @@ import Metatheorems.PropositionalLemmas
 import Metatheorems.PureFOLLemmas
 import Metatheorems.Arithmetic
 
+
+namespace Metatheorems
+
 /-!
 # Kuroda's Negative Translation
 
@@ -49,6 +52,9 @@ def Formula.kurodaInner {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι} :
 def Formula.negTrans {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι}
     (A : Formula F Γ) : Formula F Γ :=
   ¬ᶠ¬ᶠA.kurodaInner
+
+postfix:max "ᴺᵀ" => Formula.negTrans
+postfix:max "ₙₜ" => Formula.kurodaInner
 
 -- ============================================================================
 -- kurodaInner commutes with renaming and substitution
@@ -983,3 +989,5 @@ def negTrans_sound {Γ : Ctx ι} {A : Formula F Γ}
   | .ip h ..               => absurd h (by decide)
 
 end NegTransSound
+
+end Metatheorems

@@ -6,6 +6,9 @@ Authors: Horatiu
 import Metatheorems.Dialectica.Defs
 import Metatheorems.Dialectica.Lemmas
 
+
+namespace Metatheorems
+
 /-!
 # Gödel's Dialectica Interpretation — Soundness (Theorem 3.0.7)
 
@@ -24,7 +27,7 @@ def dialectica_soundness_ctx
     (si : SpaceInterp X F)
     {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
     (eqxi : EqXInterp X F si EqX)
-    {Γ : Ctx ι} (A : Formula F Γ) (env : interpCtx X Γ)
+    {Γ : Ctx ι} (A : Formula F Γ) (env : Ctx.interpret X Γ)
     (h : Derivable F EqX Allowed.extended A)
     : dialecticaRealizerCtx si A env :=
   dialectica_soundness_ctx' si eqxi h env
@@ -42,3 +45,5 @@ def dialectica_soundness
     (h : Derivable F EqX Allowed.extended A)
     : dialecticaRealizer si A :=
   dialectica_soundness' si eqxi A h
+
+end Metatheorems

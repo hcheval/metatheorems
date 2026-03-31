@@ -5,6 +5,9 @@ Authors: Horatiu
 -/
 import Metatheorems.Semantics
 
+
+namespace Metatheorems
+
 /-!
 # Strong Majorizability (total majorizer)
 
@@ -32,15 +35,17 @@ the general metatheorem straightforward to state. -/
 structure Majorizability {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     (si : SpaceInterp X F) where
   /-- The majorizability relation at type ρ: `maj ρ x_star x` means x* ≥*_ρ x. -/
-  maj : (ρ : Ty ι) → interpTy X ρ.hat → interpTy X ρ → Prop
+  maj : (ρ : Ty ι) → Ty.interpret X ρ.hat → Ty.interpret X ρ → Prop
   /-- Property 1: respects the natural number order. -/
   maj_le : ∀ {n m : Nat}, maj .nat n m → n ≥ m
   /-- Property 2: respects term application. -/
   maj_app : ∀ {ρ τ : Ty ι}
-    {f_star : interpTy X (ρ →ₜ τ).hat} {f : interpTy X (ρ →ₜ τ)}
-    {x_star : interpTy X ρ.hat} {x : interpTy X ρ},
+    {f_star : Ty.interpret X (ρ →ₜ τ).hat} {f : Ty.interpret X (ρ →ₜ τ)}
+    {x_star : Ty.interpret X ρ.hat} {x : Ty.interpret X ρ},
     maj (ρ →ₜ τ) f_star f → maj ρ x_star x → maj τ (f_star x_star) (f x)
   /-- Total majorizer: every semantic value has a majorant. -/
-  majorizer : {ρ : Ty ι} → interpTy X ρ → interpTy X ρ.hat
+  majorizer : {ρ : Ty ι} → Ty.interpret X ρ → Ty.interpret X ρ.hat
   /-- The majorizer actually majorizes. -/
-  majorizer_maj : ∀ {ρ : Ty ι} (x : interpTy X ρ), maj ρ (majorizer x) x
+  majorizer_maj : ∀ {ρ : Ty ι} (x : Ty.interpret X ρ), maj ρ (majorizer x) x
+
+end Metatheorems

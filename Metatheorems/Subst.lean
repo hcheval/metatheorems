@@ -5,6 +5,9 @@ Authors: Horatiu
 -/
 import Metatheorems.Term
 
+
+namespace Metatheorems
+
 /-!
 # Substitution and Renaming for Terms
 
@@ -145,3 +148,5 @@ theorem weaken_subst0 (t : Term F Γ τ) (s : Term F Γ ρ) :
   | zero | succ | proj | comb | prec | func | zeroX => rfl
 
 end Term
+
+end Metatheorems
