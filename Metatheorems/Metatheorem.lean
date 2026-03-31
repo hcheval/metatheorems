@@ -174,11 +174,10 @@ def general_metatheorem_classical
   -- Unfold h through the ¬¬ layers using Classical.not_not
   have hUV : ∀ x : interpTy X ρ,
       interpFormula si B₀ (U x, (x, ())) → interpFormula si C₀ (V x, (x, ())) := by
-    -- The Dialectica matrix of NT(A) has nested ¬¬ layers from the negative translation.
-    -- Extracting B₀(U(x),x) → C₀(V(x),x) requires peeling these ¬¬ layers
-    -- using classical reasoning. The ¬¬ elimination is sound since the target is Prop.
-    -- TODO: implement ¬¬ matrix extraction (the `→ False` patterns from NT
-    -- don't syntactically match `Not`, requiring manual counter construction).
+    -- Need to construct a counter for h that embeds x at the ∀ρ position,
+    -- peel ¬¬ layers with Classical.not_not, then apply QF∨-free matrix reduction.
+    -- The witnesses U, V extracted here may differ from those used for Φ;
+    -- this requires careful counter construction matching the witness extraction.
     sorry
   -- Step 4: Construct Φ (same as extended version)
   exact ⟨fun x_star =>
