@@ -110,6 +110,9 @@ def Formula.interpret {ι : Type} {X : ι → Type} {F : ι → Ty ι}
   | _, .all ρ A,  env => ∀ x : Ty.interpret X ρ, Formula.interpret si A (x, env)
   | _, .ex  ρ A,  env => ∃ x : Ty.interpret X ρ, Formula.interpret si A (x, env)
 
+notation "‖" t "‖" si env => Term.interpret si t env
+notation "‖" A "‖ₚ" si env => Formula.interpret si A env
+
 -- ============================================================================
 -- Substitution environment
 -- ============================================================================
