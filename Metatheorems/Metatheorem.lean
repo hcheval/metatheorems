@@ -74,11 +74,14 @@ def general_metatheorem
     {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
     (eqxi : EqXInterp X F si EqX)
     (mj : Majorizability si)
+    {Premises : PremiseSet F}
+    (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
+      ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
     {ρ : Ty ι}
     {B₀ C₀ : Formula F [Ty.nat, ρ]}
     (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
     (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
-    (prf : Derivable F EqX Allowed.extended
+    (prf : @Derivable ι F EqX Allowed.extended Premises []
       (all ρ (imp (all .nat B₀) (ex .nat C₀)))) :
     { Φ : Ty.interpret X ρ.hat → Nat //
       ∀ (x : Ty.interpret X ρ) (x_star : Ty.interpret X ρ.hat),
@@ -86,7 +89,7 @@ def general_metatheorem
         (∀ u : Nat, u ≤ Φ x_star → Formula.interpret si B₀ (u, (x, ()))) →
         ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret si C₀ (v, (x, ())) } := by
   -- Step 1: Apply Dialectica directly (no NT)
-  let r := dialectica_soundness_ctx' si eqxi prf
+  let r := @dialectica_soundness_ctx' ι X F si EqX eqxi Premises premise_realizer _ _ prf
   -- r : ∀ env, dialecticaRealizerCtx si (all ρ (imp (all .nat B₀) (ex .nat C₀))) env
   -- Specialize to empty env
   let r₀ := r ()
@@ -149,11 +152,14 @@ def general_metatheorem_classical
     (eqxi : EqXInterp X F si EqX)
     (adm : AdmissibleEqX EqX)
     (mj : Majorizability si)
+    {Premises : PremiseSet F}
+    (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
+      ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
     {ρ : Ty ι}
     {B₀ C₀ : Formula F [Ty.nat, ρ]}
     (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
     (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
-    (prf : Derivable F EqX Allowed.classical
+    (prf : @Derivable ι F EqX Allowed.classical Premises []
       (all ρ (imp (all .nat B₀) (ex .nat C₀)))) :
     { Φ : Ty.interpret X ρ.hat → Nat //
       ∀ (x : Ty.interpret X ρ) (x_star : Ty.interpret X ρ.hat),
@@ -161,7 +167,7 @@ def general_metatheorem_classical
         (∀ u : Nat, u ≤ Φ x_star → Formula.interpret si B₀ (u, (x, ()))) →
         ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret si C₀ (v, (x, ())) } := by
   -- Step 1: Apply ND-interpretation (NT + Dialectica)
-  let r := nd_soundness_closed si eqxi adm prf
+  let r := nd_soundness_closed si eqxi adm premise_realizer prf
   let w := r.val
   let h := r.property
   -- h : ∀ y, dialecticaMatrix si NT(∀x(∀u B₀ → ∃v C₀)) () w y

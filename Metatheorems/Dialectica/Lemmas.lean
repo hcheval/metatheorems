@@ -28,6 +28,9 @@ variable {ι : Type} {X : ι → Type} {F : ι → Ty ι} (si : SpaceInterp X F)
 variable {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) →
           Formula F Γ}
 variable (eqxi : EqXInterp X F si EqX)
+variable {Premises : PremiseSet F}
+variable (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
+    ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
 
 -- ============================================================================
 -- Modus ponens
@@ -600,9 +603,11 @@ def dialectica_ac {Γ : Ctx ι} {ρ τ : Ty ι} {A : Formula F (τ :: ρ :: Γ)}
 /-- Generalized Dialectica realizer for any context and environment.
     Returns a realizer for all environments; structural recursion on the derivation. -/
 def dialectica_soundness_ctx' {Γ : Ctx ι} {A : Formula F Γ}
-    (h : @Derivable ι F EqX Allowed.extended Γ A) :
+    (h : @Derivable ι F EqX Allowed.extended Premises Γ A) :
     ∀ env : Ctx.interpret X Γ, dialecticaRealizerCtx si A env :=
   match h with
+  -- Premises
+  | .premise hp    => premise_realizer _ _ hp
   -- Base constructors
   | .or_contract   => fun env => dialectica_or_contract si env
   | .and_contract  => fun env => dialectica_and_contract si env
@@ -668,8 +673,8 @@ def dialectica_soundness_ctx' {Γ : Ctx ι} {A : Formula F Γ}
   | .lem h_lem        => absurd h_lem (by decide)
 
 /-- **Dialectica Soundness Theorem** (Theorem 3.0.7). -/
-def dialectica_soundness' (A : Formula F ([] : Ctx ι))
-    (h : @Derivable ι F EqX Allowed.extended [] A) : dialecticaRealizer si A :=
-  dialectica_soundness_ctx' si eqxi h ()
+def dialectica_soundness' {A : Formula F ([] : Ctx ι)}
+    (h : @Derivable ι F EqX Allowed.extended Premises [] A) : dialecticaRealizer si A :=
+  @dialectica_soundness_ctx' ι X F si EqX eqxi Premises premise_realizer [] A h ()
 
 end Metatheorems

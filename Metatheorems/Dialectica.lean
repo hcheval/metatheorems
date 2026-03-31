@@ -27,10 +27,13 @@ def dialectica_soundness_ctx
     (si : SpaceInterp X F)
     {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
     (eqxi : EqXInterp X F si EqX)
+    {Premises : PremiseSet F}
+    (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
+      ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
     {Γ : Ctx ι} (A : Formula F Γ) (env : Ctx.interpret X Γ)
-    (h : Derivable F EqX Allowed.extended A)
+    (h : @Derivable ι F EqX Allowed.extended Premises Γ A)
     : dialecticaRealizerCtx si A env :=
-  dialectica_soundness_ctx' si eqxi h env
+  @dialectica_soundness_ctx' ι X F si EqX eqxi Premises premise_realizer Γ A h env
 
 /-- **Dialectica Soundness Theorem** (Theorem 3.0.7).
 
@@ -41,9 +44,12 @@ def dialectica_soundness
     (si : SpaceInterp X F)
     {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
     (eqxi : EqXInterp X F si EqX)
+    {Premises : PremiseSet F}
+    (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
+      ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
     (A : Formula F ([] : Ctx ι))
-    (h : Derivable F EqX Allowed.extended A)
+    (h : @Derivable ι F EqX Allowed.extended Premises [] A)
     : dialecticaRealizer si A :=
-  dialectica_soundness' si eqxi A h
+  @dialectica_soundness' ι X F si EqX eqxi Premises premise_realizer A h
 
 end Metatheorems

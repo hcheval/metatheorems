@@ -13,15 +13,15 @@ open Formula
 
 variable {ι : Type} {F : ι → Ty ι}
     {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
-    {a : Allowed}
+    {a : Allowed} {Premises : PremiseSet F}
 
 -- Re-export helpers that are private in Arithmetic.lean
 private def self_imp_h {Γ : Ctx ι} {A : Formula F Γ} :
-    Derivable F EqX a (A →ᶠ A) :=
+    Derivable F EqX a Premises (A →ᶠ A) :=
   .syllogism .and_contract .and_weak
 
 private def weaken_intro_h {Γ : Ctx ι} {A B : Formula F Γ}
-    (h : Derivable F EqX a A) : Derivable F EqX a (B →ᶠ A) :=
+    (h : Derivable F EqX a Premises A) : Derivable F EqX a Premises (B →ᶠ A) :=
   .mp h (.exportation .and_weak)
 
 -- The key identity: (A.renameF (ext shift)).subst0 (var vz) = A
@@ -35,35 +35,35 @@ private theorem weaken_subst0_id {Γ : Ctx ι} {ρ : Ty ι} (A : Formula F (ρ :
 
 -- Helper: instantiate a weakened ∀ at var vz, getting back the body
 private def forall_ax_vz {Γ : Ctx ι} {ρ : Ty ι} {A : Formula F (ρ :: Γ)} :
-    Derivable F EqX a ((Formula.all ρ A).weakenBy ρ →ᶠ A) := by
-  have h := @Derivable.forall_ax ι F EqX a (ρ :: Γ) ρ
+    Derivable F EqX a Premises ((Formula.all ρ A).weakenBy ρ →ᶠ A) := by
+  have h := @Derivable.forall_ax ι F EqX a Premises (ρ :: Γ) ρ
     (A.renameF (Renaming.ext Renaming.shift)) (.var .vz)
   -- h : (all ρ (A.renameF (ext shift))).weakenBy ρ → (A.renameF (ext shift)).subst0 (var vz)
   -- Rewrite conclusion using weaken_subst0_id
-  exact Eq.mp (congrArg (Derivable F EqX a ·)
+  exact Eq.mp (congrArg (Derivable F EqX a Premises ·)
     (congrArg ((Formula.all ρ A).weakenBy ρ →ᶠ ·) (weaken_subst0_id A))) h
 
 /-- Lift an implication through ∀:
     from ⊢ ∀x. P(x) → Q(x), derive ⊢ (∀x. P(x)) → (∀x. Q(x)).
     Combines forall_ax + syllogism + forall_rule in one reusable combinator. -/
 def forall_lift {Γ : Ctx ι} {ρ : Ty ι} {P Q : Formula F (ρ :: Γ)}
-    (h : Derivable F EqX a (Formula.all ρ (P →ᶠ Q))) :
-    Derivable F EqX a (Formula.all ρ P →ᶠ Formula.all ρ Q) :=
+    (h : Derivable F EqX a Premises (Formula.all ρ (P →ᶠ Q))) :
+    Derivable F EqX a Premises (Formula.all ρ P →ᶠ Formula.all ρ Q) :=
   -- In context ρ :: Γ:
   -- forall_ax_vz : (∀x.P→Q).w → P→Q
   -- forall_ax_vz : (∀x.P).w → P
   -- Combined: (∀x.P→Q) ∧ (∀x.P) → via weakenBy both → P→Q ∧ P → Q
-  let get_PQ : Derivable F EqX a
+  let get_PQ : Derivable F EqX a Premises
       ((Formula.all ρ (P →ᶠ Q)).weakenBy ρ ∧ᶠ (Formula.all ρ P).weakenBy ρ →ᶠ P →ᶠ Q) :=
     .syllogism .and_weak forall_ax_vz
-  let get_P : Derivable F EqX a
+  let get_P : Derivable F EqX a Premises
       ((Formula.all ρ (P →ᶠ Q)).weakenBy ρ ∧ᶠ (Formula.all ρ P).weakenBy ρ →ᶠ P) :=
     .syllogism (.syllogism .and_perm .and_weak) forall_ax_vz
-  let body : Derivable F EqX a
+  let body : Derivable F EqX a Premises
       ((Formula.all ρ (P →ᶠ Q)).weakenBy ρ ∧ᶠ (Formula.all ρ P).weakenBy ρ →ᶠ Q) :=
     .syllogism (pair_h get_PQ get_P) (.importation I_comb)
   -- forall_rule on body: (∀x.P→Q) ∧ (∀x.P) → ∀x.Q
-  let fr : Derivable F EqX a (Formula.all ρ (P →ᶠ Q) ∧ᶠ Formula.all ρ P →ᶠ Formula.all ρ Q) :=
+  let fr : Derivable F EqX a Premises (Formula.all ρ (P →ᶠ Q) ∧ᶠ Formula.all ρ P →ᶠ Formula.all ρ Q) :=
     .forall_rule body
   -- From h : ∀x.P→Q, pair with (∀x.P) to get the conjunction:
   .syllogism (pair_h (weaken_intro_h h) I_comb) fr
@@ -122,9 +122,9 @@ theorem renameF_ext_shift_subst0 {Γ : Ctx ι} {ρ : Ty ι}
 
 /-- Re-index a ∀ by successor: from ⊢ ∀k. P(k), derive ⊢ ∀k. P(Sk). -/
 def forall_inst_succ {Γ : Ctx ι} {P : Formula F (Ty.nat :: Γ)} :
-    Derivable F EqX a (Formula.all Ty.nat P →ᶠ
+    Derivable F EqX a Premises (Formula.all Ty.nat P →ᶠ
       Formula.all Ty.nat (P.substVar0 (.app .succ (.var .vz)))) :=
-  .forall_rule (Eq.mp (congrArg (Derivable F EqX a ·)
+  .forall_rule (Eq.mp (congrArg (Derivable F EqX a Premises ·)
     (congrArg ((Formula.all Ty.nat P).weakenBy Ty.nat →ᶠ ·)
       (renameF_ext_shift_subst0 P (.app .succ (.var .vz)))))
     (.forall_ax (.app .succ (.var .vz))))
@@ -133,23 +133,23 @@ def forall_inst_succ {Γ : Ctx ι} {P : Formula F (Ty.nat :: Γ)} :
     from ⊢ P(x) → Q(x) (in extended context), derive ⊢ (∀x. P(x)) → (∀x. Q(x)).
     Often more convenient than `forall_lift`. -/
 def forall_map {Γ : Ctx ι} {ρ : Ty ι} {P Q : Formula F (ρ :: Γ)}
-    (h : Derivable F EqX a (P →ᶠ Q)) :
-    Derivable F EqX a (Formula.all ρ P →ᶠ Formula.all ρ Q) :=
+    (h : Derivable F EqX a Premises (P →ᶠ Q)) :
+    Derivable F EqX a Premises (Formula.all ρ P →ᶠ Formula.all ρ Q) :=
   -- Use forall_rule directly: (∀x.P).w → P [forall_ax_vz] → Q [h]
   .forall_rule (.syllogism forall_ax_vz h)
 
 /-- Introduce ∃ from variable 0: Q → (∃x.Q).weakenBy ρ in context ρ :: Γ. -/
 private def exist_ax_vz {Γ : Ctx ι} {ρ : Ty ι} {A : Formula F (ρ :: Γ)} :
-    Derivable F EqX a (A →ᶠ (Formula.ex ρ A).weakenBy ρ) :=
-  Eq.mp (congrArg (Derivable F EqX a ·)
+    Derivable F EqX a Premises (A →ᶠ (Formula.ex ρ A).weakenBy ρ) :=
+  Eq.mp (congrArg (Derivable F EqX a Premises ·)
     (congrArg (· →ᶠ (Formula.ex ρ A).weakenBy ρ) (weaken_subst0_id A)))
     (.exist_ax (.var .vz) (A.renameF (Renaming.ext Renaming.shift)))
 
 /-- Map a derivation through ∃:
     from ⊢ P(x) → Q(x), derive ⊢ (∃x. P(x)) → (∃x. Q(x)). -/
 def exist_map {Γ : Ctx ι} {ρ : Ty ι} {P Q : Formula F (ρ :: Γ)}
-    (h : Derivable F EqX a (P →ᶠ Q)) :
-    Derivable F EqX a (Formula.ex ρ P →ᶠ Formula.ex ρ Q) :=
+    (h : Derivable F EqX a Premises (P →ᶠ Q)) :
+    Derivable F EqX a Premises (Formula.ex ρ P →ᶠ Formula.ex ρ Q) :=
   .exist_rule (.syllogism h exist_ax_vz)
 
 end Metatheorems

@@ -87,48 +87,53 @@ and `allowed` (which extension principles are available).
 When `allowed = Allowed.base`, this is pure WE-HA^{ω,X}.
 When `allowed = Allowed.extended`, this adds AC + IP + Markov.
 When `allowed = Allowed.classical`, this adds LEM + AC. -/
+abbrev PremiseSet {ι : Type} (F : ι → Ty ι) := (Σ Γ : Ctx ι, Formula F Γ) → Prop
+
 inductive Derivable {ι : Type} (F : ι → Ty ι)
     (EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ)
-    (allowed : Allowed) :
+    (allowed : Allowed)
+    (Premises : PremiseSet F) :
     {Γ : Ctx ι} → Formula F Γ → Type where
+  -- Premises (theory axioms)
+  | premise       : Premises ⟨_, A⟩ → Derivable F EqX allowed Premises A
   -- Propositional axioms (§9.1)
-  | or_contract  : Derivable F EqX allowed (A ∨ᶠ A →ᶠ A)
-  | and_contract : Derivable F EqX allowed (A →ᶠ A ∧ᶠ A)
-  | or_weak      : Derivable F EqX allowed (A →ᶠ A ∨ᶠ B)
-  | and_weak     : Derivable F EqX allowed (A ∧ᶠ B →ᶠ A)
-  | or_perm      : Derivable F EqX allowed (A ∨ᶠ B →ᶠ B ∨ᶠ A)
-  | and_perm     : Derivable F EqX allowed (A ∧ᶠ B →ᶠ B ∧ᶠ A)
-  | exfalso      : Derivable F EqX allowed (⊥ᶠ →ᶠ A)
-  | forall_ax    : (t : Term F Γ ρ) → Derivable F EqX allowed (Formula.all ρ A →ᶠ A.subst0 t)
+  | or_contract  : Derivable F EqX allowed Premises (A ∨ᶠ A →ᶠ A)
+  | and_contract : Derivable F EqX allowed Premises (A →ᶠ A ∧ᶠ A)
+  | or_weak      : Derivable F EqX allowed Premises (A →ᶠ A ∨ᶠ B)
+  | and_weak     : Derivable F EqX allowed Premises (A ∧ᶠ B →ᶠ A)
+  | or_perm      : Derivable F EqX allowed Premises (A ∨ᶠ B →ᶠ B ∨ᶠ A)
+  | and_perm     : Derivable F EqX allowed Premises (A ∧ᶠ B →ᶠ B ∧ᶠ A)
+  | exfalso      : Derivable F EqX allowed Premises (⊥ᶠ →ᶠ A)
+  | forall_ax    : (t : Term F Γ ρ) → Derivable F EqX allowed Premises (Formula.all ρ A →ᶠ A.subst0 t)
   | exist_ax     : (t : Term F Γ ρ) → (A : Formula F (ρ :: Γ)) →
-                   Derivable F EqX allowed (A.subst0 t →ᶠ Formula.ex ρ A)
+                   Derivable F EqX allowed Premises (A.subst0 t →ᶠ Formula.ex ρ A)
 
   -- Rules (§9.2)
-  | mp           : Derivable F EqX allowed A → Derivable F EqX allowed (A →ᶠ B) →
-                   Derivable F EqX allowed B
-  | syllogism    : Derivable F EqX allowed (A →ᶠ B) → Derivable F EqX allowed (B →ᶠ C) →
-                   Derivable F EqX allowed (A →ᶠ C)
-  | exportation  : Derivable F EqX allowed (A ∧ᶠ B →ᶠ C) →
-                   Derivable F EqX allowed (A →ᶠ B →ᶠ C)
-  | importation  : Derivable F EqX allowed (A →ᶠ B →ᶠ C) →
-                   Derivable F EqX allowed (A ∧ᶠ B →ᶠ C)
-  | expansion    : Derivable F EqX allowed (A →ᶠ B) →
-                   Derivable F EqX allowed (C ∨ᶠ A →ᶠ C ∨ᶠ B)
-  | forall_rule  : Derivable F EqX allowed (Formula.weakenBy ρ B →ᶠ A) →
-                   Derivable F EqX allowed (B →ᶠ Formula.all ρ A)
+  | mp           : Derivable F EqX allowed Premises A → Derivable F EqX allowed Premises (A →ᶠ B) →
+                   Derivable F EqX allowed Premises B
+  | syllogism    : Derivable F EqX allowed Premises (A →ᶠ B) → Derivable F EqX allowed Premises (B →ᶠ C) →
+                   Derivable F EqX allowed Premises (A →ᶠ C)
+  | exportation  : Derivable F EqX allowed Premises (A ∧ᶠ B →ᶠ C) →
+                   Derivable F EqX allowed Premises (A →ᶠ B →ᶠ C)
+  | importation  : Derivable F EqX allowed Premises (A →ᶠ B →ᶠ C) →
+                   Derivable F EqX allowed Premises (A ∧ᶠ B →ᶠ C)
+  | expansion    : Derivable F EqX allowed Premises (A →ᶠ B) →
+                   Derivable F EqX allowed Premises (C ∨ᶠ A →ᶠ C ∨ᶠ B)
+  | forall_rule  : Derivable F EqX allowed Premises (Formula.weakenBy ρ B →ᶠ A) →
+                   Derivable F EqX allowed Premises (B →ᶠ Formula.all ρ A)
   | exist_rule   : {B : Formula F Γ} → {A : Formula F (ρ :: Γ)} →
-                   Derivable F EqX allowed (A →ᶠ Formula.weakenBy ρ B) →
-                   Derivable F EqX allowed (Formula.ex ρ A →ᶠ B)
+                   Derivable F EqX allowed Premises (A →ᶠ Formula.weakenBy ρ B) →
+                   Derivable F EqX allowed Premises (Formula.ex ρ A →ᶠ B)
 
   -- Universal generalization (9.42)
-  | univ_gen     : Derivable F EqX allowed A →
-                   Derivable F EqX allowed (Formula.all ρ (Formula.weakenBy ρ A))
+  | univ_gen     : Derivable F EqX allowed Premises A →
+                   Derivable F EqX allowed Premises (Formula.all ρ (Formula.weakenBy ρ A))
 
   -- Successor (§9.5)
-  | succ_ne_zero : Derivable F EqX allowed
+  | succ_ne_zero : Derivable F EqX allowed Premises
       (Formula.all Ty.nat
         (Formula.eq0 (Term.app Term.succ (.var .vz)) Term.zero →ᶠ ⊥ᶠ))
-  | succ_inj     : Derivable F EqX allowed
+  | succ_inj     : Derivable F EqX allowed Premises
       (Formula.all Ty.nat (Formula.all Ty.nat
         (Formula.eq0
           (Term.app Term.succ (.var (.vs .vz)))
@@ -136,25 +141,25 @@ inductive Derivable {ι : Type} (F : ι → Ty ι)
         →ᶠ Formula.eq0 (.var (.vs .vz)) (.var .vz))))
 
   -- Combinators (§9.6)
-  | proj_ax      : Derivable F EqX allowed
+  | proj_ax      : Derivable F EqX allowed Premises
       (eqAtType EqX ρ (Term.app2 (Term.proj ρ τ) s t) s)
-  | comb_ax      : Derivable F EqX allowed
+  | comb_ax      : Derivable F EqX allowed Premises
       (eqAtType EqX τ
         (Term.app3 (Term.comb δ ρ τ) f g x)
         (Term.app (Term.app f x) (Term.app g x)))
 
   -- Recursor (§9.6, eq. 9.54)
-  | rec_zero     : Derivable F EqX allowed
+  | rec_zero     : Derivable F EqX allowed Premises
       (eqAtType EqX ρ (Term.app3 (Term.prec ρ) y z Term.zero) y)
-  | rec_succ     : Derivable F EqX allowed
+  | rec_succ     : Derivable F EqX allowed Premises
       (eqAtType EqX ρ
         (Term.app3 (Term.prec ρ) y z (Term.app Term.succ x))
         (Term.app2 z (Term.app3 (Term.prec ρ) y z x) x))
 
   -- Equality (§9.7)
-  | refl0        : Derivable F EqX allowed (Formula.eq0 t t)
-  | sym0         : Derivable F EqX allowed (Formula.eq0 s t →ᶠ Formula.eq0 t s)
-  | trans0       : Derivable F EqX allowed
+  | refl0        : Derivable F EqX allowed Premises (Formula.eq0 t t)
+  | sym0         : Derivable F EqX allowed Premises (Formula.eq0 s t →ᶠ Formula.eq0 t s)
+  | trans0       : Derivable F EqX allowed Premises
       (Formula.eq0 s t ∧ᶠ Formula.eq0 t u →ᶠ Formula.eq0 s u)
 
   -- QF-ER (§9.7, eq. 9.58)
@@ -164,14 +169,14 @@ inductive Derivable {ι : Type} (F : ι → Ty ι)
   -- first encode A₀ as `qf_term A₀ =₀ 0` (which IS ∨-free) via qf_term_correct.
   | qfer         : {A₀ : Formula F Γ} →
                    A₀.isQF = true → A₀.isVFree = true →
-                   Derivable F EqX allowed (A₀ →ᶠ eqAtType EqX ρ s t) →
-                   Derivable F EqX allowed (A₀ →ᶠ eqAtType EqX σ (Term.subst0 r s) (Term.subst0 r t))
+                   Derivable F EqX allowed Premises (A₀ →ᶠ eqAtType EqX ρ s t) →
+                   Derivable F EqX allowed Premises (A₀ →ᶠ eqAtType EqX σ (Term.subst0 r s) (Term.subst0 r t))
 
   -- Induction (§9.8)
-  | induction    : Derivable F EqX allowed (A.subst0 Term.zero) →
-                   Derivable F EqX allowed (Formula.all Ty.nat
+  | induction    : Derivable F EqX allowed Premises (A.subst0 Term.zero) →
+                   Derivable F EqX allowed Premises (Formula.all Ty.nat
                      (A →ᶠ Formula.substVar0 A (Term.app Term.succ (.var .vz)))) →
-                   Derivable F EqX allowed (Formula.all Ty.nat A)
+                   Derivable F EqX allowed Premises (Formula.all Ty.nat A)
 
   -- ══════════════════════════════════════════════════════════════════════════
   -- Extension principles (guarded by `allowed` fields)
@@ -179,24 +184,24 @@ inductive Derivable {ι : Type} (F : ι → Ty ι)
 
   -- Law of excluded middle
   | lem          : allowed.lem = true →
-                   Derivable F EqX allowed (A ∨ᶠ ¬ᶠA)
+                   Derivable F EqX allowed Premises (A ∨ᶠ ¬ᶠA)
 
   -- Markov's principle M^ω (QF ∨-free)
   | markov       : allowed.markov = true →
                    {A₀ : Formula F (ρ :: Γ)} → A₀.isQF = true → Formula.isVFree A₀ = true →
-                   Derivable F EqX allowed (¬ᶠ(¬ᶠ(Formula.ex ρ A₀)) →ᶠ Formula.ex ρ A₀)
+                   Derivable F EqX allowed Premises (¬ᶠ(¬ᶠ(Formula.ex ρ A₀)) →ᶠ Formula.ex ρ A₀)
 
   -- Independence of premise IP^ω_∀ (QF ∨-free premise)
   | ip           : allowed.ip = true →
                    {A₀ : Formula F (σ :: Γ)} → A₀.isQF = true → Formula.isVFree A₀ = true →
-                   Derivable F EqX allowed
+                   Derivable F EqX allowed Premises
                      ((Formula.all σ A₀ →ᶠ Formula.ex ρ B) →ᶠ
                       Formula.ex ρ ((Formula.all σ A₀).weakenBy ρ →ᶠ B))
 
   -- Axiom of choice AC (full, for arbitrary A)
   | ac           : allowed.ac = true →
                    {A : Formula F (τ :: ρ :: Γ)} →
-                   Derivable F EqX allowed
+                   Derivable F EqX allowed Premises
                      ((Formula.all ρ (Formula.ex τ A)) →ᶠ
                       Formula.ex (ρ →ₜ τ) (Formula.all ρ (Formula.substF Formula.acSubst A)))
 
@@ -207,7 +212,7 @@ inductive Derivable {ι : Type} (F : ι → Ty ι)
   | qfac         : allowed.qfac = true →
                    {A₀ : Formula F (τ :: ρ :: Γ)} → A₀.isQF = true →
                    Formula.isVFree A₀ = true →
-                   Derivable F EqX allowed
+                   Derivable F EqX allowed Premises
                      ((Formula.all ρ (Formula.ex τ A₀)) →ᶠ
                       Formula.ex (ρ →ₜ τ) (Formula.all ρ (Formula.substF Formula.acSubst A₀)))
 
@@ -220,9 +225,11 @@ inductive Derivable {ι : Type} (F : ι → Ty ι)
 def Derivable.castAllowed {ι : Type} {F : ι → Ty ι}
     {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
     {a₁ a₂ : Allowed} (h_le : Allowed.le a₁ a₂)
+    {Premises : PremiseSet F}
     {Γ : Ctx ι} {A : Formula F Γ}
-    (h : Derivable F EqX a₁ A) : Derivable F EqX a₂ A :=
+    (h : Derivable F EqX a₁ Premises A) : Derivable F EqX a₂ Premises A :=
   match h with
+  | .premise hp   => .premise hp
   | .or_contract  => .or_contract
   | .and_contract => .and_contract
   | .or_weak      => .or_weak
@@ -278,14 +285,17 @@ structure AdmissibleEqX {ι : Type} {F : ι → Ty ι}
       (σ : Term.Subst F Γ Δ),
       (EqX i u v).substF σ = EqX i (u.subst σ) (v.subst σ)
   /-- Reflexivity: ⊢ EqX i t t. -/
-  eqx_refl : ∀ {a : Allowed} {Γ : Ctx ι} {i : ι} (t : Term F Γ (Ty.base i)),
-      Derivable F EqX a (EqX i t t)
+  eqx_refl : ∀ {a : Allowed} {Premises : PremiseSet F}
+      {Γ : Ctx ι} {i : ι} (t : Term F Γ (Ty.base i)),
+      Derivable F EqX a Premises (EqX i t t)
   /-- Symmetry: ⊢ EqX i s t → EqX i t s. -/
-  eqx_sym : ∀ {a : Allowed} {Γ : Ctx ι} {i : ι} {s t : Term F Γ (Ty.base i)},
-      Derivable F EqX a (EqX i s t →ᶠ EqX i t s)
+  eqx_sym : ∀ {a : Allowed} {Premises : PremiseSet F}
+      {Γ : Ctx ι} {i : ι} {s t : Term F Γ (Ty.base i)},
+      Derivable F EqX a Premises (EqX i s t →ᶠ EqX i t s)
   /-- Transitivity: ⊢ EqX i s t ∧ EqX i t u → EqX i s u. -/
-  eqx_trans : ∀ {a : Allowed} {Γ : Ctx ι} {i : ι} {s t u : Term F Γ (Ty.base i)},
-      Derivable F EqX a (EqX i s t ∧ᶠ EqX i t u →ᶠ EqX i s u)
+  eqx_trans : ∀ {a : Allowed} {Premises : PremiseSet F}
+      {Γ : Ctx ι} {i : ι} {s t u : Term F Γ (Ty.base i)},
+      Derivable F EqX a Premises (EqX i s t ∧ᶠ EqX i t u →ᶠ EqX i s u)
   /-- EqX at base types is purely universal (∀-nesting around QF core).
       Ensures eqAtType is provably equivalent to its kurodaInner image,
       needed by the negative translation (lem:negative-forall-equiv). -/
