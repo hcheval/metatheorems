@@ -447,6 +447,55 @@ def embed_nat_R {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ realTy ι) :=
   Term.lam (Term.lam
     (.app Term.encode_nat_Q (.var (.vs .vz))))
 
+/-- Real negation: neg_R(f)(n) = neg_Q(f(n)). -/
+def neg_R {Γ : Ctx ι} : Term F Γ (realTy ι →ₜ realTy ι) :=
+  Term.lam (Term.lam
+    -- f = var (vs vz), n = var vz
+    (.app Term.neg_Q (.app (.var (.vs .vz)) (.var .vz))))
+
+/-- Real addition: add_R(f, g)(n) = add_Q(f̂(n+1), ĝ(n+1)).
+    The shift by 1 ensures the sum has Cauchy rate 2^{-n}
+    (each summand has rate 2^{-(n+1)} and errors add). -/
+def add_R {Γ : Ctx ι} : Term F Γ (realTy ι →ₜ realTy ι →ₜ realTy ι) :=
+  Term.lam (Term.lam (Term.lam
+    -- f = var (vs (vs vz)), g = var (vs vz), n = var vz
+    (let f := Term.var (.vs (.vs .vz))
+     let g := Term.var (.vs .vz)
+     let n := Term.var .vz
+     let n1 := Term.app .succ n
+     Term.app2 Term.add_Q
+       (Term.app (Term.app Term.cauchyfy f) n1)
+       (Term.app (Term.app Term.cauchyfy g) n1))))
+
+/-- Real subtraction: sub_R(f, g) = add_R(f, neg_R(g)). -/
+def sub_R {Γ : Ctx ι} : Term F Γ (realTy ι →ₜ realTy ι →ₜ realTy ι) :=
+  Term.lam (Term.lam
+    (Term.app2 Term.add_R (.var (.vs .vz)) (.app Term.neg_R (.var .vz))))
+
+/-- Real multiplication: mul_R(f, g)(n) = mul_Q(f̂(n + b), ĝ(n + b))
+    where b = f(0) + g(0) + 2 bounds the operands, ensuring the product
+    has Cauchy rate 2^{-n}. -/
+def mul_R {Γ : Ctx ι} : Term F Γ (realTy ι →ₜ realTy ι →ₜ realTy ι) :=
+  Term.lam (Term.lam (Term.lam
+    -- f = var (vs (vs vz)), g = var (vs vz), n = var vz
+    (let f := Term.var (.vs (.vs .vz))
+     let g := Term.var (.vs .vz)
+     let n := Term.var .vz
+     -- bound b = f(0) + g(0) + 2
+     let b := Term.app2 Term.add
+       (Term.app2 Term.add (.app f .zero) (.app g .zero))
+       (Term.ofNat 2)
+     let nb := Term.app2 Term.add n b
+     Term.app2 Term.mul_Q
+       (Term.app (Term.app Term.cauchyfy f) nb)
+       (Term.app (Term.app Term.cauchyfy g) nb))))
+
+/-- Real absolute value: abs_R(f)(n) = abs_Q(f̂(n)). -/
+def abs_R {Γ : Ctx ι} : Term F Γ (realTy ι →ₜ realTy ι) :=
+  Term.lam (Term.lam
+    (.app Term.abs_Q
+      (Term.app (Term.app Term.cauchyfy (.var (.vs .vz))) (.var .vz))))
+
 end Term
 
 -- === Formulas ===
@@ -530,5 +579,212 @@ def Term.round_nat {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ realTy ι) :=
         (.app Term.exp2 (Term.app2 Term.add (.var .vz) (Term.ofNat 2))))
       (.app Term.pd (.app Term.exp2
         (Term.app2 Term.add (.var .vz) (.app .succ .zero))))))
+
+-- ============================================================================
+-- Ordered Field Axioms (Derivable in WE-HA^ω)
+-- ============================================================================
+
+-- Following Kohlenbach's condition (m): (ℕ^ℕ, +_ℝ, ·_ℝ, 0_ℝ, 1_ℝ, <_ℝ)
+-- is an Archimedean ordered field, provably in WE-HA^ω.
+
+variable {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) →
+    Term F Γ (Ty.base i) → Formula F Γ}
+  {al : Allowed} {Premises : PremiseSet F}
+
+-- Notation: real-typed variables in context
+private abbrev rTy := realTy ι
+-- In context [rTy, Γ]: f = var vz
+-- In context [rTy, rTy, Γ]: f = var (vs vz), g = var vz
+-- In context [rTy, rTy, rTy, Γ]: f = var (vs (vs vz)), g = var (vs vz), h = var vz
+
+section OrderedFieldAxioms
+
+variable {Γ : Ctx ι}
+
+-- ── Additive group ──────────────────────────────────────────────────────────
+
+/-- ⊢ ∀f,g : ℝ. f +_ℝ g =_ℝ g +_ℝ f -/
+def add_comm_R :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all rTy (Formula.all rTy
+        (eq_R (Term.app2 Term.add_R (.var (.vs .vz)) (.var .vz))
+              (Term.app2 Term.add_R (.var .vz) (.var (.vs .vz)))))) :=
+  sorry
+
+/-- ⊢ ∀f,g,h : ℝ. (f +_ℝ g) +_ℝ h =_ℝ f +_ℝ (g +_ℝ h) -/
+def add_assoc_R :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all rTy (Formula.all rTy (Formula.all rTy
+        (eq_R
+          (Term.app2 Term.add_R
+            (Term.app2 Term.add_R (.var (.vs (.vs .vz))) (.var (.vs .vz)))
+            (.var .vz))
+          (Term.app2 Term.add_R (.var (.vs (.vs .vz)))
+            (Term.app2 Term.add_R (.var (.vs .vz)) (.var .vz))))))) :=
+  sorry
+
+/-- ⊢ ∀f : ℝ. f +_ℝ 0_ℝ =_ℝ f -/
+def add_zero_R :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all rTy
+        (eq_R (Term.app2 Term.add_R (.var .vz) Term.zero_R)
+              (.var .vz))) :=
+  sorry
+
+/-- ⊢ ∀f : ℝ. f +_ℝ neg_R(f) =_ℝ 0_ℝ -/
+def add_neg_R :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all rTy
+        (eq_R (Term.app2 Term.add_R (.var .vz)
+                (.app Term.neg_R (.var .vz)))
+              Term.zero_R)) :=
+  sorry
+
+-- ── Multiplicative monoid ───────────────────────────────────────────────────
+
+/-- ⊢ ∀f,g : ℝ. f ·_ℝ g =_ℝ g ·_ℝ f -/
+def mul_comm_R :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all rTy (Formula.all rTy
+        (eq_R (Term.app2 Term.mul_R (.var (.vs .vz)) (.var .vz))
+              (Term.app2 Term.mul_R (.var .vz) (.var (.vs .vz)))))) :=
+  sorry
+
+/-- ⊢ ∀f,g,h : ℝ. (f ·_ℝ g) ·_ℝ h =_ℝ f ·_ℝ (g ·_ℝ h) -/
+def mul_assoc_R :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all rTy (Formula.all rTy (Formula.all rTy
+        (eq_R
+          (Term.app2 Term.mul_R
+            (Term.app2 Term.mul_R (.var (.vs (.vs .vz))) (.var (.vs .vz)))
+            (.var .vz))
+          (Term.app2 Term.mul_R (.var (.vs (.vs .vz)))
+            (Term.app2 Term.mul_R (.var (.vs .vz)) (.var .vz))))))) :=
+  sorry
+
+/-- ⊢ ∀f : ℝ. f ·_ℝ 1_ℝ =_ℝ f -/
+def mul_one_R :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all rTy
+        (eq_R (Term.app2 Term.mul_R (.var .vz) Term.one_R)
+              (.var .vz))) :=
+  sorry
+
+-- ── Distributivity ──────────────────────────────────────────────────────────
+
+/-- ⊢ ∀f,g,h : ℝ. f ·_ℝ (g +_ℝ h) =_ℝ (f ·_ℝ g) +_ℝ (f ·_ℝ h) -/
+def distrib_R :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all rTy (Formula.all rTy (Formula.all rTy
+        (eq_R
+          (Term.app2 Term.mul_R (.var (.vs (.vs .vz)))
+            (Term.app2 Term.add_R (.var (.vs .vz)) (.var .vz)))
+          (Term.app2 Term.add_R
+            (Term.app2 Term.mul_R (.var (.vs (.vs .vz))) (.var (.vs .vz)))
+            (Term.app2 Term.mul_R (.var (.vs (.vs .vz)))
+              (.var .vz))))))) :=
+  sorry
+
+-- ── Order ───────────────────────────────────────────────────────────────────
+
+/-- ⊢ ∀f : ℝ. ¬(f <_ℝ f) (irreflexivity of <_ℝ) -/
+def lt_irrefl_R :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all rTy (Formula.neg (lt_R (.var .vz) (.var .vz)))) :=
+  sorry
+
+/-- ⊢ ∀f,g,h : ℝ. f <_ℝ g ∧ g <_ℝ h → f <_ℝ h -/
+def lt_trans_R :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all rTy (Formula.all rTy (Formula.all rTy
+        ((lt_R (.var (.vs (.vs .vz))) (.var (.vs .vz))
+          ∧ᶠ lt_R (.var (.vs .vz)) (.var .vz))
+          →ᶠ lt_R (.var (.vs (.vs .vz))) (.var .vz))))) :=
+  sorry
+
+/-- ⊢ ∀f,g,h : ℝ. f <_ℝ g → f +_ℝ h <_ℝ g +_ℝ h -/
+def lt_add_R :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all rTy (Formula.all rTy (Formula.all rTy
+        (lt_R (.var (.vs (.vs .vz))) (.var (.vs .vz))
+          →ᶠ lt_R
+            (Term.app2 Term.add_R (.var (.vs (.vs .vz))) (.var .vz))
+            (Term.app2 Term.add_R (.var (.vs .vz)) (.var .vz)))))) :=
+  sorry
+
+/-- ⊢ ∀f,g : ℝ. 0 <_ℝ f ∧ 0 <_ℝ g → 0 <_ℝ f ·_ℝ g -/
+def lt_mul_pos_R :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all rTy (Formula.all rTy
+        ((lt_R Term.zero_R (.var (.vs .vz))
+          ∧ᶠ lt_R Term.zero_R (.var .vz))
+          →ᶠ lt_R Term.zero_R
+            (Term.app2 Term.mul_R (.var (.vs .vz)) (.var .vz))))) :=
+  sorry
+
+/-- ⊢ 0_ℝ <_ℝ 1_ℝ -/
+def zero_lt_one_R :
+    Derivable F EqX al Premises (Γ := Γ)
+      (lt_R Term.zero_R Term.one_R) :=
+  sorry
+
+-- ── Archimedean property ────────────────────────────────────────────────────
+
+/-- ⊢ ∀f : ℝ. ∃n⁰. f <_ℝ embed_nat(n) -/
+def archimedean_R :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all rTy
+        (Formula.ex Ty.nat
+          (lt_R (Term.var (.vs .vz))
+                (.app Term.embed_nat_R (.var .vz))))) :=
+  sorry
+
+-- ── =_ℝ is an equivalence relation ─────────────────────────────────────────
+
+/-- ⊢ ∀f : ℝ. f =_ℝ f -/
+def eq_R_refl :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all rTy (eq_R (.var .vz) (.var .vz))) :=
+  sorry
+
+/-- ⊢ ∀f,g : ℝ. f =_ℝ g → g =_ℝ f -/
+def eq_R_sym :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all rTy (Formula.all rTy
+        (eq_R (.var (.vs .vz)) (.var .vz) →ᶠ
+         eq_R (.var .vz) (.var (.vs .vz))))) :=
+  sorry
+
+/-- ⊢ ∀f,g,h : ℝ. f =_ℝ g ∧ g =_ℝ h → f =_ℝ h -/
+def eq_R_trans :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all rTy (Formula.all rTy (Formula.all rTy
+        (eq_R (.var (.vs (.vs .vz))) (.var (.vs .vz))
+          ∧ᶠ eq_R (.var (.vs .vz)) (.var .vz)
+          →ᶠ eq_R (.var (.vs (.vs .vz))) (.var .vz))))) :=
+  sorry
+
+-- ── Properties needed for metric space transitivity ─────────────────────────
+
+/-- ⊢ ∀f,g : ℝ. f =_ℝ 0 ∧ g =_ℝ 0 → f +_ℝ g =_ℝ 0 -/
+def add_eq_zero_R :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all rTy (Formula.all rTy
+        (eq_R (.var (.vs .vz)) Term.zero_R
+          ∧ᶠ eq_R (.var .vz) Term.zero_R
+          →ᶠ eq_R (Term.app2 Term.add_R (.var (.vs .vz)) (.var .vz))
+                   Term.zero_R))) :=
+  sorry
+
+/-- ⊢ ∀f,g : ℝ. f ≤_ℝ g ∧ g =_ℝ 0 → f =_ℝ 0 -/
+def le_zero_eq_zero_R :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all rTy (Formula.all rTy
+        (le_R (.var (.vs .vz)) (.var .vz)
+          ∧ᶠ eq_R (.var .vz) Term.zero_R
+          →ᶠ eq_R (.var (.vs .vz)) Term.zero_R))) :=
+  sorry
+
+end OrderedFieldAxioms
 
 end Metatheorems
