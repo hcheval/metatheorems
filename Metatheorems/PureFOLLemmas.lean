@@ -30,7 +30,7 @@ private theorem weaken_subst0_id {Γ : Ctx ι} {ρ : Ty ι} (A : Formula F (ρ :
   substF_renameF_id (Renaming.ext Renaming.shift) (Term.subst0_map (.var .vz))
     (fun {_} v => match v with
       | .vz => rfl
-      | .vs _ => by simp [Renaming.ext, Term.subst0_map, Renaming.shift])
+      | .vs _ => by simp [Term.Renaming.ext, Term.subst0_map, Term.Renaming.shift])
     A
 
 -- Helper: instantiate a weakened ∀ at var vz, getting back the body
@@ -72,22 +72,17 @@ def forall_lift {Γ : Ctx ι} {ρ : Ty ι} {P Q : Formula F (ρ :: Γ)}
 private theorem term_subst_rename {Γ Γ' Δ : Ctx ι} {τ : Ty ι}
     (r : Renaming Γ Γ') (σ : Term.Subst F Γ' Δ)
     (t : Term F Γ τ) :
-    (t.rename r).subst σ = t.subst (fun {τ} v => σ (r v)) := by
-  induction t with
-  | var v => rfl
-  | app f a ihf iha => simp [Term.rename, Term.subst, ihf, iha]
-  | zero | succ | proj | comb | prec | func | zeroX => rfl
+    (t.rename r).subst σ = t.subst (fun {τ} v => σ (r v)) :=
+  Term.rename_subst r σ t
 
 /-- Term-level: (t.rename (ext shift)).subst (subst0_map s) = t.subst (substVar0_map s). -/
 private theorem term_rename_ext_shift_subst0 {Γ : Ctx ι} {ρ τ : Ty ι}
     (t : Term F (ρ :: Γ) τ) (s : Term F (ρ :: Γ) ρ) :
     (t.rename (Renaming.ext Renaming.shift)).subst (Term.subst0_map s) =
     t.subst (Term.substVar0_map s) := by
-  induction t with
-  | var v => cases v <;> simp [Term.rename, Term.subst, Renaming.ext, Renaming.shift,
-      Term.subst0_map, Term.substVar0_map]
-  | app f a ihf iha => simp [Term.rename, Term.subst, ihf, iha]
-  | zero | succ | proj | comb | prec | func | zeroX => rfl
+  rw [Term.rename_subst]; congr 1; funext τ v; cases v with
+  | vz => rfl
+  | vs w => rfl
 
 /-- General: (A.renameF r).substF σ = A.substF (fun v => σ (r v)) when the compositions
     of ext match. Proved by induction on A generalizing over contexts. -/
@@ -108,7 +103,7 @@ private theorem substF_renameF {Γ Γ' Δ : Ctx ι}
     rw [ih (Renaming.ext r) (Term.Subst.ext σ)]
     congr 1; funext τ v; cases v with
     | vz => rfl
-    | vs w => simp [Renaming.ext, Term.Subst.ext]
+    | vs w => simp [Term.Renaming.ext, Term.Subst.ext]
 
 /-- Key identity: rename(ext shift) then subst0 = substVar0. -/
 theorem renameF_ext_shift_subst0 {Γ : Ctx ι} {ρ : Ty ι}
@@ -118,7 +113,7 @@ theorem renameF_ext_shift_subst0 {Γ : Ctx ι} {ρ : Ty ι}
   rw [substF_renameF]
   congr 1; funext τ v; cases v with
   | vz => rfl
-  | vs _ => simp [Renaming.ext, Renaming.shift, Term.subst0_map, Term.substVar0_map]
+  | vs _ => simp [Term.Renaming.ext, Term.Renaming.shift, Term.subst0_map, Term.substVar0_map]
 
 /-- Re-index a ∀ by successor: from ⊢ ∀k. P(k), derive ⊢ ∀k. P(Sk). -/
 def forall_inst_succ {Γ : Ctx ι} {P : Formula F (Ty.nat :: Γ)} :

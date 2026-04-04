@@ -48,14 +48,6 @@ structure AbstractMajorizability {ι : Type} {X : ι → Type} {F : ι → Ty ι
   /-- Majorant for successor (S : nat → nat). -/
   succ_maj : ∃ s_star : ℕ → Ty.interpret X (Ty.nat →ₜ Ty.nat).hat,
     ∀ n ≥ N, maj (.nat →ₜ .nat) (s_star n) (Nat.succ : Nat → Nat)
-  /-- Majorant for projection (Π_{ρ,τ}). -/
-  proj_maj : ∀ (ρ τ : Ty ι), ∃ p_star : ℕ → Ty.interpret X (ρ →ₜ τ →ₜ ρ).hat,
-    ∀ n ≥ N, maj (ρ →ₜ τ →ₜ ρ) (p_star n) (fun x _ => x)
-  /-- Majorant for the combinator (Σ_{δ,ρ,τ}). -/
-  comb_maj : ∀ (δ ρ τ : Ty ι),
-    ∃ c_star : ℕ → Ty.interpret X ((δ →ₜ ρ →ₜ τ) →ₜ (δ →ₜ ρ) →ₜ δ →ₜ τ).hat,
-    ∀ n ≥ N, maj ((δ →ₜ ρ →ₜ τ) →ₜ (δ →ₜ ρ) →ₜ δ →ₜ τ)
-      (c_star n) (fun x y z => x z (y z))
   /-- Majorant for the recursor (R_ρ). -/
   prec_maj : ∀ (ρ : Ty ι), ∃ r_star : ℕ → Ty.interpret X (recTy ρ).hat,
     ∀ n ≥ N, maj (recTy ρ) (r_star n)
@@ -88,33 +80,32 @@ def IsMajorizable {ι : Type} {X : ι → Type} {F : ι → Ty ι}
 theorem all_closed_terms_majorizable {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     {si : SpaceInterp X F} (am : AbstractMajorizability si)
     {ρ : Ty ι} (t : Term F ([] : Ctx ι) ρ) : IsMajorizable am t := by
-  induction t with
-  | var v => nomatch v
-  | app f a ihf iha =>
+  match t with
+  | .var v => nomatch v
+  | .app f a =>
+    have ihf := all_closed_terms_majorizable am f
+    have iha := all_closed_terms_majorizable am a
     obtain ⟨f_star, hf⟩ := ihf
     obtain ⟨a_star, ha⟩ := iha
     refine ⟨fun n => f_star n (a_star n), fun n hn => ?_⟩
     simp only [Term.interpret] at hf ⊢
     exact am.app_compat (f_star n) _ (a_star n) _ (hf n hn) (ha n hn)
-  | zero =>
+  | .lam body =>
+    -- TODO: requires generalization to open terms (majorizability of lambda bodies)
+    sorry
+  | .zero =>
     obtain ⟨z_star, hz⟩ := am.zero_maj
     exact ⟨z_star, fun n hn => by simp only [Term.interpret]; exact hz n hn⟩
-  | succ =>
+  | .succ =>
     obtain ⟨s_star, hs⟩ := am.succ_maj
     exact ⟨s_star, fun n hn => by simp only [Term.interpret]; exact hs n hn⟩
-  | proj ρ τ =>
-    obtain ⟨p_star, hp⟩ := am.proj_maj ρ τ
-    exact ⟨p_star, fun n hn => by simp only [Term.interpret]; exact hp n hn⟩
-  | comb δ ρ τ =>
-    obtain ⟨c_star, hc⟩ := am.comb_maj δ ρ τ
-    exact ⟨c_star, fun n hn => by simp only [Term.interpret]; exact hc n hn⟩
-  | prec ρ =>
+  | .prec ρ =>
     obtain ⟨r_star, hr⟩ := am.prec_maj ρ
     exact ⟨r_star, fun n hn => by simp only [Term.interpret]; exact hr n hn⟩
-  | func f =>
+  | .func f =>
     obtain ⟨f_star, hf⟩ := am.func_maj f
     exact ⟨f_star, fun n hn => by simp only [Term.interpret]; exact hf n hn⟩
-  | zeroX i =>
+  | .zeroX i =>
     obtain ⟨z_star, hz⟩ := am.zeroX_maj i
     exact ⟨z_star, fun n hn => by simp only [Term.interpret]; exact hz n hn⟩
 

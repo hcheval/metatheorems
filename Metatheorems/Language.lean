@@ -111,14 +111,14 @@ def isQFVFree : Formula F Γ → Bool := fun A => A.isQF && A.isVFree
 -- ============================================================================
 
 /-- Apply a variable renaming to a formula. -/
-def renameF (r : Renaming Γ Δ) : Formula F Γ → Formula F Δ
+def renameF (r : Term.Renaming Γ Δ) : Formula F Γ → Formula F Δ
   | .bot     => .bot
   | .eq0 s t => .eq0 (s.rename r) (t.rename r)
   | .and A B => .and (renameF r A) (renameF r B)
   | .or  A B => .or  (renameF r A) (renameF r B)
   | .imp A B => .imp (renameF r A) (renameF r B)
-  | .all ρ A => .all ρ (renameF (Renaming.ext r) A)
-  | .ex  ρ A => .ex  ρ (renameF (Renaming.ext r) A)
+  | .all ρ A => .all ρ (renameF (Term.Renaming.ext r) A)
+  | .ex  ρ A => .ex  ρ (renameF (Term.Renaming.ext r) A)
 
 -- ============================================================================
 -- Substitution on Formulas
@@ -141,7 +141,7 @@ def subst0 (A : Formula F (ρ :: Γ)) (s : Term F Γ ρ) : Formula F Γ :=
 /-- Applying a substitution after a renaming with an identity composition leaves formulas
     unchanged.  The binder cases use the fact that extension preserves the identity property. -/
 theorem substF_renameF_id {Γ Γ' : Ctx ι}
-    (r : Renaming Γ Γ') (s : Term.Subst F Γ' Γ)
+    (r : Term.Renaming Γ Γ') (s : Term.Subst F Γ' Γ)
     (h : ∀ {τ} (v : Var Γ τ), s (r v) = Term.var v)
     (A : Formula F Γ) :
     (A.renameF r).substF s = A := by
@@ -154,18 +154,18 @@ theorem substF_renameF_id {Γ Γ' : Ctx ι}
   | ex ρ B ihB | all ρ B ihB =>
     simp only [Formula.renameF, Formula.substF]
     congr 1
-    apply ihB (Renaming.ext r) (Term.Subst.ext s)
+    apply ihB (Term.Renaming.ext r) (Term.Subst.ext s)
     intro τ v
     cases v with
-    | vz => simp [Renaming.ext, Term.Subst.ext]
+    | vz => simp [Term.Renaming.ext, Term.Subst.ext]
     | vs w =>
-      simp only [Renaming.ext, Term.Subst.ext]
+      simp only [Term.Renaming.ext, Term.Subst.ext]
       rw [h w]
-      simp [Term.weaken, Var.weaken]
+      simp [Term.weaken, Term.rename, Term.Renaming.shift]
 
 /-- Weaken a formula: embed from context Γ into (σ :: Γ). -/
 def weaken : Formula F Γ → Formula F (σ :: Γ) :=
-  renameF Renaming.shift
+  renameF Term.Renaming.shift
 
 -- ============================================================================
 -- In-place substitution of variable 0

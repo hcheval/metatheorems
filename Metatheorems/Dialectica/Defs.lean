@@ -409,12 +409,8 @@ private lemma Ctx.interpretSubst_ext_var {ι : Type} {X : ι → Type} {F : ι �
         Term.Subst F (ρ' :: Γ) (ρ' :: Δ)) (z, env) =
     (z, Ctx.interpretSubst si
       (fun v => Term.var (r v) : Term.Subst F Γ Δ) env) := by
-  simp only [Ctx.interpretSubst, Renaming.ext, Term.interpret, Ctx.lookup]
+  simp only [Ctx.interpretSubst, Term.Renaming.ext, Term.interpret, Ctx.lookup]
   congr 1
-  have h1 : (fun {τ : Ty ι} (w : Var Γ τ) => (Term.var (Var.vs (r w)) : Term F (ρ' :: Δ) τ)) =
-             (fun {τ : Ty ι} (w : Var Γ τ) => (Term.var (r w) : Term F Δ τ).weaken) := by
-    funext τ w; rfl
-  rw [h1]
   exact Ctx.interpretSubst_weaken_eq si (fun v => Term.var (r v)) env z
 
 /-- The Dialectica matrix commutes with formula renaming.
@@ -679,7 +675,7 @@ theorem dialecticaMatrix_weaken {ι : Type} {X : ι → Type} {F : ι → Ty ι}
       (fun {τ} (x : Var Γ τ) =>
         Term.var (Renaming.shift x) : Term.Subst F Γ (ρ :: Γ))
       (v, env) = env := by
-    simp only [Renaming.shift]
+    simp only [Term.Renaming.shift]
     have h1 : (fun {τ : Ty ι} (x : Var Γ τ) =>
                 (Term.var (Var.vs x) : Term F (ρ :: Γ) τ)) =
               (fun {τ : Ty ι} (x : Var Γ τ) =>

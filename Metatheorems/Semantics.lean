@@ -79,6 +79,7 @@ The interpretation of constants follows Proposition 2.3.52:
   [Π]     := fun x y => x
   [Σ]     := fun x y z => x z (y z)
   [R]     := primitive recursion
+  [λx.t]  := fun x => [t]
   [f_χ]   := spaceInterp.funcInterp f
   [0_{X_i}] := spaceInterp.zeroInterp i -/
 def Term.interpret {ι : Type} {X : ι → Type} {F : ι → Ty ι}
@@ -86,10 +87,9 @@ def Term.interpret {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     {Γ : Ctx ι} → {τ : Ty ι} → Term F Γ τ → Ctx.interpret X Γ → Ty.interpret X τ
   | _, _, .var v,       env => Ctx.lookup v env
   | _, _, .app f a,     env => (Term.interpret si f env) (Term.interpret si a env)
+  | _, _, .lam body,    env => fun x => Term.interpret si body (x, env)
   | _, _, .zero,        _   => (0 : Nat)
   | _, _, .succ,        _   => (Nat.succ : Nat → Nat)
-  | _, _, .proj _ _,    _   => fun x _ => x
-  | _, _, .comb _ _ _,  _   => fun x y z => x z (y z)
   | _, _, .prec _,      _   => fun y z n => Nat.rec y (fun n ih => z ih n) n
   | _, _, .func f,      _   => si.funcInterp f
   | _, _, .zeroX i,     _   => si.zeroInterp i
@@ -125,7 +125,31 @@ def Ctx.interpretSubst {ι : Type} {X : ι → Type} {F : ι → Ty ι}
   | _ :: _, _, s, env => (Term.interpret si (s .vz) env, Ctx.interpretSubst si (fun v => s (.vs v)) env)
 
 -- ============================================================================
--- Term evaluation commutes with weakening and substitution
+-- Term evaluation commutes with renaming (general form)
+-- ============================================================================
+
+/-- General: evaluating a renamed term in env_Δ equals evaluating the original
+    in env_Γ when the environments agree on variable lookups through the renaming. -/
+private lemma Term.interpret_rename_gen {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    (si : SpaceInterp X F) {Γ Δ : Ctx ι} {τ : Ty ι}
+    (r : Renaming Γ Δ) (t : Term F Γ τ)
+    (env_Δ : Ctx.interpret X Δ) (env_Γ : Ctx.interpret X Γ)
+    (h : ∀ {σ} (v : Var Γ σ), Ctx.lookup (r v) env_Δ = Ctx.lookup v env_Γ) :
+    Term.interpret si (t.rename r) env_Δ = Term.interpret si t env_Γ := by
+  induction t generalizing Δ with
+  | var v => exact h v
+  | app _ _ ihf iha =>
+    simp only [Term.rename, Term.interpret, ihf r env_Δ env_Γ h, iha r env_Δ env_Γ h]
+  | lam body ih =>
+    simp only [Term.rename, Term.interpret]
+    funext x
+    exact ih (Renaming.ext r) (x, env_Δ) (x, env_Γ) (fun v => by cases v with
+      | vz => rfl
+      | vs w => exact h w)
+  | zero | succ | prec | func | zeroX => rfl
+
+-- ============================================================================
+-- Term evaluation commutes with weakening
 -- ============================================================================
 
 /-- Evaluating a weakened term in an extended environment equals the original. -/
@@ -133,16 +157,7 @@ lemma Term.interpret_weaken {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     (si : SpaceInterp X F) {Γ : Ctx ι} {τ σ : Ty ι}
     (t : Term F Γ τ) (v : Ty.interpret X σ) (env : Ctx.interpret X Γ) :
     Term.interpret si t.weaken (v, env) = Term.interpret si t env := by
-  induction t with
-  | var w => simp only [Term.weaken, Var.weaken, Term.interpret, Ctx.lookup]
-  | app _ _ ihf iha => simp only [Term.weaken, Term.interpret, ihf, iha]
-  | zero => simp [Term.weaken, Term.interpret]
-  | succ => simp [Term.weaken, Term.interpret]
-  | proj _ _ => simp [Term.weaken, Term.interpret]
-  | comb _ _ _ => simp [Term.weaken, Term.interpret]
-  | prec _ => simp [Term.weaken, Term.interpret]
-  | func _ => simp [Term.weaken, Term.interpret]
-  | zeroX _ => simp [Term.weaken, Term.interpret]
+  exact Term.interpret_rename_gen si Renaming.shift t (v, env) env (fun _ => rfl)
 
 private lemma lookupVar_interpCtxSubst {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     (si : SpaceInterp X F) {Γ Δ : Ctx ι} {τ : Ty ι}
@@ -152,20 +167,9 @@ private lemma lookupVar_interpCtxSubst {ι : Type} {X : ι → Type} {F : ι →
   | vz => simp [Ctx.interpretSubst, Ctx.lookup]
   | vs w ih => simp [Ctx.interpretSubst, Ctx.lookup, ih]
 
-lemma Term.interpret_substF {ι : Type} {X : ι → Type} {F : ι → Ty ι}
-    (si : SpaceInterp X F) {Γ Δ : Ctx ι} {τ : Ty ι}
-    (s : Term.Subst F Γ Δ) (t : Term F Γ τ) (env : Ctx.interpret X Δ) :
-    Term.interpret si (t.subst s) env = Term.interpret si t (Ctx.interpretSubst si s env) := by
-  induction t with
-  | var v => simp [Term.subst, Term.interpret, lookupVar_interpCtxSubst]
-  | app _ _ ihf iha => simp [Term.subst, Term.interpret, ihf, iha]
-  | zero => simp [Term.subst, Term.interpret]
-  | succ => simp [Term.subst, Term.interpret]
-  | proj _ _ => simp [Term.subst, Term.interpret]
-  | comb _ _ _ => simp [Term.subst, Term.interpret]
-  | prec _ => simp [Term.subst, Term.interpret]
-  | func _ => simp [Term.subst, Term.interpret]
-  | zeroX _ => simp [Term.subst, Term.interpret]
+-- ============================================================================
+-- interpretSubst lemmas (moved before interpret_substF for lam case)
+-- ============================================================================
 
 lemma Ctx.interpretSubst_weaken_eq {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     (si : SpaceInterp X F) {Γ Δ : Ctx ι} {σ : Ty ι}
@@ -188,7 +192,7 @@ lemma Ctx.interpretSubst_id {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     refine Prod.ext rfl ?_
     have : Ctx.interpretSubst si (fun w => ((.var w : Term F _ _)).weaken) (a, env') =
            Ctx.interpretSubst si (fun v => .var v) env' := Ctx.interpretSubst_weaken_eq si _ env' a
-    simp only [Term.weaken, Var.weaken] at this
+    simp only [Term.weaken, Term.rename, Renaming.shift, Term.Renaming.shift] at this
     rw [this, ih env']
 
 lemma Ctx.interpretSubst_ext {ι : Type} {X : ι → Type} {F : ι → Ty ι}
@@ -198,20 +202,30 @@ lemma Ctx.interpretSubst_ext {ι : Type} {X : ι → Type} {F : ι → Ty ι}
   simp only [Ctx.interpretSubst, Term.Subst.ext, Term.interpret, Ctx.lookup]
   exact Prod.ext rfl (Ctx.interpretSubst_weaken_eq si s env v)
 
-/-- Renaming is a special case of substitution (each variable maps to .var). -/
-private lemma Term.rename_eq_subst {ι : Type} {F : ι → Ty ι} {Γ Δ : Ctx ι} {τ : Ty ι}
-    (r : Renaming Γ Δ) (t : Term F Γ τ) :
-    t.rename r = t.subst (fun v => .var (r v)) := by
-  induction t with
-  | var v => rfl
-  | app _ _ ihf iha => simp only [Term.rename, Term.subst, ihf, iha]
-  | zero => rfl
-  | succ => rfl
-  | proj _ _ => rfl
-  | comb _ _ _ => rfl
-  | prec _ => rfl
-  | func _ => rfl
-  | zeroX _ => rfl
+-- ============================================================================
+-- Term evaluation commutes with substitution
+-- ============================================================================
+
+lemma Term.interpret_substF {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    (si : SpaceInterp X F) {Γ Δ : Ctx ι} {τ : Ty ι}
+    (s : Term.Subst F Γ Δ) (t : Term F Γ τ) (env : Ctx.interpret X Δ) :
+    Term.interpret si (t.subst s) env = Term.interpret si t (Ctx.interpretSubst si s env) := by
+  induction t generalizing Δ with
+  | var v => simp [Term.subst, Term.interpret, lookupVar_interpCtxSubst]
+  | app _ _ ihf iha => simp [Term.subst, Term.interpret, ihf, iha]
+  | lam body ih =>
+    simp only [Term.subst, Term.interpret]
+    funext x
+    rw [ih (Term.Subst.ext s) (x, env), Ctx.interpretSubst_ext]
+  | zero => simp [Term.subst, Term.interpret]
+  | succ => simp [Term.subst, Term.interpret]
+  | prec _ => simp [Term.subst, Term.interpret]
+  | func _ => simp [Term.subst, Term.interpret]
+  | zeroX _ => simp [Term.subst, Term.interpret]
+
+-- ============================================================================
+-- Renaming is a special case of substitution
+-- ============================================================================
 
 /-- Term evaluation commutes with renaming. -/
 theorem Term.interpret_rename {ι : Type} {X : ι → Type} {F : ι → Ty ι}
@@ -244,19 +258,6 @@ lemma Term.interpret_subst0 {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     (si : SpaceInterp X F) {Γ : Ctx ι} {ρ τ : Ty ι}
     (t : Term F (ρ :: Γ) τ) (u : Term F Γ ρ) (env : Ctx.interpret X Γ) :
     Term.interpret si (t.subst0 u) env = Term.interpret si t (Term.interpret si u env, env) := by
-  induction t with
-  | var v => cases v with
-    | vz => simp [Term.subst0, Term.subst, Term.subst0_map, Term.interpret, Ctx.lookup]
-    | vs w => simp [Term.subst0, Term.subst, Term.subst0_map, Term.interpret, Ctx.lookup]
-  | app f a ihf iha =>
-      change Term.interpret si (Term.app (f.subst0 u) (a.subst0 u)) env = _
-      simp only [Term.interpret, ihf, iha]
-  | zero => simp [Term.subst0, Term.subst, Term.interpret]
-  | succ => simp [Term.subst0, Term.subst, Term.interpret]
-  | proj _ _ => simp [Term.subst0, Term.subst, Term.interpret]
-  | comb _ _ _ => simp [Term.subst0, Term.subst, Term.interpret]
-  | prec _ => simp [Term.subst0, Term.subst, Term.interpret]
-  | func _ => simp [Term.subst0, Term.subst, Term.interpret]
-  | zeroX _ => simp [Term.subst0, Term.subst, Term.interpret]
+  simp [Term.subst0, Term.interpret_substF, Ctx.interpretSubst_subst0_map]
 
 end Metatheorems

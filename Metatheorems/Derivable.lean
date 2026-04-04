@@ -140,13 +140,10 @@ inductive Derivable {ι : Type} (F : ι → Ty ι)
           (Term.app Term.succ (.var .vz))
         →ᶠ Formula.eq0 (.var (.vs .vz)) (.var .vz))))
 
-  -- Combinators (§9.6)
-  | proj_ax      : Derivable F EqX allowed Premises
-      (eqAtType EqX ρ (Term.app2 (Term.proj ρ τ) s t) s)
-  | comb_ax      : Derivable F EqX allowed Premises
-      (eqAtType EqX τ
-        (Term.app3 (Term.comb δ ρ τ) f g x)
-        (Term.app (Term.app f x) (Term.app g x)))
+  -- Beta reduction (β-equality for primitive λ)
+  | beta_eq      : (body : Term F (ρ :: Γ) τ) → (u : Term F Γ ρ) →
+                   Derivable F EqX allowed Premises
+      (eqAtType EqX τ (Term.app (Term.lam body) u) (Term.subst0 body u))
 
   -- Recursor (§9.6, eq. 9.54)
   | rec_zero     : Derivable F EqX allowed Premises
@@ -249,8 +246,7 @@ def Derivable.castAllowed {ι : Type} {F : ι → Ty ι}
   | .univ_gen h1      => .univ_gen (h1.castAllowed h_le)
   | .succ_ne_zero     => .succ_ne_zero
   | .succ_inj         => .succ_inj
-  | .proj_ax          => .proj_ax
-  | .comb_ax          => .comb_ax
+  | .beta_eq b u      => .beta_eq b u
   | .rec_zero         => .rec_zero
   | .rec_succ         => .rec_succ
   | .refl0            => .refl0

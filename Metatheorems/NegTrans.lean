@@ -232,7 +232,7 @@ private def nn_all_nn {Γ : Ctx ι} {ρ : Ty ι} {Q : Formula F (ρ :: Γ)} :
       Term.subst0_map (.var .vz) (Renaming.ext Renaming.shift v) = Term.var v :=
     fun {_} v => match v with
     | .vz => rfl
-    | .vs w => by simp [Renaming.ext, Term.subst0_map, Renaming.shift]
+    | .vs w => by simp [Term.Renaming.ext, Term.subst0_map, Term.Renaming.shift]
   let heq : (Formula.renameF (Renaming.ext Renaming.shift) (¬ᶠ¬ᶠQ)).subst0 (.var .vz) =
             (¬ᶠ¬ᶠQ : Formula F (ρ :: Γ)) :=
     Formula.substF_renameF_id (Renaming.ext Renaming.shift) (Term.subst0_map (.var .vz))
@@ -556,7 +556,7 @@ def negTrans_induction {ι : Type} {F : ι → Ty ι}
         Term.subst0_map (F := F) (.var .vz) (Renaming.ext Renaming.shift v) = Term.var v := by
       intro _ v; cases v with
       | vz   => rfl
-      | vs w => simp [Renaming.ext, Term.subst0_map, Renaming.shift]
+      | vs w => simp [Term.Renaming.ext, Term.subst0_map, Term.Renaming.shift]
     have heq2 : (Formula.renameF (Renaming.ext Renaming.shift) Q₀).subst0 (.var .vz) = Q₀ :=
       Formula.substF_renameF_id (Renaming.ext Renaming.shift) (Term.subst0_map (.var .vz))
         hbody Q₀
@@ -740,19 +740,6 @@ private theorem eqAtType_isPU (adm : AdmissibleEqX EqX) (ρ : Ty ι)
   | base i => exact adm.eqx_pu i s t
   | arr ρ τ ih_ρ ih_τ => simp only [eqAtType, Formula.isPurelyUniversal]; exact ih_τ _ _
 
-def negTrans_proj_ax (adm : AdmissibleEqX EqX)
-    {Γ : Ctx ι} {ρ τ : Ty ι} {s : Term F Γ ρ} {t : Term F Γ τ} :
-    Derivable F EqX Allowed.nt_target Premises (eqAtType EqX ρ (Term.app2 (Term.proj ρ τ) s t) s).negTrans :=
-  negTrans_pu_axiom adm (eqAtType_isPU adm ρ _ _) .proj_ax
-
-def negTrans_comb_ax (adm : AdmissibleEqX EqX)
-    {Γ : Ctx ι} {δ ρ τ : Ty ι}
-    {f : Term F Γ (δ →ₜ ρ →ₜ τ)} {g : Term F Γ (δ →ₜ ρ)} {x : Term F Γ δ} :
-    Derivable F EqX Allowed.nt_target Premises (eqAtType EqX τ
-      (Term.app3 (Term.comb δ ρ τ) f g x)
-      (Term.app (Term.app f x) (Term.app g x))).negTrans :=
-  negTrans_pu_axiom adm (eqAtType_isPU adm τ _ _) .comb_ax
-
 def negTrans_rec_zero (adm : AdmissibleEqX EqX)
     {Γ : Ctx ι} {ρ : Ty ι}
     {y : Term F Γ ρ} {z : Term F Γ (ρ →ₜ Ty.nat →ₜ ρ)} :
@@ -766,6 +753,13 @@ def negTrans_rec_succ (adm : AdmissibleEqX EqX)
       (Term.app3 (Term.prec ρ) y z (Term.app Term.succ x))
       (Term.app2 z (Term.app3 (Term.prec ρ) y z x) x)).negTrans :=
   negTrans_pu_axiom adm (eqAtType_isPU adm ρ _ _) .rec_succ
+
+def negTrans_beta_eq (adm : AdmissibleEqX EqX)
+    {Γ : Ctx ι} {ρ τ : Ty ι}
+    {body : Term F (ρ :: Γ) τ} {u : Term F Γ ρ} :
+    Derivable F EqX Allowed.nt_target Premises
+      (eqAtType EqX τ (Term.app (Term.lam body) u) (Term.subst0 body u)).negTrans :=
+  negTrans_pu_axiom adm (eqAtType_isPU adm τ _ _) (.beta_eq body u)
 
 -- ── QF-ER ────────────────────────────────────────────────────────────────────
 
@@ -964,10 +958,9 @@ def negTrans_sound {Γ : Ctx ι} {A : Formula F Γ}
   | .succ_ne_zero          => negTrans_succ_ne_zero
   | .succ_inj              => negTrans_succ_inj
   -- Equational axioms: eqAtType is purely universal, use negTrans_pu_axiom
-  | .proj_ax               => negTrans_proj_ax adm
-  | .comb_ax               => negTrans_comb_ax adm
   | .rec_zero              => negTrans_rec_zero adm
   | .rec_succ              => negTrans_rec_succ adm
+  | .beta_eq body u        => negTrans_beta_eq adm
   -- QF-ER
   | .qfer (ρ := ρ_v) (σ := σ_v) (s := s_v) (t := t_v) (r := r_v) hqf hvf h_inner => by
       -- ih : NT(A₀ → eq_ρ s t) = ¬¬(A₀ → eq_ρ.ki)

@@ -14,16 +14,18 @@ namespace Metatheorems
 Following Chapter 2 (Definition 2.3.1) of the reference document, we define the
 intrinsically typed terms of Weakly Extensional Heyting Arithmetic over T^X.
 
-Terms are combinatory: the primitive constants are 0, S, Π (projector),
-Σ (combinator), and R (recursor), plus application. Lambda abstraction is
-defined as a derived operation by combinatory compilation (Definition 2.3.19).
+The term language includes the primitive constants 0, S, Π (projector),
+Σ (combinator), and R (recursor), plus application and lambda abstraction.
+
+Lambda abstraction is a primitive term constructor (not compiled to S/K
+combinators). Beta reduction `(λx.t) u =_τ t[u/x]` is an axiom in the
+proof system (`Derivable.beta_eq`).
 
 ## Main Definitions
 
 * `Ctx ι` — Typing contexts (lists of types).
 * `Var Γ τ` — Well-typed de Bruijn variable in context Γ of type τ.
 * `Term F Γ τ` — Intrinsically typed terms in context Γ of type τ.
-* `Term.lam` — Lambda abstraction by combinatory compilation (Def. 2.3.19).
 -/
 
 open Ty
@@ -73,13 +75,10 @@ inductive Term {ι : Type} (F : ι → Ty ι) : Ctx ι → Ty ι → Type where
   | zero  : Term F Γ Ty.nat
   /-- Successor S^{0→0}. -/
   | succ  : Term F Γ (Ty.nat →ₜ Ty.nat)
-  /-- Projector Π_{ρ,τ} (K combinator): Πxy = x. -/
-  | proj  : (ρ τ : Ty ι) → Term F Γ (ρ →ₜ τ →ₜ ρ)
-  /-- Combinator Σ_{δ,ρ,τ} (S combinator): Σxyz = xz(yz). -/
-  | comb  : (δ ρ τ : Ty ι) →
-            Term F Γ ((δ →ₜ ρ →ₜ τ) →ₜ (δ →ₜ ρ) →ₜ δ →ₜ τ)
   /-- Primitive recursor R_ρ. Named `prec` to avoid clash with inductive recursor. -/
   | prec  : (ρ : Ty ι) → Term F Γ (recTy ρ)
+  /-- Lambda abstraction: λx^ρ. body. -/
+  | lam   : Term F (ρ :: Γ) τ → Term F Γ (ρ →ₜ τ)
   /-- Abstract space function constant f_χ. -/
   | func  : (f : ι) → Term F Γ (F f)
   /-- Zero element 0_{X_i} for base type X_i. -/
@@ -108,52 +107,37 @@ def ofNat : (n : Nat) → Term F Γ Ty.nat
   | n + 1 => .app .succ (ofNat n)
 
 -- ============================================================================
--- Weakening
+-- Renamings and weakening
 -- ============================================================================
 
-/-- Weaken a term: embed from context Γ into extended context (σ :: Γ). -/
-def weaken : Term F Γ τ → Term F (σ :: Γ) τ
-  | .var v         => .var v.weaken
-  | .app f a       => .app f.weaken a.weaken
+/-- A renaming from context Γ to context Δ: maps each variable in Γ to
+    a variable of the same type in Δ. -/
+def Renaming (Γ Δ : Ctx ι) : Type :=
+  ∀ {τ : Ty ι}, Var Γ τ → Var Δ τ
+
+/-- Extend a renaming under a binder. -/
+def Renaming.ext (r : Renaming Γ Δ) : Renaming (σ :: Γ) (σ :: Δ) :=
+  fun v => match v with
+  | .vz   => .vz
+  | .vs w => .vs (r w)
+
+/-- Shift renaming: weakens all variables by one. -/
+def Renaming.shift : Renaming Γ (σ :: Γ) := Var.vs
+
+/-- Apply a renaming to a term. -/
+def rename (r : Renaming Γ Δ) : Term F Γ τ → Term F Δ τ
+  | .var v         => .var (r v)
+  | .app f a       => .app (rename r f) (rename r a)
+  | .lam body      => .lam (rename (Renaming.ext r) body)
   | .zero          => .zero
   | .succ          => .succ
-  | .proj ρ' τ'    => .proj ρ' τ'
-  | .comb δ' ρ' τ' => .comb δ' ρ' τ'
   | .prec ρ'       => .prec ρ'
   | .func f        => .func f
   | .zeroX i       => .zeroX i
 
--- ============================================================================
--- Lambda abstraction (Definition 2.3.19)
--- ============================================================================
-
-/-- Lambda abstraction by combinatory compilation (Definition 2.3.19).
-
-Given `t : Term F (ρ :: Γ) τ` (term with free variable of type ρ at de Bruijn
-index 0), produce `lam t : Term F Γ (ρ →ₜ τ)`.
-
-The cases from the paper:
-- (i)   t = var vz: λx.x = Σ_{ρ,0→ρ,ρ} Π_{ρ,0→ρ} Π_{ρ,0}  (identity = SKK)
-- (ii)  t doesn't use var vz: λx.t = Π_{τ,ρ} t'  (t' is t with vz removed)
-- (iii) t = app u v: λx.(u v) = Σ_{ρ,δ,τ} (λx.u) (λx.v) -/
-def lam {ρ : Ty ι} : Term F (ρ :: Γ) τ → Term F Γ (ρ →ₜ τ)
-  -- (i) λx.x = I = SKK
-  | .var .vz =>
-      app2 (Term.comb ρ (Ty.nat →ₜ ρ) ρ) (Term.proj ρ (Ty.nat →ₜ ρ)) (Term.proj ρ Ty.nat)
-  -- (ii) λx.y = Π y  (for variables other than vz)
-  | .var (.vs v) =>
-      (Term.proj _ ρ).app (.var v)
-  -- (iii) λx.(f a) = Σ (λx.f) (λx.a)
-  | .app f a =>
-      app2 (Term.comb ρ _ _) (lam f) (lam a)
-  -- λx.c = Π c  (for all constants: they don't depend on x)
-  | .zero          => (Term.proj _ ρ).app .zero
-  | .succ          => (Term.proj _ ρ).app .succ
-  | .proj ρ' τ'    => (Term.proj _ ρ).app (.proj ρ' τ')
-  | .comb δ' ρ' τ' => (Term.proj _ ρ).app (.comb δ' ρ' τ')
-  | .prec ρ'       => (Term.proj _ ρ).app (.prec ρ')
-  | .func f        => (Term.proj _ ρ).app (.func f)
-  | .zeroX i       => (Term.proj _ ρ).app (.zeroX i)
+/-- Weaken a term: embed from context Γ into extended context (σ :: Γ). -/
+def weaken : Term F Γ τ → Term F (σ :: Γ) τ :=
+  rename Renaming.shift
 
 end Term
 

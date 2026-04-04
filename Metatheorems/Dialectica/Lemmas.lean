@@ -646,14 +646,13 @@ def dialectica_soundness_ctx' {Γ : Ctx ι} {A : Formula F Γ}
        fun ⟨m, n, (), ()⟩ h => by
          simp only [dialecticaMatrix, Term.interpret, Ctx.lookup] at h ⊢
          exact Nat.succ.inj h⟩
-  | .proj_ax   => fun env =>
-      eqAtType_from_semEq si eqxi _ _ _ env (by simp [Term.interpret, Term.app2])
-  | .comb_ax   => fun env =>
-      eqAtType_from_semEq si eqxi _ _ _ env (by simp [Term.interpret, Term.app3])
   | .rec_zero  => fun env =>
       eqAtType_from_semEq si eqxi _ _ _ env (by simp [Term.interpret, Term.app3]; rfl)
   | .rec_succ  => fun env =>
       eqAtType_from_semEq si eqxi _ _ _ env (by simp [Term.interpret, Term.app3, Term.app2])
+  | .beta_eq body u => fun env =>
+      eqAtType_from_semEq si eqxi _ _ _ env (by
+        simp [Term.interpret, Term.interpret_subst0])
   | .refl0     => fun env => dialectica_refl0 si env
   | .sym0      => fun env => dialectica_sym0 si env
   | .trans0    => fun env => dialectica_trans0 si env
