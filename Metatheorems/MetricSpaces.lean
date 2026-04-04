@@ -13,32 +13,109 @@ namespace Metatheorems
 # Metric Spaces as Abstract Spaces
 
 Instantiates the WE-HA^{ω,X} framework for a single metric space (X, d).
-Following Section 6.1 of the reference document:
+Following §5.1 (Definition 5.1.2) of the reference document:
 
 * One abstract base type X (so `ι = Unit`)
 * One function constant `d_X : X → X → ℝ` (the metric)
 * Zero element `0_X : X` (a distinguished point)
-* Equality at type X: `x =_X y ≡ d_X(x,y) =_ℝ 0`
-* Axioms: symmetry, triangle inequality, non-negativity, reflexivity
+* Equality at type X: `x =_X y ≡ d_X(x,y) =_ℝ 0_ℝ`
+* Axioms: reflexivity, symmetry, triangle inequality (pseudo-metric)
 
 ## Main Definitions
 
 * `MetricSpace.ι` — the index type `Unit`
-* `MetricSpace.F` — the function constant types (`d_X : X → X → ℝ`)
-* `MetricSpace.X` — the carrier types (`X ()` = the metric space)
-* `MetricSpace.Premises` — the metric space axioms
+* `MetricSpace.F` — the function constant types
+* `MetricSpace.EqX` — equality at type X via d
+* `MetricSpace.Premises` — the pseudo-metric axioms
+* `MetricSpace.admissibleEqX` — EqX is admissible
 -/
+
+open Formula
+
+-- ============================================================================
+-- Basic setup
+-- ============================================================================
 
 /-- Index type for a single metric space: one base type. -/
 abbrev MetricSpace.ι := Unit
 
--- In a concrete instantiation, X () would be an actual type (e.g., a complete metric space).
+/-- Abbreviation for the base type X. -/
+abbrev xTy : Ty MetricSpace.ι := Ty.base ()
 
 /-- Function constant types for a metric space.
     The single function constant is `d_X : X → X → ℝ` (the metric).
     `ℝ` is encoded as `Ty.nat →ₜ Ty.nat` (type level 1). -/
 def MetricSpace.F : MetricSpace.ι → Ty MetricSpace.ι
-  | () => Ty.base () →ₜ Ty.base () →ₜ realTy MetricSpace.ι
+  | () => xTy →ₜ xTy →ₜ realTy MetricSpace.ι
+
+/-- Shorthand for the metric term d_X in any context. -/
+abbrev d_X {Γ : Ctx MetricSpace.ι} :
+    Term MetricSpace.F Γ (xTy →ₜ xTy →ₜ realTy MetricSpace.ι) :=
+  Term.func ()
+
+-- ============================================================================
+-- Equality at type X
+-- ============================================================================
+
+/-- Equality at the base type X: `x =_X y ≡ d_X(x,y) =_ℝ 0_ℝ`.
+    This is a Π₁⁰ (purely universal) formula since `eq_R` is `∀n. (QF body)`. -/
+def MetricSpace.EqX : (i : MetricSpace.ι) →
+    {Γ : Ctx MetricSpace.ι} →
+    Term MetricSpace.F Γ (Ty.base i) →
+    Term MetricSpace.F Γ (Ty.base i) →
+    Formula MetricSpace.F Γ :=
+  fun () {_} s t => eq_R (Term.app (Term.app (Term.func ()) s) t) Term.zero_R
+
+-- ============================================================================
+-- Metric space axioms (Premises)
+-- ============================================================================
+
+-- Following Definition 5.1.2 of the reference document.
+
+/-- Axiom 1: ∀x^X. d(x,x) =_ℝ 0_ℝ  (reflexivity of the metric).
+    Context-polymorphic: axiom is closed (no free variables), valid in any context. -/
+def MetricSpace.ax_refl {Γ : Ctx MetricSpace.ι} : Formula MetricSpace.F Γ :=
+  Formula.all xTy
+    (eq_R (Term.app2 d_X (Term.var .vz) (Term.var .vz)) Term.zero_R)
+
+/-- Axiom 2: ∀x^X,y^X. d(x,y) =_ℝ d(y,x)  (symmetry of the metric).
+    Context-polymorphic. -/
+def MetricSpace.ax_sym {Γ : Ctx MetricSpace.ι} : Formula MetricSpace.F Γ :=
+  Formula.all xTy (Formula.all xTy
+    (eq_R (Term.app2 d_X (Term.var (.vs .vz)) (Term.var .vz))
+          (Term.app2 d_X (Term.var .vz) (Term.var (.vs .vz)))))
+
+/-- Axiom 3: ∀x^X,y^X,z^X. d(x,z) ≤_ℝ d(x,y) +_ℝ d(y,z)
+    (triangle inequality). Uses le_R_pu for purely universal form.
+    Context-polymorphic. -/
+def MetricSpace.ax_triangle {Γ : Ctx MetricSpace.ι} : Formula MetricSpace.F Γ :=
+  Formula.all xTy (Formula.all xTy (Formula.all xTy
+    (le_R_pu
+      (Term.app2 d_X (Term.var (.vs (.vs .vz))) (Term.var .vz))
+      (Term.app2 Term.add_R
+        (Term.app2 d_X (Term.var (.vs (.vs .vz))) (Term.var (.vs .vz)))
+        (Term.app2 d_X (Term.var (.vs .vz)) (Term.var .vz))))))
+
+-- Verify axioms are purely universal (needed for Premises)
+theorem MetricSpace.ax_refl_pu :
+    (MetricSpace.ax_refl (Γ := Γ)).isPurelyUniversal = true := by rfl
+
+theorem MetricSpace.ax_sym_pu :
+    (MetricSpace.ax_sym (Γ := Γ)).isPurelyUniversal = true := by rfl
+
+theorem MetricSpace.ax_triangle_pu :
+    (MetricSpace.ax_triangle (Γ := Γ)).isPurelyUniversal = true := by rfl
+
+/-- The set of metric space axioms as a `PremiseSet`.
+    Context-polymorphic: axioms are closed formulas, available at any context. -/
+def MetricSpace.Premises : PremiseSet MetricSpace.F :=
+  fun ⟨Γ, A⟩ => A = MetricSpace.ax_refl ∨
+                 A = MetricSpace.ax_sym ∨
+                 A = MetricSpace.ax_triangle
+
+-- ============================================================================
+-- Semantic interpretation
+-- ============================================================================
 
 /-- The type of metric space interpretations. Packages the carrier type,
     the metric function, and the distinguished point. -/
@@ -57,26 +134,29 @@ def MetricSpaceInterp.toSpaceInterp (m : MetricSpaceInterp) :
   zeroInterp := fun () => m.zero
 
 -- ============================================================================
--- Equality at type X
+-- AdmissibleEqX for the metric space EqX
 -- ============================================================================
 
--- Equality at the base type X: `x =_X y ≡ d(x, y) =_ℝ 0`.
--- In the encoded form, this is a purely universal formula:
--- `∀n. d(x,y)(n) = 0_ℝ(n)` (pointwise equality of the Cauchy sequences).
--- TODO: Define EqX concretely once RealNumbers.lean has the encoding.
--- EqX () s t := ∀n. eq0 (app (app (app (func ()) s) t) (var vz)) (real_zero (var vz))
+-- NOTE: All fields are sorry'd because eq_R uses Term.lam-compiled terms
+-- (zero_R, cauchyfy, sub_Q, etc.). Any elaboration that reduces eq_R applied
+-- to these terms forces Lean to expand the entire combinator tree under
+-- weaken/subst, causing exponential blowup.
+--
+-- Proof sketch (pen-and-paper):
+--   substF_nat: follows from eq_R_substF (sorry'd in RealNumbers)
+--   eqx_refl:   from ax_refl (∀x. d(x,x)=0) via forall_ax instantiation
+--   eqx_sym:    from ax_sym (∀x,y. d(x,y)=d(y,x)) + eq_R_sym
+--   eqx_trans:  from ax_triangle + add_eq_zero_R + le_zero_eq_zero_R
+--   eqx_pu:     eq_R is Π₁⁰ by construction (Formula.all over eq0)
+--
+-- These become provable once eq_R internals have closed-term substitution
+-- lemmas (like add_closed_subst in Arithmetic.lean).
 
--- ============================================================================
--- Metric space axioms (Premises)
--- ============================================================================
-
--- The axioms of a metric space theory, expressed as a `PremiseSet`.
--- These are purely universal formulas:
--- * Reflexivity: ∀x. d(x,x) =_ℝ 0
--- * Symmetry: ∀x,y. d(x,y) =_ℝ d(y,x)
--- * Triangle inequality: ∀x,y,z. d(x,z) ≤_ℝ d(x,y) +_ℝ d(y,z)
--- * Non-negativity: ∀x,y. 0 ≤_ℝ d(x,y)
--- TODO: Define concretely once RealNumbers.lean provides =_ℝ, ≤_ℝ, +_ℝ.
--- For now, leave as a parameter that users instantiate.
+def MetricSpace.admissibleEqX : AdmissibleEqX MetricSpace.EqX where
+  substF_nat := sorry
+  eqx_refl := sorry
+  eqx_sym := sorry
+  eqx_trans := sorry
+  eqx_pu := sorry
 
 end Metatheorems

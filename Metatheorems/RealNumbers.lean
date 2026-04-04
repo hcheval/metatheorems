@@ -541,6 +541,12 @@ def le_R {Γ : Ctx ι} (f g : Term F Γ (realTy ι)) : Formula F Γ :=
 theorem eq_R_isPurelyUniversal (f g : Term F Γ (realTy ι)) :
     (eq_R f g).isPurelyUniversal = true := by rfl
 
+/-- `eq_R` commutes with substitution: naturality for the real equality formula.
+    This is needed for `AdmissibleEqX.substF_nat` in the metric space case. -/
+theorem eq_R_substF {Γ Δ : Ctx ι} (f g : Term F Γ (realTy ι))
+    (σ : Term.Subst F Γ Δ) :
+    (eq_R f g).substF σ = eq_R (f.subst σ) (g.subst σ) := sorry
+
 -- `le_R` is Π₁⁰ (purely universal after unfolding ¬∃ to ∀¬).
 -- Note: le_R unfolds to (∃n. body) → ⊥, which is NOT syntactically purely
 -- universal in our formula representation. For metric space axioms that need
@@ -564,6 +570,11 @@ def le_R_pu {Γ : Ctx ι} (f g : Term F Γ (realTy ι)) : Formula F Γ :=
 
 theorem le_R_pu_isPurelyUniversal (f g : Term F Γ (realTy ι)) :
     (le_R_pu f g).isPurelyUniversal = true := by rfl
+
+/-- `le_R_pu` commutes with substitution. -/
+theorem le_R_pu_substF {Γ Δ : Ctx ι} (f g : Term F Γ (realTy ι))
+    (σ : Term.Subst F Γ Δ) :
+    (le_R_pu f g).substF σ = le_R_pu (f.subst σ) (g.subst σ) := sorry
 
 -- ============================================================================
 -- Rounding: (·)_∘ for embedding [0,∞) into ℕ^ℕ
