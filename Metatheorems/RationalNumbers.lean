@@ -219,7 +219,7 @@ def rat_encode {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat →ₜ Ty.nat →
     (Term.app2 Term.pair
       (Term.app2 Term.monus
         (Term.app2 Term.mul (Term.ofNat 2) (.var (.vs .vz)))  -- 2·num
-        (.app Term.isOdd (.var (.vs (.vs .vz)))))              -- - isOdd(sign)
+        (.app Term.isEven (.var (.vs (.vs .vz)))))             -- - isEven(sign)
       (.var .vz))))                                            -- den_m1
 
 -- ============================================================================
@@ -500,27 +500,6 @@ variable {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) →
 
 -- ── Congruence helpers (outside section to avoid Γ capture) ──────────────
 
-/-- s =₀ t → add(s, u) =₀ add(t, u) -/
-private def add_congr_l {Γ : Ctx ι}
-    {s t : Term F Γ Ty.nat} (h : Derivable F EqX al Premises (Formula.eq0 s t))
-    (u : Term F Γ Ty.nat) :
-    Derivable F EqX al Premises (Formula.eq0 (Term.app2 Term.add s u) (Term.app2 Term.add t u)) :=
-  qfer_no_premise_nat_nf h (r := Term.app2 Term.add (.var .vz) u.weaken)
-    (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map, add_closed_subst]
-        exact congrArg _ (Term.weaken_subst0 u s))
-    (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map, add_closed_subst]
-        exact congrArg _ (Term.weaken_subst0 u t))
-
-/-- s =₀ t → add(u, s) =₀ add(u, t) -/
-private def add_congr_r {Γ : Ctx ι} (u : Term F Γ Ty.nat)
-    {s t : Term F Γ Ty.nat} (h : Derivable F EqX al Premises (Formula.eq0 s t)) :
-    Derivable F EqX al Premises (Formula.eq0 (Term.app2 Term.add u s) (Term.app2 Term.add u t)) :=
-  qfer_no_premise_nat_nf h (r := Term.app2 Term.add u.weaken (.var .vz))
-    (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map, add_closed_subst]
-        exact congrArg (Term.app · s) (congrArg (Term.app Term.add ·) (Term.weaken_subst0 u s)))
-    (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map, add_closed_subst]
-        exact congrArg (Term.app · t) (congrArg (Term.app Term.add ·) (Term.weaken_subst0 u t)))
-
 /-- s =₀ t → mul(s, u) =₀ mul(t, u) -/
 private def mul_congr_l {Γ : Ctx ι}
     {s t : Term F Γ Ty.nat} (h : Derivable F EqX al Premises (Formula.eq0 s t))
@@ -547,6 +526,49 @@ private def sg_congr {Γ : Ctx ι} {s t : Term F Γ Ty.nat}
     (h : Derivable F EqX al Premises (Formula.eq0 s t)) :
     Derivable F EqX al Premises (Formula.eq0 (Term.app Term.sg s) (Term.app Term.sg t)) :=
   qfer_no_premise_nat_nf h (r := Term.app Term.sg (.var .vz)) rfl rfl
+
+private def sg_bar_congr {Γ : Ctx ι} {s t : Term F Γ Ty.nat}
+    (h : Derivable F EqX al Premises (Formula.eq0 s t)) :
+    Derivable F EqX al Premises (Formula.eq0 (Term.app Term.sg_bar s) (Term.app Term.sg_bar t)) :=
+  qfer_no_premise_nat_nf h (r := Term.app Term.sg_bar (.var .vz)) rfl rfl
+
+private def pd_congr {Γ : Ctx ι} {s t : Term F Γ Ty.nat}
+    (h : Derivable F EqX al Premises (Formula.eq0 s t)) :
+    Derivable F EqX al Premises (Formula.eq0 (Term.app Term.pd s) (Term.app Term.pd t)) :=
+  qfer_no_premise_nat_nf h (r := Term.app Term.pd (.var .vz)) rfl rfl
+
+/-- Variant of `Term.weaken_subst0` matching the eta-expanded form left by `simp`. -/
+private theorem weaken_subst0_eta (t : Term F Γ τ) (s : Term F Γ ρ) :
+    Term.subst (fun {_τ} => Term.subst0_map s) (Term.weaken t) = t :=
+  Term.weaken_subst0 t s
+
+/-- Congruence for a closed ternary operation: from three pairwise equalities. -/
+private def app3_congr_closed {Γ : Ctx ι}
+    (f : Term F Γ (Ty.nat →ₜ Ty.nat →ₜ Ty.nat →ₜ Ty.nat))
+    {a a' b b' c c' : Term F Γ Ty.nat}
+    (ha : Derivable F EqX al Premises (Formula.eq0 a a'))
+    (hb : Derivable F EqX al Premises (Formula.eq0 b b'))
+    (hc : Derivable F EqX al Premises (Formula.eq0 c c')) :
+    Derivable F EqX al Premises (Formula.eq0 (Term.app3 f a b c) (Term.app3 f a' b' c')) :=
+  have mk_nf (x y z : Term F Γ Ty.nat) :
+      (Term.app3 f.weaken x.weaken y.weaken (.var .vz) : Term F (Ty.nat :: Γ) _).subst0 z =
+      Term.app3 f x y z := by
+    simp only [Term.subst0, Term.app3, Term.subst, Term.subst0_map,
+      weaken_subst0_eta]
+  have mk_nf2 (x z : Term F Γ Ty.nat) (y : Term F Γ Ty.nat) :
+      (Term.app3 f.weaken x.weaken (.var .vz) z.weaken : Term F (Ty.nat :: Γ) _).subst0 y =
+      Term.app3 f x y z := by
+    simp only [Term.subst0, Term.app3, Term.subst, Term.subst0_map,
+      weaken_subst0_eta]
+  have mk_nf3 (y z : Term F Γ Ty.nat) (x : Term F Γ Ty.nat) :
+      (Term.app3 f.weaken (.var .vz) y.weaken z.weaken : Term F (Ty.nat :: Γ) _).subst0 x =
+      Term.app3 f x y z := by
+    simp only [Term.subst0, Term.app3, Term.subst, Term.subst0_map,
+      weaken_subst0_eta]
+  let s1 := qfer_no_premise_nat_nf hc (mk_nf a b c) (mk_nf a b c')
+  let s2 := qfer_no_premise_nat_nf hb (mk_nf2 a c' b) (mk_nf2 a c' b')
+  let s3 := qfer_no_premise_nat_nf ha (mk_nf3 b' c' a) (mk_nf3 b' c' a')
+  .mp (.mp s3 (.mp (.mp (.mp s2 (.mp s1 and_intro)) .trans0) and_intro)) .trans0
 
 section RationalOrderedField
 
@@ -616,6 +638,19 @@ def eq_Q_refl :
   let taut : Derivable F EqX al Premises (Γ := Γ) (⊥ᶠ →ᶠ ⊥ᶠ) :=
     .syllogism .and_contract .and_weak
   .mp taut step
+
+/-- From s =₀ t (nat equality), derive eq_Q(s, t). -/
+private def eq_Q_from_nat_eq {s t : Term F Γ Ty.nat}
+    (h : Derivable F EqX al Premises (Formula.eq0 s t)) :
+    Derivable F EqX al Premises (eq_Q s t) :=
+  let refl_s := Derivable.mp (eq_Q_refl (adm := adm)) (.forall_ax s)
+  let congr := qfer_no_premise_nat_nf h
+    (r := Term.app2 Term.eq_Q_dec s.weaken (.var .vz))
+    (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map, eq_Q_dec_closed_subst]
+        exact congrArg (Term.app · s) (congrArg (Term.app Term.eq_Q_dec ·) (Term.weaken_subst0 s s)))
+    (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map, eq_Q_dec_closed_subst]
+        exact congrArg (Term.app · t) (congrArg (Term.app Term.eq_Q_dec ·) (Term.weaken_subst0 s t)))
+  .mp (.mp refl_s (.mp (.mp congr .sym0) and_intro)) .trans0
 
 /-- ⊢ ∀a,b. eq_Q(a, b) → eq_Q(b, a) -/
 def eq_Q_sym :
@@ -734,7 +769,65 @@ def mul_Q_comm :
       (Formula.all Ty.nat (Formula.all Ty.nat
         (eq_Q (Term.app2 Term.mul_Q (.var (.vs .vz)) (.var .vz))
               (Term.app2 Term.mul_Q (.var .vz) (.var (.vs .vz)))))) :=
-  sorry
+  let a : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat := .var (.vs .vz)
+  let b : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat := .var .vz
+  let sa := Term.app Term.rat_sign a
+  let sb := Term.app Term.rat_sign b
+  let na := Term.app Term.rat_num a
+  let nb := Term.app Term.rat_num b
+  let da := Term.app Term.rat_den a
+  let db := Term.app Term.rat_den b
+  -- Body of mul_Q in extended context
+  let body : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat :=
+    Term.app3 Term.rat_encode
+      (Term.app Term.sg_bar (Term.app2 Term.abs_diff
+        (Term.app Term.rat_sign (.var (.vs .vz)))
+        (Term.app Term.rat_sign (.var .vz))))
+      (Term.app2 Term.mul
+        (Term.app Term.rat_num (.var (.vs .vz)))
+        (Term.app Term.rat_num (.var .vz)))
+      (Term.app Term.pd (Term.app2 Term.mul
+        (Term.app Term.rat_den (.var (.vs .vz)))
+        (Term.app Term.rat_den (.var .vz))))
+  have body_eq : (Term.mul_Q : Term F (Ty.nat :: Ty.nat :: Γ) _) =
+      Term.lam (Term.lam body) := by rfl
+  -- NF for mul_Q(a,b)
+  have nf_ab : (body.subst0 (b.weaken)).subst0 a =
+      Term.app3 Term.rat_encode
+        (Term.app Term.sg_bar (Term.app2 Term.abs_diff sa sb))
+        (Term.app2 Term.mul na nb)
+        (Term.app Term.pd (Term.app2 Term.mul da db)) := by
+    simp only [body, a, b, sa, sb, na, nb, da, db,
+      Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
+      rat_encode_closed_subst, sg_bar_closed_subst, abs_diff_closed_subst,
+      mul_closed_subst, rat_num_closed_subst, rat_den_closed_subst,
+      rat_sign_closed_subst, pd_closed_subst,
+      Term.weaken, Term.rename, Term.Renaming.shift]
+  -- NF for mul_Q(b,a)
+  have nf_ba : (body.subst0 (a.weaken)).subst0 b =
+      Term.app3 Term.rat_encode
+        (Term.app Term.sg_bar (Term.app2 Term.abs_diff sb sa))
+        (Term.app2 Term.mul nb na)
+        (Term.app Term.pd (Term.app2 Term.mul db da)) := by
+    simp only [body, a, b, sa, sb, na, nb, da, db,
+      Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
+      rat_encode_closed_subst, sg_bar_closed_subst, abs_diff_closed_subst,
+      mul_closed_subst, rat_num_closed_subst, rat_den_closed_subst,
+      rat_sign_closed_subst, pd_closed_subst,
+      Term.weaken, Term.rename, Term.Renaming.shift]
+  -- Unfold mul_Q(a,b) and mul_Q(b,a) to their NFs
+  let unfold_ab := body_eq ▸ lam2_correct_nf adm body a b nf_ab
+  let unfold_ba := body_eq ▸ lam2_correct_nf adm body b a nf_ba
+  -- NF_ab =₀ NF_ba via commutativity of components
+  let h1 := sg_bar_congr (abs_diff_comm adm sa sb)
+  let h2 := mul_comm adm na nb
+  let h3 := pd_congr (mul_comm adm da db)
+  let eq_nf := app3_congr_closed Term.rat_encode h1 h2 h3
+  -- Chain: mul_Q(a,b) =₀ NF_ab =₀ NF_ba =₀ mul_Q(b,a)
+  let c1 := .mp (.mp eq_nf (.mp unfold_ab and_intro)) .trans0
+  let h_eq := .mp (.mp (.mp unfold_ba .sym0) (.mp c1 and_intro)) .trans0
+  -- Lift to eq_Q and universalize
+  univ_gen (univ_gen (eq_Q_from_nat_eq h_eq))
 
 /-- ⊢ ∀a,b,c. eq_Q(mul_Q(mul_Q(a,b), c), mul_Q(a, mul_Q(b,c))) -/
 def mul_Q_assoc :
