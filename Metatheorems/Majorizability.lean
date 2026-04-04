@@ -40,6 +40,13 @@ structure AbstractMajorizability {ι : Type} {X : ι → Type} {F : ι → Ty ι
     (f_star : Ty.interpret X (ρ →ₜ τ).hat) (f : Ty.interpret X (ρ →ₜ τ))
     (x_star : Ty.interpret X ρ.hat) (x : Ty.interpret X ρ),
     maj (ρ →ₜ τ) f_star f → maj ρ x_star x → maj τ (f_star x_star) (f x)
+  /-- Property 2': arrow introduction (converse of app_compat).
+      Needed for primitive lambda abstractions. -/
+  arrow_intro : ∀ {ρ τ : Ty ι}
+    (f_star : Ty.interpret X (ρ →ₜ τ).hat) (f : Ty.interpret X (ρ →ₜ τ)),
+    (∀ (x_star : Ty.interpret X ρ.hat) (x : Ty.interpret X ρ),
+      maj ρ x_star x → maj τ (f_star x_star) (f x)) →
+    maj (ρ →ₜ τ) f_star f
   /-- The uniform threshold N for constant majorizability. -/
   N : ℕ
   /-- Majorant for zero (0 : nat). -/
@@ -61,7 +68,37 @@ structure AbstractMajorizability {ι : Type} {X : ι → Type} {F : ι → Ty ι
     ∀ n ≥ N, maj (.base i) (z_star n) (si.zeroInterp i)
 
 -- ============================================================================
--- All closed terms are majorizable (Lemma 6.0.2)
+-- Hat-context lookup and majorizable environments
+-- ============================================================================
+
+/-- Look up a variable in an interpreted hat-context. -/
+def Ctx.lookupHat {ι : Type} {X : ι → Type} :
+    {Γ : Ctx ι} → {τ : Ty ι} → Var Γ τ →
+    Ctx.interpret X (Γ.map Ty.hat) → Ty.interpret X τ.hat
+  | _ :: _, _, .vz,   (v, _)   => v
+  | _ :: _, _, .vs x, (_, env) => Ctx.lookupHat x env
+
+/-- An environment pair `(env_star, env)` is majorizable if each component
+    of `env_star` majorizes the corresponding component of `env`. -/
+def MajEnv {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    {si : SpaceInterp X F} (am : AbstractMajorizability si) :
+    (Γ : Ctx ι) → Ctx.interpret X (Γ.map Ty.hat) → Ctx.interpret X Γ → Prop
+  | [],     (),              ()           => True
+  | _ :: Γ, (v_star, e_star), (v, env)    => am.maj _ v_star v ∧ MajEnv am Γ e_star env
+
+/-- Looking up a variable in a majorizable environment preserves majorizability. -/
+lemma MajEnv.lookup {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    {si : SpaceInterp X F} {am : AbstractMajorizability si}
+    {Γ : Ctx ι} {τ : Ty ι} (v : Var Γ τ)
+    {env_star : Ctx.interpret X (Γ.map Ty.hat)} {env : Ctx.interpret X Γ}
+    (h : MajEnv am Γ env_star env) :
+    am.maj τ (Ctx.lookupHat v env_star) (Ctx.lookup v env) := by
+  induction v with
+  | vz => exact h.1
+  | vs w ih => exact ih h.2
+
+-- ============================================================================
+-- All terms are majorizable (generalized Lemma 6.0.2)
 -- ============================================================================
 
 /-- A closed term `t : Term F [] ρ` is majorizable if there exists
@@ -72,41 +109,58 @@ def IsMajorizable {ι : Type} {X : ι → Type} {F : ι → Ty ι}
   ∃ t_star : ℕ → Ty.interpret X ρ.hat,
     ∀ n ≥ am.N, am.maj ρ (t_star n) (Term.interpret si t ())
 
-/-- **Lemma 6.0.2**: All closed terms are majorizable.
+/-- **Lemma 6.0.2 (generalized)**: All terms are majorizable in majorizable
+    environments.
 
     By induction on the term:
-    - Constants: use the corresponding field of `AbstractMajorizability`
-    - Application `t u`: combine majorants via `app_compat` -/
+    - Variables: use `MajEnv.lookup`
+    - Application: combine majorants via `app_compat`
+    - Lambda: use IH on body + `arrow_intro`
+    - Constants: use the corresponding field of `AbstractMajorizability` -/
+theorem all_terms_majorizable {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    {si : SpaceInterp X F} (am : AbstractMajorizability si)
+    {Γ : Ctx ι} {ρ : Ty ι} (t : Term F Γ ρ) :
+    ∃ t_star : ℕ → Ctx.interpret X (Γ.map Ty.hat) → Ty.interpret X ρ.hat,
+      ∀ n ≥ am.N,
+        ∀ (env_star : Ctx.interpret X (Γ.map Ty.hat)) (env : Ctx.interpret X Γ),
+          MajEnv am Γ env_star env →
+          am.maj ρ (t_star n env_star) (Term.interpret si t env) := by
+  induction t with
+  | var v =>
+    exact ⟨fun _ env_star => Ctx.lookupHat v env_star, fun _ _ _ _ h => MajEnv.lookup v h⟩
+  | app f a ihf iha =>
+    obtain ⟨f_star, hf⟩ := ihf
+    obtain ⟨a_star, ha⟩ := iha
+    exact ⟨fun n env_star => f_star n env_star (a_star n env_star),
+      fun n hn env_star env henv =>
+        am.app_compat _ _ _ _ (hf n hn env_star env henv) (ha n hn env_star env henv)⟩
+  | lam body ih =>
+    obtain ⟨body_star, hbody⟩ := ih
+    exact ⟨fun n env_star x_star => body_star n (x_star, env_star),
+      fun n hn env_star env henv =>
+        am.arrow_intro _ _ (fun x_star x hx =>
+          hbody n hn (x_star, env_star) (x, env) ⟨hx, henv⟩)⟩
+  | zero =>
+    obtain ⟨z_star, hz⟩ := am.zero_maj
+    exact ⟨fun n _ => z_star n, fun n hn _ _ _ => hz n hn⟩
+  | succ =>
+    obtain ⟨s_star, hs⟩ := am.succ_maj
+    exact ⟨fun n _ => s_star n, fun n hn _ _ _ => hs n hn⟩
+  | prec ρ =>
+    obtain ⟨r_star, hr⟩ := am.prec_maj ρ
+    exact ⟨fun n _ => r_star n, fun n hn _ _ _ => hr n hn⟩
+  | func f =>
+    obtain ⟨f_star, hf⟩ := am.func_maj f
+    exact ⟨fun n _ => f_star n, fun n hn _ _ _ => hf n hn⟩
+  | zeroX i =>
+    obtain ⟨z_star, hz⟩ := am.zeroX_maj i
+    exact ⟨fun n _ => z_star n, fun n hn _ _ _ => hz n hn⟩
+
+/-- **Corollary**: All closed terms are majorizable. -/
 theorem all_closed_terms_majorizable {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     {si : SpaceInterp X F} (am : AbstractMajorizability si)
     {ρ : Ty ι} (t : Term F ([] : Ctx ι) ρ) : IsMajorizable am t := by
-  match t with
-  | .var v => nomatch v
-  | .app f a =>
-    have ihf := all_closed_terms_majorizable am f
-    have iha := all_closed_terms_majorizable am a
-    obtain ⟨f_star, hf⟩ := ihf
-    obtain ⟨a_star, ha⟩ := iha
-    refine ⟨fun n => f_star n (a_star n), fun n hn => ?_⟩
-    simp only [Term.interpret] at hf ⊢
-    exact am.app_compat (f_star n) _ (a_star n) _ (hf n hn) (ha n hn)
-  | .lam body =>
-    -- TODO: requires generalization to open terms (majorizability of lambda bodies)
-    sorry
-  | .zero =>
-    obtain ⟨z_star, hz⟩ := am.zero_maj
-    exact ⟨z_star, fun n hn => by simp only [Term.interpret]; exact hz n hn⟩
-  | .succ =>
-    obtain ⟨s_star, hs⟩ := am.succ_maj
-    exact ⟨s_star, fun n hn => by simp only [Term.interpret]; exact hs n hn⟩
-  | .prec ρ =>
-    obtain ⟨r_star, hr⟩ := am.prec_maj ρ
-    exact ⟨r_star, fun n hn => by simp only [Term.interpret]; exact hr n hn⟩
-  | .func f =>
-    obtain ⟨f_star, hf⟩ := am.func_maj f
-    exact ⟨f_star, fun n hn => by simp only [Term.interpret]; exact hf n hn⟩
-  | .zeroX i =>
-    obtain ⟨z_star, hz⟩ := am.zeroX_maj i
-    exact ⟨z_star, fun n hn => by simp only [Term.interpret]; exact hz n hn⟩
+  obtain ⟨t_star, ht⟩ := all_terms_majorizable am t
+  exact ⟨fun n => t_star n (), fun n hn => ht n hn () () True.intro⟩
 
 end Metatheorems
