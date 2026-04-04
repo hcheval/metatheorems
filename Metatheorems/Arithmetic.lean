@@ -1776,6 +1776,120 @@ def abs_diff_comm (x y : Term F Γ Ty.nat) :
   let c1 := .mp (.mp ac (.mp unfold_xy and_intro)) .trans0
   .mp (.mp (.mp unfold_yx .sym0) (.mp c1 and_intro)) .trans0
 
+-- ── Congruence helpers for add ──────────────────────────────────────────────
+
+private theorem add_vz_w_subst0 (u s : Term F Γ Ty.nat) :
+    (Term.app2 Term.add (.var .vz) u.weaken : Term F (Ty.nat :: Γ) _).subst0 s =
+    Term.app2 Term.add s u := by
+  simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map, add_closed_subst']
+  have := Term.weaken_subst0 u s; simp only [Term.subst0] at this; rw [this]
+
+/-- s =₀ t → add(s, u) =₀ add(t, u). -/
+def add_congr_l {s t : Term F Γ Ty.nat}
+    (h : Derivable F EqX al Premises (Formula.eq0 s t)) (u : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (Formula.eq0 (Term.app2 Term.add s u) (Term.app2 Term.add t u)) :=
+  qfer_no_premise_nat_nf h (add_vz_w_subst0 u s) (add_vz_w_subst0 u t)
+
+/-- s =₀ t → add(u, s) =₀ add(u, t). -/
+def add_congr_r (u : Term F Γ Ty.nat) {s t : Term F Γ Ty.nat}
+    (h : Derivable F EqX al Premises (Formula.eq0 s t)) :
+    Derivable F EqX al Premises (Formula.eq0 (Term.app2 Term.add u s) (Term.app2 Term.add u t)) :=
+  qfer_no_premise_nat_nf h (add_w_vz_subst0 u s) (add_w_vz_subst0 u t)
+
+-- ── mul_succ_l and mul_comm ─────────────────────────────────────────────────
+
+/-- Sx * y = x*y + y. By induction on y. -/
+def mul_succ_l (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (Formula.eq0
+      (Term.app2 Term.mul (.app .succ x) y)
+      (Term.app2 Term.add (Term.app2 Term.mul x y) y)) :=
+  let xw := x.weaken (σ := Ty.nat)
+  let sx := Term.app Term.succ xw
+  have xw_subst0 : ∀ s : Term F Γ Ty.nat,
+      Term.subst (fun {τ} ↦ Term.subst0_map s) x.weaken = x := Term.weaken_subst0 x
+  let A : Formula F (Ty.nat :: Γ) :=
+    Formula.eq0 (Term.app2 Term.mul sx (.var .vz))
+      (Term.app2 Term.add (Term.app2 Term.mul xw (.var .vz)) (.var .vz))
+  have base_nf : A.subst0 Term.zero =
+      Formula.eq0 (Term.app2 Term.mul (.app .succ x) Term.zero)
+        (Term.app2 Term.add (Term.app2 Term.mul x Term.zero) Term.zero) := by
+    simp only [A, sx, xw, Formula.subst0, Formula.substF, Term.subst, Term.subst0_map,
+      Term.app2, add_closed_subst, mul_closed_subst', xw_subst0]
+  have base := base_nf ▸ (
+    let lhs := mul_zero adm (.app .succ x)
+    let mz := mul_zero adm x
+    let az := add_zero_r adm (Term.app2 Term.mul x Term.zero)
+    let rhs := .mp (.mp mz (.mp az and_intro)) .trans0
+    .mp (.mp (.mp rhs .sym0) (.mp lhs and_intro)) .trans0)
+  have step_nf : Formula.substVar0 A (.app .succ (.var .vz)) =
+      Formula.eq0 (Term.app2 Term.mul sx (.app .succ (.var .vz)))
+        (Term.app2 Term.add (Term.app2 Term.mul xw (.app .succ (.var .vz))) (.app .succ (.var .vz))) := by
+    simp only [A, sx, xw, Formula.substVar0, Formula.substF, Term.subst, Term.substVar0_map,
+      Term.app2, add_closed_subst, mul_closed_subst', weaken_substVar0]
+  have step_body := step_nf ▸ (
+    let vz : Term F (Ty.nat :: Γ) Ty.nat := .var .vz
+    let mxwy := Term.app2 Term.mul xw vz
+    let ms1 := mul_succ (Premises := Premises) adm sx vz
+    let ih_congr := qfer_nat_nf (by rfl) (by rfl) I_comb
+      (add_vz_w_subst0 sx (Term.app2 Term.mul sx vz))
+      (add_vz_w_subst0 sx (Term.app2 Term.add mxwy vz))
+    let c1 := .syllogism (pair_h (weaken_intro_h ms1) ih_congr) .trans0
+    let assoc1 := add_assoc adm mxwy vz sx
+    let as1 := add_succ adm vz xw
+    let cr1 := add_congr_r mxwy as1
+    let lhs := .syllogism (pair_h c1 (weaken_intro_h (.mp (.mp cr1 (.mp assoc1 and_intro)) .trans0))) .trans0
+    let ms2 := mul_succ (Premises := Premises) adm xw vz
+    let ms2_congr := add_congr_l ms2 (.app .succ vz)
+    let assoc2 := add_assoc adm mxwy xw (.app .succ vz)
+    let as2 := add_succ adm xw vz
+    let cr2 := add_congr_r mxwy as2
+    let rhs := .mp (.mp cr2 (.mp (.mp (.mp assoc2 (.mp ms2_congr and_intro)) .trans0) and_intro)) .trans0
+    let comm := add_comm adm vz xw
+    let sc := succ_congr comm
+    let eq_mid := add_congr_r mxwy sc
+    .syllogism (pair_h lhs (weaken_intro_h (.mp (.mp (.mp rhs .sym0) (.mp eq_mid and_intro)) .trans0))) .trans0)
+  have inst_nf : A.subst0 y =
+      Formula.eq0 (Term.app2 Term.mul (.app .succ x) y)
+        (Term.app2 Term.add (Term.app2 Term.mul x y) y) := by
+    simp only [A, sx, xw, Formula.subst0, Formula.substF, Term.subst, Term.subst0_map,
+      Term.app2, add_closed_subst, mul_closed_subst', xw_subst0]
+  inst_nf ▸ .mp (Derivable.induction base (univ_gen step_body)) (.forall_ax y)
+
+/-- x * y = y * x. By induction on y. -/
+def mul_comm (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (Formula.eq0
+      (Term.app2 Term.mul x y) (Term.app2 Term.mul y x)) :=
+  let xw := x.weaken (σ := Ty.nat)
+  have xw_subst0 : ∀ s : Term F Γ Ty.nat,
+      Term.subst (fun {τ} ↦ Term.subst0_map s) x.weaken = x := Term.weaken_subst0 x
+  let A : Formula F (Ty.nat :: Γ) :=
+    Formula.eq0 (Term.app2 Term.mul xw (.var .vz)) (Term.app2 Term.mul (.var .vz) xw)
+  have base_nf : A.subst0 Term.zero =
+      Formula.eq0 (Term.app2 Term.mul x Term.zero) (Term.app2 Term.mul Term.zero x) := by
+    simp only [A, xw, Formula.subst0, Formula.substF, Term.subst, Term.subst0_map, Term.app2,
+      mul_closed_subst', xw_subst0]
+  have base := base_nf ▸
+    .mp (.mp (.mp (mul_zero_l adm x) .sym0) (.mp (mul_zero adm x) and_intro)) .trans0
+  have step_nf : Formula.substVar0 A (.app .succ (.var .vz)) =
+      Formula.eq0 (Term.app2 Term.mul xw (.app .succ (.var .vz)))
+        (Term.app2 Term.mul (.app .succ (.var .vz)) xw) := by
+    simp only [A, xw, Formula.substVar0, Formula.substF, Term.subst, Term.substVar0_map, Term.app2,
+      mul_closed_subst', weaken_substVar0]
+  have step_body := step_nf ▸ (
+    let vz : Term F (Ty.nat :: Γ) Ty.nat := .var .vz
+    let ms := mul_succ (Premises := Premises) adm xw vz
+    let ih_congr := qfer_nat_nf (by rfl) (by rfl) I_comb
+      (add_vz_w_subst0 xw (Term.app2 Term.mul xw vz))
+      (add_vz_w_subst0 xw (Term.app2 Term.mul vz xw))
+    let msl := mul_succ_l (Premises := Premises) adm vz xw
+    let c1 := .syllogism (pair_h (weaken_intro_h ms) ih_congr) .trans0
+    .syllogism (pair_h c1 (weaken_intro_h (.mp msl .sym0))) .trans0)
+  have inst_nf : A.subst0 y =
+      Formula.eq0 (Term.app2 Term.mul x y) (Term.app2 Term.mul y x) := by
+    simp only [A, xw, Formula.subst0, Formula.substF, Term.subst, Term.subst0_map, Term.app2,
+      mul_closed_subst', xw_subst0]
+  inst_nf ▸ .mp (Derivable.induction base (univ_gen step_body)) (.forall_ax y)
+
 end ArithProps
 
 -- ============================================================================
