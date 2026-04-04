@@ -3,7 +3,7 @@ Copyright (c) 2026. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Horatiu
 -/
-import Metatheorems.Arithmetic
+import Metatheorems.RationalNumbers
 
 namespace Metatheorems
 
@@ -17,358 +17,21 @@ to within 2^{-n}.
 
 ## Structure
 
-1. **Auxiliary arithmetic**: `max`, `sg`, `isEven`, `triag`, `exp2`
-2. **Cantor pairing**: `pair`, `inv_triag`, `fst_pair`, `snd_pair`
-3. **Division by 2**: `div2` (via state-pair recursion using pairing)
-4. **Rational encoding**: `rat_num`, `rat_den`, `rat_sign`, `rat_encode`
-5. **Rational arithmetic**: `neg_Q`, `add_Q`, `sub_Q`, `mul_Q`, `abs_Q`
-6. **Rational comparison**: `le_Q_dec`, `lt_Q_dec` (decision terms, 0 = true)
-7. **Rational constants**: `encode_nat_Q`, `pow2neg_Q`
-8. **Cauchyfication**: `cauchyfy` (f ↦ f̂)
-9. **Real operations**: `eq_R`, `lt_R`, `le_R`, `zero_R`, `add_R`
+1. **Cauchyfication**: `cauchyfy` (f ↦ f̂)
+2. **Real operations**: `zero_R`, `one_R`, `add_R`, `neg_R`, `sub_R`, `mul_R`, `abs_R`
+3. **Real formulas**: `eq_R`, `lt_R`, `le_R`, `le_R_pu`
+4. **Ordered field axioms** (sorry'd)
 -/
 
 open Formula
 
-/-- The type of real numbers: type level 1 = ℕ → ℕ.
-    A real `x : ℝₜ` is a function where `x(n)` encodes a rational
-    approximation of the real value to within 2^{-n}. -/
-abbrev realTy (ι : Type) : Ty ι := Ty.nat →ₜ Ty.nat
-
 variable {ι : Type} {F : ι → Ty ι}
 
 -- ============================================================================
--- Section 1: Auxiliary Arithmetic Terms
+-- Section 1: Cauchyfication
 -- ============================================================================
 
 namespace Term
-
-/-- Maximum: max(x, y) = x + (y ∸ x). -/
-def max {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat →ₜ Ty.nat) :=
-  Term.lam (Term.lam
-    (Term.app2 Term.add (.var (.vs .vz))
-      (Term.app2 Term.monus (.var .vz) (.var (.vs .vz)))))
-
-/-- Minimum: min(x, y) = x ∸ (x ∸ y). -/
-def min {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat →ₜ Ty.nat) :=
-  Term.lam (Term.lam
-    (Term.app2 Term.monus (.var (.vs .vz))
-      (Term.app2 Term.monus (.var (.vs .vz)) (.var .vz))))
-
-/-- Sign: sg(0) = 0, sg(Sn) = 1. -/
-def sg {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat) :=
-  Term.lam
-    (Term.app3 (.prec Ty.nat)
-      .zero                                        -- sg(0) = 0
-      (Term.lam (Term.lam                          -- λr k. 1
-        (.app .succ .zero)))
-      (.var .vz))
-
-/-- Is-even: isEven(0) = 1, isEven(Sn) = sg_bar(isEven(n)).
-    Returns 1 for even, 0 for odd. -/
-def isEven {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat) :=
-  Term.lam
-    (Term.app3 (.prec Ty.nat)
-      (.app .succ .zero)                           -- isEven(0) = 1
-      (Term.lam (Term.lam                          -- λr k. sg_bar(r)
-        (.app Term.sg_bar (.var (.vs .vz)))))
-      (.var .vz))
-
-/-- Is-odd: isOdd(n) = 1 ∸ isEven(n). -/
-def isOdd {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat) :=
-  Term.lam
-    (Term.app2 Term.monus (.app .succ .zero)
-      (.app Term.isEven (.var .vz)))
-
-/-- Triangular number: triag(0) = 0, triag(Sn) = triag(n) + S(n).
-    Computes n·(n+1)/2. -/
-def triag {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat) :=
-  Term.lam
-    (Term.app3 (.prec Ty.nat)
-      .zero                                        -- triag(0) = 0
-      (Term.lam (Term.lam                          -- λr k. add r (S k)
-        (Term.app2 Term.add
-          (.var (.vs .vz))                         -- r
-          (.app .succ (.var .vz)))))               -- S k
-      (.var .vz))
-
-/-- Power of 2: exp2(0) = 1, exp2(Sn) = 2 · exp2(n). -/
-def exp2 {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat) :=
-  Term.lam
-    (Term.app3 (.prec Ty.nat)
-      (.app .succ .zero)                           -- exp2(0) = 1
-      (Term.lam (Term.lam                          -- λr k. r + r = 2r
-        (Term.app2 Term.add
-          (.var (.vs .vz))
-          (.var (.vs .vz)))))
-      (.var .vz))
-
-/-- Conditional: ite(b, x, y) = b·x + (1-b)·y for b ∈ {0,1}.
-    When b = 1: returns x. When b = 0: returns y. -/
-def ite_nat {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat →ₜ Ty.nat →ₜ Ty.nat) :=
-  Term.lam (Term.lam (Term.lam
-    -- b = var (vs (vs vz)), x = var (vs vz), y = var vz
-    (Term.app2 Term.add
-      (Term.app2 Term.mul (.var (.vs (.vs .vz))) (.var (.vs .vz)))
-      (Term.app2 Term.mul
-        (Term.app2 Term.monus (.app .succ .zero) (.var (.vs (.vs .vz))))
-        (.var .vz)))))
-
-/-- geq(a, b) = 1 if a ≥ b, 0 if a < b.
-    Computed as sg_bar(b ∸ a). -/
-def geq {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat →ₜ Ty.nat) :=
-  Term.lam (Term.lam
-    (.app Term.sg_bar
-      (Term.app2 Term.monus (.var .vz) (.var (.vs .vz)))))
-
--- ============================================================================
--- Section 2: Cantor Pairing
--- ============================================================================
-
-/-- Cantor pairing: pair(a, b) = triag(a + b) + a. -/
-def pair {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat →ₜ Ty.nat) :=
-  Term.lam (Term.lam
-    (Term.app2 Term.add
-      (.app Term.triag (Term.app2 Term.add (.var (.vs .vz)) (.var .vz)))
-      (.var (.vs .vz))))
-
-/-- Inverse triangular number: the largest w with triag(w) ≤ n.
-    inv_triag(0) = 0
-    inv_triag(Sk) = inv_triag(k) + sg_bar(monus(triag(S(inv_triag(k))))(Sk))
-
-    The step increments w when triag(w+1) ≤ n. -/
-def inv_triag {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat) :=
-  Term.lam
-    (Term.app3 (.prec Ty.nat)
-      .zero                                        -- inv_triag(0) = 0
-      (Term.lam (Term.lam                          -- λr k. r + sg_bar(monus(triag(Sr))(Sk))
-        (Term.app2 Term.add
-          (.var (.vs .vz))                         -- r
-          (.app Term.sg_bar
-            (Term.app2 Term.monus
-              (.app Term.triag                     -- triag(S r)
-                (.app .succ (.var (.vs .vz))))
-              (.app .succ (.var .vz)))))))         -- S k
-      (.var .vz))
-
-/-- First Cantor projection: fst_pair(n) = n - triag(inv_triag(n)). -/
-def fst_pair {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat) :=
-  Term.lam
-    (Term.app2 Term.monus
-      (.var .vz)
-      (.app Term.triag (.app Term.inv_triag (.var .vz))))
-
-/-- Second Cantor projection: snd_pair(n) = inv_triag(n) - fst_pair(n). -/
-def snd_pair {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat) :=
-  Term.lam
-    (Term.app2 Term.monus
-      (.app Term.inv_triag (.var .vz))
-      (.app Term.fst_pair (.var .vz)))
-
--- ============================================================================
--- Section 3: Division by 2
--- ============================================================================
-
-/-- Division by 2 via state-pair recursion.
-    Tracks state pair(div2(k), isEven(k)) as a single natural number.
-    state(0) = pair(0, 1)
-    state(Sk) = pair(fst(state(k)) + snd(state(k)), sg_bar(snd(state(k))))
-    div2(n) = fst_pair(state(n)). -/
-def div2 {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat) :=
-  Term.lam
-    (.app Term.fst_pair
-      (Term.app3 (.prec Ty.nat)
-        (Term.app2 Term.pair .zero (.app .succ .zero))  -- pair(0, 1)
-        (Term.lam (Term.lam                              -- λr k.
-          (Term.app2 Term.pair
-            (Term.app2 Term.add                          --   fst(r) + snd(r)
-              (.app Term.fst_pair (.var (.vs .vz)))
-              (.app Term.snd_pair (.var (.vs .vz))))
-            (.app Term.sg_bar                            --   sg_bar(snd(r))
-              (.app Term.snd_pair (.var (.vs .vz)))))))
-        (.var .vz)))
-
--- ============================================================================
--- Section 4: Rational Number Encoding
--- ============================================================================
-
--- A natural number n encodes the rational:
---   j₁(n) even:  +(j₁(n)/2)     / (j₂(n) + 1)
---   j₁(n) odd:   -((j₁(n)+1)/2) / (j₂(n) + 1)
---
--- We extract: sign, unsigned numerator, denominator.
-
-/-- Unsigned numerator of the rational encoded by n.
-    = div2(j₁(n) + isOdd(j₁(n))). -/
-def rat_num {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat) :=
-  Term.lam
-    (.app Term.div2
-      (Term.app2 Term.add
-        (.app Term.fst_pair (.var .vz))
-        (.app Term.isOdd (.app Term.fst_pair (.var .vz)))))
-
-/-- Denominator of the rational encoded by n: j₂(n) + 1. -/
-def rat_den {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat) :=
-  Term.lam (.app .succ (.app Term.snd_pair (.var .vz)))
-
-/-- Sign of the rational encoded by n: 1 if positive (j₁(n) even), 0 if negative. -/
-def rat_sign {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat) :=
-  Term.lam (.app Term.isEven (.app Term.fst_pair (.var .vz)))
-
-/-- Encode a rational from (sign, unsigned_num, denom_minus_1) → ℕ.
-    sign = 1 → j₁ = 2·num (even)
-    sign = 0 → j₁ = 2·num - 1 (odd, only makes sense when num > 0)
-    For num = 0, the sign doesn't matter (both encode 0). -/
-def rat_encode {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat →ₜ Ty.nat →ₜ Ty.nat) :=
-  Term.lam (Term.lam (Term.lam
-    -- sign = var (vs (vs vz)), num = var (vs vz), den_m1 = var vz
-    (Term.app2 Term.pair
-      (Term.app2 Term.monus
-        (Term.app2 Term.mul (Term.ofNat 2) (.var (.vs .vz)))  -- 2·num
-        (.app Term.isOdd (.var (.vs (.vs .vz)))))              -- - isOdd(sign)
-      (.var .vz))))                                            -- den_m1
-
--- ============================================================================
--- Section 5: Rational Arithmetic
--- ============================================================================
-
--- All rational operations take natural-number encodings and return encodings.
-
-/-- Negation of a rational: flip the sign.
-    neg_Q(n) = encode(1 - sign(n), num(n), j₂(n)). -/
-def neg_Q {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat) :=
-  Term.lam
-    (Term.app3 Term.rat_encode
-      (Term.app2 Term.monus (.app .succ .zero)      -- 1 - sign(n)
-        (.app Term.rat_sign (.var .vz)))
-      (.app Term.rat_num (.var .vz))                 -- num(n)
-      (.app Term.snd_pair (.var .vz)))               -- j₂(n) = den - 1
-
-/-- Rational addition: add_Q(n₁, n₂).
-    Extracts signs, numerators, denominators, cross-multiplies,
-    handles same/different sign cases. -/
-def add_Q {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat →ₜ Ty.nat) :=
-  Term.lam (Term.lam
-    -- n₁ = var (vs vz), n₂ = var vz
-    -- Let s₁ = rat_sign(n₁), p₁ = rat_num(n₁), d₁ = rat_den(n₁)
-    -- Let s₂ = rat_sign(n₂), p₂ = rat_num(n₂), d₂ = rat_den(n₂)
-    -- Let a = p₁ · d₂, b = p₂ · d₁  (cross products)
-    -- same_sign = sg_bar(|s₁ - s₂|)
-    -- result_num = ite(same, a + b, |a - b|)
-    -- result_sign = ite(same, s₁, ite(geq(a,b), s₁, s₂))
-    -- result_den_m1 = d₁ · d₂ - 1
-    (let n₁ := Term.var (.vs .vz)
-     let n₂ := Term.var .vz
-     let s₁ := Term.app Term.rat_sign n₁
-     let p₁ := Term.app Term.rat_num n₁
-     let d₁ := Term.app Term.rat_den n₁
-     let s₂ := Term.app Term.rat_sign n₂
-     let p₂ := Term.app Term.rat_num n₂
-     let d₂ := Term.app Term.rat_den n₂
-     let a  := Term.app2 Term.mul p₁ d₂
-     let b  := Term.app2 Term.mul p₂ d₁
-     let same := Term.app Term.sg_bar (Term.app2 Term.abs_diff s₁ s₂)
-     let result_num := Term.app3 Term.ite_nat same
-       (Term.app2 Term.add a b)
-       (Term.app2 Term.abs_diff a b)
-     let result_sign := Term.app3 Term.ite_nat same s₁
-       (Term.app3 Term.ite_nat (Term.app2 Term.geq a b) s₁ s₂)
-     let result_den_m1 := Term.app Term.pd (Term.app2 Term.mul d₁ d₂)
-     Term.app3 Term.rat_encode result_sign result_num result_den_m1))
-
-/-- Rational subtraction: sub_Q(n₁, n₂) = add_Q(n₁, neg_Q(n₂)). -/
-def sub_Q {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat →ₜ Ty.nat) :=
-  Term.lam (Term.lam
-    (Term.app2 Term.add_Q
-      (.var (.vs .vz))
-      (.app Term.neg_Q (.var .vz))))
-
-/-- Rational multiplication: mul_Q(n₁, n₂).
-    num = num₁ · num₂
-    den = den₁ · den₂
-    sign = same_sign(sign₁, sign₂) -/
-def mul_Q {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat →ₜ Ty.nat) :=
-  Term.lam (Term.lam
-    (let n₁ := Term.var (.vs .vz)
-     let n₂ := Term.var .vz
-     let s₁ := Term.app Term.rat_sign n₁
-     let s₂ := Term.app Term.rat_sign n₂
-     -- same sign = positive result
-     let result_sign := Term.app Term.sg_bar (Term.app2 Term.abs_diff s₁ s₂)
-     let result_num := Term.app2 Term.mul
-       (Term.app Term.rat_num n₁) (Term.app Term.rat_num n₂)
-     let result_den_m1 := Term.app Term.pd (Term.app2 Term.mul
-       (Term.app Term.rat_den n₁) (Term.app Term.rat_den n₂))
-     Term.app3 Term.rat_encode result_sign result_num result_den_m1))
-
-/-- Absolute value of a rational: set sign to positive.
-    abs_Q(n) = encode(1, num(n), j₂(n)). -/
-def abs_Q {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat) :=
-  Term.lam
-    (Term.app3 Term.rat_encode
-      (.app .succ .zero)                             -- sign = 1 (positive)
-      (.app Term.rat_num (.var .vz))                 -- num(n)
-      (.app Term.snd_pair (.var .vz)))               -- j₂(n) = den - 1
-
--- ============================================================================
--- Section 6: Rational Comparison (Decision Terms)
--- ============================================================================
-
--- Convention: decision terms return 0 when the predicate holds (matching qf_term).
-
-/-- Less-than for rationals (decision term): returns 0 iff n₁ <_ℚ n₂.
-    n₁ < n₂ ⟺ n₂ - n₁ is strictly positive
-    ⟺ sign(sub(n₂, n₁)) = 1 ∧ num(sub(n₂, n₁)) > 0.
-    Returns: |sign(d) - 1| + sg_bar(num(d)) where d = sub_Q(n₂, n₁). -/
-def lt_Q_dec {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat →ₜ Ty.nat) :=
-  Term.lam (Term.lam
-    (let diff := Term.app2 Term.sub_Q (.var .vz) (.var (.vs .vz))
-     Term.app2 Term.add
-       (Term.app2 Term.abs_diff (.app Term.rat_sign diff) (.app .succ .zero))
-       (.app Term.sg_bar (.app Term.rat_num diff))))
-
-/-- Less-than-or-equal for rationals (decision term): returns 0 iff n₁ ≤_ℚ n₂.
-    n₁ ≤ n₂ ⟺ n₂ - n₁ is non-negative
-    ⟺ sign(sub(n₂, n₁)) = 1 ∨ num(sub(n₂, n₁)) = 0.
-    Returns: |sign(d) - 1| · num(d) where d = sub_Q(n₂, n₁). -/
-def le_Q_dec {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat →ₜ Ty.nat) :=
-  Term.lam (Term.lam
-    (let diff := Term.app2 Term.sub_Q (.var .vz) (.var (.vs .vz))
-     Term.app2 Term.mul
-       (Term.app2 Term.abs_diff (.app Term.rat_sign diff) (.app .succ .zero))
-       (.app Term.rat_num diff)))
-
--- ============================================================================
--- Section 7: Rational Constants
--- ============================================================================
-
-/-- Encode the natural number n as a (non-negative) rational: n/1.
-    encode_nat_Q(n) = pair(2·n, 0). -/
-def encode_nat_Q {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat) :=
-  Term.lam
-    (Term.app2 Term.pair
-      (Term.app2 Term.mul (Term.ofNat 2) (.var .vz))
-      .zero)
-
-/-- Encode the rational 2^{-n} as a natural number.
-    2^{-n} = 1 / 2^n, encoded as pair(2·1, 2^n - 1) = pair(2, exp2(n) - 1). -/
-def pow2neg_Q {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat) :=
-  Term.lam
-    (Term.app2 Term.pair
-      (Term.ofNat 2)                                 -- 2·1 = 2 (positive, numerator = 1)
-      (.app Term.pd (.app Term.exp2 (.var .vz))))    -- exp2(n) - 1
-
-/-- The rational zero: 0/1 = pair(0, 0). -/
-def zero_Q {Γ : Ctx ι} : Term F Γ Ty.nat :=
-  Term.app2 Term.pair .zero .zero
-
-/-- The rational one: 1/1 = pair(2, 0). -/
-def one_Q {Γ : Ctx ι} : Term F Γ Ty.nat :=
-  Term.app2 Term.pair (Term.ofNat 2) .zero
-
--- ============================================================================
--- Section 8: Cauchyfication
--- ============================================================================
 
 -- Given f : ℕ → ℕ (encoding a sequence of rationals), produce f̂ satisfying
 -- the Cauchy condition: ∀n. |f̂(n) -_Q f̂(n+1)|_Q <_Q ⟨2^{-n-1}⟩_Q.
@@ -429,7 +92,7 @@ def cauchyfy {Γ : Ctx ι} : Term F Γ ((Ty.nat →ₜ Ty.nat) →ₜ (Ty.nat �
         (.var .vz))))                                -- n
 
 -- ============================================================================
--- Section 9: Real Number Operations
+-- Section 2: Real Number Operations
 -- ============================================================================
 
 -- === Terms ===
@@ -498,7 +161,57 @@ def abs_R {Γ : Ctx ι} : Term F Γ (realTy ι →ₜ realTy ι) :=
 
 end Term
 
--- === Formulas ===
+-- ============================================================================
+-- Closed term substitution lemmas (real-level)
+-- ============================================================================
+
+section ClosedSubst
+variable {Γ Δ : Ctx ι} (σ : Term.Subst F Γ Δ)
+
+@[simp] private theorem cauchyfy_closed_subst :
+    (Term.cauchyfy : Term F Γ _).subst σ = Term.cauchyfy := by
+  simp only [Term.cauchyfy, Term.subst, Term.Subst.ext, Term.app2, Term.app3,
+    Term.weaken, Term.rename, Term.Renaming.ext, Term.Renaming.shift,
+    fst_pair_closed_subst, pair_closed_subst, snd_pair_closed_subst,
+    lt_Q_dec_closed_subst, abs_Q_closed_subst, sub_Q_closed_subst,
+    pow2neg_Q_closed_subst, ite_nat_closed_subst, sg_bar_closed_subst]
+@[simp] theorem zero_R_closed_subst :
+    (Term.zero_R : Term F Γ _).subst σ = Term.zero_R := by rfl
+@[simp] private theorem one_R_closed_subst :
+    (Term.one_R : Term F Γ _).subst σ = Term.one_R := by rfl
+@[simp] private theorem embed_nat_R_closed_subst :
+    (Term.embed_nat_R : Term F Γ _).subst σ = Term.embed_nat_R := by rfl
+@[simp] private theorem neg_R_closed_subst :
+    (Term.neg_R : Term F Γ _).subst σ = Term.neg_R := by rfl
+private theorem add_closed_subst :
+    (Term.add : Term F Γ _).subst σ = Term.add := by rfl
+
+@[simp] private theorem add_R_closed_subst :
+    (Term.add_R : Term F Γ _).subst σ = Term.add_R := by
+  simp only [Term.add_R, Term.subst, Term.Subst.ext, Term.app2,
+    Term.weaken, Term.rename, Term.Renaming.shift,
+    add_Q_closed_subst, cauchyfy_closed_subst]
+@[simp] private theorem sub_R_closed_subst :
+    (Term.sub_R : Term F Γ _).subst σ = Term.sub_R := by
+  simp only [Term.sub_R, Term.subst, Term.Subst.ext, Term.app2,
+    Term.weaken, Term.rename, Term.Renaming.shift,
+    add_R_closed_subst, neg_R_closed_subst]
+@[simp] private theorem mul_R_closed_subst :
+    (Term.mul_R : Term F Γ _).subst σ = Term.mul_R := by
+  simp only [Term.mul_R, Term.subst, Term.Subst.ext, Term.app2,
+    Term.weaken, Term.rename, Term.Renaming.shift, Term.ofNat,
+    mul_Q_closed_subst, cauchyfy_closed_subst, add_closed_subst]
+@[simp] private theorem abs_R_closed_subst :
+    (Term.abs_R : Term F Γ _).subst σ = Term.abs_R := by
+  simp only [Term.abs_R, Term.subst, Term.Subst.ext, Term.app2,
+    Term.weaken, Term.rename, Term.Renaming.shift,
+    abs_Q_closed_subst, cauchyfy_closed_subst]
+
+end ClosedSubst
+
+-- ============================================================================
+-- Real Number Formulas
+-- ============================================================================
 
 /-- Real equality: f₁ =_ℝ f₂ :≡ ∀n. |f̂₁(n+1) -_ℚ f̂₂(n+1)|_ℚ <_ℚ ⟨2^{-n}⟩_ℚ.
     This is a Π₁⁰ formula (∀ over nat, QF body). -/
@@ -533,7 +246,7 @@ def le_R {Γ : Ctx ι} (f g : Term F Γ (realTy ι)) : Formula F Γ :=
   Formula.neg (lt_R g f)
 
 -- ============================================================================
--- Key Properties (statements only)
+-- Key Properties
 -- ============================================================================
 
 /-- `eq_R` is quantifier-free under the ∀n wrapper, so the whole formula
@@ -545,7 +258,11 @@ theorem eq_R_isPurelyUniversal (f g : Term F Γ (realTy ι)) :
     This is needed for `AdmissibleEqX.substF_nat` in the metric space case. -/
 theorem eq_R_substF {Γ Δ : Ctx ι} (f g : Term F Γ (realTy ι))
     (σ : Term.Subst F Γ Δ) :
-    (eq_R f g).substF σ = eq_R (f.subst σ) (g.subst σ) := sorry
+    (eq_R f g).substF σ = eq_R (f.subst σ) (g.subst σ) := by
+  simp only [eq_R, Formula.substF, Term.subst, Term.Subst.ext, Term.app2,
+    Term.weaken_subst_ext,
+    lt_Q_dec_closed_subst, abs_Q_closed_subst, sub_Q_closed_subst,
+    cauchyfy_closed_subst, pow2neg_Q_closed_subst]
 
 -- `le_R` is Π₁⁰ (purely universal after unfolding ¬∃ to ∀¬).
 -- Note: le_R unfolds to (∃n. body) → ⊥, which is NOT syntactically purely
@@ -574,7 +291,11 @@ theorem le_R_pu_isPurelyUniversal (f g : Term F Γ (realTy ι)) :
 /-- `le_R_pu` commutes with substitution. -/
 theorem le_R_pu_substF {Γ Δ : Ctx ι} (f g : Term F Γ (realTy ι))
     (σ : Term.Subst F Γ Δ) :
-    (le_R_pu f g).substF σ = le_R_pu (f.subst σ) (g.subst σ) := sorry
+    (le_R_pu f g).substF σ = le_R_pu (f.subst σ) (g.subst σ) := by
+  simp only [le_R_pu, Formula.substF, Term.subst, Term.Subst.ext, Term.app2,
+    Term.weaken_subst_ext,
+    le_Q_dec_closed_subst, sub_Q_closed_subst, cauchyfy_closed_subst,
+    pow2neg_Q_closed_subst]
 
 -- ============================================================================
 -- Rounding: (·)_∘ for embedding [0,∞) into ℕ^ℕ

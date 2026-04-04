@@ -137,26 +137,17 @@ def MetricSpaceInterp.toSpaceInterp (m : MetricSpaceInterp) :
 -- AdmissibleEqX for the metric space EqX
 -- ============================================================================
 
--- NOTE: All fields are sorry'd because eq_R uses Term.lam-compiled terms
--- (zero_R, cauchyfy, sub_Q, etc.). Any elaboration that reduces eq_R applied
--- to these terms forces Lean to expand the entire combinator tree under
--- weaken/subst, causing exponential blowup.
---
--- Proof sketch (pen-and-paper):
---   substF_nat: follows from eq_R_substF (sorry'd in RealNumbers)
---   eqx_refl:   from ax_refl (∀x. d(x,x)=0) via forall_ax instantiation
---   eqx_sym:    from ax_sym (∀x,y. d(x,y)=d(y,x)) + eq_R_sym
---   eqx_trans:  from ax_triangle + add_eq_zero_R + le_zero_eq_zero_R
---   eqx_pu:     eq_R is Π₁⁰ by construction (Formula.all over eq0)
---
--- These become provable once eq_R internals have closed-term substitution
--- lemmas (like add_closed_subst in Arithmetic.lean).
+-- substF_nat: follows from eq_R_substF (proved in RealNumbers)
+-- eqx_pu:     eq_R is Π₁⁰ by construction (Formula.all over eq0)
+-- eqx_refl/sym/trans: require ordered field axioms (sorry'd in RealNumbers)
 
 def MetricSpace.admissibleEqX : AdmissibleEqX MetricSpace.EqX where
-  substF_nat := sorry
+  substF_nat := fun {_ _} () u v σ => by
+    simp only [MetricSpace.EqX, eq_R_substF, Term.subst, Term.app2,
+      zero_R_closed_subst]
   eqx_refl := sorry
   eqx_sym := sorry
   eqx_trans := sorry
-  eqx_pu := sorry
+  eqx_pu := fun () {_} _ _ => eq_R_isPurelyUniversal _ _
 
 end Metatheorems
