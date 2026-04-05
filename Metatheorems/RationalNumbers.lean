@@ -1497,14 +1497,111 @@ private def inv_triag_succ (n : Term F Γ Ty.nat) :
   let h_final_rhs := .mp (.mp h_add_r (.mp h_add_l and_intro)) .trans0
   .mp (.mp h_final_rhs (.mp c2 and_intro)) .trans0
 
-/-- Key invariant: `inv_triag(triag(w) + r) =₀ w` when `r ≤ w`.
+/-!
+### The `inv_triag_triag_add` invariant
+
+Key fact: `inv_triag(triag(w) + r) =₀ w` when `r ≤ w`.
+
+This powers `fst_pair_pair` and `snd_pair_pair`. The full proof uses *nested*
+Peano induction (outer on `w`, inner on `r` for the step case) because the
+two-variable bound `r ≤ w` cannot be reduced to a single induction variable.
+
+We split the proof into four pieces:
+
+* `inv_triag_triag_self_succ` (L1) — closes the `r = 0` branch of the inner
+  induction at `w ↦ Sw`: given the outer IH specialised at `r := w`, derive
+  `inv_triag(triag(Sw)) =₀ Sw`.
+
+* `inv_triag_triag_add_inner_step` (L2) — the `r → Sr` branch of the inner
+  induction. Given `inv_triag(triag(Sw) + r) =₀ Sw` with `Sr ≤ Sw`, derive
+  `inv_triag(triag(Sw) + Sr) =₀ Sw`. Uses `inv_triag_succ` and the fact that
+  `triag(S(Sw)) ∸ S(triag(Sw) + r) ≥ 1` (so the `sg_bar` correction vanishes).
+
+* `inv_triag_triag_add_step` (L3) — the outer induction step `B(w) →ᶠ B(Sw)`,
+  where `B(w) := ∀r. monus r w =₀ 0 → inv_triag(triag w + r) =₀ w`. Combines
+  L1 (at `r = 0`) with an inner `Derivable.induction` driven by L2.
+
+* `inv_triag_triag_add` — outer induction on `w` with base case (trivial:
+  `r ≤ 0` forces `r = 0`, then `inv_triag(0) = 0`) and step L3.
+-/
+
+/-- **L1.** Closes the `r = 0` case in the step of the outer induction.
+
+    Given the outer IH specialised to `r := w` (i.e. `inv_triag(triag w + w) =₀ w`),
+    derive `inv_triag(triag(Sw)) =₀ Sw`.
+
+    Proof sketch: `triag(Sw) = S(triag w + w)` via `triag_succ` + `add_succ`.
+    Apply `inv_triag_succ`:
+    `inv_triag(S(triag w + w)) = inv_triag(triag w + w) + sg_bar(triag(S(inv_triag(triag w + w))) ∸ S(triag w + w))`.
+    Rewrite the inner `inv_triag(triag w + w)` to `w` via the hypothesis.
+    The `sg_bar` argument becomes `triag(Sw) ∸ S(triag w + w) = 0`, so `sg_bar = 1`.
+    Result: `w + 1 = Sw`. -/
+private def inv_triag_triag_self_succ (w : Term F Γ Ty.nat)
+    (_ih : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.inv_triag
+        (Term.app2 Term.add (.app Term.triag w) w)) w)) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.inv_triag (.app .succ w)) (.app .succ w)) :=
+  sorry
+
+/-- **L2.** Inner induction step on `r`.
+
+    Given `inv_triag(triag(Sw) + r) =₀ Sw` and `monus (Sr) (Sw) =₀ 0` (i.e. `Sr ≤ Sw`),
+    derive `inv_triag(triag(Sw) + Sr) =₀ Sw`.
+
+    Proof sketch: `triag(Sw) + Sr = S(triag(Sw) + r)`. Apply `inv_triag_succ`:
+    `inv_triag(S(triag(Sw) + r)) = inv_triag(triag(Sw) + r) + sg_bar(triag(S(inv_triag(triag(Sw) + r))) ∸ S(triag(Sw) + r))`.
+    Rewrite inner `inv_triag(triag(Sw) + r)` to `Sw` via the hypothesis.
+    The `sg_bar` argument: `triag(S(Sw)) ∸ S(triag(Sw) + r) = (Sw ∸ r)`.
+    From `Sr ≤ Sw` we get `r < Sw` hence `Sw ∸ r ≥ 1`, so `sg_bar = 0`.
+    Result: `Sw + 0 = Sw`. -/
+private def inv_triag_triag_add_inner_step (w r : Term F Γ Ty.nat)
+    (_ih : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.inv_triag
+        (Term.app2 Term.add (.app Term.triag (.app .succ w)) r)) (.app .succ w)))
+    (_hle : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.monus (.app .succ r) (.app .succ w)) Term.zero)) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.inv_triag
+        (Term.app2 Term.add (.app Term.triag (.app .succ w)) (.app .succ r)))
+        (.app .succ w)) :=
+  sorry
+
+/-- **L3.** Outer induction step: `B(w) →ᶠ B(Sw)`, where
+    `B(w) := ∀r. monus r w =₀ 0 →ᶠ inv_triag(triag w + r) =₀ w`.
+
+    Proof sketch: open the outer IH at `r := w` (since `monus w w =₀ 0` by
+    `monus_self`) to obtain the specialized fact needed by L1. Then perform an
+    inner `Derivable.induction` on `r` inside `B(Sw)`:
+
+    * Inner base `r = 0`: `monus 0 (Sw) =₀ 0` holds; use L1 to conclude
+      `inv_triag(triag(Sw) + 0) =₀ inv_triag(triag(Sw)) =₀ Sw`.
+
+    * Inner step `r → Sr`: the inner IH provides
+      `inv_triag(triag(Sw) + r) =₀ Sw` (under hypothesis `monus r (Sw) =₀ 0`).
+      Combine with `monus (Sr) (Sw) =₀ 0` via L2 to get the step conclusion.
+
+    The nested induction is assembled with `forall_inst_succ` + `forall_map`
+    or a direct `Derivable.induction` on the bundled `∀r` formula `B`. -/
+private def inv_triag_triag_add_step {Γ : Ctx ι} :
+    let C : Formula F (Ty.nat :: Ty.nat :: Γ) :=
+      Formula.eq0 (Term.app2 Term.monus (.var .vz) (.var (.vs .vz))) Term.zero →ᶠ
+      Formula.eq0 (.app Term.inv_triag
+        (Term.app2 Term.add (.app Term.triag (.var (.vs .vz))) (.var .vz)))
+        (.var (.vs .vz))
+    let B : Formula F (Ty.nat :: Γ) := Formula.all Ty.nat C
+    Derivable F EqX al Premises (B →ᶠ Formula.substVar0 B (.app .succ (.var .vz))) :=
+  sorry
+
+/-- **Main theorem.** Key invariant: `inv_triag(triag(w) + r) =₀ w` when `r ≤ w`.
 
     This is the core arithmetic fact behind the Cantor pairing projections.
     The side condition `r ≤ w` ensures `triag(w) + r < triag(w+1)`, so the
     `inv_triag` recursion correctly identifies `w` as the triangle index.
 
-    Proved by induction on `w`, with the bounded quantifier `∀r ≤ w` encoded
-    as `∀r. monus r w =₀ 0 → ...`. TODO: finish the arithmetic chain. -/
+    Proved by outer induction on `w` using `B(w) := ∀r. monus r w =₀ 0 → ...`.
+    Base case: `r ≤ 0` forces `r = 0`, then `inv_triag(triag 0 + 0) = inv_triag(0) = 0`.
+    Step case: delegated to `inv_triag_triag_add_step` (L3). -/
 private def inv_triag_triag_add (w r : Term F Γ Ty.nat)
     (_h : Derivable F EqX al Premises (Formula.eq0 (Term.app2 Term.monus r w) Term.zero)) :
     Derivable F EqX al Premises
