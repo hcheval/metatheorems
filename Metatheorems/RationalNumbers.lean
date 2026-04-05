@@ -611,7 +611,8 @@ private def sg_succ (n : Term F Γ Ty.nat) :
   let z := Term.lam (Term.lam ((.app .succ .zero) : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat))
   let h1 := lam_correct_nf body (.app .succ n) (sg_body_nf _)
   let h2 := lam2_correct_nf adm ((.app .succ .zero) : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat)
-    (Term.app3 (.prec Ty.nat) .zero z n) n (by rfl)
+    (Term.app3 (.prec Ty.nat) .zero z n) n
+    (by simp only [Term.subst0, Term.subst])
   let c1 := .mp (.mp .rec_succ (.mp h1 and_intro)) (eqAtType_trans adm)
   .mp (.mp h2 (.mp c1 and_intro)) (eqAtType_trans adm)
 
@@ -629,8 +630,7 @@ private theorem ite_nat_body_nf {Γ : Ctx ι} (b x y : Term F Γ Ty.nat) :
       (Term.app2 Term.mul b x)
       (Term.app2 Term.mul (Term.app2 Term.monus (.app .succ .zero) b) y) := by
   simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
-    add_closed_subst, mul_closed_subst, monus_closed_subst,
-    Term.weaken, Term.Renaming.shift]
+    add_closed_subst, mul_closed_subst, monus_closed_subst, weaken_subst0_eta]
 
 /-- Beta-reduction of ite_nat:
     ite_nat(b, x, y) =₀ add(mul(b, x), mul(monus(1, b), y)). -/
@@ -644,7 +644,7 @@ private def ite_nat_unfold (b x y : Term F Γ Ty.nat) :
 /-- ite_nat(0, x, y) =₀ y. -/
 private def ite_nat_zero (x y : Term F Γ Ty.nat) :
     Derivable F EqX al Premises (Formula.eq0 (Term.app3 Term.ite_nat Term.zero x y) y) :=
-  let h1 := ite_nat_unfold Term.zero x y
+  let h1 := ite_nat_unfold adm Term.zero x y
   let h2 := mul_zero_l adm x
   let h3 := add_zero_l adm (Term.app2 Term.mul (Term.app2 Term.monus (.app .succ .zero) Term.zero) y)
   let h4 := monus_zero adm (.app .succ .zero)
@@ -659,7 +659,7 @@ private def ite_nat_zero (x y : Term F Γ Ty.nat) :
 /-- ite_nat(S0, x, y) =₀ x. -/
 private def ite_nat_one (x y : Term F Γ Ty.nat) :
     Derivable F EqX al Premises (Formula.eq0 (Term.app3 Term.ite_nat (.app .succ .zero) x y) x) :=
-  let h1 := ite_nat_unfold (.app .succ .zero) x y
+  let h1 := ite_nat_unfold adm (.app .succ .zero) x y
   let h2 := mul_one_l adm x
   let h3 := monus_succ_l adm .zero .zero
   let h4 := monus_zero adm .zero
@@ -770,14 +770,23 @@ private def triag_succ (n : Term F Γ Ty.nat) :
   let body : Term F (Ty.nat :: Γ) Ty.nat :=
     Term.app3 (.prec Ty.nat) .zero
       (Term.lam (Term.lam (Term.app2 Term.add (.var (.vs .vz)) (.app .succ (.var .vz))))) (.var .vz)
-  let step_fn := Term.lam (Term.lam (Term.app2 Term.add (.var (.vs .vz)) (.app .succ (.var .vz))))
+  let step_fn : Term F Γ (Ty.nat →ₜ Ty.nat →ₜ Ty.nat) :=
+    Term.lam (Term.lam (Term.app2 Term.add (.var (.vs .vz)) (.app .succ (.var .vz))))
+  let rec_n : Term F Γ Ty.nat := Term.app3 (.prec Ty.nat) .zero step_fn n
   let h1 := lam_correct_nf body (.app .succ n) (triag_body_nf _)
   let h2 := lam2_correct_nf adm
     (Term.app2 Term.add (.var (.vs .vz)) (.app .succ (.var .vz))
       : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat)
-    (Term.app3 (.prec Ty.nat) .zero step_fn n) n (by rfl)
+    rec_n n
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+          add_closed_subst, weaken_subst0_eta]
+        rfl)
   let c1 := .mp (.mp .rec_succ (.mp h1 and_intro)) (eqAtType_trans adm)
-  .mp (.mp h2 (.mp c1 and_intro)) (eqAtType_trans adm)
+  let c2 := .mp (.mp h2 (.mp c1 and_intro)) (eqAtType_trans adm)
+  -- Convert rec_n to triag(n): triag(n) =₀ rec_n by lam_correct
+  let h3 := lam_correct_nf body n (triag_body_nf _)
+  let h4 := add_congr_l (.mp h3 .sym0) (.app .succ n)
+  .mp (.mp h4 (.mp c2 and_intro)) .trans0
 
 -- ── pair evaluation ───────────────────────────────────────────────────────
 
@@ -789,8 +798,7 @@ private theorem pair_body_nf {Γ : Ctx ι} (x y : Term F Γ Ty.nat) :
     Term.app2 Term.add
       (.app Term.triag (Term.app2 Term.add x y)) x := by
   simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
-    add_closed_subst, triag_closed_subst,
-    Term.weaken, Term.Renaming.shift, weaken_subst0_eta]
+    add_closed_subst, triag_closed_subst, weaken_subst0_eta]
 
 /-- pair(x, y) =₀ add(triag(add(x, y)), x). -/
 private def pair_unfold (x y : Term F Γ Ty.nat) :
@@ -804,7 +812,7 @@ private def pair_zero_zero :
     Derivable F EqX al Premises (Γ := Γ)
       (Formula.eq0 (Term.app2 Term.pair Term.zero Term.zero) Term.zero) :=
   -- pair(0,0) =₀ add(triag(add(0,0)), 0)
-  let h1 := pair_unfold Term.zero Term.zero
+  let h1 := pair_unfold adm Term.zero Term.zero
   -- add(0,0) =₀ 0
   let h2 := add_zero_r adm Term.zero
   -- triag(add(0,0)) =₀ triag(0)
@@ -870,7 +878,7 @@ private def fst_pair_unfold (n : Term F Γ Ty.nat) :
     Derivable F EqX al Premises
       (Formula.eq0 (.app Term.fst_pair n)
         (Term.app2 Term.monus n (.app Term.triag (.app Term.inv_triag n)))) :=
-  Term.lam_correct _ n
+  lam_correct_nf _ n (fst_pair_body_nf n)
 
 /-- fst_pair(0) =₀ 0. -/
 private def fst_pair_zero :
@@ -903,10 +911,10 @@ private theorem snd_pair_body_nf {Γ : Ctx ι} (s : Term F Γ Ty.nat) :
 private def snd_pair_zero :
     Derivable F EqX al Premises (Γ := Γ)
       (Formula.eq0 (.app Term.snd_pair Term.zero) Term.zero) :=
-  let h1 := Term.lam_correct _ (Term.zero : Term F Γ _)
+  let h1 := lam_correct_nf _ (Term.zero : Term F Γ _) (snd_pair_body_nf _)
   -- inv_triag(0) =₀ 0 and fst_pair(0) =₀ 0
   let h2 := monus_congr_l inv_triag_zero (Term.app Term.fst_pair Term.zero)
-  let h3 := monus_congr_r Term.zero fst_pair_zero
+  let h3 := monus_congr_r Term.zero (fst_pair_zero adm)
   let h4 := .mp (.mp h3 (.mp h2 and_intro)) .trans0
   let h5 := monus_zero adm Term.zero
   let h6 := .mp (.mp h5 (.mp h4 and_intro)) .trans0
@@ -935,7 +943,9 @@ private def isEven_zero :
 private def isOdd_unfold (n : Term F Γ Ty.nat) :
     Derivable F EqX al Premises
       (Formula.eq0 (.app Term.isOdd n) (Term.app2 Term.monus (.app .succ .zero) (.app Term.isEven n))) :=
-  Term.lam_correct _ n
+  lam_correct_nf
+    (Term.app2 Term.monus (.app .succ .zero) (.app Term.isEven (.var .vz))
+      : Term F (Ty.nat :: Γ) Ty.nat) n (by rfl)
 
 /-- isOdd(0) =₀ 0. -/
 private def isOdd_zero :
@@ -949,6 +959,13 @@ private def isOdd_zero :
   let h6 := .mp (.mp h5 (.mp h2 and_intro)) .trans0
   .mp (.mp h6 (.mp h1 and_intro)) .trans0
 
+-- ── succ_congr (needed locally since Arithmetic.lean's is private) ─────────
+
+private def succ_congr {s t : Term F Γ Ty.nat}
+    (h : Derivable F EqX al Premises (Formula.eq0 s t)) :
+    Derivable F EqX al Premises (Formula.eq0 (.app .succ s) (.app .succ t)) :=
+  qfer_no_premise_nat_nf h (r := .app .succ (.var .vz)) rfl rfl
+
 -- ── rat_sign/rat_num/rat_den of zero_Q ────────────────────────────────────
 
 /-- rat_sign(zero_Q) =₀ 1. -/
@@ -957,13 +974,13 @@ private def rat_sign_zero_Q :
       (Formula.eq0 (.app Term.rat_sign Term.zero_Q) (.app .succ .zero)) :=
   -- rat_sign(n) = isEven(fst_pair(n)); zero_Q = pair(0,0)
   -- rat_sign(pair(0,0)) =₀ rat_sign(0) by rat_sign_congr(pair_zero_zero)
-  let h1 := rat_sign_congr pair_zero_zero
+  let h1 := rat_sign_congr (pair_zero_zero adm)
   -- rat_sign(0) = isEven(fst_pair(0))
   -- Need: rat_sign(0) =₀ isEven(fst_pair(0))
   let h2 := Term.lam_correct
     (.app Term.isEven (.app Term.fst_pair (.var .vz)) : Term F (Ty.nat :: Γ) _) Term.zero
   -- isEven(fst_pair(0)) =₀ isEven(0)
-  let h3 := isEven_congr fst_pair_zero
+  let h3 := isEven_congr (fst_pair_zero adm)
   -- isEven(0) =₀ 1
   let h4 := isEven_zero
   -- Chain: rat_sign(pair(0,0)) =₀ rat_sign(0) =₀ isEven(fst_pair(0)) =₀ isEven(0) =₀ 1
@@ -976,22 +993,15 @@ private def rat_den_zero_Q :
     Derivable F EqX al Premises (Γ := Γ)
       (Formula.eq0 (.app Term.rat_den Term.zero_Q) (.app .succ .zero)) :=
   -- rat_den(pair(0,0)) =₀ rat_den(0) by congr
-  let h1 := rat_den_congr pair_zero_zero
+  let h1 := rat_den_congr (pair_zero_zero adm)
   -- rat_den(0) = S(snd_pair(0))
   let h2 := Term.lam_correct
     (.app .succ (.app Term.snd_pair (.var .vz)) : Term F (Ty.nat :: Γ) _) Term.zero
   -- S(snd_pair(0)) =₀ S(0)
-  let h3 := succ_congr snd_pair_zero
+  let h3 := succ_congr (snd_pair_zero adm)
   -- Chain
   let c1 := .mp (.mp h3 (.mp h2 and_intro)) .trans0
   .mp (.mp c1 (.mp h1 and_intro)) .trans0
-
--- ── succ_congr (needed locally since Arithmetic.lean's is private) ─────────
-
-private def succ_congr {s t : Term F Γ Ty.nat}
-    (h : Derivable F EqX al Premises (Formula.eq0 s t)) :
-    Derivable F EqX al Premises (Formula.eq0 (.app .succ s) (.app .succ t)) :=
-  qfer_no_premise_nat_nf h (r := .app .succ (.var .vz)) rfl rfl
 
 -- ── Small-value evaluation: triag(1) =₀ 1, pair(0,1) =₀ 1 ───────────────
 
@@ -1161,7 +1171,7 @@ private def rat_num_zero_Q :
     Derivable F EqX al Premises (Γ := Γ)
       (Formula.eq0 (.app Term.rat_num Term.zero_Q) Term.zero) :=
   -- rat_num(pair(0,0)) =₀ rat_num(0)
-  let h1 := rat_num_congr pair_zero_zero
+  let h1 := rat_num_congr (pair_zero_zero adm)
   -- rat_num(0) =₀ div2(add(fst_pair(0), isOdd(fst_pair(0))))
   let rat_num_body : Term F (Ty.nat :: Γ) Ty.nat :=
     .app Term.div2
@@ -1171,9 +1181,9 @@ private def rat_num_zero_Q :
   let h2 := lam_correct_nf rat_num_body Term.zero (by rfl)
   -- fst_pair(0) =₀ 0
   -- isOdd(fst_pair(0)) =₀ isOdd(0) =₀ 0
-  let h3 := .mp (.mp isOdd_zero (.mp (isOdd_congr fst_pair_zero) and_intro)) .trans0
+  let h3 := .mp (.mp (isOdd_zero adm) (.mp (isOdd_congr (fst_pair_zero adm)) and_intro)) .trans0
   -- add(fst_pair(0), isOdd(fst_pair(0))) =₀ add(0, 0) =₀ 0
-  let h4 := add_congr_l fst_pair_zero _
+  let h4 := add_congr_l (fst_pair_zero adm) _
   let h5 := add_congr_r Term.zero h3
   let h6 := .mp (.mp h5 (.mp h4 and_intro)) .trans0
   let h7 := .mp (.mp (add_zero_r adm Term.zero) (.mp h6 and_intro)) .trans0
@@ -1187,6 +1197,406 @@ private def rat_num_zero_Q :
   .mp (.mp c2 (.mp h1 and_intro)) .trans0
 
 -- ── Equality is an equivalence relation ────────────────────────────────────
+
+-- ── Additional arithmetic helpers ─────────────────────────────────────────
+
+/-- |n - 0| =₀ n. abs_diff(n, 0) = add(monus(n,0), monus(0,n)) = add(n, 0) = n. -/
+private def abs_diff_zero_r (n : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (Formula.eq0 (Term.app2 Term.abs_diff n Term.zero) n) :=
+  let h1 := lam2_correct_nf adm
+    (Term.app2 Term.add
+      (Term.app2 Term.monus (.var (.vs .vz)) (.var .vz))
+      (Term.app2 Term.monus (.var .vz) (.var (.vs .vz)))
+      : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat)
+    n Term.zero (by rfl)
+  -- add(monus(n,0), monus(0,n)) =₀ add(n, monus(0,n))
+  let h2 := add_congr_l (monus_zero adm n) _
+  -- monus(0,n) =₀ 0
+  let h3 := add_congr_r n (monus_zero_l adm n)
+  -- add(n, 0) =₀ n
+  let h4 := add_zero_r adm n
+  let c := .mp (.mp h4 (.mp (.mp (.mp h3 (.mp h2 and_intro)) .trans0) and_intro)) .trans0
+  .mp (.mp c (.mp h1 and_intro)) .trans0
+
+/-- |0 - n| =₀ n. -/
+private def abs_diff_zero_l (n : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (Formula.eq0 (Term.app2 Term.abs_diff Term.zero n) n) :=
+  .mp (.mp (abs_diff_zero_r adm n) (.mp (abs_diff_comm adm Term.zero n) and_intro)) .trans0
+
+
+/-- geq(n, 0) =₀ S0 for all n. geq(n,0) = sg_bar(monus(0,n)) = sg_bar(0) = 1. -/
+private def geq_zero_r (n : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (Formula.eq0 (Term.app2 Term.geq n Term.zero) (.app .succ .zero)) :=
+  let h1 := lam2_correct_nf adm
+    (.app Term.sg_bar (Term.app2 Term.monus (.var .vz) (.var (.vs .vz)))
+      : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat)
+    n Term.zero (by rfl)
+  let h2 := sg_bar_congr (monus_zero_l adm n)
+  let h3 := sg_bar_zero (Premises := Premises)
+  let c := .mp (.mp h3 (.mp h2 and_intro)) .trans0
+  .mp (.mp c (.mp h1 and_intro)) .trans0
+
+-- ── Case analysis infrastructure ──────────────────────────────────────────
+
+/-- For any n: sg_bar(n) =₀ S0 ∨ sg_bar(n) =₀ 0.
+    Case n=0: sg_bar(0) = S0. Case n≠0: n = S(pd n), sg_bar(S(pd n)) = 0. -/
+private def sg_bar_cases (n : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app Term.sg_bar n) (.app .succ .zero) ∨ᶠ
+       Formula.eq0 (Term.app Term.sg_bar n) Term.zero) :=
+  -- Case n = 0: n=0 → sg_bar(n) =₀ sg_bar(0) (by qfer) → =₀ S0
+  let qf_sg0 : Derivable F EqX al Premises
+      (Formula.eq0 n Term.zero →ᶠ
+       Formula.eq0 (Term.app Term.sg_bar n) (Term.app Term.sg_bar Term.zero)) :=
+    .qfer (r := .app Term.sg_bar (.var .vz)) (by rfl) (by rfl) I_comb
+  let case_z := .syllogism (pair_h qf_sg0 (weaken_intro sg_bar_zero))
+    (.syllogism .trans0 .or_weak)
+  -- Case n ≠ 0: n=S(pd n) → sg_bar(n) =₀ sg_bar(S(pd n)) (by qfer) → =₀ 0
+  let qf_sgn : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 n Term.zero →ᶠ
+       Formula.eq0 (Term.app Term.sg_bar n) (Term.app Term.sg_bar (.app .succ (.app Term.pd n)))) :=
+    .qfer (r := .app Term.sg_bar (.var .vz)) (by rfl) (by rfl) (ne_zero_eq_succ_pd adm n)
+  let case_nz := .syllogism (pair_h qf_sgn (weaken_intro (sg_bar_succ adm (.app Term.pd n))))
+    (.syllogism .trans0 or_inr)
+  .mp (.mp eq0_decidable' (.forall_ax n)) (or_elim_rule case_z case_nz)
+
+/-- Congruence for ite_nat in the boolean argument:
+    b =₀ b' → ite(b, x, y) =₀ ite(b', x, y). -/
+private def ite_nat_congr_b {b b' x y : Term F Γ Ty.nat}
+    (h : Derivable F EqX al Premises (Formula.eq0 b b')) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app3 Term.ite_nat b x y) (Term.app3 Term.ite_nat b' x y)) :=
+  app3_congr_closed Term.ite_nat h .refl0 .refl0
+
+/-- Congruence for ite_nat in the first value argument:
+    x =₀ x' → ite(b, x, y) =₀ ite(b, x', y). -/
+private def ite_nat_congr_x {b x x' y : Term F Γ Ty.nat}
+    (h : Derivable F EqX al Premises (Formula.eq0 x x')) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app3 Term.ite_nat b x y) (Term.app3 Term.ite_nat b x' y)) :=
+  app3_congr_closed Term.ite_nat .refl0 h .refl0
+
+/-- Congruence for ite_nat in the second value argument:
+    y =₀ y' → ite(b, x, y) =₀ ite(b, x, y'). -/
+private def ite_nat_congr_y {b x y y' : Term F Γ Ty.nat}
+    (h : Derivable F EqX al Premises (Formula.eq0 y y')) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app3 Term.ite_nat b x y) (Term.app3 Term.ite_nat b x y')) :=
+  app3_congr_closed Term.ite_nat .refl0 .refl0 h
+
+/-- ite(sg_bar(n), x, x) =₀ x for any n.
+    By case analysis: sg_bar(n) = 1 → ite(1,x,x) = x; sg_bar(n) = 0 → ite(0,x,x) = x. -/
+private def ite_nat_sg_bar_same (n x : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app3 Term.ite_nat (Term.app Term.sg_bar n) x x) x) :=
+  let b := Term.app Term.sg_bar n
+  -- Case sg_bar(n) = S0: ite(b, x, x) =₀ ite(S0, x, x) =₀ x
+  let qf_ite1 : Derivable F EqX al Premises
+      (Formula.eq0 b (.app .succ .zero) →ᶠ
+       Formula.eq0 (Term.app3 Term.ite_nat b x x)
+                   (Term.app3 Term.ite_nat (.app .succ .zero) x x)) :=
+    qfer_nat_nf (by rfl) (by rfl) I_comb
+      (r := Term.app3 Term.ite_nat (.var .vz) x.weaken x.weaken)
+      (by simp only [Term.subst0, Term.app3, Term.subst, Term.subst0_map,
+            ite_nat_closed_subst, weaken_subst0_eta])
+      (by simp only [Term.subst0, Term.app3, Term.subst, Term.subst0_map,
+            ite_nat_closed_subst, weaken_subst0_eta])
+  let case1 := .syllogism (pair_h qf_ite1 (weaken_intro (ite_nat_one adm x x))) .trans0
+  -- Case sg_bar(n) = 0: ite(b, x, x) =₀ ite(0, x, x) =₀ x
+  let qf_ite0 : Derivable F EqX al Premises
+      (Formula.eq0 b Term.zero →ᶠ
+       Formula.eq0 (Term.app3 Term.ite_nat b x x)
+                   (Term.app3 Term.ite_nat Term.zero x x)) :=
+    qfer_nat_nf (by rfl) (by rfl) I_comb
+      (r := Term.app3 Term.ite_nat (.var .vz) x.weaken x.weaken)
+      (by simp only [Term.subst0, Term.app3, Term.subst, Term.subst0_map,
+            ite_nat_closed_subst, weaken_subst0_eta])
+      (by simp only [Term.subst0, Term.app3, Term.subst, Term.subst0_map,
+            ite_nat_closed_subst, weaken_subst0_eta])
+  let case0 := .syllogism (pair_h qf_ite0 (weaken_intro (ite_nat_zero adm x x))) .trans0
+  .mp (sg_bar_cases adm n) (or_elim_rule case1 case0)
+
+-- geq(n, 0) =₀ S0 for all n (already proved, but alias for clarity).
+-- (geq_zero_r is already defined above)
+
+/-- Congruence for geq in the first argument:
+    s =₀ t → geq(s, u) =₀ geq(t, u). -/
+private def geq_congr_l {s t : Term F Γ Ty.nat}
+    (h : Derivable F EqX al Premises (Formula.eq0 s t)) (u : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.geq s u) (Term.app2 Term.geq t u)) :=
+  qfer_no_premise_nat_nf h (r := Term.app2 Term.geq (.var .vz) u.weaken)
+    (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map, geq_closed_subst,
+          weaken_subst0_eta])
+    (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map, geq_closed_subst,
+          weaken_subst0_eta])
+
+/-- Congruence for geq in the second argument. -/
+private def geq_congr_r (u : Term F Γ Ty.nat) {s t : Term F Γ Ty.nat}
+    (h : Derivable F EqX al Premises (Formula.eq0 s t)) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.geq u s) (Term.app2 Term.geq u t)) :=
+  qfer_no_premise_nat_nf h (r := Term.app2 Term.geq u.weaken (.var .vz))
+    (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map, geq_closed_subst,
+          weaken_subst0_eta])
+    (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map, geq_closed_subst,
+          weaken_subst0_eta])
+
+/-- Congruence for rat_encode in all three arguments. -/
+private def rat_encode_congr {s s' n n' d d' : Term F Γ Ty.nat}
+    (hs : Derivable F EqX al Premises (Formula.eq0 s s'))
+    (hn : Derivable F EqX al Premises (Formula.eq0 n n'))
+    (hd : Derivable F EqX al Premises (Formula.eq0 d d')) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app3 Term.rat_encode s n d) (Term.app3 Term.rat_encode s' n' d')) :=
+  app3_congr_closed Term.rat_encode hs hn hd
+
+-- ============================================================================
+-- Cantor pair projection lemmas
+-- ============================================================================
+
+/-- `x ≤ x + y`, i.e., `monus x (add x y) =₀ 0`.
+    By induction on `y`. Base: `monus x (x+0) =₀ monus x x =₀ 0`.
+    Step: `monus x (x + Sy) =₀ monus x (S(x+y)) =₀ pd(monus x (x+y)) =₀ pd(0) =₀ 0`. -/
+private def le_add_right (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.monus x (Term.app2 Term.add x y)) Term.zero) :=
+  let xw := x.weaken (σ := Ty.nat)
+  let A : Formula F (Ty.nat :: Γ) :=
+    Formula.eq0 (Term.app2 Term.monus xw (Term.app2 Term.add xw (.var .vz))) Term.zero
+  have xw_subst0 : ∀ s : Term F Γ Ty.nat,
+      Term.subst (fun {τ} ↦ Term.subst0_map s) x.weaken = x := Term.weaken_subst0 x
+  -- Base: monus x (add x 0) = 0. monus x (add x 0) = monus x x (add_zero_r) = 0 (monus_self).
+  have base_nf : A.subst0 Term.zero =
+      Formula.eq0 (Term.app2 Term.monus x (Term.app2 Term.add x Term.zero)) Term.zero := by
+    simp only [A, xw, Formula.subst0, Formula.substF, Term.subst, Term.subst0_map, Term.app2,
+      monus_closed_subst, add_closed_subst, xw_subst0]
+  have base : Derivable F EqX al Premises (A.subst0 Term.zero) := base_nf ▸
+    let h1 := add_zero_r adm x  -- add x 0 =₀ x
+    let h2 := monus_congr_r x h1  -- monus x (add x 0) =₀ monus x x
+    let h3 := monus_self adm x  -- monus x x =₀ 0
+    .mp (.mp h3 (.mp h2 and_intro)) .trans0
+  -- Step: A(y) → A(Sy).
+  -- A(y): monus xw (add xw y) =₀ 0
+  -- A(Sy): monus xw (add xw (Sy)) =₀ 0
+  -- add xw (Sy) = S(add xw y) [add_succ]
+  -- monus xw (S(add xw y)) = pd(monus xw (add xw y)) [monus_succ]
+  -- pd(monus xw (add xw y)) = pd 0 [IH via pd congruence, i.e. qfer]
+  -- pd 0 = 0 [pd_zero]
+  have xw_substVar0 : x.weaken.subst
+      (Term.substVar0_map (.app .succ (.var .vz : Term F (Ty.nat :: Γ) Ty.nat))) = x.weaken := by
+    simp only [Term.weaken]
+    rw [Term.rename_subst, Term.rename_eq_subst]; rfl
+  have step_nf : Formula.substVar0 A (.app .succ (.var .vz)) =
+      Formula.eq0 (Term.app2 Term.monus xw
+        (Term.app2 Term.add xw (.app .succ (.var .vz)))) Term.zero := by
+    simp only [A, xw, Formula.substVar0, Formula.substF, Term.subst, Term.substVar0_map,
+      Term.app2, monus_closed_subst, add_closed_subst, xw_substVar0]
+  have step_body : Derivable F EqX al Premises (A →ᶠ Formula.substVar0 A (.app .succ (.var .vz))) :=
+    step_nf ▸
+    let yv : Term F (Ty.nat :: Γ) Ty.nat := .var .vz
+    -- add_succ xw yv : add xw (Syv) =₀ S(add xw yv)
+    let as_eq := add_succ adm xw yv
+    -- monus_eq1 : monus xw (add xw Syv) =₀ monus xw (S(add xw yv))  [congr on 2nd arg]
+    let monus_eq1 := monus_congr_r xw as_eq
+    -- monus_eq2 : monus xw (S(add xw yv)) =₀ pd(monus xw (add xw yv))  [monus_succ]
+    let monus_eq2 := monus_succ adm xw (Term.app2 Term.add xw yv)
+    -- combined : monus xw (add xw Syv) =₀ pd(monus xw (add xw yv))
+    let combined := .mp (.mp monus_eq2 (.mp monus_eq1 and_intro)) .trans0
+    -- pd_ih : A → pd(monus xw (add xw yv)) =₀ pd 0  [pd congruence]
+    let pd_ih : Derivable F EqX al Premises (A →ᶠ
+        Formula.eq0 (.app Term.pd (Term.app2 Term.monus xw (Term.app2 Term.add xw yv)))
+          (.app Term.pd Term.zero)) :=
+      .qfer (σ := Ty.nat) (r := .app Term.pd (.var .vz)) (by rfl) (by rfl) I_comb
+    -- chain1 : A → monus xw (add xw Syv) =₀ pd 0
+    let chain1 : Derivable F EqX al Premises (A →ᶠ
+        Formula.eq0 (Term.app2 Term.monus xw (Term.app2 Term.add xw (.app .succ yv)))
+          (.app Term.pd Term.zero)) :=
+      .syllogism (pair_h (weaken_intro combined) pd_ih) .trans0
+    -- pd_zero: pd 0 =₀ 0
+    let pz : Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
+        (Formula.eq0 (.app Term.pd Term.zero) Term.zero) := pd_zero
+    -- final: A → monus xw (add xw Syv) =₀ 0
+    .syllogism (pair_h chain1 (weaken_intro pz)) .trans0
+  have inst_nf : A.subst0 y =
+      Formula.eq0 (Term.app2 Term.monus x (Term.app2 Term.add x y)) Term.zero := by
+    simp only [A, xw, Formula.subst0, Formula.substF, Term.subst, Term.subst0_map, Term.app2,
+      monus_closed_subst, add_closed_subst, xw_subst0]
+  inst_nf ▸ .mp (Derivable.induction base (univ_gen step_body)) (.forall_ax y)
+
+/-- Commuted `monus_cancel`: `(a + b) ∸ a =₀ b`.
+    From `monus_cancel b a : (b + a) ∸ a =₀ b` via `add_comm`. -/
+private def monus_add_cancel_l (a b : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.monus (Term.app2 Term.add a b) a) b) :=
+  let h1 := add_comm adm a b  -- add a b =₀ add b a
+  let h2 := monus_congr_l h1 a  -- (add a b) ∸ a =₀ (add b a) ∸ a
+  let h3 := monus_cancel (Premises := Premises) adm b a  -- (add b a) ∸ a =₀ b
+  .mp (.mp h3 (.mp h2 and_intro)) .trans0
+
+/-- Key invariant: `inv_triag(triag(w) + r) =₀ w` when `r ≤ w`.
+
+    This is the core arithmetic fact behind the Cantor pairing projections.
+    The side condition `r ≤ w` ensures `triag(w) + r < triag(w+1)`, so the
+    `inv_triag` recursion correctly identifies `w` as the triangle index.
+
+    Proved by induction on `w`, with the bounded quantifier `∀r ≤ w` encoded
+    as `∀r. monus r w =₀ 0 → ...`. TODO: finish the arithmetic chain. -/
+private def inv_triag_triag_add (w r : Term F Γ Ty.nat)
+    (_h : Derivable F EqX al Premises (Formula.eq0 (Term.app2 Term.monus r w) Term.zero)) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.inv_triag
+        (Term.app2 Term.add (.app Term.triag w) r)) w) :=
+  sorry
+
+/-- **Cantor projection 1**: `fst_pair(pair(x, y)) =₀ x`.
+
+    Proof: `pair(x,y) = triag(x+y) + x` (by `pair_unfold`), so
+    `fst_pair(pair(x,y)) = (triag(x+y) + x) ∸ triag(inv_triag(triag(x+y) + x))`
+    `= (triag(x+y) + x) ∸ triag(x+y)` (by `inv_triag_triag_add`)
+    `= x` (by `monus_add_cancel_l`). -/
+private def fst_pair_pair (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.fst_pair (Term.app2 Term.pair x y)) x) :=
+  -- tpxy := triag(x+y) + x (the unfolded form of pair(x,y))
+  let tpxy : Term F Γ Ty.nat :=
+    Term.app2 Term.add (.app Term.triag (Term.app2 Term.add x y)) x
+  -- h_pair : pair(x,y) =₀ tpxy
+  let h_pair := pair_unfold adm x y
+  -- h_cong1 : fst_pair(pair(x,y)) =₀ fst_pair(tpxy)
+  let h_cong1 : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.fst_pair (Term.app2 Term.pair x y))
+        (.app Term.fst_pair tpxy)) :=
+    qfer_no_premise_nat_nf h_pair (r := .app Term.fst_pair (.var .vz)) rfl rfl
+  -- h_unfold : fst_pair(tpxy) =₀ tpxy ∸ triag(inv_triag(tpxy))
+  let h_unfold := fst_pair_unfold tpxy
+  -- h_le : monus x (x + y) =₀ 0  (i.e., x ≤ x + y)
+  let h_le := le_add_right adm x y
+  -- h_inv : inv_triag(tpxy) =₀ x+y
+  let h_inv : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.inv_triag tpxy) (Term.app2 Term.add x y)) :=
+    inv_triag_triag_add (Term.app2 Term.add x y) x h_le
+  -- h_mcong : tpxy ∸ triag(inv_triag(tpxy)) =₀ tpxy ∸ triag(x+y)
+  let h_mcong : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.monus tpxy (.app Term.triag (.app Term.inv_triag tpxy)))
+        (Term.app2 Term.monus tpxy (.app Term.triag (Term.app2 Term.add x y)))) :=
+    monus_congr_r tpxy (triag_congr h_inv)
+  -- h_cancel : tpxy ∸ triag(x+y) =₀ x, i.e., (triag(x+y) + x) ∸ triag(x+y) =₀ x
+  let h_cancel := monus_add_cancel_l adm (.app Term.triag (Term.app2 Term.add x y)) x
+  -- Chain: fst_pair(pair(x,y)) =₀ fst_pair(tpxy) =₀ tpxy ∸ triag(inv_triag tpxy)
+  --                           =₀ tpxy ∸ triag(x+y) =₀ x
+  let step_a := .mp (.mp h_unfold (.mp h_cong1 and_intro)) .trans0
+  let step_b := .mp (.mp h_mcong (.mp step_a and_intro)) .trans0
+  .mp (.mp h_cancel (.mp step_b and_intro)) .trans0
+
+/-- **Cantor projection 2**: `snd_pair(pair(x, y)) =₀ y`.
+
+    Proof: `snd_pair(n) = inv_triag(n) ∸ fst_pair(n)`. For `n = pair(x,y)`:
+    `inv_triag(pair(x,y)) =₀ x+y` (via `pair_unfold` + `inv_triag_triag_add`),
+    `fst_pair(pair(x,y)) =₀ x` (by `fst_pair_pair`).
+    So `snd_pair(pair(x,y)) =₀ (x+y) ∸ x =₀ y` (by `monus_add_cancel_l`). -/
+private def snd_pair_pair (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.snd_pair (Term.app2 Term.pair x y)) y) :=
+  let pxy := Term.app2 Term.pair x y
+  -- h_unfold : snd_pair(pxy) =₀ inv_triag(pxy) ∸ fst_pair(pxy)
+  let h_unfold : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.snd_pair pxy)
+        (Term.app2 Term.monus (.app Term.inv_triag pxy) (.app Term.fst_pair pxy))) :=
+    lam_correct_nf _ pxy (snd_pair_body_nf _)
+  -- Step 1: inv_triag(pxy) =₀ x+y
+  --   pxy =₀ triag(x+y) + x (pair_unfold), then congr on inv_triag, then inv_triag_triag_add
+  let h_pair := pair_unfold adm x y  -- pxy =₀ triag(x+y) + x
+  let h_inv_cong : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.inv_triag pxy)
+        (.app Term.inv_triag
+          (Term.app2 Term.add (.app Term.triag (Term.app2 Term.add x y)) x))) :=
+    qfer_no_premise_nat_nf h_pair (r := .app Term.inv_triag (.var .vz)) rfl rfl
+  let h_le := le_add_right adm x y
+  let h_inv_triag_add :=
+    inv_triag_triag_add (Term.app2 Term.add x y) x h_le
+  let h_inv : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.inv_triag pxy) (Term.app2 Term.add x y)) :=
+    .mp (.mp h_inv_triag_add (.mp h_inv_cong and_intro)) .trans0
+  -- Step 2: fst_pair(pxy) =₀ x
+  let h_fst := fst_pair_pair adm x y
+  -- Step 3: monus(inv_triag(pxy), fst_pair(pxy)) =₀ monus(x+y, x)
+  let h_m1 : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.monus (.app Term.inv_triag pxy) (.app Term.fst_pair pxy))
+        (Term.app2 Term.monus (Term.app2 Term.add x y) (.app Term.fst_pair pxy))) :=
+    monus_congr_l h_inv (.app Term.fst_pair pxy)
+  let h_m2 : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.monus (Term.app2 Term.add x y) (.app Term.fst_pair pxy))
+        (Term.app2 Term.monus (Term.app2 Term.add x y) x)) :=
+    monus_congr_r (Term.app2 Term.add x y) h_fst
+  let h_m := .mp (.mp h_m2 (.mp h_m1 and_intro)) .trans0
+  -- Step 4: monus(x+y, x) =₀ y by monus_add_cancel_l
+  let h_cancel := monus_add_cancel_l adm x y
+  -- Chain everything
+  let step_a := .mp (.mp h_m (.mp h_unfold and_intro)) .trans0
+  .mp (.mp h_cancel (.mp step_a and_intro)) .trans0
+
+-- ============================================================================
+-- rat_encode roundtrip lemmas
+-- ============================================================================
+
+/-- `rat_den(rat_encode(s, n, d)) =₀ succ(d)`.
+
+    Unfolds: `rat_encode(s,n,d) = pair(2n ∸ isEven(s), d)`,
+    so `rat_den(...) = succ(snd_pair(pair(2n ∸ isEven(s), d))) = succ(d)`
+    via `snd_pair_pair`. -/
+private def rat_den_rat_encode (s n d : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_den (Term.app3 Term.rat_encode s n d))
+        (.app .succ d)) :=
+  -- body of rat_encode in context (s,n,d :: Γ)
+  let encoded_pair : Term F Γ Ty.nat :=
+    Term.app2 Term.pair
+      (Term.app2 Term.monus
+        (Term.app2 Term.mul (Term.ofNat 2) n)
+        (.app Term.isEven s))
+      d
+  -- Step 1: rat_encode(s,n,d) =₀ pair(2n ∸ isEven(s), d)
+  -- Directly: apply lam3_correct with the rat_encode body NF.
+  let body_e : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.pair
+      (Term.app2 Term.monus
+        (Term.app2 Term.mul (Term.ofNat 2) (.var (.vs .vz)))
+        (.app Term.isEven (.var (.vs (.vs .vz)))))
+      (.var .vz)
+  have body_e_nf : ((body_e.subst0 (d.weaken.weaken)).subst0 (n.weaken)).subst0 s =
+      encoded_pair := by
+    simp only [body_e, encoded_pair, Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+      Term.ofNat, pair_closed_subst, mul_closed_subst, monus_closed_subst,
+      isEven_closed_subst, weaken_subst0_eta]
+  let h_encode : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app3 Term.rat_encode s n d) encoded_pair) :=
+    body_e_nf ▸ lam3_correct_nf adm body_e s n d body_e_nf
+  -- Step 2: rat_den(rat_encode(s,n,d)) =₀ rat_den(encoded_pair) via congr
+  let h_den_cong : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_den (Term.app3 Term.rat_encode s n d))
+        (.app Term.rat_den encoded_pair)) :=
+    qfer_no_premise_nat_nf h_encode (r := .app Term.rat_den (.var .vz)) rfl rfl
+  -- Step 3: rat_den(encoded_pair) =₀ S(snd_pair(encoded_pair)) by lam_correct
+  let rat_den_body : Term F (Ty.nat :: Γ) Ty.nat :=
+    .app .succ (.app Term.snd_pair (.var .vz))
+  have rat_den_body_nf : rat_den_body.subst0 encoded_pair =
+      .app .succ (.app Term.snd_pair encoded_pair) := by
+    simp only [rat_den_body, encoded_pair, Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+      snd_pair_closed_subst, pair_closed_subst, mul_closed_subst, monus_closed_subst,
+      isEven_closed_subst]
+  let h_unfold : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_den encoded_pair)
+        (.app .succ (.app Term.snd_pair encoded_pair))) :=
+    lam_correct_nf rat_den_body encoded_pair rat_den_body_nf
+  -- Step 4: snd_pair(encoded_pair) =₀ d by snd_pair_pair
+  let h_snd := snd_pair_pair adm
+    (Term.app2 Term.monus (Term.app2 Term.mul (Term.ofNat 2) n) (.app Term.isEven s)) d
+  -- Step 5: succ(snd_pair(encoded_pair)) =₀ succ(d) by succ_congr
+  let h_succ := succ_congr h_snd
+  -- Chain
+  let chain1 := .mp (.mp h_unfold (.mp h_den_cong and_intro)) .trans0
+  .mp (.mp h_succ (.mp chain1 and_intro)) .trans0
 
 /-- ⊢ ∀a. eq_Q(a, a) -/
 def eq_Q_refl :
@@ -1424,10 +1834,16 @@ def mul_Q_comm :
   let h3 := pd_congr (mul_comm adm da db)
   let eq_nf := app3_congr_closed Term.rat_encode h1 h2 h3
   -- Chain: mul_Q(a,b) =₀ NF_ab =₀ NF_ba =₀ mul_Q(b,a)
-  let c1 := .mp (.mp eq_nf (.mp unfold_ab and_intro)) .trans0
-  let h_eq := .mp (.mp (.mp unfold_ba .sym0) (.mp c1 and_intro)) .trans0
+  let c1 : Derivable F EqX al Premises (Formula.eq0
+      (Term.app2 Term.mul_Q a b)
+      (Term.app3 Term.rat_encode
+        (Term.app Term.sg_bar (Term.app2 Term.abs_diff sb sa))
+        (Term.app2 Term.mul nb na)
+        (Term.app Term.pd (Term.app2 Term.mul db da)))) :=
+    Derivable.mp (Derivable.mp eq_nf (Derivable.mp unfold_ab and_intro)) .trans0
+  let h_eq := Derivable.mp (Derivable.mp (Derivable.mp unfold_ba .sym0) (Derivable.mp c1 and_intro)) .trans0
   -- Lift to eq_Q and universalize
-  univ_gen (univ_gen (eq_Q_from_nat_eq h_eq))
+  univ_gen (univ_gen (@eq_Q_from_nat_eq _ _ _ _ _ adm _ _ _ h_eq))
 
 /-- ⊢ ∀a,b,c. eq_Q(mul_Q(mul_Q(a,b), c), mul_Q(a, mul_Q(b,c))) -/
 def mul_Q_assoc :
