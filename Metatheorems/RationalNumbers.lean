@@ -1434,6 +1434,84 @@ private def monus_add_cancel_l (a b : Term F Γ Ty.nat) :
   let h3 := monus_cancel (Premises := Premises) adm b a  -- (add b a) ∸ a =₀ b
   .mp (.mp h3 (.mp h2 and_intro)) .trans0
 
+/-- `(x + y) ∸ (x + z) =₀ y ∸ z`. By induction on `x`.
+
+    Base `x=0`: `(0+y) ∸ (0+z) =₀ y ∸ z` via `add_zero_l` on both sides.
+    Step `x → Sx`: `(Sx+y) ∸ (Sx+z) =₀ S(x+y) ∸ S(x+z) =₀ (x+y) ∸ (x+z) =₀ y ∸ z`
+    via `add_succ_l` twice, `monus_succ_l`, then the IH. -/
+private def add_monus_cancel_l (x y z : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0
+        (Term.app2 Term.monus (Term.app2 Term.add x y) (Term.app2 Term.add x z))
+        (Term.app2 Term.monus y z)) :=
+  let yw := y.weaken (σ := Ty.nat)
+  let zw := z.weaken (σ := Ty.nat)
+  let A : Formula F (Ty.nat :: Γ) :=
+    Formula.eq0 (Term.app2 Term.monus
+        (Term.app2 Term.add (.var .vz) yw) (Term.app2 Term.add (.var .vz) zw))
+      (Term.app2 Term.monus yw zw)
+  have yw_subst0 : ∀ s : Term F Γ Ty.nat,
+      Term.subst (fun {τ} ↦ Term.subst0_map s) y.weaken = y := Term.weaken_subst0 y
+  have zw_subst0 : ∀ s : Term F Γ Ty.nat,
+      Term.subst (fun {τ} ↦ Term.subst0_map s) z.weaken = z := Term.weaken_subst0 z
+  -- Base: (0+y) ∸ (0+z) =₀ y ∸ z.
+  have base_nf : A.subst0 Term.zero =
+      Formula.eq0 (Term.app2 Term.monus
+        (Term.app2 Term.add Term.zero y) (Term.app2 Term.add Term.zero z))
+        (Term.app2 Term.monus y z) := by
+    simp only [A, yw, zw, Formula.subst0, Formula.substF, Term.subst, Term.subst0_map,
+      Term.app2, monus_closed_subst, add_closed_subst, yw_subst0, zw_subst0]
+  have base : Derivable F EqX al Premises (A.subst0 Term.zero) := base_nf ▸
+    let az1 := add_zero_l adm y  -- 0+y =₀ y
+    let az2 := add_zero_l adm z  -- 0+z =₀ z
+    let c1 := monus_congr_l az1 (Term.app2 Term.add Term.zero z)
+    -- c1 : (0+y) ∸ (0+z) =₀ y ∸ (0+z)
+    let c2 := monus_congr_r y az2
+    -- c2 : y ∸ (0+z) =₀ y ∸ z
+    .mp (.mp c2 (.mp c1 and_intro)) .trans0
+  -- Step: A(x) → A(Sx).
+  have yw_substVar0 : y.weaken.subst
+      (Term.substVar0_map (.app .succ (.var .vz : Term F (Ty.nat :: Γ) Ty.nat))) = y.weaken := by
+    simp only [Term.weaken]
+    rw [Term.rename_subst, Term.rename_eq_subst]; rfl
+  have zw_substVar0 : z.weaken.subst
+      (Term.substVar0_map (.app .succ (.var .vz : Term F (Ty.nat :: Γ) Ty.nat))) = z.weaken := by
+    simp only [Term.weaken]
+    rw [Term.rename_subst, Term.rename_eq_subst]; rfl
+  have step_nf : Formula.substVar0 A (.app .succ (.var .vz)) =
+      Formula.eq0 (Term.app2 Term.monus
+        (Term.app2 Term.add (.app .succ (.var .vz)) yw)
+        (Term.app2 Term.add (.app .succ (.var .vz)) zw))
+        (Term.app2 Term.monus yw zw) := by
+    simp only [A, yw, zw, Formula.substVar0, Formula.substF, Term.subst, Term.substVar0_map,
+      Term.app2, monus_closed_subst, add_closed_subst, yw_substVar0, zw_substVar0]
+  have step_body : Derivable F EqX al Premises (A →ᶠ Formula.substVar0 A (.app .succ (.var .vz))) :=
+    step_nf ▸
+    let xv : Term F (Ty.nat :: Γ) Ty.nat := .var .vz
+    -- as_y : (Sx + y) =₀ S(x + y)
+    let as_y := add_succ_l adm xv yw
+    -- as_z : (Sx + z) =₀ S(x + z)
+    let as_z := add_succ_l adm xv zw
+    -- m1 : (Sx+y) ∸ (Sx+z) =₀ S(x+y) ∸ (Sx+z)
+    let m1 := monus_congr_l as_y (Term.app2 Term.add (.app .succ xv) zw)
+    -- m2 : S(x+y) ∸ (Sx+z) =₀ S(x+y) ∸ S(x+z)
+    let m2 := monus_congr_r (.app .succ (Term.app2 Term.add xv yw)) as_z
+    -- m3 : S(x+y) ∸ S(x+z) =₀ (x+y) ∸ (x+z)
+    let m3 := monus_succ_l adm (Term.app2 Term.add xv yw) (Term.app2 Term.add xv zw)
+    -- Chain m1;m2;m3: (Sx+y) ∸ (Sx+z) =₀ (x+y) ∸ (x+z)  (unconditional)
+    let c12 := .mp (.mp m2 (.mp m1 and_intro)) .trans0
+    let c123 := .mp (.mp m3 (.mp c12 and_intro)) .trans0
+    -- A is exactly: (x+y) ∸ (x+z) =₀ y ∸ z (with x = .var .vz = xv).
+    -- So (A →ᶠ A) via I_comb gives us the IH step.
+    .syllogism (pair_h (weaken_intro c123) (@I_comb _ _ EqX al Premises _ A)) .trans0
+  have inst_nf : A.subst0 x =
+      Formula.eq0 (Term.app2 Term.monus
+        (Term.app2 Term.add x y) (Term.app2 Term.add x z))
+        (Term.app2 Term.monus y z) := by
+    simp only [A, yw, zw, Formula.subst0, Formula.substF, Term.subst, Term.subst0_map,
+      Term.app2, monus_closed_subst, add_closed_subst, yw_subst0, zw_subst0]
+  inst_nf ▸ .mp (Derivable.induction base (univ_gen step_body)) (.forall_ax x)
+
 /-- Step equation for `inv_triag`:
     `inv_triag(Sn) =₀ inv_triag(n) + sg_bar(triag(S(inv_triag(n))) ∸ Sn)`.
 
@@ -1613,7 +1691,7 @@ private def inv_triag_triag_self_succ (w : Term F Γ Ty.nat)
     From `Sr ≤ Sw` we get `r < Sw` hence `Sw ∸ r ≥ 1`, so `sg_bar = 0`.
     Result: `Sw + 0 = Sw`. -/
 private def inv_triag_triag_add_inner_step (w r : Term F Γ Ty.nat)
-    (_ih : Derivable F EqX al Premises
+    (ih : Derivable F EqX al Premises
       (Formula.eq0 (.app Term.inv_triag
         (Term.app2 Term.add (.app Term.triag (.app .succ w)) r)) (.app .succ w)))
     (_hle : Derivable F EqX al Premises
@@ -1622,7 +1700,68 @@ private def inv_triag_triag_add_inner_step (w r : Term F Γ Ty.nat)
       (Formula.eq0 (.app Term.inv_triag
         (Term.app2 Term.add (.app Term.triag (.app .succ w)) (.app .succ r)))
         (.app .succ w)) :=
-  sorry
+  -- Abbreviations
+  let tSw : Term F Γ Ty.nat := .app Term.triag (.app .succ w)  -- triag(Sw)
+  -- Step 1: triag(Sw) + Sr =₀ S(triag(Sw) + r)  (via add_succ)
+  let h_as := add_succ adm tSw r
+  -- Step 2: inv_triag(triag(Sw) + Sr) =₀ inv_triag(S(triag(Sw) + r))  (inv_triag congr)
+  let h_it_cong := inv_triag_congr h_as
+  -- Step 3: inv_triag(S(triag(Sw) + r)) unfolds via inv_triag_succ
+  let h_unfold := inv_triag_succ adm (Term.app2 Term.add tSw r)
+  -- Step 4: rewrite inner inv_triag(triag(Sw)+r) to Sw on the LHS of the add.
+  let h_add_l := add_congr_l ih
+    (.app Term.sg_bar
+      (Term.app2 Term.monus
+        (.app Term.triag (.app .succ
+          (.app Term.inv_triag (Term.app2 Term.add tSw r))))
+        (.app .succ (Term.app2 Term.add tSw r))))
+  -- Step 5: rewrite inner inv_triag inside triag(S(.)) via ih + triag/succ congr
+  let h_tr_inner := triag_congr (succ_congr ih)
+  -- Step 6: monus(triag(S(inv_triag(..))), S(triag(Sw)+r)) =₀ monus(triag(S(Sw)), S(triag(Sw)+r))
+  let h_monus1 := monus_congr_l h_tr_inner (.app .succ (Term.app2 Term.add tSw r))
+  -- Step 7: triag(S(Sw)) =₀ triag(Sw) + S(Sw)  (triag_succ)
+  let h_triag_SSw := triag_succ adm (.app .succ w)
+  -- Step 8: monus(triag(S(Sw)), S(triag(Sw)+r)) =₀ monus(triag(Sw) + S(Sw), S(triag(Sw)+r))
+  let h_monus2 := monus_congr_l h_triag_SSw (.app .succ (Term.app2 Term.add tSw r))
+  -- Step 9: S(triag(Sw)+r) =₀ triag(Sw) + Sr  (sym of add_succ)
+  let h_Sadd_sym : Derivable F EqX al Premises
+      (Formula.eq0 (.app .succ (Term.app2 Term.add tSw r))
+        (Term.app2 Term.add tSw (.app .succ r))) :=
+    .mp h_as .sym0
+  -- Step 10: monus(triag(Sw) + S(Sw), S(triag(Sw)+r)) =₀ monus(triag(Sw) + S(Sw), triag(Sw) + Sr)
+  let h_monus3 := monus_congr_r (Term.app2 Term.add tSw (.app .succ (.app .succ w))) h_Sadd_sym
+  -- Step 11: (triag(Sw)+S(Sw)) ∸ (triag(Sw)+Sr) =₀ S(Sw) ∸ Sr  (add_monus_cancel_l)
+  let h_add_cancel := add_monus_cancel_l adm tSw (.app .succ (.app .succ w)) (.app .succ r)
+  -- Step 12: S(Sw) ∸ Sr =₀ Sw ∸ r  (monus_succ_l)
+  let h_monus_sl := monus_succ_l adm (.app .succ w) r
+  -- Chain monus1..monus3, add_cancel, monus_sl:
+  -- monus(triag(S(inv_triag(..))), S(..)) =₀ Sw ∸ r
+  let h_chain_m1 := .mp (.mp h_monus2 (.mp h_monus1 and_intro)) .trans0
+  let h_chain_m2 := .mp (.mp h_monus3 (.mp h_chain_m1 and_intro)) .trans0
+  let h_chain_m3 := .mp (.mp h_add_cancel (.mp h_chain_m2 and_intro)) .trans0
+  let h_sg_arg_eq := .mp (.mp h_monus_sl (.mp h_chain_m3 and_intro)) .trans0
+  -- Step 13: sg_bar(monus(...)) =₀ sg_bar(Sw ∸ r)  (sg_bar congruence)
+  let h_sg_cong := sg_bar_congr h_sg_arg_eq
+  -- Step 14 (SORRY): sg_bar(Sw ∸ r) =₀ 0
+  -- This follows from hle: Sr ∸ Sw =₀ 0 (i.e., r ≤ w), which via monus_succ_l gives r ∸ w =₀ 0,
+  -- hence Sw ∸ r ≥ 1, hence sg_bar(Sw ∸ r) =₀ 0. Requires a nested-induction helper.
+  let h_sg_zero : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.sg_bar (Term.app2 Term.monus (.app .succ w) r)) Term.zero) :=
+    sorry
+  -- Chain sg_cong + sg_zero: sg_bar(monus(...)) =₀ 0
+  let h_sg_final := .mp (.mp h_sg_zero (.mp h_sg_cong and_intro)) .trans0
+  -- Step 15: add(Sw, sg_bar(...)) =₀ add(Sw, 0)  (add_congr_r on sg_final)
+  let h_add_r := add_congr_r (.app .succ w) h_sg_final
+  -- Step 16: add(Sw, 0) =₀ Sw  (add_zero_r)
+  let h_add_0 := add_zero_r adm (.app .succ w)
+  -- Chain: add(Sw, sg_bar(...)) =₀ Sw
+  let h_add_sw := .mp (.mp h_add_0 (.mp h_add_r and_intro)) .trans0
+  -- Chain with h_add_l: add(inv_triag(triag(Sw)+r), sg_bar(...)) =₀ Sw
+  let h_rhs_eq_Sw := .mp (.mp h_add_sw (.mp h_add_l and_intro)) .trans0
+  -- Chain with h_unfold: inv_triag(S(triag(Sw)+r)) =₀ Sw
+  let h_itS_eq_Sw := .mp (.mp h_rhs_eq_Sw (.mp h_unfold and_intro)) .trans0
+  -- Chain with h_it_cong: inv_triag(triag(Sw) + Sr) =₀ Sw
+  .mp (.mp h_itS_eq_Sw (.mp h_it_cong and_intro)) .trans0
 
 /-- **L3.** Outer induction step: `B(w) →ᶠ B(Sw)`, where
     `B(w) := ∀r. monus r w =₀ 0 →ᶠ inv_triag(triag w + r) =₀ w`.
