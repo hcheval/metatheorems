@@ -381,6 +381,81 @@ def lam2_correct_nf (adm : AdmissibleEqX EqX) {ρ₂ ρ₁ τ : Ty ι} {Γ : Ctx
     (congrArg (eqAtType EqX τ (Term.app2 (Term.lam (Term.lam body)) s₁ s₂)) hnf))
     (Term.lam2_correct adm body s₁ s₂)
 
+/-- Beta-reduction for 3-argument lambda application.
+    `(lam (lam (lam body))) s₁ s₂ s₃ =_τ NF`
+    where NF = `((body.subst0 (s₃.weaken.weaken)).subst0 (s₂.weaken)).subst0 s₁`. -/
+def Term.lam3_correct {ρ₃ ρ₂ ρ₁ τ : Ty ι} {Γ : Ctx ι}
+    (adm : AdmissibleEqX EqX)
+    (body : Term F (ρ₁ :: ρ₂ :: ρ₃ :: Γ) τ)
+    (s₁ : Term F Γ ρ₃) (s₂ : Term F Γ ρ₂) (s₃ : Term F Γ ρ₁) :
+    Derivable F EqX al Premises (eqAtType EqX τ
+      (Term.app3 (Term.lam (Term.lam (Term.lam body))) s₁ s₂ s₃)
+      (((body.subst0 (s₃.weaken.weaken)).subst0 (s₂.weaken)).subst0 s₁)) :=
+  -- Step A: lam2_correct on outer two lambdas gives function-type equality
+  let step_a := Term.lam2_correct adm (Term.lam body) s₁ s₂
+  -- step_a : eqAtType (ρ₁ →ₜ τ) (app2 (lam₃ body) s₁ s₂) mid
+  -- where mid = ((lam body).subst0 (s₂.weaken)).subst0 s₁
+  -- Step B: instantiate at s₃ via forall_ax + transport
+  let P := eqAtType EqX τ
+    (Term.app (Term.app2 (Term.lam (Term.lam (Term.lam body))) s₁ s₂).weaken (.var .vz))
+    (Term.app (((Term.lam body).subst0 (s₂.weaken)).subst0 s₁).weaken (.var .vz))
+  let inst_raw : Derivable F EqX al Premises (P.subst0 s₃) := .mp step_a (.forall_ax s₃)
+  let heq_inst : P.subst0 s₃ = eqAtType EqX τ
+      (Term.app (Term.app2 (Term.lam (Term.lam (Term.lam body))) s₁ s₂) s₃)
+      (Term.app (((Term.lam body).subst0 (s₂.weaken)).subst0 s₁) s₃) := by
+    rw [eqAtType_subst0 adm, app_weaken_vz_subst0, app_weaken_vz_subst0]
+  let step_b := Eq.mp (congrArg (Derivable F EqX al Premises) heq_inst) inst_raw
+  -- Step C: lam_correct body (s₃.ww) in context ρ₂ :: ρ₃ :: Γ, then universalize twice
+  let step_c0 : Derivable F EqX al Premises
+      (eqAtType EqX τ (Term.app (Term.lam body) s₃.weaken.weaken)
+        (body.subst0 s₃.weaken.weaken)) :=
+    Term.lam_correct body s₃.weaken.weaken
+  -- First universalize over ρ₂ (var 0), instantiate at s₂.weaken
+  let step_c1 := univ_gen step_c0
+  let Q1 := eqAtType EqX τ (Term.app (Term.lam body) s₃.weaken.weaken)
+    (body.subst0 s₃.weaken.weaken)
+  let step_c2_raw : Derivable F EqX al Premises (Q1.subst0 s₂.weaken) :=
+    .mp step_c1 (.forall_ax s₂.weaken)
+  let heq_c1 : Q1.subst0 s₂.weaken = eqAtType EqX τ
+      (Term.app ((Term.lam body).subst0 s₂.weaken) s₃.weaken)
+      ((body.subst0 s₃.weaken.weaken).subst0 s₂.weaken) := by
+    rw [eqAtType_subst0 adm]
+    congr 1
+    · show Term.app ((Term.lam body).subst0 s₂.weaken) (s₃.weaken.weaken.subst0 s₂.weaken) =
+           Term.app ((Term.lam body).subst0 s₂.weaken) s₃.weaken
+      rw [weaken_subst0_h]
+  let step_c2 := Eq.mp (congrArg (Derivable F EqX al Premises) heq_c1) step_c2_raw
+  -- Second universalize over ρ₃ (var 0), instantiate at s₁
+  let step_c3 := univ_gen step_c2
+  let Q2 := eqAtType EqX τ
+    (Term.app ((Term.lam body).subst0 s₂.weaken) s₃.weaken)
+    ((body.subst0 s₃.weaken.weaken).subst0 s₂.weaken)
+  let step_c4_raw : Derivable F EqX al Premises (Q2.subst0 s₁) :=
+    .mp step_c3 (.forall_ax s₁)
+  let heq_c2 : Q2.subst0 s₁ = eqAtType EqX τ
+      (Term.app (((Term.lam body).subst0 s₂.weaken).subst0 s₁) s₃)
+      (((body.subst0 s₃.weaken.weaken).subst0 s₂.weaken).subst0 s₁) := by
+    rw [eqAtType_subst0 adm]
+    congr 1
+    · show Term.app (((Term.lam body).subst0 s₂.weaken).subst0 s₁) (s₃.weaken.subst0 s₁) =
+           Term.app (((Term.lam body).subst0 s₂.weaken).subst0 s₁) s₃
+      rw [weaken_subst0_h]
+  let step_c4 := Eq.mp (congrArg (Derivable F EqX al Premises) heq_c2) step_c4_raw
+  -- Chain step_b and step_c4 via eqAtType_trans
+  .mp (.mp step_c4 (.mp step_b and_intro)) (eqAtType_trans adm)
+
+/-- lam3_correct with explicit normal form. -/
+def lam3_correct_nf (adm : AdmissibleEqX EqX) {ρ₃ ρ₂ ρ₁ τ : Ty ι} {Γ : Ctx ι}
+    (body : Term F (ρ₁ :: ρ₂ :: ρ₃ :: Γ) τ)
+    (s₁ : Term F Γ ρ₃) (s₂ : Term F Γ ρ₂) (s₃ : Term F Γ ρ₁)
+    {target : Term F Γ τ}
+    (hnf : ((body.subst0 (s₃.weaken.weaken)).subst0 (s₂.weaken)).subst0 s₁ = target) :
+    Derivable F EqX al Premises (eqAtType EqX τ
+      (Term.app3 (Term.lam (Term.lam (Term.lam body))) s₁ s₂ s₃) target) :=
+  Eq.mp (congrArg (Derivable F EqX al Premises ·)
+    (congrArg (eqAtType EqX τ (Term.app3 (Term.lam (Term.lam (Term.lam body))) s₁ s₂ s₃)) hnf))
+    (Term.lam3_correct adm body s₁ s₂ s₃)
+
 /-- lam_correct with explicit normal form. -/
 def lam_correct_nf {ρ τ : Ty ι} {Γ : Ctx ι}
     (body : Term F (ρ :: Γ) τ) (s : Term F Γ ρ)
@@ -1889,6 +1964,30 @@ def mul_comm (x y : Term F Γ Ty.nat) :
     simp only [A, xw, Formula.subst0, Formula.substF, Term.subst, Term.subst0_map, Term.app2,
       mul_closed_subst', xw_subst0]
   inst_nf ▸ .mp (Derivable.induction base (univ_gen step_body)) (.forall_ax y)
+
+/-- 1 * y = y. From mul_succ_l: S0 * y = 0*y + y = 0 + y = y. -/
+def mul_one_l (y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (Formula.eq0
+      (Term.app2 Term.mul (.app .succ .zero) y) y) :=
+  -- S0 * y = 0*y + y
+  let h1 := mul_succ_l (Premises := Premises) adm .zero y
+  -- 0*y = 0
+  let h2 := mul_zero_l adm y
+  -- 0*y + y = 0 + y
+  let h3 := add_congr_l h2 y
+  -- 0 + y = y
+  let h4 := add_zero_l adm y
+  -- Chain: S0*y = 0*y + y = 0 + y = y
+  let c1 := .mp (.mp h3 (.mp h1 and_intro)) .trans0
+  .mp (.mp h4 (.mp c1 and_intro)) .trans0
+
+/-- x * 1 = x. From mul_one_l and mul_comm. -/
+def mul_one_r (x : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (Formula.eq0
+      (Term.app2 Term.mul x (.app .succ .zero)) x) :=
+  let c := mul_comm adm x (.app .succ .zero)
+  let m := mul_one_l adm x
+  .mp (.mp m (.mp c and_intro)) .trans0
 
 end ArithProps
 
