@@ -1634,7 +1634,7 @@ private def rat_den_rat_encode (s n d : Term F Γ Ty.nat) :
       isEven_closed_subst, weaken_subst0_eta]
   let h_encode : Derivable F EqX al Premises
       (Formula.eq0 (Term.app3 Term.rat_encode s n d) encoded_pair) :=
-    body_e_nf ▸ lam3_correct_nf adm body_e s n d body_e_nf
+    lam3_correct_nf adm body_e s n d body_e_nf
   -- Step 2: rat_den(rat_encode(s,n,d)) =₀ rat_den(encoded_pair) via congr
   let h_den_cong : Derivable F EqX al Premises
       (Formula.eq0 (.app Term.rat_den (Term.app3 Term.rat_encode s n d))
