@@ -1434,6 +1434,69 @@ private def monus_add_cancel_l (a b : Term F Γ Ty.nat) :
   let h3 := monus_cancel (Premises := Premises) adm b a  -- (add b a) ∸ a =₀ b
   .mp (.mp h3 (.mp h2 and_intro)) .trans0
 
+/-- Step equation for `inv_triag`:
+    `inv_triag(Sn) =₀ inv_triag(n) + sg_bar(triag(S(inv_triag(n))) ∸ Sn)`.
+
+    Follows directly from the definition of `inv_triag` via `rec_succ`. Generalizes
+    the unfold pattern used in `inv_triag_one`. -/
+private def inv_triag_succ (n : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.inv_triag (.app .succ n))
+        (Term.app2 Term.add (.app Term.inv_triag n)
+          (.app Term.sg_bar
+            (Term.app2 Term.monus
+              (.app Term.triag (.app .succ (.app Term.inv_triag n)))
+              (.app .succ n))))) :=
+  let body : Term F (Ty.nat :: Γ) Ty.nat :=
+    Term.app3 (.prec Ty.nat)
+      .zero
+      (Term.lam (Term.lam
+        (Term.app2 Term.add (.var (.vs .vz))
+          (.app Term.sg_bar
+            (Term.app2 Term.monus
+              (.app Term.triag (.app .succ (.var (.vs .vz))))
+              (.app .succ (.var .vz)))))))
+      (.var .vz)
+  let step_fn : Term F Γ (Ty.nat →ₜ Ty.nat →ₜ Ty.nat) :=
+    Term.lam (Term.lam
+      (Term.app2 Term.add (.var (.vs .vz))
+        (.app Term.sg_bar
+          (Term.app2 Term.monus
+            (.app Term.triag (.app .succ (.var (.vs .vz))))
+            (.app .succ (.var .vz))))))
+  -- r0 := rec(0, step, n) — the literal rec term equal to inv_triag(n)
+  let r0 : Term F Γ Ty.nat := Term.app3 (.prec Ty.nat) .zero step_fn n
+  -- Step 1: inv_triag(Sn) =₀ body[Sn] by lam_correct
+  let h1 := lam_correct_nf body (.app .succ n) (inv_triag_body_nf _)
+  -- Step 2: body[Sn] = rec(0, step, Sn) =₀ step(rec(0,step,n), n) by rec_succ
+  let c1 := .mp (.mp .rec_succ (.mp h1 and_intro)) (eqAtType_trans adm)
+  -- Step 3: step(r0, n) = add(r0, sg_bar(monus(triag(S r0), Sn))) by lam2_correct
+  let h2 := lam2_correct_nf adm
+    (Term.app2 Term.add (.var (.vs .vz))
+      (.app Term.sg_bar
+        (Term.app2 Term.monus (.app Term.triag (.app .succ (.var (.vs .vz))))
+          (.app .succ (.var .vz))))
+      : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat)
+    r0 n
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+          add_closed_subst, sg_bar_closed_subst, monus_closed_subst, triag_closed_subst,
+          weaken_subst0_eta]; rfl)
+  let c2 := .mp (.mp h2 (.mp c1 and_intro)) (eqAtType_trans adm)
+  -- Now: inv_triag(Sn) =₀ add(r0, sg_bar(monus(triag(S r0), Sn)))
+  -- Need to convert r0 to inv_triag(n).
+  let r0_eq : Derivable F EqX al Premises (Formula.eq0 r0 (.app Term.inv_triag n)) :=
+    .mp (.mp (lam_correct_nf body n (inv_triag_body_nf _)) .sym0) I_comb
+  -- Replace r0 with inv_triag(n) everywhere on the RHS via congruence
+  let h_add_l := add_congr_l r0_eq
+    (.app Term.sg_bar
+      (Term.app2 Term.monus (.app Term.triag (.app .succ r0)) (.app .succ n)))
+  let h_tr_cong := triag_congr (succ_congr r0_eq)
+  let h_monus_cong := monus_congr_l h_tr_cong (.app .succ n)
+  let h_sg_cong := sg_bar_congr h_monus_cong
+  let h_add_r := add_congr_r (.app Term.inv_triag n) h_sg_cong
+  let h_final_rhs := .mp (.mp h_add_r (.mp h_add_l and_intro)) .trans0
+  .mp (.mp h_final_rhs (.mp c2 and_intro)) .trans0
+
 /-- Key invariant: `inv_triag(triag(w) + r) =₀ w` when `r ≤ w`.
 
     This is the core arithmetic fact behind the Cantor pairing projections.
