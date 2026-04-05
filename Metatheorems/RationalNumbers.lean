@@ -1530,19 +1530,76 @@ We split the proof into four pieces:
     Given the outer IH specialised to `r := w` (i.e. `inv_triag(triag w + w) =₀ w`),
     derive `inv_triag(triag(Sw)) =₀ Sw`.
 
-    Proof sketch: `triag(Sw) = S(triag w + w)` via `triag_succ` + `add_succ`.
+    Proof: `triag(Sw) = S(triag w + w)` via `triag_succ` + `add_succ`.
     Apply `inv_triag_succ`:
     `inv_triag(S(triag w + w)) = inv_triag(triag w + w) + sg_bar(triag(S(inv_triag(triag w + w))) ∸ S(triag w + w))`.
     Rewrite the inner `inv_triag(triag w + w)` to `w` via the hypothesis.
     The `sg_bar` argument becomes `triag(Sw) ∸ S(triag w + w) = 0`, so `sg_bar = 1`.
     Result: `w + 1 = Sw`. -/
 private def inv_triag_triag_self_succ (w : Term F Γ Ty.nat)
-    (_ih : Derivable F EqX al Premises
+    (ih : Derivable F EqX al Premises
       (Formula.eq0 (.app Term.inv_triag
         (Term.app2 Term.add (.app Term.triag w) w)) w)) :
     Derivable F EqX al Premises
-      (Formula.eq0 (.app Term.inv_triag (.app .succ w)) (.app .succ w)) :=
-  sorry
+      (Formula.eq0 (.app Term.inv_triag (.app Term.triag (.app .succ w)))
+        (.app .succ w)) :=
+  -- Step 1: triag(Sw) =₀ triag w + Sw
+  let h_ts := triag_succ adm w
+  -- Step 2: triag w + Sw =₀ S(triag w + w)
+  let h_as := add_succ adm (.app Term.triag w) w
+  -- Combine: triag(Sw) =₀ S(triag w + w)
+  let h_triagSw : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.triag (.app .succ w))
+        (.app .succ (Term.app2 Term.add (.app Term.triag w) w))) :=
+    .mp (.mp h_as (.mp h_ts and_intro)) .trans0
+  -- Step 3: inv_triag(triag(Sw)) =₀ inv_triag(S(triag w + w))
+  let h_itSw := inv_triag_congr h_triagSw
+  -- Step 4: Unfold inv_triag(S(triag w + w)) via inv_triag_succ
+  let h_unfold := inv_triag_succ adm (Term.app2 Term.add (.app Term.triag w) w)
+  -- Step 5: Using ih, rewrite inv_triag(triag w + w) to w in the add_l position.
+  let h_add_l := add_congr_l ih
+    (.app Term.sg_bar
+      (Term.app2 Term.monus
+        (.app Term.triag (.app .succ
+          (.app Term.inv_triag (Term.app2 Term.add (.app Term.triag w) w))))
+        (.app .succ (Term.app2 Term.add (.app Term.triag w) w))))
+  -- Step 6: triag(S(inv_triag(triag w + w))) =₀ triag(Sw)  (via succ_congr ih)
+  let h_tr_inner := triag_congr (succ_congr ih)
+  -- Step 7: monus(triag(S(...)), S(triag w + w)) =₀ monus(triag(Sw), S(triag w + w))
+  let h_monus_step1 := monus_congr_l h_tr_inner
+    (.app .succ (Term.app2 Term.add (.app Term.triag w) w))
+  -- Step 8: monus(triag(Sw), S(triag w + w)) =₀ monus(S(triag w + w), S(triag w + w))
+  let h_monus_step2 := monus_congr_l h_triagSw
+    (.app .succ (Term.app2 Term.add (.app Term.triag w) w))
+  -- Chain Steps 7-8
+  let h_monus_chain :=
+    .mp (.mp h_monus_step2 (.mp h_monus_step1 and_intro)) .trans0
+  -- Step 9: monus(S(triag w + w), S(triag w + w)) =₀ 0
+  let h_monus_self :=
+    monus_self adm (.app .succ (Term.app2 Term.add (.app Term.triag w) w))
+  -- Chain to 0
+  let h_monus_0 := .mp (.mp h_monus_self (.mp h_monus_chain and_intro)) .trans0
+  -- Step 10: sg_bar(that) =₀ sg_bar(0) =₀ S0
+  let h_sg_eq_0 := sg_bar_congr h_monus_0
+  let h_sg_1 :=
+    .mp (.mp (sg_bar_zero (Premises := Premises)) (.mp h_sg_eq_0 and_intro)) .trans0
+  -- Step 11: add(w, sg_bar(...)) =₀ add(w, S0)
+  let h_add_r := add_congr_r w h_sg_1
+  -- Step 12: add(w, S0) =₀ S(add(w, 0))  via add_succ
+  let h_add_w_succ := add_succ adm w Term.zero
+  -- Step 13: S(add(w, 0)) =₀ Sw  via succ_congr (add_zero_r w)
+  let h_S_add0 := succ_congr (add_zero_r adm w)
+  -- add(w, S0) =₀ Sw
+  let h_add_w_S0 :=
+    .mp (.mp h_S_add0 (.mp h_add_w_succ and_intro)) .trans0
+  -- add(w, sg_bar(...)) =₀ Sw
+  let h_add_final := .mp (.mp h_add_w_S0 (.mp h_add_r and_intro)) .trans0
+  -- add(inv_triag(triag w + w), sg_bar(X)) =₀ Sw
+  let h_rhs_eq_Sw := .mp (.mp h_add_final (.mp h_add_l and_intro)) .trans0
+  -- inv_triag(S(triag w + w)) =₀ Sw
+  let h_itS_eq_Sw := .mp (.mp h_rhs_eq_Sw (.mp h_unfold and_intro)) .trans0
+  -- inv_triag(triag(Sw)) =₀ Sw
+  .mp (.mp h_itS_eq_Sw (.mp h_itSw and_intro)) .trans0
 
 /-- **L2.** Inner induction step on `r`.
 
