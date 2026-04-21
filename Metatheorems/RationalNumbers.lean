@@ -1292,6 +1292,85 @@ private def isOdd_two :
   let h6 := .mp (.mp h5 (.mp h2 and_intro)) .trans0
   .mp (.mp h6 (.mp h1 and_intro)) .trans0
 
+-- ── Double-step parity and division ──────────────────────────────────────
+
+/-- isEven(n + n) =₀ S0 for all n.
+
+    Base: isEven(0 + 0) = isEven(0) = S0.
+    Step: isEven(S(n) + S(n)) = isEven(SS(n+n)) = sg_bar(sg_bar(isEven(n+n)))
+          = sg_bar(sg_bar(S0)) = sg_bar(0) = S0. -/
+private def isEven_double (n : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.isEven (Term.app2 Term.add n n)) (.app .succ .zero)) :=
+  let A : Formula F (Ty.nat :: Γ) :=
+    Formula.eq0 (.app Term.isEven (Term.app2 Term.add (.var .vz) (.var .vz))) (.app .succ .zero)
+  -- Base: A[0] = isEven(add(0, 0)) =₀ S0
+  have base_nf : A.subst0 Term.zero =
+      Formula.eq0 (.app Term.isEven (Term.app2 Term.add Term.zero Term.zero)) (.app .succ .zero) := by
+    simp only [A, Formula.subst0, Formula.substF, Term.subst, Term.subst0_map, Term.app2,
+      add_closed_subst, isEven_closed_subst]
+  have base : Derivable F EqX al Premises (A.subst0 Term.zero) :=
+    base_nf ▸
+    let h1 := isEven_congr (add_zero_r adm Term.zero)
+    .mp (.mp isEven_zero (.mp h1 and_intro)) .trans0
+  -- Step: A(k) → A(Sk), i.e., isEven(k+k) =₀ S0 → isEven(Sk+Sk) =₀ S0
+  let k : Term F (Ty.nat :: Γ) Ty.nat := .var .vz
+  let kk := Term.app2 Term.add k k
+  have step_nf : Formula.substVar0 A (.app .succ k) =
+      Formula.eq0 (.app Term.isEven (Term.app2 Term.add (.app .succ k) (.app .succ k)))
+        (.app .succ .zero) := by
+    simp only [A, Formula.substVar0, Formula.substF, Term.subst, Term.substVar0_map, Term.app2,
+      add_closed_subst, isEven_closed_subst]
+  have step_body : Derivable F EqX al Premises (A →ᶠ Formula.substVar0 A (.app .succ k)) :=
+    step_nf ▸
+    -- add(Sk, Sk) =₀ S(add(k, Sk)) =₀ SS(add(k, k))
+    let h_add1 := add_succ_l adm k (.app .succ k)
+    let h_add2 := succ_congr (add_succ adm k k)
+    let h_add := .mp (.mp h_add2 (.mp h_add1 and_intro)) .trans0
+    -- isEven(add(Sk, Sk)) =₀ isEven(SS(kk))
+    let h_ie_cong := isEven_congr h_add
+    -- isEven(SS(kk)) =₀ sg_bar(isEven(S(kk))) by isEven_succ
+    let h_ie_ss1 := isEven_succ adm (.app .succ kk)
+    -- isEven(S(kk)) =₀ sg_bar(isEven(kk)) by isEven_succ
+    let h_ie_ss2 := isEven_succ adm kk
+    -- isEven(SS(kk)) =₀ sg_bar(sg_bar(isEven(kk)))
+    let h_chain1 := .mp (.mp (sg_bar_congr h_ie_ss2) (.mp h_ie_ss1 and_intro)) .trans0
+    -- isEven(add(Sk,Sk)) =₀ sg_bar(sg_bar(isEven(kk)))
+    let h_chain2 := .mp (.mp h_chain1 (.mp h_ie_cong and_intro)) .trans0
+    -- From IH: isEven(kk) =₀ S0 → sg_bar(sg_bar(isEven(kk))) =₀ sg_bar(sg_bar(S0))
+    let congr_ih : Derivable F EqX al Premises
+        (A →ᶠ Formula.eq0 (.app Term.sg_bar (.app Term.sg_bar (.app Term.isEven kk)))
+                          (.app Term.sg_bar (.app Term.sg_bar (.app .succ .zero)))) :=
+      qfer_nat_nf (by rfl) (by rfl) I_comb
+        (r := .app Term.sg_bar (.app Term.sg_bar (.var .vz)))
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, sg_bar_closed_subst]; rfl)
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, sg_bar_closed_subst])
+    -- sg_bar(sg_bar(S0)) =₀ sg_bar(0) =₀ S0
+    let h_sgsg := .mp (.mp sg_bar_zero (.mp (sg_bar_congr (sg_bar_succ adm .zero)) and_intro)) .trans0
+    -- IH → sg_bar(sg_bar(isEven(kk))) =₀ S0
+    let h_ih_to_target := .syllogism (pair_h congr_ih (weaken_intro h_sgsg)) .trans0
+    -- IH → isEven(add(Sk,Sk)) =₀ S0
+    .syllogism (pair_h (weaken_intro h_chain2) h_ih_to_target) .trans0
+  -- Instantiate
+  have inst_nf : A.subst0 n =
+      Formula.eq0 (.app Term.isEven (Term.app2 Term.add n n)) (.app .succ .zero) := by
+    simp only [A, Formula.subst0, Formula.substF, Term.subst, Term.subst0_map, Term.app2,
+      add_closed_subst, isEven_closed_subst]
+  inst_nf ▸ .mp (Derivable.induction base (univ_gen step_body)) (.forall_ax n)
+
+/-- isOdd(n + n) =₀ 0 for all n.
+    From isEven_double: isEven(n+n) = S0, isOdd(n+n) = 1 - isEven(n+n) = 1 - 1 = 0. -/
+private def isOdd_double (n : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.isOdd (Term.app2 Term.add n n)) Term.zero) :=
+  let h1 := isOdd_unfold (Term.app2 Term.add n n)
+  let h2 := monus_congr_r (.app .succ .zero) (isEven_double adm n)
+  let h3 := monus_succ_l adm .zero .zero
+  let h4 := monus_zero adm .zero
+  let c := .mp (.mp h4 (.mp h3 and_intro)) .trans0
+  let c2 := .mp (.mp c (.mp h2 and_intro)) .trans0
+  .mp (.mp c2 (.mp h1 and_intro)) .trans0
+
 -- ── Case analysis infrastructure ──────────────────────────────────────────
 
 /-- For any n: sg_bar(n) =₀ S0 ∨ sg_bar(n) =₀ 0.
