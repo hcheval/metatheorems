@@ -743,6 +743,35 @@ private def monus_congr_r (u : Term F Γ Ty.nat) {s t : Term F Γ Ty.nat}
     (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map, monus_closed_subst]
         exact congrArg (Term.app · t) (congrArg (Term.app Term.monus ·) (Term.weaken_subst0 u t)))
 
+private def abs_diff_congr_l {s t : Term F Γ Ty.nat}
+    (h : Derivable F EqX al Premises (Formula.eq0 s t)) (u : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.abs_diff s u) (Term.app2 Term.abs_diff t u)) :=
+  qfer_no_premise_nat_nf h (r := Term.app2 Term.abs_diff (.var .vz) u.weaken)
+    (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map, abs_diff_closed_subst]
+        exact congrArg _ (Term.weaken_subst0 u s))
+    (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map, abs_diff_closed_subst]
+        exact congrArg _ (Term.weaken_subst0 u t))
+
+private def abs_diff_congr_r (u : Term F Γ Ty.nat) {s t : Term F Γ Ty.nat}
+    (h : Derivable F EqX al Premises (Formula.eq0 s t)) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.abs_diff u s) (Term.app2 Term.abs_diff u t)) :=
+  qfer_no_premise_nat_nf h (r := Term.app2 Term.abs_diff u.weaken (.var .vz))
+    (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map, abs_diff_closed_subst]
+        exact congrArg (Term.app · s)
+          (congrArg (Term.app Term.abs_diff ·) (Term.weaken_subst0 u s)))
+    (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map, abs_diff_closed_subst]
+        exact congrArg (Term.app · t)
+          (congrArg (Term.app Term.abs_diff ·) (Term.weaken_subst0 u t)))
+
+private def abs_diff_congr {a a' b b' : Term F Γ Ty.nat}
+    (ha : Derivable F EqX al Premises (Formula.eq0 a a'))
+    (hb : Derivable F EqX al Premises (Formula.eq0 b b')) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.abs_diff a b) (Term.app2 Term.abs_diff a' b')) :=
+  .mp (.mp (abs_diff_congr_r a' hb) (.mp (abs_diff_congr_l ha b) and_intro)) .trans0
+
 -- ── triag evaluation ──────────────────────────────────────────────────────
 
 private theorem triag_body_nf {Γ : Ctx ι} (s : Term F Γ Ty.nat) :
@@ -1370,6 +1399,83 @@ private def isOdd_double (n : Term F Γ Ty.nat) :
   let c := .mp (.mp h4 (.mp h3 and_intro)) .trans0
   let c2 := .mp (.mp c (.mp h2 and_intro)) .trans0
   .mp (.mp c2 (.mp h1 and_intro)) .trans0
+
+
+/-- For any n: isEven(n) =₀ S0 ∨ isEven(n) =₀ 0.
+    Base: isEven(0) =₀ S0 → left disjunct.
+    Step: case left (isEven(k) =₀ S0): sg_bar(S0) =₀ 0, so isEven(Sk) =₀ 0 → right.
+          case right (isEven(k) =₀ 0): sg_bar(0) =₀ S0, so isEven(Sk) =₀ S0 → left. -/
+private def isEven_cases (n : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.isEven n) (.app .succ .zero) ∨ᶠ
+       Formula.eq0 (.app Term.isEven n) Term.zero) :=
+  let A : Formula F (Ty.nat :: Γ) :=
+    Formula.eq0 (.app Term.isEven (.var .vz)) (.app .succ .zero) ∨ᶠ
+    Formula.eq0 (.app Term.isEven (.var .vz)) Term.zero
+  -- Base: A[0] = isEven(0) =₀ S0 ∨ isEven(0) =₀ 0
+  have base_nf : A.subst0 Term.zero =
+      (Formula.eq0 (.app Term.isEven Term.zero) (.app .succ .zero) ∨ᶠ
+       Formula.eq0 (.app Term.isEven Term.zero) Term.zero) := by
+    simp only [A, Formula.subst0, Formula.substF, Term.subst, Term.subst0_map,
+      isEven_closed_subst]
+  have base : Derivable F EqX al Premises (A.subst0 Term.zero) :=
+    base_nf ▸ .mp isEven_zero .or_weak
+  -- Step: A(k) → A(Sk)
+  let k : Term F (Ty.nat :: Γ) Ty.nat := .var .vz
+  have step_nf : Formula.substVar0 A (.app .succ k) =
+      (Formula.eq0 (.app Term.isEven (.app .succ k)) (.app .succ .zero) ∨ᶠ
+       Formula.eq0 (.app Term.isEven (.app .succ k)) Term.zero) := by
+    simp only [A, Formula.substVar0, Formula.substF, Term.subst, Term.substVar0_map,
+      isEven_closed_subst]
+  have step_body : Derivable F EqX al Premises (A →ᶠ Formula.substVar0 A (.app .succ k)) :=
+    step_nf ▸
+    -- isEven_succ: isEven(Sk) =₀ sg_bar(isEven(k))
+    let h_succ := isEven_succ adm k
+    -- Case left: isEven(k) =₀ S0 → isEven(Sk) =₀ S0 ∨ isEven(Sk) =₀ 0
+    -- sg_bar(isEven(k)) =₀ sg_bar(S0) conditional on isEven(k) =₀ S0
+    let cong_l : Derivable F EqX al Premises
+        (Formula.eq0 (.app Term.isEven k) (.app .succ .zero) →ᶠ
+         Formula.eq0 (.app Term.sg_bar (.app Term.isEven k))
+                     (.app Term.sg_bar (.app .succ .zero))) :=
+      qfer_nat_nf (by rfl) (by rfl) I_comb
+        (r := .app Term.sg_bar (.var .vz))
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, sg_bar_closed_subst])
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, sg_bar_closed_subst])
+    -- sg_bar(S0) =₀ 0
+    let h_sg_s0 := sg_bar_succ adm (.zero : Term F (Ty.nat :: Γ) _)
+    -- isEven(k) =₀ S0 → sg_bar(isEven(k)) =₀ 0
+    let h_l_sg0 := .syllogism (pair_h cong_l (weaken_intro h_sg_s0)) .trans0
+    -- isEven(k) =₀ S0 → isEven(Sk) =₀ 0
+    let h_l_ie0 := .syllogism (pair_h (weaken_intro h_succ) h_l_sg0) .trans0
+    -- isEven(k) =₀ S0 → (isEven(Sk) =₀ S0 ∨ isEven(Sk) =₀ 0)
+    let case_left := .syllogism h_l_ie0 or_inr
+    -- Case right: isEven(k) =₀ 0 → isEven(Sk) =₀ S0 ∨ isEven(Sk) =₀ 0
+    -- sg_bar(isEven(k)) =₀ sg_bar(0) conditional on isEven(k) =₀ 0
+    let cong_r : Derivable F EqX al Premises
+        (Formula.eq0 (.app Term.isEven k) Term.zero →ᶠ
+         Formula.eq0 (.app Term.sg_bar (.app Term.isEven k))
+                     (.app Term.sg_bar Term.zero)) :=
+      qfer_nat_nf (by rfl) (by rfl) I_comb
+        (r := .app Term.sg_bar (.var .vz))
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, sg_bar_closed_subst])
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, sg_bar_closed_subst])
+    -- sg_bar(0) =₀ S0
+    let h_sg_0 := sg_bar_zero (Premises := Premises) (Γ := Ty.nat :: Γ)
+    -- isEven(k) =₀ 0 → sg_bar(isEven(k)) =₀ S0
+    let h_r_sgs1 := .syllogism (pair_h cong_r (weaken_intro h_sg_0)) .trans0
+    -- isEven(k) =₀ 0 → isEven(Sk) =₀ S0
+    let h_r_ies1 := .syllogism (pair_h (weaken_intro h_succ) h_r_sgs1) .trans0
+    -- isEven(k) =₀ 0 → (isEven(Sk) =₀ S0 ∨ isEven(Sk) =₀ 0)
+    let case_right := .syllogism h_r_ies1 .or_weak
+    -- Combine: A(k) → A(Sk)
+    or_elim_rule case_left case_right
+  -- Instantiate with n
+  have inst_nf : A.subst0 n =
+      (Formula.eq0 (.app Term.isEven n) (.app .succ .zero) ∨ᶠ
+       Formula.eq0 (.app Term.isEven n) Term.zero) := by
+    simp only [A, Formula.subst0, Formula.substF, Term.subst, Term.subst0_map,
+      isEven_closed_subst]
+  inst_nf ▸ .mp (Derivable.induction base (univ_gen step_body)) (.forall_ax n)
 
 -- ── Case analysis infrastructure ──────────────────────────────────────────
 
@@ -3081,6 +3187,99 @@ private def rat_den_rat_encode (s n d : Term F Γ Ty.nat) :
   let chain1 := .mp (.mp h_unfold (.mp h_den_cong and_intro)) .trans0
   .mp (.mp h_succ (.mp chain1 and_intro)) .trans0
 
+/-- Helper: `add(pd(add(n,n)), isOdd(pd(add(n,n)))) =₀ add(n,n)`. By induction on n. -/
+private def pd_double_add_isOdd_pd_double (n : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0
+        (Term.app2 Term.add
+          (.app Term.pd (Term.app2 Term.add n n))
+          (.app Term.isOdd (.app Term.pd (Term.app2 Term.add n n))))
+        (Term.app2 Term.add n n)) :=
+  let A : Formula F (Ty.nat :: Γ) :=
+    Formula.eq0
+      (Term.app2 Term.add
+        (.app Term.pd (Term.app2 Term.add (.var .vz) (.var .vz)))
+        (.app Term.isOdd (.app Term.pd (Term.app2 Term.add (.var .vz) (.var .vz)))))
+      (Term.app2 Term.add (.var .vz) (.var .vz))
+  have base_nf : A.subst0 Term.zero =
+      Formula.eq0
+        (Term.app2 Term.add
+          (.app Term.pd (Term.app2 Term.add Term.zero Term.zero))
+          (.app Term.isOdd (.app Term.pd (Term.app2 Term.add Term.zero Term.zero))))
+        (Term.app2 Term.add Term.zero Term.zero) := by
+    simp only [A, Formula.subst0, Formula.substF, Term.subst, Term.subst0_map, Term.app2,
+      add_closed_subst, pd_closed_subst, isOdd_closed_subst]
+  have base_proof : Derivable F EqX al Premises
+      (Formula.eq0
+        (Term.app2 Term.add
+          (.app Term.pd (Term.app2 Term.add Term.zero Term.zero))
+          (.app Term.isOdd (.app Term.pd (Term.app2 Term.add Term.zero Term.zero))))
+        (Term.app2 Term.add Term.zero Term.zero)) :=
+    let zz := Term.app2 Term.add Term.zero Term.zero
+    let h_zz := add_zero_r adm Term.zero
+    let h_pd_zz := .mp (.mp pd_zero (.mp (pd_congr h_zz) and_intro)) .trans0
+    let h_isOdd_pd_zz := .mp (.mp (isOdd_zero (adm := adm))
+      (.mp (isOdd_congr h_pd_zz) and_intro)) .trans0
+    let h1 := .mp (.mp (add_congr_r Term.zero h_isOdd_pd_zz)
+      (.mp (add_congr_l h_pd_zz (.app Term.isOdd (.app Term.pd zz))) and_intro)) .trans0
+    let h2 := add_zero_r adm Term.zero
+    .mp (.mp (.mp h_zz .sym0) (.mp (.mp (.mp h2 (.mp h1 and_intro)) .trans0) and_intro)) .trans0
+  have base : Derivable F EqX al Premises (A.subst0 Term.zero) := base_nf ▸ base_proof
+  let k : Term F (Ty.nat :: Γ) Ty.nat := .var .vz
+  let kk := Term.app2 Term.add k k
+  let SkSk := Term.app2 Term.add (.app .succ k) (.app .succ k)
+  have step_nf : Formula.substVar0 A (.app .succ k) =
+      Formula.eq0
+        (Term.app2 Term.add (.app Term.pd SkSk) (.app Term.isOdd (.app Term.pd SkSk)))
+        SkSk := by
+    simp only [A, SkSk, Formula.substVar0, Formula.substF, Term.subst, Term.substVar0_map,
+      Term.app2, add_closed_subst, pd_closed_subst, isOdd_closed_subst]
+  have step_proof : Derivable F EqX al Premises
+      (Formula.eq0
+        (Term.app2 Term.add (.app Term.pd SkSk) (.app Term.isOdd (.app Term.pd SkSk))) SkSk) :=
+    let h_add1 := add_succ_l adm k (.app .succ k)
+    let h_add2 := add_succ adm k k
+    let h_SkSk_eq : Derivable F EqX al Premises
+        (Formula.eq0 SkSk (.app .succ (.app .succ kk))) :=
+      .mp (.mp (succ_congr h_add2) (.mp h_add1 and_intro)) .trans0
+    let h_pd : Derivable F EqX al Premises
+        (Formula.eq0 (.app Term.pd SkSk) (.app .succ kk)) :=
+      .mp (.mp (pd_succ adm (.app .succ kk))
+        (.mp (pd_congr h_SkSk_eq) and_intro)) .trans0
+    let h_ie_skk : Derivable F EqX al Premises
+        (Formula.eq0 (.app Term.isEven (.app .succ kk)) Term.zero) :=
+      .mp (.mp (sg_bar_succ adm (.zero : Term F (Ty.nat :: Γ) _))
+        (.mp (.mp (.mp (sg_bar_congr (isEven_double adm k))
+          (.mp (isEven_succ adm kk) and_intro)) .trans0) and_intro)) .trans0
+    let h_isOdd_skk : Derivable F EqX al Premises
+        (Formula.eq0 (.app Term.isOdd (.app .succ kk)) (.app .succ .zero)) :=
+      .mp (.mp (monus_zero adm (.app .succ .zero))
+        (.mp (.mp (.mp (monus_congr_r (.app .succ .zero) h_ie_skk)
+          (.mp (isOdd_unfold (.app .succ kk)) and_intro)) .trans0) and_intro)) .trans0
+    let h_isOdd_pd := .mp (.mp h_isOdd_skk (.mp (isOdd_congr h_pd) and_intro)) .trans0
+    let h_lhs := .mp (.mp (add_congr_r (.app .succ kk) h_isOdd_pd)
+      (.mp (add_congr_l h_pd (.app Term.isOdd (.app Term.pd SkSk))) and_intro)) .trans0
+    let h_add_s0 : Derivable F EqX al Premises
+        (Formula.eq0 (Term.app2 Term.add (.app .succ kk) (.app .succ .zero))
+          (.app .succ (.app .succ kk))) :=
+      let s1 := add_succ_l adm kk (.app .succ .zero)
+      let s2 := succ_congr (add_succ adm kk .zero)
+      let s3 := succ_congr (succ_congr (add_zero_r adm kk))
+      .mp (.mp s3 (.mp (.mp (.mp s2 (.mp s1 and_intro)) .trans0) and_intro)) .trans0
+    let h_rhs := .mp (.mp (.mp h_SkSk_eq .sym0) (.mp h_add_s0 and_intro)) .trans0
+    .mp (.mp h_rhs (.mp h_lhs and_intro)) .trans0
+  have step : Derivable F EqX al Premises (A →ᶠ Formula.substVar0 A (.app .succ k)) :=
+    step_nf ▸ weaken_intro step_proof
+  have inst_nf : A.subst0 n =
+      Formula.eq0
+        (Term.app2 Term.add
+          (.app Term.pd (Term.app2 Term.add n n))
+          (.app Term.isOdd (.app Term.pd (Term.app2 Term.add n n))))
+        (Term.app2 Term.add n n) := by
+    simp only [A, Formula.subst0, Formula.substF, Term.subst, Term.subst0_map, Term.app2,
+      add_closed_subst, pd_closed_subst, isOdd_closed_subst]
+  inst_nf ▸ .mp (Derivable.induction base (univ_gen step)) (.forall_ax n)
+
 -- ── pair congruence (both arguments) ──────────────────────────────────────
 
 /-- pair(a, b) =₀ pair(a', b') from a =₀ a' and b =₀ b'. -/
@@ -3106,6 +3305,586 @@ private def pair_congr {a a' b b' : Term F Γ Ty.nat}
     (r := Term.app2 Term.pair (.var .vz) b'.weaken)
     (mk_nf2 b' a) (mk_nf2 b' a')
   .mp (.mp s2 (.mp s1 and_intro)) .trans0
+
+
+/-- The step function body of div2's state-pair recursion (context-polymorphic).
+    step(r, _) = pair(fst(r) + snd(r), sg_bar(snd(r))). -/
+private def div2_step_body : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat :=
+  Term.app2 Term.pair
+    (Term.app2 Term.add (.app Term.fst_pair (.var (.vs .vz))) (.app Term.snd_pair (.var (.vs .vz))))
+    (.app Term.sg_bar (.app Term.snd_pair (.var (.vs .vz))))
+
+/-- The step function of div2's state-pair recursion (context-polymorphic). -/
+private def div2_step : Term F Γ (Ty.nat →ₜ Ty.nat →ₜ Ty.nat) :=
+  Term.lam (Term.lam (div2_step_body (F := F) (Γ := Γ)))
+
+@[simp] private theorem div2_step_closed_subst :
+    (div2_step : Term F Γ _).subst σ = div2_step := by rfl
+
+@[simp] private theorem div2_step_closed_rename :
+    (div2_step : Term F Γ _).rename r = div2_step := by rfl
+
+/-- div2(n + n) =₀ n for all n.
+
+    Uses the pair invariant: rec(pair(0,1), step, n+n) = pair(n, 1) where
+    step(r, _) = pair(fst(r)+snd(r), sg_bar(snd(r))).
+    Base: rec(..., 0) = pair(0, 1).
+    Step: two rec_succ unfoldings, using IH to simplify. -/
+private def div2_double (n : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.div2 (Term.app2 Term.add n n)) n) :=
+  let k : Term F (Ty.nat :: Γ) Ty.nat := .var .vz
+  let kk := Term.app2 Term.add k k
+  let base_val := Term.app2 Term.pair (.zero : Term F _ _) (.app .succ .zero)
+  let step_fn := div2_step (F := F) (Γ := Ty.nat :: Γ)
+  let rec_m := Term.app3 (.prec Ty.nat) base_val step_fn kk
+  -- A(k) := rec(base, step, k+k) =₀ pair(k, S0)
+  let A : Formula F (Ty.nat :: Γ) :=
+    Formula.eq0 rec_m (Term.app2 Term.pair k (.app .succ .zero))
+  -- ── Base: A[0] ──
+  have base_nf : A.subst0 Term.zero =
+      Formula.eq0
+        (Term.app3 (.prec Ty.nat)
+          (Term.app2 Term.pair .zero (.app .succ .zero))
+          div2_step
+          (Term.app2 Term.add Term.zero Term.zero))
+        (Term.app2 Term.pair Term.zero (.app .succ .zero)) := by
+    simp only [A, rec_m, base_val, step_fn, kk, k,
+      Formula.subst0, Formula.substF, Term.subst, Term.subst0_map, Term.app2, Term.app3,
+      add_closed_subst, pair_closed_subst, div2_step_closed_subst]
+  have base_pf : Derivable F EqX al Premises (A.subst0 Term.zero) :=
+    base_nf ▸
+    let h_add00 := add_zero_r adm (Term.zero : Term F Γ _)
+    let h_rec_cong : Derivable F EqX al Premises
+        (Formula.eq0
+          (Term.app3 (.prec Ty.nat)
+            (Term.app2 Term.pair (.zero : Term F Γ _) (.app .succ .zero))
+            (div2_step : Term F Γ _)
+            (Term.app2 Term.add Term.zero Term.zero))
+          (Term.app3 (.prec Ty.nat)
+            (Term.app2 Term.pair (.zero : Term F Γ _) (.app .succ .zero))
+            (div2_step : Term F Γ _)
+            Term.zero)) :=
+      qfer_no_premise_nat_nf h_add00
+        (r := Term.app3 (.prec Ty.nat)
+          (Term.app2 Term.pair (.zero : Term F (Ty.nat :: Γ) _) (.app .succ .zero))
+          (div2_step : Term F (Ty.nat :: Γ) _)
+          (.var .vz))
+        (by simp only [Term.subst0, Term.app3, Term.app2, Term.subst, Term.subst0_map,
+              add_closed_subst, div2_step_closed_subst, pair_closed_subst])
+        (by simp only [Term.subst0, Term.app3, Term.app2, Term.subst, Term.subst0_map,
+              div2_step_closed_subst, pair_closed_subst])
+    .mp (.mp (.rec_zero (ρ := Ty.nat)) (.mp h_rec_cong and_intro)) .trans0
+  -- ── Step: A(k) ��� A(Sk) ──
+  have step_nf_eq : Formula.substVar0 A (.app .succ k) =
+      Formula.eq0
+        (Term.app3 (.prec Ty.nat) base_val step_fn (Term.app2 Term.add (.app .succ k) (.app .succ k)))
+        (Term.app2 Term.pair (.app .succ k) (.app .succ .zero)) := by
+    simp only [A, rec_m, base_val, step_fn, kk, k,
+      Formula.substVar0, Formula.substF, Term.subst, Term.substVar0_map, Term.app2, Term.app3,
+      add_closed_subst, pair_closed_subst, div2_step_closed_subst]
+  let Sm := Term.app .succ kk
+  let rec_Sm := Term.app3 (.prec Ty.nat) base_val step_fn Sm
+  let rec_SSm := Term.app3 (.prec Ty.nat) base_val step_fn (.app .succ Sm)
+  let step_body_inner := div2_step_body (F := F) (Γ := Ty.nat :: Γ)
+  have step_body_fn : Derivable F EqX al Premises
+      (A →ᶠ Formula.substVar0 A (.app .succ k)) :=
+    step_nf_eq ▸
+    -- add(Sk, Sk) =₀ SS(kk)
+    let h_add_chain :=
+      let h1 := add_succ_l adm k (.app .succ k)
+      let h2 := succ_congr (add_succ adm k k)
+      .mp (.mp h2 (.mp h1 and_intro)) .trans0
+    -- rec(_, _, add(Sk,Sk)) =₀ rec(_, _, SS(kk)) by congruence
+    let h_rec_chain := qfer_no_premise_nat_nf h_add_chain
+      (r := Term.app3 (.prec Ty.nat)
+        (Term.app2 Term.pair (.zero : Term F (Ty.nat :: Ty.nat :: Γ) _) (.app .succ .zero))
+        (div2_step : Term F (Ty.nat :: Ty.nat :: Γ) _)
+        (.var .vz))
+      (by simp only [Term.subst0, Term.app3, Term.app2,
+            Term.subst, Term.subst0_map, pair_closed_subst, add_closed_subst,
+            div2_step_closed_subst]; rfl)
+      (by simp only [Term.subst0, Term.app3, Term.app2,
+            Term.subst, Term.subst0_map, pair_closed_subst,
+            div2_step_closed_subst]; rfl)
+    -- rec_succ unfoldings
+    let h_rs2 : Derivable F EqX al Premises (Formula.eq0 rec_SSm
+        (Term.app2 step_fn rec_Sm Sm)) := .rec_succ (ρ := Ty.nat)
+    let h_rs1 : Derivable F EqX al Premises (Formula.eq0 rec_Sm
+        (Term.app2 step_fn rec_m kk)) := .rec_succ (ρ := Ty.nat)
+    -- step(rec_m, kk) unfold: pair(fst(rec_m)+snd(rec_m), sg_bar(snd(rec_m)))
+    have step_nf1 : (step_body_inner.subst0 (kk.weaken)).subst0 rec_m =
+        Term.app2 Term.pair
+          (Term.app2 Term.add (.app Term.fst_pair rec_m) (.app Term.snd_pair rec_m))
+          (.app Term.sg_bar (.app Term.snd_pair rec_m)) := by
+      simp only [step_body_inner, div2_step_body, rec_m, kk, k, base_val, step_fn,
+        Term.subst0, Term.subst, Term.subst0_map, Term.app2, Term.app3,
+        pair_closed_subst, add_closed_subst, fst_pair_closed_subst,
+        snd_pair_closed_subst, sg_bar_closed_subst, div2_step_closed_subst,
+        Term.weaken, Term.rename]
+    let h_step1_unfold := lam2_correct_nf adm step_body_inner rec_m kk step_nf1
+    -- IH → fst(rec_m) =₀ k
+    let h_fst_ih : Derivable F EqX al Premises
+        (A →ᶠ Formula.eq0 (.app Term.fst_pair rec_m) k) :=
+      .syllogism
+        (qfer_nat_nf (by rfl) (by rfl) I_comb
+          (r := .app Term.fst_pair (.var .vz))
+          (by simp only [rec_m, kk, k, base_val, step_fn, div2_step,
+                Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
+                fst_pair_closed_subst, pair_closed_subst, add_closed_subst,
+                snd_pair_closed_subst, sg_bar_closed_subst, div2_step_closed_subst])
+          (by simp only [Term.subst0, Term.subst, Term.subst0_map,
+                fst_pair_closed_subst, pair_closed_subst]))
+        (.syllogism (pair_h I_comb (weaken_intro (fst_pair_pair adm k (.app .succ .zero)))) .trans0)
+    -- IH → snd(rec_m) =₀ S0
+    let h_snd_ih : Derivable F EqX al Premises
+        (A →ᶠ Formula.eq0 (.app Term.snd_pair rec_m) (.app .succ .zero)) :=
+      .syllogism
+        (qfer_nat_nf (by rfl) (by rfl) I_comb
+          (r := .app Term.snd_pair (.var .vz))
+          (by simp only [rec_m, kk, k, base_val, step_fn, div2_step,
+                Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
+                snd_pair_closed_subst, pair_closed_subst, add_closed_subst,
+                fst_pair_closed_subst, sg_bar_closed_subst, div2_step_closed_subst])
+          (by simp only [Term.subst0, Term.subst, Term.subst0_map,
+                snd_pair_closed_subst, pair_closed_subst]))
+        (.syllogism (pair_h I_comb (weaken_intro (snd_pair_pair adm k (.app .succ .zero)))) .trans0)
+    -- k + S0 =₀ Sk
+    let h_add_kS0 :=
+      let h1 := add_succ adm k (.zero : Term F (Ty.nat :: Γ) _)
+      let h2 := succ_congr (add_zero_r adm k)
+      .mp (.mp h2 (.mp h1 and_intro)) .trans0
+    -- IH → fst(rec_m)+snd(rec_m) =₀ Sk
+    let h_add_ih : Derivable F EqX al Premises
+        (A →ᶠ Formula.eq0 (Term.app2 Term.add (.app Term.fst_pair rec_m) (.app Term.snd_pair rec_m))
+          (.app .succ k)) :=
+      let cong_l := qfer_nat_nf (by rfl) (by rfl) h_fst_ih
+        (r := Term.app2 Term.add (.var .vz) ((Term.app Term.snd_pair rec_m).weaken))
+        (by simp only [rec_m, kk, k, base_val, step_fn, div2_step,
+              Term.subst0, Term.subst, Term.subst0_map, Term.app2, Term.app3,
+              add_closed_subst, fst_pair_closed_subst, snd_pair_closed_subst,
+              pair_closed_subst, sg_bar_closed_subst, div2_step_closed_subst,
+              Term.weaken, Term.rename]; rfl)
+        (by simp only [rec_m, kk, k, base_val, step_fn, div2_step,
+              Term.subst0, Term.subst, Term.subst0_map, Term.app2, Term.app3,
+              add_closed_subst, snd_pair_closed_subst, pair_closed_subst,
+              fst_pair_closed_subst, sg_bar_closed_subst, div2_step_closed_subst,
+              Term.weaken, Term.rename, Term.Renaming.shift]; rfl)
+      let cong_r := qfer_nat_nf (by rfl) (by rfl) h_snd_ih
+        (r := Term.app2 Term.add k.weaken (.var .vz))
+        (by simp only [k, Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+              add_closed_subst, snd_pair_closed_subst, Term.weaken, Term.rename,
+              Term.Renaming.shift]; rfl)
+        (by simp only [k, Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+              add_closed_subst]; rfl)
+      .syllogism (pair_h cong_l cong_r)
+        (.syllogism .trans0 (.syllogism (pair_h I_comb (weaken_intro h_add_kS0)) .trans0))
+    -- IH → sg_bar(snd(rec_m)) =₀ 0
+    let h_sgb_ih : Derivable F EqX al Premises
+        (A →ᶠ Formula.eq0 (.app Term.sg_bar (.app Term.snd_pair rec_m)) Term.zero) :=
+      .syllogism
+        (qfer_nat_nf (by rfl) (by rfl) h_snd_ih
+          (r := .app Term.sg_bar (.var .vz))
+          (by simp only [rec_m, kk, k, base_val, step_fn, div2_step,
+                Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
+                sg_bar_closed_subst, snd_pair_closed_subst, pair_closed_subst,
+                add_closed_subst, fst_pair_closed_subst, div2_step_closed_subst])
+          (by simp only [Term.subst0, Term.subst, Term.subst0_map, sg_bar_closed_subst]))
+        (.syllogism (pair_h I_comb (weaken_intro (sg_bar_succ adm (.zero : Term F (Ty.nat :: Γ) _)))) .trans0)
+    -- IH → pair(fst+snd, sg_bar(snd)) =₀ pair(Sk, 0)
+    let h_pair1 : Derivable F EqX al Premises
+        (A →ᶠ Formula.eq0
+          (Term.app2 Term.pair
+            (Term.app2 Term.add (.app Term.fst_pair rec_m) (.app Term.snd_pair rec_m))
+            (.app Term.sg_bar (.app Term.snd_pair rec_m)))
+          (Term.app2 Term.pair (.app .succ k) Term.zero)) :=
+      let cong_l : Derivable F EqX al Premises
+          (A →ᶠ Formula.eq0
+            (Term.app2 Term.pair
+              (Term.app2 Term.add (.app Term.fst_pair rec_m) (.app Term.snd_pair rec_m))
+              (.app Term.sg_bar (.app Term.snd_pair rec_m)))
+            (Term.app2 Term.pair (.app .succ k) (.app Term.sg_bar (.app Term.snd_pair rec_m)))) :=
+        qfer_nat_nf (by rfl) (by rfl) h_add_ih
+          (r := Term.app2 Term.pair (.var .vz)
+            ((Term.app Term.sg_bar (Term.app Term.snd_pair rec_m)).weaken))
+          (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map,
+                pair_closed_subst, weaken_subst0_eta])
+          (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map,
+                pair_closed_subst, weaken_subst0_eta])
+      let cong_r : Derivable F EqX al Premises
+          (A →ᶠ Formula.eq0
+            (Term.app2 Term.pair (.app .succ k) (.app Term.sg_bar (.app Term.snd_pair rec_m)))
+            (Term.app2 Term.pair (.app .succ k) Term.zero)) :=
+        qfer_nat_nf (by rfl) (by rfl) h_sgb_ih
+          (r := Term.app2 Term.pair ((Term.app .succ k).weaken) (.var .vz))
+          (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map,
+                pair_closed_subst, weaken_subst0_eta])
+          (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map,
+                pair_closed_subst, weaken_subst0_eta])
+      .syllogism (pair_h cong_l cong_r) .trans0
+    -- IH → step(rec_m, kk) =₀ pair(Sk, 0)
+    let h_step1_val : Derivable F EqX al Premises
+        (A →ᶠ Formula.eq0 (Term.app2 step_fn rec_m kk)
+          (Term.app2 Term.pair (.app .succ k) Term.zero)) :=
+      .syllogism (pair_h (weaken_intro h_step1_unfold) h_pair1) .trans0
+    -- IH → rec_Sm =₀ pair(Sk, 0)
+    let h_rec_Sm_val : Derivable F EqX al Premises
+        (A →ᶠ Formula.eq0 rec_Sm (Term.app2 Term.pair (.app .succ k) Term.zero)) :=
+      .syllogism (pair_h (weaken_intro h_rs1) h_step1_val) .trans0
+    -- step(pair(Sk, 0), Sm) unfolding
+    let Sk := Term.app .succ k
+    let pair_Sk_0 : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.pair Sk Term.zero
+    have step_nf2 : (step_body_inner.subst0 (Sm.weaken)).subst0 pair_Sk_0 =
+        Term.app2 Term.pair
+          (Term.app2 Term.add (.app Term.fst_pair pair_Sk_0) (.app Term.snd_pair pair_Sk_0))
+          (.app Term.sg_bar (.app Term.snd_pair pair_Sk_0)) := by
+      simp only [step_body_inner, div2_step_body, pair_Sk_0, Sk, Sm, kk, k,
+        Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+        pair_closed_subst, add_closed_subst, fst_pair_closed_subst,
+        snd_pair_closed_subst, sg_bar_closed_subst, Term.weaken, Term.rename]
+    let h_step2_unfold := lam2_correct_nf adm step_body_inner pair_Sk_0 Sm step_nf2
+    -- Simplify: fst(pair(Sk, 0)) =₀ Sk, snd(pair(Sk, 0)) =₀ 0
+    let h_fst2 := fst_pair_pair adm Sk Term.zero
+    let h_snd2 := snd_pair_pair adm Sk Term.zero
+    let h_add2 := .mp (.mp (add_zero_r adm Sk)
+        (.mp (.mp (.mp (add_congr_r Sk h_snd2)
+            (.mp (add_congr_l h_fst2 (.app Term.snd_pair pair_Sk_0)) and_intro)) .trans0) and_intro)) .trans0
+    let h_sgb2 := .mp (.mp (sg_bar_zero (Premises := Premises))
+      (.mp (sg_bar_congr h_snd2) and_intro)) .trans0
+    -- step(pair(Sk, 0), Sm) =₀ pair(Sk, S0)
+    let h_step2_val : Derivable F EqX al Premises (Formula.eq0
+        (Term.app2 step_fn pair_Sk_0 Sm)
+        (Term.app2 Term.pair Sk (.app .succ .zero))) :=
+      .mp (.mp (pair_congr h_add2 h_sgb2) (.mp h_step2_unfold and_intro)) .trans0
+    -- IH → step(rec_Sm, Sm) =₀ step(pair(Sk, 0), Sm) via congruence
+    let h_step2_cong : Derivable F EqX al Premises
+        (A →ᶠ Formula.eq0 (Term.app2 step_fn rec_Sm Sm) (Term.app2 step_fn pair_Sk_0 Sm)) :=
+      qfer_nat_nf (by rfl) (by rfl) h_rec_Sm_val
+        (r := Term.app2 (div2_step : Term F (Ty.nat :: Ty.nat :: Γ) _) (.var .vz) Sm.weaken)
+        (by simp only [step_fn, div2_step, rec_Sm, Sm, kk, k, base_val, pair_Sk_0,
+              Term.subst0, Term.subst, Term.subst0_map, Term.app2, Term.app3,
+              pair_closed_subst, add_closed_subst, fst_pair_closed_subst,
+              snd_pair_closed_subst, sg_bar_closed_subst, div2_step_closed_subst,
+              Term.weaken, Term.rename, Term.Renaming.shift]; rfl)
+        (by simp only [step_fn, div2_step, pair_Sk_0, Sm, kk, k,
+              Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+              pair_closed_subst, add_closed_subst, fst_pair_closed_subst,
+              snd_pair_closed_subst, sg_bar_closed_subst, div2_step_closed_subst,
+              Term.weaken, Term.rename, Term.Renaming.shift]; rfl)
+    -- IH → step(rec_Sm, Sm) =₀ pair(Sk, S0)
+    let h_step2_final : Derivable F EqX al Premises
+        (A →ᶠ Formula.eq0 (Term.app2 step_fn rec_Sm Sm) (Term.app2 Term.pair Sk (.app .succ .zero))) :=
+      .syllogism (pair_h h_step2_cong (weaken_intro h_step2_val)) .trans0
+    -- IH → rec_SSm =₀ pair(Sk, S0) via rec_succ chain
+    let h_rec_SSm : Derivable F EqX al Premises
+        (A →ᶠ Formula.eq0 rec_SSm (Term.app2 Term.pair Sk (.app .succ .zero))) :=
+      .syllogism (pair_h (weaken_intro h_rs2) h_step2_final) .trans0
+    -- IH → rec(_, _, add(Sk, Sk)) =₀ pair(Sk, S0)
+    .syllogism (pair_h (weaken_intro h_rec_chain) h_rec_SSm) .trans0
+  -- ── Instantiate ──
+  have inst_nf : A.subst0 n =
+      Formula.eq0
+        (Term.app3 (.prec Ty.nat)
+          (Term.app2 Term.pair .zero (.app .succ .zero))
+          div2_step
+          (Term.app2 Term.add n n))
+        (Term.app2 Term.pair n (.app .succ .zero)) := by
+    simp only [A, rec_m, base_val, step_fn, kk, k,
+      Formula.subst0, Formula.substF, Term.subst, Term.subst0_map, Term.app2, Term.app3,
+      add_closed_subst, pair_closed_subst, div2_step_closed_subst]
+  let h_all := Derivable.induction base_pf (univ_gen step_body_fn)
+  let h_pair : Derivable F EqX al Premises
+      (Formula.eq0
+        (Term.app3 (.prec Ty.nat)
+          (Term.app2 Term.pair .zero (.app .succ .zero))
+          div2_step
+          (Term.app2 Term.add n n))
+        (Term.app2 Term.pair n (.app .succ .zero))) :=
+    inst_nf ▸ Derivable.mp h_all (.forall_ax n)
+  -- div2(n+n) = fst(rec(base, step, n+n))
+  let div2_body : Term F (Ty.nat :: Γ) Ty.nat :=
+    .app Term.fst_pair (Term.app3 (.prec Ty.nat)
+      (Term.app2 Term.pair .zero (.app .succ .zero))
+      div2_step
+      (.var .vz))
+  let h_div2_unfold := lam_correct_nf div2_body (Term.app2 Term.add n n) (by rfl)
+  let h_fst_final := fst_pair_pair adm n (.app .succ .zero)
+  let h_fst_cong := fst_pair_congr h_pair
+  let c1 := .mp (.mp h_fst_cong (.mp h_div2_unfold and_intro)) .trans0
+  .mp (.mp h_fst_final (.mp c1 and_intro)) .trans0
+-- ── pair congruence (both arguments) ──────────────────────────────────────
+
+/-- `rat_num(rat_encode(s, n, d)) =₀ n` when `isEven(s) ∈ {S0, 0}`.
+
+    Unfolds: `rat_encode(s,n,d) = pair(2n ∸ isEven(s), d)`,
+    so `rat_num(rat_encode(s,n,d)) = div2(fst_pair(pair(2n ∸ isEven(s), d))
+        + isOdd(fst_pair(pair(2n ∸ isEven(s), d))))`.
+    By `fst_pair_pair` this simplifies to `div2((2n ∸ isEven(s)) + isOdd(2n ∸ isEven(s)))`.
+    Case `isEven(s) = 0`: `2n ∸ 0 = 2n`, `isOdd(2n) = 0`, `div2(2n + 0) = div2(2n) = n`.
+    Case `isEven(s) = S0`: `2n ∸ S0 = pd(2n)`, use `pd_double_add_isOdd_pd_double`. -/
+private def rat_num_rat_encode (s n d : Term F Γ Ty.nat)
+    (hs : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.isEven s) (.app .succ .zero) ∨ᶠ
+       Formula.eq0 (.app Term.isEven s) Term.zero)) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_num (Term.app3 Term.rat_encode s n d)) n) :=
+  -- Abbreviations
+  let ie_s := Term.app Term.isEven s
+  let nn := Term.app2 Term.add n n
+  let two_n := Term.app2 Term.mul (Term.ofNat 2) n
+  let encoded_pair : Term F Γ Ty.nat :=
+    Term.app2 Term.pair (Term.app2 Term.monus two_n ie_s) d
+  -- Step 1: rat_encode(s,n,d) =₀ pair(2n ∸ isEven(s), d)
+  let body_e : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.pair
+      (Term.app2 Term.monus
+        (Term.app2 Term.mul (Term.ofNat 2) (.var (.vs .vz)))
+        (.app Term.isEven (.var (.vs (.vs .vz)))))
+      (.var .vz)
+  have body_e_nf : ((body_e.subst0 (d.weaken.weaken)).subst0 (n.weaken)).subst0 s =
+      encoded_pair := by
+    simp only [body_e, encoded_pair, two_n, ie_s, Term.subst0, Term.subst, Term.subst0_map,
+      Term.app2, Term.ofNat, pair_closed_subst, mul_closed_subst, monus_closed_subst,
+      isEven_closed_subst, weaken_subst0_eta]
+  let h_encode := lam3_correct_nf adm body_e s n d body_e_nf
+  -- Step 2: rat_num(rat_encode(s,n,d)) =₀ rat_num(encoded_pair)
+  let h_rn_cong := rat_num_congr h_encode
+  -- Step 3: rat_num(encoded_pair) = div2(fst_pair(ep) + isOdd(fst_pair(ep)))
+  let fp_ep := Term.app Term.fst_pair encoded_pair
+  let rat_num_unfolded :=
+    Term.app Term.div2 (Term.app2 Term.add fp_ep (.app Term.isOdd fp_ep))
+  let rat_num_body : Term F (Ty.nat :: Γ) Ty.nat :=
+    .app Term.div2
+      (Term.app2 Term.add
+        (.app Term.fst_pair (.var .vz))
+        (.app Term.isOdd (.app Term.fst_pair (.var .vz))))
+  have rn_body_nf : rat_num_body.subst0 encoded_pair = rat_num_unfolded := by
+    simp only [rat_num_body, rat_num_unfolded, fp_ep, encoded_pair, Term.subst0, Term.subst,
+      Term.subst0_map, Term.app2, div2_closed_subst, add_closed_subst, fst_pair_closed_subst,
+      isOdd_closed_subst, pair_closed_subst, monus_closed_subst, mul_closed_subst,
+      isEven_closed_subst]
+  let h_rn_unfold := lam_correct_nf rat_num_body encoded_pair rn_body_nf
+  -- Step 4: fst_pair(encoded_pair) =₀ 2n ∸ isEven(s)
+  let f := Term.app2 Term.monus two_n ie_s
+  let h_fst := fst_pair_pair adm f d
+  -- Step 5: rat_num_unfolded =₀ div2(f + isOdd(f)) by congruence on fst_pair result
+  -- First: fst_pair(ep) + isOdd(fst_pair(ep)) =₀ f + isOdd(f)
+  let h_add_cong := .mp (.mp (add_congr_r f (isOdd_congr h_fst))
+    (.mp (add_congr_l h_fst (.app Term.isOdd fp_ep)) and_intro)) .trans0
+  -- Chain: rat_num(rat_encode(s,n,d)) =₀ div2(f + isOdd(f))
+  let c1 := .mp (.mp h_rn_unfold (.mp h_rn_cong and_intro)) .trans0
+  let chain1 := .mp (.mp (div2_congr h_add_cong) (.mp c1 and_intro)) .trans0
+  -- Step 6: 2n =₀ n+n
+  let h_two_n_eq_nn : Derivable F EqX al Premises (Formula.eq0 two_n nn) :=
+    let h_ms := mul_succ_l adm (.app .succ .zero) n
+    let h_m1 := .mp (.mp (mul_one_r adm n)
+      (.mp (mul_comm adm (.app .succ .zero) n) and_intro)) .trans0
+    .mp (.mp (add_congr_l h_m1 n) (.mp h_ms and_intro)) .trans0
+  -- f =₀ f'  where f' = (n+n) ∸ isEven(s)
+  let f' := Term.app2 Term.monus nn ie_s
+  let h_f_eq := monus_congr_l h_two_n_eq_nn ie_s
+  -- div2(f + isOdd(f)) =₀ div2(f' + isOdd(f'))
+  let h_add_f := .mp (.mp (add_congr_r f' (isOdd_congr h_f_eq))
+    (.mp (add_congr_l h_f_eq (.app Term.isOdd f)) and_intro)) .trans0
+  let chain2 := .mp (.mp (div2_congr h_add_f) (.mp chain1 and_intro)) .trans0
+  -- chain2 : rat_num(rat_encode(s,n,d)) =₀ div2(f' + isOdd(f'))
+  -- Conditional monus: isEven(s)=e → f'=₀(n+n)∸e
+  let mk_monus_cond (e : Term F Γ Ty.nat) :
+      Derivable F EqX al Premises
+        (Formula.eq0 ie_s e →ᶠ Formula.eq0 f' (Term.app2 Term.monus nn e)) :=
+    qfer_nat_nf (by rfl) (by rfl) I_comb
+      (r := Term.app2 Term.monus nn.weaken (.var .vz))
+      (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map, monus_closed_subst,
+            weaken_subst0_eta]; rfl)
+      (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map, monus_closed_subst,
+            weaken_subst0_eta])
+  -- Conditional div2: H → f'=₀t gives H → div2(f'+isOdd(f'))=₀div2(t+isOdd(t))
+  let mk_div2_cond (e t : Term F Γ Ty.nat)
+      (h_f'_t : Derivable F EqX al Premises (Formula.eq0 ie_s e →ᶠ Formula.eq0 f' t)) :
+      Derivable F EqX al Premises
+        (Formula.eq0 ie_s e →ᶠ
+         Formula.eq0
+           (.app Term.div2 (Term.app2 Term.add f' (.app Term.isOdd f')))
+           (.app Term.div2 (Term.app2 Term.add t (.app Term.isOdd t)))) :=
+    qfer_nat_nf (by rfl) (by rfl) h_f'_t
+      (r := .app Term.div2 (Term.app2 Term.add (.var .vz) (.app Term.isOdd (.var .vz))))
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map, div2_closed_subst,
+            add_closed_subst, isOdd_closed_subst, monus_closed_subst]; rfl)
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map, div2_closed_subst,
+            add_closed_subst, isOdd_closed_subst, monus_closed_subst, pd_closed_subst]; rfl)
+  -- ── Case isEven(s) = 0 ──
+  let case_zero : Derivable F EqX al Premises
+      (Formula.eq0 ie_s Term.zero →ᶠ
+       Formula.eq0 (.app Term.rat_num (Term.app3 Term.rat_encode s n d)) n) :=
+    let h_f'_nn := .syllogism (mk_monus_cond Term.zero)
+      (.syllogism (pair_h I_comb (weaken_intro (monus_zero adm nn))) .trans0)
+    let h_d := mk_div2_cond Term.zero nn h_f'_nn
+    let h_tail :=
+      let h1 := div2_congr (add_congr_r nn (isOdd_double adm n))
+      let h2 := div2_congr (add_zero_r adm nn)
+      let h3 := div2_double adm n
+      .mp (.mp h3 (.mp (.mp (.mp h2 (.mp h1 and_intro)) .trans0) and_intro)) .trans0
+    .syllogism (pair_h (weaken_intro chain2)
+      (.syllogism h_d (.syllogism (pair_h I_comb (weaken_intro h_tail)) .trans0))) .trans0
+  -- ── Case isEven(s) = S0 ──
+  let case_one : Derivable F EqX al Premises
+      (Formula.eq0 ie_s (.app .succ .zero) →ᶠ
+       Formula.eq0 (.app Term.rat_num (Term.app3 Term.rat_encode s n d)) n) :=
+    let h_monus_s0 : Derivable F EqX al Premises
+        (Formula.eq0 (Term.app2 Term.monus nn (.app .succ .zero)) (.app Term.pd nn)) :=
+      .mp (.mp (pd_congr (monus_zero adm nn))
+        (.mp (monus_succ adm nn .zero) and_intro)) .trans0
+    let h_f'_pd := .syllogism (mk_monus_cond (.app .succ .zero))
+      (.syllogism (pair_h I_comb (weaken_intro h_monus_s0)) .trans0)
+    let h_d := mk_div2_cond (.app .succ .zero) (.app Term.pd nn) h_f'_pd
+    let h_tail :=
+      .mp (.mp (div2_double adm n)
+        (.mp (div2_congr (pd_double_add_isOdd_pd_double adm n)) and_intro)) .trans0
+    .syllogism (pair_h (weaken_intro chain2)
+      (.syllogism h_d (.syllogism (pair_h I_comb (weaken_intro h_tail)) .trans0))) .trans0
+  .mp hs (or_elim_rule case_one case_zero)
+
+-- ── rat_sign roundtrip ───────────────────────────────────────────────────
+
+/-- The common chain: rat_sign(rat_encode(s,n,d)) =₀ isEven(2n ∸ isEven(s)). -/
+private def rat_sign_rat_encode_unfold (s n d : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_sign (Term.app3 Term.rat_encode s n d))
+        (.app Term.isEven (Term.app2 Term.monus
+          (Term.app2 Term.mul (Term.ofNat 2) n) (.app Term.isEven s)))) :=
+  let two_n := Term.app2 Term.mul (Term.ofNat 2) n
+  let ie_s := Term.app Term.isEven s
+  let encoded_pair : Term F Γ Ty.nat :=
+    Term.app2 Term.pair (Term.app2 Term.monus two_n ie_s) d
+  let body_e : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.pair
+      (Term.app2 Term.monus
+        (Term.app2 Term.mul (Term.ofNat 2) (.var (.vs .vz)))
+        (.app Term.isEven (.var (.vs (.vs .vz)))))
+      (.var .vz)
+  have body_e_nf : ((body_e.subst0 (d.weaken.weaken)).subst0 (n.weaken)).subst0 s =
+      encoded_pair := by
+    simp only [body_e, encoded_pair, two_n, ie_s, Term.subst0, Term.subst, Term.subst0_map,
+      Term.app2, Term.ofNat, pair_closed_subst, mul_closed_subst, monus_closed_subst,
+      isEven_closed_subst, weaken_subst0_eta]
+  let h_encode := lam3_correct_nf adm body_e s n d body_e_nf
+  let h_rs_cong := rat_sign_congr h_encode
+  let rat_sign_body : Term F (Ty.nat :: Γ) Ty.nat :=
+    .app Term.isEven (.app Term.fst_pair (.var .vz))
+  let h_unfold := lam_correct_nf rat_sign_body encoded_pair (by rfl)
+  let h_fst := fst_pair_pair adm (Term.app2 Term.monus two_n ie_s) d
+  let h_ie := isEven_congr h_fst
+  let c := .mp (.mp h_unfold (.mp h_rs_cong and_intro)) .trans0
+  .mp (.mp h_ie (.mp c and_intro)) .trans0
+
+/-- rat_sign(rat_encode(s,n,d)) =₀ S0 when isEven(s) =₀ 0 (s is odd, positive sign). -/
+private def rat_sign_rat_encode_pos (s n d : Term F Γ Ty.nat)
+    (hs : Derivable F EqX al Premises (Formula.eq0 (.app Term.isEven s) Term.zero)) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_sign (Term.app3 Term.rat_encode s n d))
+        (.app .succ .zero)) :=
+  let two_n := Term.app2 Term.mul (Term.ofNat 2) n
+  let h1 := rat_sign_rat_encode_unfold adm s n d
+  let h_monus := monus_congr_r two_n hs
+  let h_monus0 := .mp (.mp (monus_zero adm two_n) (.mp h_monus and_intro)) .trans0
+  let h_ie := isEven_congr h_monus0
+  let h_two_n_eq_nn := let h_ms := mul_succ_l adm (.app .succ .zero) n
+    let h_m1 := .mp (.mp (mul_one_r adm n)
+      (.mp (mul_comm adm (.app .succ .zero) n) and_intro)) .trans0
+    .mp (.mp (add_congr_l h_m1 n) (.mp h_ms and_intro)) .trans0
+  let h_ie2 := isEven_congr h_two_n_eq_nn
+  let h_double := isEven_double adm n
+  let c1 := .mp (.mp h_ie2 (.mp h_ie and_intro)) .trans0
+  let c2 := .mp (.mp h_double (.mp c1 and_intro)) .trans0
+  .mp (.mp c2 (.mp h1 and_intro)) .trans0
+
+/-- rat_sign(rat_encode(s,n,d)) =₀ 0 when isEven(s) =₀ S0 and n ≠ 0 (negative sign with
+    nonzero numerator). -/
+private def rat_sign_rat_encode_neg (s n d : Term F Γ Ty.nat)
+    (hs : Derivable F EqX al Premises (Formula.eq0 (.app Term.isEven s) (.app .succ .zero)))
+    (hn : Derivable F EqX al Premises (¬ᶠFormula.eq0 n Term.zero)) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_sign (Term.app3 Term.rat_encode s n d)) Term.zero) :=
+  let two_n := Term.app2 Term.mul (Term.ofNat 2) n
+  let nn := Term.app2 Term.add n n
+  let h1 := rat_sign_rat_encode_unfold adm s n d
+  let h_monus := monus_congr_r two_n hs
+  let h_two_n_eq_nn := let h_ms := mul_succ_l adm (.app .succ .zero) n
+    let h_m1 := .mp (.mp (mul_one_r adm n)
+      (.mp (mul_comm adm (.app .succ .zero) n) and_intro)) .trans0
+    .mp (.mp (add_congr_l h_m1 n) (.mp h_ms and_intro)) .trans0
+  let h_monus_s0 : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.monus two_n (.app .succ .zero))
+        (.app Term.pd nn)) :=
+    let hm1 := monus_congr_l h_two_n_eq_nn (.app .succ .zero)
+    let hm2 := monus_succ adm nn .zero
+    let hm3 := pd_congr (monus_zero adm nn)
+    .mp (.mp hm3 (.mp (.mp (.mp hm2 (.mp hm1 and_intro)) .trans0) and_intro)) .trans0
+  let h_tgt := .mp (.mp h_monus_s0 (.mp h_monus and_intro)) .trans0
+  let h_ie_tgt := isEven_congr h_tgt
+  let h_ie_chain := .mp (.mp h_ie_tgt (.mp h1 and_intro)) .trans0
+  -- Now need: isEven(pd(n+n)) =₀ 0.
+  -- From n ≠ 0: n = S(pd(n)), so n+n = S(pd n) + S(pd n) which is > 0.
+  -- n+n ≠ 0 and isEven(n+n) = S0, so by isEven_succ: isEven(S(pd(n+n))) = sg_bar(isEven(pd(n+n)))
+  -- We have n+n = S(pd(n+n)), so isEven(n+n) = isEven(S(pd(n+n))) = sg_bar(isEven(pd(n+n)))
+  -- Since isEven(n+n) = S0, sg_bar(isEven(pd(n+n))) = S0, so isEven(pd(n+n)) = 0.
+  -- Proof: n≠0 → n+n≠0 → n+n=S(pd(n+n)) → isEven(n+n)=isEven(S(pd(nn)))=sg_bar(isEven(pd(nn)))
+  --        isEven(nn)=S0 → sg_bar(isEven(pd(nn)))=S0 → isEven(pd(nn))=0
+  let h_nn_ne : Derivable F EqX al Premises (¬ᶠFormula.eq0 nn Term.zero) :=
+    -- add_eq_zero_iff forward: nn=0 → n=0 ∧ n=0; then and_weak: n=0 ∧ n=0 → n=0
+    let h_fwd := .mp (add_eq_zero_iff adm n n) .and_weak
+    -- nn=0 → n=0 (compose forward with and_weak)
+    let h_nn_imp_n := .syllogism h_fwd .and_weak
+    -- ¬(n=0) → ¬(nn=0) (contrapositive)
+    .syllogism h_nn_imp_n hn
+  let h_nn_eq_succ : Derivable F EqX al Premises
+      (Formula.eq0 nn (.app .succ (.app Term.pd nn))) :=
+    .mp h_nn_ne (ne_zero_eq_succ_pd adm nn)
+  let h_ie_nn_eq := isEven_congr h_nn_eq_succ
+  let h_ie_succ := isEven_succ adm (.app Term.pd nn)
+  -- isEven(nn) =₀ sg_bar(isEven(pd(nn)))
+  let h_ie_nn_sgb := .mp (.mp h_ie_succ (.mp h_ie_nn_eq and_intro)) .trans0
+  -- sg_bar(isEven(pd(nn))) =₀ isEven(nn)
+  let h_sgb_to_nn := Derivable.mp h_ie_nn_sgb .sym0
+  let h_ie_double := isEven_double adm n
+  -- sg_bar(isEven(pd(nn))) =₀ S0
+  let h_sgb_eq := .mp (.mp h_ie_double (.mp h_sgb_to_nn and_intro)) .trans0
+  -- From sg_bar(x) = S0 we need x = 0.
+  -- sg_bar(isEven(pd(nn))) =₀ S0. We do a case split on isEven(pd(nn)):
+  -- If isEven(pd(nn)) = S0: sg_bar(S0) =₀ 0 ≠ S0 — contradiction
+  -- If isEven(pd(nn)) = 0: done
+  let ie_pd_nn := Term.app Term.isEven (.app Term.pd nn)
+  let h_cases := isEven_cases adm (.app Term.pd nn)
+  -- Case isEven(pd(nn)) = S0: derive contradiction
+  let case_s0 : Derivable F EqX al Premises
+      (Formula.eq0 ie_pd_nn (.app .succ .zero) →ᶠ
+       Formula.eq0 ie_pd_nn Term.zero) :=
+    -- H: ie_pd_nn =₀ S0 → sg_bar(ie_pd_nn) =₀ sg_bar(S0)
+    let h_sgb_cond : Derivable F EqX al Premises
+        (Formula.eq0 ie_pd_nn (.app .succ .zero) →ᶠ
+         Formula.eq0 (.app Term.sg_bar ie_pd_nn) (.app Term.sg_bar (.app .succ .zero))) :=
+      qfer_nat_nf (by rfl) (by rfl) I_comb
+        (r := .app Term.sg_bar (.var .vz)) rfl rfl
+    -- sg_bar(S0) =₀ 0
+    let h_sgb_s0 := sg_bar_succ adm (.zero : Term F Γ _)
+    -- H → sg_bar(ie_pd_nn) =₀ 0
+    let h_cond_zero := .syllogism (pair_h h_sgb_cond (weaken_intro h_sgb_s0)) .trans0
+    -- H → S0 =₀ 0 (chain h_sgb_eq sym + cond_zero)
+    let h_to_bad := .syllogism (pair_h
+        (weaken_intro (Derivable.mp h_sgb_eq .sym0))
+        h_cond_zero) .trans0
+    -- S0 =₀ 0 → ⊥ (from succ_ne_zero instantiated at 0)
+    let h_sne : Derivable F EqX al Premises
+        (Formula.eq0 (.app .succ .zero) Term.zero →ᶠ ⊥ᶠ) :=
+      .mp .succ_ne_zero (.forall_ax .zero)
+    -- H → ⊥ → ie_pd_nn =₀ 0
+    .syllogism (.syllogism h_to_bad h_sne) .exfalso
+  -- Case isEven(pd(nn)) = 0: trivially have the goal
+  let case_z : Derivable F EqX al Premises
+      (Formula.eq0 ie_pd_nn Term.zero →ᶠ Formula.eq0 ie_pd_nn Term.zero) := I_comb
+  let h_ie_pd := .mp h_cases (or_elim_rule case_s0 case_z)
+  -- h_ie_pd : isEven(pd(nn)) =₀ 0. Chain with h_ie_chain.
+  .mp (.mp h_ie_pd (.mp h_ie_chain and_intro)) .trans0
 
 -- ── div2(2) =₀ 1 ─────────────────────────────────────────────────────────
 
@@ -3394,6 +4173,431 @@ def eq_Q_sym :
     .syllogism (pair_h (weaken_intro (.mp h_eq .sym0)) I_comb) .trans0
   univ_gen (univ_gen core)
 
+/-- Derive eq_Q(a, b) from proofs that the cross-product and sign·sg parts of eq_Q_dec
+    are both zero.  Handles the eq_Q_dec unfolding internally. -/
+private def eq_Q_from_components {a b : Term F Γ Ty.nat}
+    (h_cross : Derivable F EqX al Premises (Formula.eq0
+      (Term.app2 Term.abs_diff
+        (Term.app2 Term.mul (Term.app Term.rat_num a) (Term.app Term.rat_den b))
+        (Term.app2 Term.mul (Term.app Term.rat_num b) (Term.app Term.rat_den a)))
+      Term.zero))
+    (h_sign : Derivable F EqX al Premises (Formula.eq0
+      (Term.app2 Term.mul
+        (Term.app2 Term.abs_diff (Term.app Term.rat_sign a) (Term.app Term.rat_sign b))
+        (Term.app Term.sg (Term.app2 Term.add (Term.app Term.rat_num a) (Term.app Term.rat_num b))))
+      Term.zero)) :
+    Derivable F EqX al Premises (eq_Q a b) :=
+  let body : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.add
+      (Term.app2 Term.abs_diff
+        (Term.app2 Term.mul (Term.app Term.rat_num (.var (.vs .vz))) (Term.app Term.rat_den (.var .vz)))
+        (Term.app2 Term.mul (Term.app Term.rat_num (.var .vz)) (Term.app Term.rat_den (.var (.vs .vz)))))
+      (Term.app2 Term.mul
+        (Term.app2 Term.abs_diff (Term.app Term.rat_sign (.var (.vs .vz))) (Term.app Term.rat_sign (.var .vz)))
+        (Term.app Term.sg (Term.app2 Term.add (Term.app Term.rat_num (.var (.vs .vz))) (Term.app Term.rat_num (.var .vz)))))
+  have body_eq : (Term.eq_Q_dec : Term F Γ _) = Term.lam (Term.lam body) := by rfl
+  have body_nf : (body.subst0 (b.weaken)).subst0 a =
+      Term.app2 Term.add
+        (Term.app2 Term.abs_diff
+          (Term.app2 Term.mul (Term.app Term.rat_num a) (Term.app Term.rat_den b))
+          (Term.app2 Term.mul (Term.app Term.rat_num b) (Term.app Term.rat_den a)))
+        (Term.app2 Term.mul
+          (Term.app2 Term.abs_diff (Term.app Term.rat_sign a) (Term.app Term.rat_sign b))
+          (Term.app Term.sg (Term.app2 Term.add (Term.app Term.rat_num a) (Term.app Term.rat_num b)))) := by
+    simp only [body, Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+      add_closed_subst, abs_diff_closed_subst, mul_closed_subst, rat_num_closed_subst,
+      rat_den_closed_subst, rat_sign_closed_subst, sg_closed_subst,
+      weaken_subst0_eta]
+  let unfold := body_eq ▸ lam2_correct_nf adm body a b body_nf
+  let h_sum := .mp (.mp h_sign (.mp h_cross and_intro))
+    (.mp (add_eq_zero_iff adm _ _) (.syllogism .and_perm .and_weak))
+  .mp (.mp h_sum (.mp unfold and_intro)) .trans0
+
+/-- Distributivity of ∧ over ∨: `H ∧ (A ∨ B) → (H ∧ A) ∨ (H ∧ B)`. -/
+private def and_or_dist : Derivable F EqX al Premises (Γ := Γ)
+    (H ∧ᶠ (A ∨ᶠ B) →ᶠ (H ∧ᶠ A) ∨ᶠ (H ∧ᶠ B)) :=
+  .syllogism .and_perm
+    (.importation (or_elim_rule
+      (.exportation (.syllogism .and_perm .or_weak))
+      (.exportation (.syllogism .and_perm or_inr))))
+
+/-- From `sg_bar(x) =₀ S0`, derive `x =₀ 0`. -/
+private def sg_bar_eq_S0_implies_zero (x : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.sg_bar x) (.app .succ .zero) →ᶠ Formula.eq0 x .zero) :=
+  let backward : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 x .zero →ᶠ Formula.eq0 (.app Term.sg_bar x) .zero) :=
+    .mp (sg_bar_eq_zero_iff adm x) (.syllogism .and_perm .and_weak)
+  let h_contra : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.sg_bar x) (.app .succ .zero) ∧ᶠ ¬ᶠFormula.eq0 x .zero →ᶠ ⊥ᶠ) :=
+    .syllogism
+      (.syllogism (pair_h (.syllogism .and_weak .sym0) (.syllogism and_proj2 backward)) .trans0)
+      (.mp .succ_ne_zero (.forall_ax (.zero : Term F Γ _)))
+  let h_disj := .mp eq0_decidable' (.forall_ax x)
+  .syllogism (pair_h I_comb (weaken_intro h_disj)) (
+    .syllogism and_or_dist
+      (or_elim_rule and_proj2 (.syllogism h_contra .exfalso)))
+
+/-- x+z =₀ y+z → x =₀ y (right additive cancellation). -/
+private def add_cancel_r {Γ : Ctx ι} (x y z : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add x z) (Term.app2 Term.add y z) →ᶠ
+       Formula.eq0 x y) :=
+  let m1 := monus_cancel adm x z
+  let m2 := monus_cancel adm y z
+  let cond_mon := qfer_nat_nf (by rfl) (by rfl) I_comb
+    (r := Term.app2 Term.monus (.var .vz) z.weaken)
+    (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map, monus_closed_subst]
+        exact congrArg _ (Term.weaken_subst0 z (Term.app2 Term.add x z)))
+    (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map, monus_closed_subst]
+        exact congrArg _ (Term.weaken_subst0 z (Term.app2 Term.add y z)))
+  .syllogism (pair_h (.syllogism (pair_h (weaken_intro_h (.mp m1 .sym0)) cond_mon) .trans0)
+    (weaken_intro_h m2)) .trans0
+
+-- Helpers for doubly-weakened terms under substitution
+private theorem dw_subst0 {Γ : Ctx ι} {F : ι → Ty ι} (t : Term F Γ Ty.nat) (s : Term F Γ Ty.nat) :
+    Term.subst (Term.Subst.ext (σ := Ty.nat) (Term.subst0_map s))
+      (t.weaken (σ := Ty.nat)).weaken = t.weaken := by
+  simp only [Term.weaken]
+  rw [Term.rename_subst, Term.rename_subst, Term.rename_eq_subst]; rfl
+
+private theorem dw_substVar0 {Γ : Ctx ι} {F : ι → Ty ι} (t : Term F Γ Ty.nat)
+    (u : Term F (Ty.nat :: Γ) Ty.nat) :
+    Term.subst (Term.Subst.ext (σ := Ty.nat) (Term.substVar0_map u))
+      (t.weaken (σ := Ty.nat)).weaken = (t.weaken (σ := Ty.nat)).weaken := by
+  simp only [Term.weaken]
+  rw [Term.rename_subst, Term.rename_subst, Term.rename_rename, Term.rename_eq_subst]; rfl
+
+private theorem tw_subst0 {Γ : Ctx ι} {F : ι → Ty ι} (t : Term F Γ Ty.nat)
+    (s : Term F (Ty.nat :: Γ) Ty.nat) :
+    Term.subst (Term.Subst.ext (σ := Ty.nat) (Term.subst0_map s))
+      ((t.weaken (σ := Ty.nat)).weaken (σ := Ty.nat)).weaken = (t.weaken (σ := Ty.nat)).weaken := by
+  simp only [Term.weaken]
+  rw [Term.rename_subst, Term.rename_subst, Term.rename_subst,
+    Term.rename_rename, Term.rename_eq_subst]; rfl
+
+@[simp] private theorem mul_closed_rename {Γ Δ : Ctx ι} (r : Renaming Γ Δ) :
+    (Term.mul : Term F Γ _).rename r = Term.mul := by rfl
+
+private theorem ww_subst_ext_subst0 {Γ : Ctx ι} {F : ι → Ty ι} (t : Term F Γ Ty.nat)
+    (s : Term F Γ Ty.nat) :
+    Term.subst (Term.Subst.ext (σ := Ty.nat) (Term.subst0_map s))
+      ((t.weaken (σ := Ty.nat)).weaken (σ := Ty.nat)) = t.weaken (σ := Ty.nat) := by
+  simp only [Term.weaken]
+  rw [Term.rename_subst, Term.rename_subst, Term.rename_eq_subst]; rfl
+
+private theorem ww_subst_ext_substVar0 {Γ : Ctx ι} {F : ι → Ty ι} (t : Term F Γ Ty.nat)
+    (u : Term F (Ty.nat :: Γ) Ty.nat) :
+    Term.subst (Term.Subst.ext (σ := Ty.nat) (Term.substVar0_map u))
+      ((t.weaken (σ := Ty.nat)).weaken (σ := Ty.nat)) =
+      (t.weaken (σ := Ty.nat)).weaken (σ := Ty.nat) := by
+  simp only [Term.weaken]
+  rw [Term.rename_subst, Term.rename_subst, Term.rename_rename, Term.rename_eq_subst]; rfl
+
+private theorem nww_rename_subst0 {Γ : Ctx ι} {F : ι → Ty ι} (t : Term F Γ Ty.nat)
+    (s : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat) :
+    Term.subst (Term.subst0_map s)
+      (Term.rename (Term.Renaming.ext Term.Renaming.shift)
+        (Term.rename Term.Renaming.shift (Term.rename Term.Renaming.shift t))) =
+    Term.rename Term.Renaming.shift (Term.rename Term.Renaming.shift t) := by
+  rw [Term.rename_subst, Term.rename_subst, Term.rename_subst,
+      Term.rename_rename, Term.rename_eq_subst]; rfl
+
+/-- Step body for mul_cancel_succ induction.
+    In context Ty.nat :: Ty.nat :: Γ: var(vs vz) = x (induction var), var(vz) = y.
+    IH (A.weakenBy) is ∀z. x*S(nww) = z*S(nww) → x = z.
+    Goal: S(x)*S(nww) = y*S(nww) → S(x) = y. -/
+private def mul_cancel_succ_step {Γ : Ctx ι} (n : Term F Γ Ty.nat) :
+    let nww := (n.weaken (σ := Ty.nat)).weaken (σ := Ty.nat)
+    let nwww := nww.weaken (σ := Ty.nat)
+    let xv : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat := .var (.vs .vz)
+    let yv : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat := .var .vz
+    let sxv := Term.app Term.succ xv
+    let inner : Formula F (Ty.nat :: Ty.nat :: Γ) :=
+      Formula.eq0 (Term.app2 Term.mul (.var (.vs .vz)) (.app .succ nww))
+                 (Term.app2 Term.mul (.var .vz) (.app .succ nww))
+      →ᶠ Formula.eq0 (.var (.vs .vz)) (.var .vz)
+    let A : Formula F (Ty.nat :: Γ) := Formula.all Ty.nat inner
+    Derivable F EqX al Premises (A.weakenBy Ty.nat →ᶠ
+      (Formula.eq0 (Term.app2 Term.mul sxv (.app .succ nww))
+                   (Term.app2 Term.mul yv (.app .succ nww))
+       →ᶠ Formula.eq0 sxv yv)) :=
+  let nww := (n.weaken (σ := Ty.nat)).weaken (σ := Ty.nat)
+  let nwww := nww.weaken (σ := Ty.nat)
+  let xv : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat := .var (.vs .vz)
+  let yv : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat := .var .vz
+  let sxv := Term.app Term.succ xv
+  let snww := Term.app Term.succ nww
+  let pdy := Term.app Term.pd yv
+  let inner : Formula F (Ty.nat :: Ty.nat :: Γ) :=
+    Formula.eq0 (Term.app2 Term.mul (.var (.vs .vz)) snww)
+               (Term.app2 Term.mul (.var .vz) snww)
+    →ᶠ Formula.eq0 (.var (.vs .vz)) (.var .vz)
+  let A : Formula F (Ty.nat :: Γ) := Formula.all Ty.nat inner
+  -- IH instantiated at pd(y): x*S(nww) = pd(y)*S(nww) → x = pd(y)
+  have ih_nf : (inner.renameF (Renaming.ext Renaming.shift)).subst0 pdy =
+      (Formula.eq0 (Term.app2 Term.mul xv snww)
+                   (Term.app2 Term.mul pdy snww)
+       →ᶠ Formula.eq0 xv pdy) := by
+    simp only [inner, snww, nww, Formula.renameF, Formula.subst0, Formula.substF,
+      Term.rename, Term.subst, Term.Renaming.ext,
+      Term.subst0_map, Term.app2,
+      mul_closed_subst, mul_closed_rename, Term.weaken,
+      nww_rename_subst0]; rfl
+  let ih_at_pdy := Eq.mp (congrArg (fun f => Derivable F EqX al Premises
+    (A.weakenBy Ty.nat →ᶠ f)) ih_nf) (Derivable.forall_ax pdy)
+  -- Case y = 0: S(x)*S(nww) = 0 contradicts succ_ne_zero
+  let mul_zero_eq : Derivable F EqX al Premises
+      (Formula.eq0 yv .zero →ᶠ
+       Formula.eq0 (Term.app2 Term.mul yv snww) .zero) :=
+    .syllogism (pair_h
+      (qfer_nat_nf (by rfl) (by rfl) I_comb
+        (r := Term.app2 Term.mul (.var .vz) snww.weaken)
+        (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map, mul_closed_subst]
+            exact congrArg _ (Term.weaken_subst0 snww yv))
+        (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map, mul_closed_subst]
+            exact congrArg _ (Term.weaken_subst0 snww .zero)))
+      (weaken_intro_h (mul_zero_l adm snww))) .trans0
+  let sxv_mul_ne_zero : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul sxv snww) .zero →ᶠ ⊥ᶠ) :=
+    .syllogism (.mp (mul_eq_zero_iff adm sxv snww) .and_weak)
+      (or_elim_rule
+        (.mp .succ_ne_zero (.forall_ax xv))
+        (.mp .succ_ne_zero (.forall_ax nww)))
+  let case_y0 : Derivable F EqX al Premises
+      (Formula.eq0 yv .zero →ᶠ
+       (A.weakenBy Ty.nat →ᶠ
+        (Formula.eq0 (Term.app2 Term.mul sxv snww)
+                    (Term.app2 Term.mul yv snww) →ᶠ Formula.eq0 sxv yv))) :=
+    .exportation (.exportation (.syllogism
+      (pair_h and_proj2 (.syllogism (.syllogism .and_weak .and_weak) mul_zero_eq))
+      (.syllogism .trans0 (.syllogism sxv_mul_ne_zero .exfalso))))
+  -- Case y ≠ 0:
+  -- mul_succ_l: S(x)*S(nww) = x*S(nww) + S(nww)
+  let msl_sx := mul_succ_l adm xv snww
+  -- y ≠ 0 → y = S(pd(y)), so y*S(nww) = S(pd(y))*S(nww) = pd(y)*S(nww) + S(nww)
+  let ne_succ := ne_zero_eq_succ_pd adm yv
+  let msl_pdy := mul_succ_l adm pdy snww
+  let y_mul_eq : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 yv .zero →ᶠ
+       Formula.eq0 (Term.app2 Term.mul yv snww)
+                   (Term.app2 Term.add (Term.app2 Term.mul pdy snww) snww)) :=
+    .syllogism (pair_h
+      (qfer_nat_nf (by rfl) (by rfl) ne_succ
+        (r := Term.app2 Term.mul (.var .vz) snww.weaken)
+        (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map, mul_closed_subst]
+            exact congrArg _ (Term.weaken_subst0 snww yv))
+        (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map, mul_closed_subst]
+            exact congrArg _ (Term.weaken_subst0 snww (.app Term.succ pdy))))
+      (weaken_intro_h msl_pdy)) .trans0
+  -- Chain: S(x)*S(nww) = x*S(nww)+S(nww), y*S(nww) = pd(y)*S(nww)+S(nww)
+  -- From hyp + chains: x*S(nww)+S(nww) = pd(y)*S(nww)+S(nww)
+  -- By add_cancel_r: x*S(nww) = pd(y)*S(nww)
+  -- By IH: x = pd(y)
+  -- S(x) = S(pd(y)) = y
+  let succ_congr : Derivable F EqX al Premises
+      (Formula.eq0 xv pdy →ᶠ Formula.eq0 sxv (.app .succ pdy)) :=
+    qfer_nat_nf (by rfl) (by rfl) I_comb (r := .app .succ (.var .vz)) rfl rfl
+  let case_yne0 : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 yv .zero →ᶠ
+       (A.weakenBy Ty.nat →ᶠ
+        (Formula.eq0 (Term.app2 Term.mul sxv snww)
+                    (Term.app2 Term.mul yv snww) →ᶠ Formula.eq0 sxv yv))) :=
+    .exportation (.exportation (
+    -- Hypothesis context (left-assoc): (¬(y=0) ∧ IH) ∧ hyp
+    let get_hyp := @and_proj2 _ F EqX al Premises _
+      (¬ᶠFormula.eq0 yv .zero ∧ᶠ A.weakenBy Ty.nat)
+      (Formula.eq0 (Term.app2 Term.mul sxv snww) (Term.app2 Term.mul yv snww))
+    let get_ne : Derivable F EqX al Premises
+        (¬ᶠFormula.eq0 yv .zero ∧ᶠ A.weakenBy Ty.nat ∧ᶠ
+         Formula.eq0 (Term.app2 Term.mul sxv snww) (Term.app2 Term.mul yv snww) →ᶠ
+         ¬ᶠFormula.eq0 yv .zero) :=
+      .syllogism .and_weak .and_weak
+    let chain1 : Derivable F EqX al Premises
+        (¬ᶠFormula.eq0 yv .zero ∧ᶠ A.weakenBy Ty.nat ∧ᶠ
+         Formula.eq0 (Term.app2 Term.mul sxv snww) (Term.app2 Term.mul yv snww) →ᶠ
+         Formula.eq0 (Term.app2 Term.add (Term.app2 Term.mul xv snww) snww)
+                     (Term.app2 Term.mul yv snww)) :=
+      .syllogism (pair_h (weaken_intro_h (.mp msl_sx .sym0)) get_hyp) .trans0
+    let chain2 : Derivable F EqX al Premises
+        (¬ᶠFormula.eq0 yv .zero ∧ᶠ A.weakenBy Ty.nat ∧ᶠ
+         Formula.eq0 (Term.app2 Term.mul sxv snww) (Term.app2 Term.mul yv snww) →ᶠ
+         Formula.eq0 (Term.app2 Term.add (Term.app2 Term.mul xv snww) snww)
+                     (Term.app2 Term.add (Term.app2 Term.mul pdy snww) snww)) :=
+      .syllogism (pair_h chain1 (.syllogism get_ne y_mul_eq)) .trans0
+    let chain3 : Derivable F EqX al Premises
+        (¬ᶠFormula.eq0 yv .zero ∧ᶠ A.weakenBy Ty.nat ∧ᶠ
+         Formula.eq0 (Term.app2 Term.mul sxv snww) (Term.app2 Term.mul yv snww) →ᶠ
+         Formula.eq0 (Term.app2 Term.mul xv snww) (Term.app2 Term.mul pdy snww)) :=
+      .syllogism chain2 (add_cancel_r adm _ _ snww)
+    let get_ih : Derivable F EqX al Premises
+        (¬ᶠFormula.eq0 yv .zero ∧ᶠ A.weakenBy Ty.nat ∧ᶠ
+         Formula.eq0 (Term.app2 Term.mul sxv snww) (Term.app2 Term.mul yv snww) →ᶠ
+         A.weakenBy Ty.nat) :=
+      .syllogism .and_weak and_proj2
+    let chain4 : Derivable F EqX al Premises
+        (¬ᶠFormula.eq0 yv .zero ∧ᶠ A.weakenBy Ty.nat ∧ᶠ
+         Formula.eq0 (Term.app2 Term.mul sxv snww) (Term.app2 Term.mul yv snww) →ᶠ
+         Formula.eq0 xv pdy) :=
+      .syllogism (pair_h get_ih chain3) (.importation ih_at_pdy)
+    let chain5 : Derivable F EqX al Premises
+        (¬ᶠFormula.eq0 yv .zero ∧ᶠ A.weakenBy Ty.nat ∧ᶠ
+         Formula.eq0 (Term.app2 Term.mul sxv snww) (Term.app2 Term.mul yv snww) →ᶠ
+         Formula.eq0 sxv yv) :=
+      .syllogism (pair_h (.syllogism chain4 succ_congr)
+        (.syllogism get_ne (.syllogism ne_succ .sym0))) .trans0
+    chain5))
+  -- Combine via case analysis
+  let dec := .mp eq0_decidable' (.forall_ax yv)
+  .mp dec (or_elim_rule case_y0 case_yne0)
+
+/-- x*S(n) =₀ y*S(n) → x =₀ y (multiplicative cancellation for successor). -/
+private def mul_cancel_succ {Γ : Ctx ι} (x y n : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul x (.app .succ n))
+                   (Term.app2 Term.mul y (.app .succ n)) →ᶠ
+       Formula.eq0 x y) :=
+  let nw := n.weaken (σ := Ty.nat)
+  let nww := nw.weaken (σ := Ty.nat)
+  let inner : Formula F (Ty.nat :: Ty.nat :: Γ) :=
+    Formula.eq0 (Term.app2 Term.mul (.var (.vs .vz)) (.app .succ nww))
+               (Term.app2 Term.mul (.var .vz) (.app .succ nww))
+    →ᶠ Formula.eq0 (.var (.vs .vz)) (.var .vz)
+  let A : Formula F (Ty.nat :: Γ) := Formula.all Ty.nat inner
+  -- Base: ∀y. mul(0, S(n)) = mul(y, S(n)) → 0 = y
+  have base_nf : A.subst0 Term.zero =
+      Formula.all Ty.nat (
+        Formula.eq0 (Term.app2 Term.mul Term.zero (.app .succ nw))
+                   (Term.app2 Term.mul (.var .vz) (.app .succ nw))
+        →ᶠ Formula.eq0 Term.zero (.var .vz)) := by
+    simp only [A, inner, nww, nw, Formula.subst0, Formula.substF, Term.subst,
+      Term.subst0_map, Term.Subst.ext, Term.app2, mul_closed_subst,
+      ww_subst_ext_subst0]; rfl
+  have base_body : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul Term.zero (.app .succ nw))
+                   (Term.app2 Term.mul (.var .vz) (.app .succ nw))
+       →ᶠ Formula.eq0 Term.zero (.var .vz)) :=
+    let snw := Term.app Term.succ nw
+    let yv : Term F (Ty.nat :: Γ) Ty.nat := .var .vz
+    let mzl := mul_zero_l adm snw
+    let y_mul_ne : Derivable F EqX al Premises
+        (Formula.eq0 (Term.app2 Term.mul yv snw) .zero →ᶠ
+         Formula.eq0 yv .zero ∨ᶠ Formula.eq0 snw .zero) :=
+      .mp (mul_eq_zero_iff adm yv snw) .and_weak
+    let snw_ne : Derivable F EqX al Premises
+        (Formula.eq0 snw .zero →ᶠ ⊥ᶠ) :=
+      .mp .succ_ne_zero (.forall_ax nw)
+    .syllogism
+      (pair_h (.syllogism (weaken_intro_h (.mp mzl .sym0)) I_comb) I_comb)
+      (.syllogism .trans0
+        (.syllogism (.syllogism .sym0 y_mul_ne)
+          (or_elim_rule (.syllogism .sym0 I_comb) (.syllogism snw_ne .exfalso))))
+  have base := base_nf ▸ univ_gen base_body
+  -- Step: A(x) → A(S(x)) via mul_cancel_succ_step
+  have step_nf : Formula.substVar0 A (.app .succ (.var .vz)) =
+      Formula.all Ty.nat (
+        Formula.eq0 (Term.app2 Term.mul (.app .succ (.var (.vs .vz))) (.app .succ nww))
+                   (Term.app2 Term.mul (.var .vz) (.app .succ nww))
+        →ᶠ Formula.eq0 (.app .succ (.var (.vs .vz))) (.var .vz)) := by
+    simp only [A, inner, nww, nw, Formula.substVar0, Formula.substF, Term.subst,
+      Term.substVar0_map, Term.Subst.ext, Term.app2, mul_closed_subst,
+      ww_subst_ext_substVar0]; rfl
+  have step_body : Derivable F EqX al Premises
+      (A →ᶠ Formula.substVar0 A (.app .succ (.var .vz))) :=
+    step_nf ▸ Derivable.forall_rule (mul_cancel_succ_step adm n)
+  -- Induction + double instantiation
+  have inst_nf : (inner.substF (Term.Subst.ext (Term.subst0_map x))).subst0 y =
+      (Formula.eq0 (Term.app2 Term.mul x (.app .succ n))
+                   (Term.app2 Term.mul y (.app .succ n)) →ᶠ Formula.eq0 x y) := by
+    simp only [inner, nww, nw, Formula.subst0, Formula.substF, Term.subst,
+      Term.subst0_map, Term.Subst.ext, Term.app2, mul_closed_subst,
+      ww_subst_ext_subst0, weaken_subst0_eta]
+  inst_nf ▸
+    .mp (.mp (Derivable.induction base (univ_gen step_body)) (.forall_ax x)) (.forall_ax y)
+
+/-- abs_diff(x,y) = 0 ∧ P → x = y -/
+private def abs_diff_zero_fwd {Γ : Ctx ι} (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.abs_diff x y) .zero →ᶠ Formula.eq0 x y) :=
+  .mp (abs_diff_eq_zero_iff adm x y) .and_weak
+
+/-- rat_den(x) =₀ S(snd_pair(x)). -/
+private def rat_den_unfold_eq (x : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_den x) (.app .succ (.app Term.snd_pair x))) :=
+  let rat_den_body : Term F (Ty.nat :: Γ) Ty.nat :=
+    .app .succ (.app Term.snd_pair (.var .vz))
+  lam_correct_nf rat_den_body x (by
+    simp only [rat_den_body, Term.subst0, Term.subst, Term.subst0_map,
+      snd_pair_closed_subst])
+
+/-- From x*S(k) =₀ 0, derive x =₀ 0 (using succ_ne_zero). -/
+private def mul_succ_eq_zero_imp (x k : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul x (.app .succ k)) .zero →ᶠ
+       Formula.eq0 x .zero) :=
+  let fwd := .mp (mul_eq_zero_iff adm x (.app .succ k)) .and_weak
+  let ne := .mp .succ_ne_zero (.forall_ax k)
+  .syllogism fwd (or_elim_rule I_comb (.syllogism ne .exfalso))
+
+/-- sg(n) =₀ 0 → n =₀ 0. -/
+private def sg_zero_fwd (n : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.sg n) .zero →ᶠ Formula.eq0 n .zero) :=
+  let dec := .mp eq0_decidable' (.forall_ax n)
+  let pd_n := Term.app Term.pd n
+  let n_eq_spd := ne_zero_eq_succ_pd adm n
+  let sg_step : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 n .zero →ᶠ
+       Formula.eq0 (.app Term.sg n) (.app Term.sg (.app .succ pd_n))) :=
+    qfer_nat_nf (by rfl) (by rfl) n_eq_spd
+      (r := .app Term.sg (.var .vz))
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map, sg_closed_subst])
+      (by simp only [pd_n, Term.subst0, Term.subst, Term.subst0_map, sg_closed_subst])
+  let sg_is_one : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 n .zero →ᶠ
+       Formula.eq0 (.app Term.sg n) (.app .succ .zero)) :=
+    .syllogism sg_step
+      (.syllogism (pair_h I_comb (weaken_intro_h (sg_succ adm pd_n))) .trans0)
+  let case1 : Derivable F EqX al Premises
+      (Formula.eq0 n .zero →ᶠ
+       (Formula.eq0 (.app Term.sg n) .zero →ᶠ Formula.eq0 n .zero)) :=
+    .exportation .and_weak
+  let case2 : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 n .zero →ᶠ
+       (Formula.eq0 (.app Term.sg n) .zero →ᶠ Formula.eq0 n .zero)) :=
+    .exportation (.syllogism
+      (pair_h (.syllogism .and_weak sg_is_one) and_proj2)
+      (.syllogism
+        (.syllogism (pair_h (.syllogism .and_weak .sym0) and_proj2)
+          (.syllogism .trans0 (.mp .succ_ne_zero (.forall_ax (.zero : Term F Γ _)))))
+        .exfalso))
+  .mp dec (or_elim_rule case1 case2)
+
+/-- s =₀ t →ᶠ s·u =₀ t·u (formula-level left multiplication congr). -/
+private def mul_congr_l_imp {s t : Term F Γ Ty.nat} (u : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 s t →ᶠ
+       Formula.eq0 (Term.app2 Term.mul s u) (Term.app2 Term.mul t u)) :=
+  qfer_nat_nf (by rfl) (by rfl) I_comb
+    (r := Term.app2 Term.mul (.var .vz) u.weaken)
+    (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map,
+        mul_closed_subst, weaken_subst0_eta])
+    (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map,
+        mul_closed_subst, weaken_subst0_eta])
+
+/-- s =₀ t →ᶠ u·s =₀ u·t (formula-level right multiplication congr). -/
+private def mul_congr_r_imp {s t : Term F Γ Ty.nat} (u : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 s t →ᶠ
+       Formula.eq0 (Term.app2 Term.mul u s) (Term.app2 Term.mul u t)) :=
+  qfer_nat_nf (by rfl) (by rfl) I_comb
+    (r := Term.app2 Term.mul u.weaken (.var .vz))
+    (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map,
+        mul_closed_subst, weaken_subst0_eta])
+    (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map,
+        mul_closed_subst, weaken_subst0_eta])
+
 /-- ⊢ ∀a,b,c. eq_Q(a, b) ∧ eq_Q(b, c) → eq_Q(a, c) -/
 def eq_Q_trans :
     Derivable F EqX al Premises (Γ := Γ)
@@ -3401,9 +4605,338 @@ def eq_Q_trans :
         (eq_Q (.var (.vs (.vs .vz))) (.var (.vs .vz))
           ∧ᶠ eq_Q (.var (.vs .vz)) (.var .vz)
           →ᶠ eq_Q (.var (.vs (.vs .vz))) (.var .vz))))) :=
-  sorry
+  let a : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat := .var (.vs (.vs .vz))
+  let b : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat := .var (.vs .vz)
+  let c : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat := .var .vz
+  let na := Term.app Term.rat_num a
+  let nb := Term.app Term.rat_num b
+  let nc := Term.app Term.rat_num c
+  let da := Term.app Term.rat_den a
+  let db := Term.app Term.rat_den b
+  let dc := Term.app Term.rat_den c
+  let sa := Term.app Term.rat_sign a
+  let sb := Term.app Term.rat_sign b
+  let sc := Term.app Term.rat_sign c
+  -- eq_Q_dec body (in context with two variables)
+  let body : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.add
+      (Term.app2 Term.abs_diff
+        (Term.app2 Term.mul (Term.app Term.rat_num (.var (.vs .vz)))
+          (Term.app Term.rat_den (.var .vz)))
+        (Term.app2 Term.mul (Term.app Term.rat_num (.var .vz))
+          (Term.app Term.rat_den (.var (.vs .vz)))))
+      (Term.app2 Term.mul
+        (Term.app2 Term.abs_diff (Term.app Term.rat_sign (.var (.vs .vz)))
+          (Term.app Term.rat_sign (.var .vz)))
+        (Term.app Term.sg (Term.app2 Term.add (Term.app Term.rat_num (.var (.vs .vz)))
+          (Term.app Term.rat_num (.var .vz)))))
+  have body_eq : (Term.eq_Q_dec : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Γ) _) =
+      Term.lam (Term.lam body) := by rfl
+  -- Normal form for eq_Q_dec(a,b)
+  have body_nf_ab : (body.subst0 (b.weaken)).subst0 a =
+      Term.app2 Term.add
+        (Term.app2 Term.abs_diff (Term.app2 Term.mul na db)
+          (Term.app2 Term.mul nb da))
+        (Term.app2 Term.mul (Term.app2 Term.abs_diff sa sb)
+          (Term.app Term.sg (Term.app2 Term.add na nb))) := by
+    simp only [body, a, b, na, nb, da, db, sa, sb,
+      Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+      add_closed_subst, abs_diff_closed_subst, mul_closed_subst, rat_num_closed_subst,
+      rat_den_closed_subst, rat_sign_closed_subst, sg_closed_subst,
+      Term.weaken, Term.rename, Term.Renaming.shift]
+  -- Normal form for eq_Q_dec(b,c)
+  have body_nf_bc : (body.subst0 (c.weaken)).subst0 b =
+      Term.app2 Term.add
+        (Term.app2 Term.abs_diff (Term.app2 Term.mul nb dc)
+          (Term.app2 Term.mul nc db))
+        (Term.app2 Term.mul (Term.app2 Term.abs_diff sb sc)
+          (Term.app Term.sg (Term.app2 Term.add nb nc))) := by
+    simp only [body, b, c, nb, nc, db, dc, sb, sc,
+      Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+      add_closed_subst, abs_diff_closed_subst, mul_closed_subst, rat_num_closed_subst,
+      rat_den_closed_subst, rat_sign_closed_subst, sg_closed_subst,
+      Term.weaken, Term.rename, Term.Renaming.shift]
+  let unfold_ab := body_eq ▸ lam2_correct_nf adm body a b body_nf_ab
+  let unfold_bc := body_eq ▸ lam2_correct_nf adm body b c body_nf_bc
+  -- Abbreviations for the cross and sign NF terms
+  let cross_ab := Term.app2 Term.abs_diff (Term.app2 Term.mul na db) (Term.app2 Term.mul nb da)
+  let sign_ab := Term.app2 Term.mul (Term.app2 Term.abs_diff sa sb)
+      (Term.app Term.sg (Term.app2 Term.add na nb))
+  let cross_bc := Term.app2 Term.abs_diff (Term.app2 Term.mul nb dc) (Term.app2 Term.mul nc db)
+  let sign_bc := Term.app2 Term.mul (Term.app2 Term.abs_diff sb sc)
+      (Term.app Term.sg (Term.app2 Term.add nb nc))
+  -- H = eq_Q(a,b) ∧ eq_Q(b,c)
+  -- Extract: H → NF_ab = 0 and H → NF_bc = 0
+  let H_to_nf_ab : Derivable F EqX al Premises
+      (eq_Q a b ∧ᶠ eq_Q b c →ᶠ
+       Formula.eq0 (Term.app2 Term.add cross_ab sign_ab) .zero) :=
+    .syllogism .and_weak
+      (.syllogism (pair_h (weaken_intro_h (.mp unfold_ab .sym0)) I_comb) .trans0)
+  let H_to_nf_bc : Derivable F EqX al Premises
+      (eq_Q a b ∧ᶠ eq_Q b c →ᶠ
+       Formula.eq0 (Term.app2 Term.add cross_bc sign_bc) .zero) :=
+    .syllogism and_proj2
+      (.syllogism (pair_h (weaken_intro_h (.mp unfold_bc .sym0)) I_comb) .trans0)
+  -- Extract cross and sign from each
+  let aez_ab := add_eq_zero_iff adm cross_ab sign_ab
+  let H_to_cross_ab0 : Derivable F EqX al Premises
+      (eq_Q a b ∧ᶠ eq_Q b c →ᶠ Formula.eq0 cross_ab .zero) :=
+    .syllogism H_to_nf_ab (.syllogism (.mp aez_ab .and_weak) .and_weak)
+  let H_to_sign_ab0 : Derivable F EqX al Premises
+      (eq_Q a b ∧ᶠ eq_Q b c →ᶠ Formula.eq0 sign_ab .zero) :=
+    .syllogism H_to_nf_ab (.syllogism (.mp aez_ab .and_weak) and_proj2)
+  let aez_bc := add_eq_zero_iff adm cross_bc sign_bc
+  let H_to_cross_bc0 : Derivable F EqX al Premises
+      (eq_Q a b ∧ᶠ eq_Q b c →ᶠ Formula.eq0 cross_bc .zero) :=
+    .syllogism H_to_nf_bc (.syllogism (.mp aez_bc .and_weak) .and_weak)
+  let H_to_sign_bc0 : Derivable F EqX al Premises
+      (eq_Q a b ∧ᶠ eq_Q b c →ᶠ Formula.eq0 sign_bc .zero) :=
+    .syllogism H_to_nf_bc (.syllogism (.mp aez_bc .and_weak) and_proj2)
+  -- H → na·db = nb·da and H → nb·dc = nc·db
+  let H_to_eq_ab : Derivable F EqX al Premises
+      (eq_Q a b ∧ᶠ eq_Q b c →ᶠ
+       Formula.eq0 (Term.app2 Term.mul na db) (Term.app2 Term.mul nb da)) :=
+    .syllogism H_to_cross_ab0 (abs_diff_zero_fwd adm _ _)
+  let H_to_eq_bc : Derivable F EqX al Premises
+      (eq_Q a b ∧ᶠ eq_Q b c →ᶠ
+       Formula.eq0 (Term.app2 Term.mul nb dc) (Term.app2 Term.mul nc db)) :=
+    .syllogism H_to_cross_bc0 (abs_diff_zero_fwd adm _ _)
+  -- ══════════════════════════════════════════════════════════════════════
+  -- CROSS PART: H → na·dc = nc·da
+  -- Strategy: (na·dc)·db = (nc·da)·db, then cancel db = S(snd_pair(b))
+  -- ══════════════════════════════════════════════════════════════════════
+  -- Chain: (na·db)·dc = (nb·da)·dc
+  let H_to_step1 : Derivable F EqX al Premises
+      (eq_Q a b ∧ᶠ eq_Q b c →ᶠ
+       Formula.eq0 (Term.app2 Term.mul (Term.app2 Term.mul na db) dc)
+                   (Term.app2 Term.mul (Term.app2 Term.mul nb da) dc)) :=
+    .syllogism H_to_eq_ab (mul_congr_l_imp dc)
+  let assoc1 := mul_assoc adm na db dc
+  let assoc2 := mul_assoc adm nb da dc
+  -- H → na·(db·dc) = nb·(da·dc)
+  let H_to_step2 : Derivable F EqX al Premises
+      (eq_Q a b ∧ᶠ eq_Q b c →ᶠ
+       Formula.eq0 (Term.app2 Term.mul na (Term.app2 Term.mul db dc))
+                   (Term.app2 Term.mul nb (Term.app2 Term.mul da dc))) :=
+    .syllogism (pair_h (weaken_intro_h (.mp assoc1 .sym0)) H_to_step1) .trans0
+    |> fun h => .syllogism (pair_h h (weaken_intro_h assoc2)) .trans0
+  -- Chain: (nb·dc)·da = (nc·db)·da
+  let H_to_step3 : Derivable F EqX al Premises
+      (eq_Q a b ∧ᶠ eq_Q b c →ᶠ
+       Formula.eq0 (Term.app2 Term.mul (Term.app2 Term.mul nb dc) da)
+                   (Term.app2 Term.mul (Term.app2 Term.mul nc db) da)) :=
+    .syllogism H_to_eq_bc (mul_congr_l_imp da)
+  let assoc3 := mul_assoc adm nb dc da
+  let assoc4 := mul_assoc adm nc db da
+  -- H → nb·(dc·da) = nc·(db·da)
+  let H_to_step4 : Derivable F EqX al Premises
+      (eq_Q a b ∧ᶠ eq_Q b c →ᶠ
+       Formula.eq0 (Term.app2 Term.mul nb (Term.app2 Term.mul dc da))
+                   (Term.app2 Term.mul nc (Term.app2 Term.mul db da))) :=
+    .syllogism (pair_h (weaken_intro_h (.mp assoc3 .sym0)) H_to_step3) .trans0
+    |> fun h => .syllogism (pair_h h (weaken_intro_h assoc4)) .trans0
+  -- nb·(da·dc) = nb·(dc·da) via comm
+  let cong1 := mul_congr_r nb (mul_comm adm da dc)
+  -- H → na·(db·dc) = nc·(db·da)
+  let H_to_step5 : Derivable F EqX al Premises
+      (eq_Q a b ∧ᶠ eq_Q b c →ᶠ
+       Formula.eq0 (Term.app2 Term.mul na (Term.app2 Term.mul db dc))
+                   (Term.app2 Term.mul nc (Term.app2 Term.mul db da))) :=
+    .syllogism (pair_h H_to_step2 (weaken_intro_h cong1)) .trans0
+    |> fun h => .syllogism (pair_h h H_to_step4) .trans0
+  -- Rearrange LHS: (na·dc)·db = na·(dc·db) = na·(db·dc) (standalone)
+  let assoc5 := mul_assoc adm na dc db
+  let cong2 := mul_congr_r na (mul_comm adm dc db)
+  let lhs_eq : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul (Term.app2 Term.mul na dc) db)
+                   (Term.app2 Term.mul na (Term.app2 Term.mul db dc))) :=
+    .mp (.mp cong2 (.mp assoc5 and_intro)) .trans0
+  -- Rearrange RHS: nc·(db·da) = nc·(da·db) = (nc·da)·db (standalone)
+  let cong3 := mul_congr_r nc (mul_comm adm db da)
+  let assoc6 := mul_assoc adm nc da db
+  let rhs_eq : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul nc (Term.app2 Term.mul db da))
+                   (Term.app2 Term.mul (Term.app2 Term.mul nc da) db)) :=
+    .mp (.mp (.mp assoc6 .sym0) (.mp cong3 and_intro)) .trans0
+  -- H → (na·dc)·db = (nc·da)·db
+  let H_to_prod_eq : Derivable F EqX al Premises
+      (eq_Q a b ∧ᶠ eq_Q b c →ᶠ
+       Formula.eq0 (Term.app2 Term.mul (Term.app2 Term.mul na dc) db)
+                   (Term.app2 Term.mul (Term.app2 Term.mul nc da) db)) :=
+    .syllogism (pair_h (weaken_intro_h lhs_eq) H_to_step5) .trans0
+    |> fun h => .syllogism (pair_h h (weaken_intro_h rhs_eq)) .trans0
+  -- db = S(snd_pair(b)), so cancel
+  let db_eq := rat_den_unfold_eq b
+  let spb := Term.app Term.snd_pair b
+  -- H → (na·dc)·S(spb) = (nc·da)·S(spb)
+  let cong_db_l := mul_congr_r (Term.app2 Term.mul na dc) db_eq
+  let cong_db_r := mul_congr_r (Term.app2 Term.mul nc da) db_eq
+  let H_to_prod_eq' : Derivable F EqX al Premises
+      (eq_Q a b ∧ᶠ eq_Q b c →ᶠ
+       Formula.eq0 (Term.app2 Term.mul (Term.app2 Term.mul na dc) (.app .succ spb))
+                   (Term.app2 Term.mul (Term.app2 Term.mul nc da) (.app .succ spb))) :=
+    .syllogism (pair_h (weaken_intro_h (.mp cong_db_l .sym0)) H_to_prod_eq) .trans0
+    |> fun h => .syllogism (pair_h h (weaken_intro_h cong_db_r)) .trans0
+  -- Cancel: H → na·dc = nc·da
+  let H_to_cross_eq : Derivable F EqX al Premises
+      (eq_Q a b ∧ᶠ eq_Q b c →ᶠ
+       Formula.eq0 (Term.app2 Term.mul na dc) (Term.app2 Term.mul nc da)) :=
+    .syllogism H_to_prod_eq' (mul_cancel_succ adm _ _ spb)
+  -- H → |na·dc - nc·da| = 0
+  let H_to_cross_ac : Derivable F EqX al Premises
+      (eq_Q a b ∧ᶠ eq_Q b c →ᶠ
+       Formula.eq0 (Term.app2 Term.abs_diff (Term.app2 Term.mul na dc)
+         (Term.app2 Term.mul nc da)) .zero) :=
+    .syllogism H_to_cross_eq
+      (.mp (abs_diff_eq_zero_iff adm _ _) (.syllogism .and_perm .and_weak))
+  -- ══════════════════════════════════════════════════════════════════════
+  -- SIGN PART: H → |sa - sc| · sg(na + nc) = 0
+  -- ══════════════════════════════════════════════════════════════════════
+  -- Helper: x·db=0 → x=0 (since db = S(spb))
+  let mul_db_zero (x : Term F _ Ty.nat) : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul x db) .zero →ᶠ Formula.eq0 x .zero) :=
+    .syllogism
+      (pair_h (weaken_intro_h (.mp (mul_congr_r x db_eq) .sym0)) I_comb)
+      (.syllogism .trans0 (mul_succ_eq_zero_imp adm x spb))
+  -- Helper: na+nc=0 → sg(na+nc)=0
+  let add_nc_to_sg : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add na nc) .zero →ᶠ
+       Formula.eq0 (.app Term.sg (Term.app2 Term.add na nc)) .zero) :=
+    .syllogism
+      (qfer_nat_nf (by rfl) (by rfl) I_comb (r := .app Term.sg (.var .vz))
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, sg_closed_subst])
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, sg_closed_subst]))
+      (.syllogism (pair_h I_comb (weaken_intro_h (sg_zero (Premises := Premises)))) .trans0)
+  -- Helper: x=0 → x·y=0
+  let zero_mul (x y : Term F _ Ty.nat) : Derivable F EqX al Premises
+      (Formula.eq0 x .zero →ᶠ Formula.eq0 (Term.app2 Term.mul x y) .zero) :=
+    .syllogism (mul_congr_l_imp (s := x) (t := .zero) y)
+      (.syllogism (pair_h I_comb (weaken_intro_h (mul_zero_l adm y))) .trans0)
+  -- Helper: sg(x+y)=0 → x=0 ∧ y=0
+  let sg_add_parts (x y : Term F _ Ty.nat) : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.sg (Term.app2 Term.add x y)) .zero →ᶠ
+       Formula.eq0 x .zero ∧ᶠ Formula.eq0 y .zero) :=
+    .syllogism (sg_zero_fwd adm _) (Derivable.mp (add_eq_zero_iff adm x y) .and_weak)
+  -- Abbreviation for target disjunction
+  let sign_disj := Formula.eq0 (Term.app2 Term.abs_diff sa sc) .zero
+      ∨ᶠ Formula.eq0 (.app Term.sg (Term.app2 Term.add na nc)) .zero
+  -- H disjunctions
+  let mez_ab_fwd : Derivable F EqX al Premises
+      (Formula.eq0 sign_ab .zero →ᶠ
+       Formula.eq0 (Term.app2 Term.abs_diff sa sb) .zero
+       ∨ᶠ Formula.eq0 (.app Term.sg (Term.app2 Term.add na nb)) .zero) :=
+    Derivable.mp (mul_eq_zero_iff adm _ _) Derivable.and_weak
+  let mez_bc_fwd : Derivable F EqX al Premises
+      (Formula.eq0 sign_bc .zero →ᶠ
+       Formula.eq0 (Term.app2 Term.abs_diff sb sc) .zero
+       ∨ᶠ Formula.eq0 (.app Term.sg (Term.app2 Term.add nb nc)) .zero) :=
+    Derivable.mp (mul_eq_zero_iff adm _ _) Derivable.and_weak
+  let H_to_disj_ab : Derivable F EqX al Premises
+      (eq_Q a b ∧ᶠ eq_Q b c →ᶠ
+       Formula.eq0 (Term.app2 Term.abs_diff sa sb) .zero
+       ∨ᶠ Formula.eq0 (.app Term.sg (Term.app2 Term.add na nb)) .zero) :=
+    .syllogism H_to_sign_ab0 mez_ab_fwd
+  let H_to_disj_bc : Derivable F EqX al Premises
+      (eq_Q a b ∧ᶠ eq_Q b c →ᶠ
+       Formula.eq0 (Term.app2 Term.abs_diff sb sc) .zero
+       ∨ᶠ Formula.eq0 (.app Term.sg (Term.app2 Term.add nb nc)) .zero) :=
+    .syllogism H_to_sign_bc0 mez_bc_fwd
+  -- CASE A: H ∧ sg(na+nb)=0 → sign_disj
+  let case_A : Derivable F EqX al Premises
+      ((eq_Q a b ∧ᶠ eq_Q b c)
+       ∧ᶠ Formula.eq0 (.app Term.sg (Term.app2 Term.add na nb)) .zero →ᶠ sign_disj) :=
+    let parts := .syllogism and_proj2 (sg_add_parts na nb)
+    let get_na := .syllogism parts .and_weak
+    let get_nb := .syllogism parts and_proj2
+    let nb_dc_0 := .syllogism get_nb (zero_mul nb dc)
+    let cross_bc := .syllogism .and_weak H_to_eq_bc
+    let nc_db_0 := .syllogism (pair_h (.syllogism nb_dc_0 .sym0) cross_bc)
+      (.syllogism .trans0 .sym0)
+    let get_nc := .syllogism nc_db_0 (mul_db_zero nc)
+    .syllogism (pair_h get_na get_nc)
+      (.syllogism (Derivable.mp (add_eq_zero_iff adm na nc) (.syllogism .and_perm .and_weak))
+        (.syllogism add_nc_to_sg or_inr))
+  -- CASE B: H ∧ sg(nb+nc)=0 → sign_disj
+  let case_B : Derivable F EqX al Premises
+      ((eq_Q a b ∧ᶠ eq_Q b c)
+       ∧ᶠ Formula.eq0 (.app Term.sg (Term.app2 Term.add nb nc)) .zero →ᶠ sign_disj) :=
+    let parts := .syllogism and_proj2 (sg_add_parts nb nc)
+    let get_nb := .syllogism parts .and_weak
+    let get_nc := .syllogism parts and_proj2
+    let nb_da_0 := .syllogism get_nb (zero_mul nb da)
+    let cross_ab := .syllogism .and_weak H_to_eq_ab
+    let na_db_0 := .syllogism (pair_h cross_ab nb_da_0) .trans0
+    let get_na := .syllogism na_db_0 (mul_db_zero na)
+    .syllogism (pair_h get_na get_nc)
+      (.syllogism (Derivable.mp (add_eq_zero_iff adm na nc) (.syllogism .and_perm .and_weak))
+        (.syllogism add_nc_to_sg or_inr))
+  -- CASE C: |sa-sb|=0 ∧ |sb-sc|=0 → sign_disj
+  let case_C : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.abs_diff sa sb) .zero
+       ∧ᶠ Formula.eq0 (Term.app2 Term.abs_diff sb sc) .zero →ᶠ sign_disj) :=
+    .syllogism
+      (.syllogism (pair_h (.syllogism .and_weak (abs_diff_zero_fwd adm sa sb))
+                         (.syllogism and_proj2 (abs_diff_zero_fwd adm sb sc)))
+        (.syllogism .trans0
+          (Derivable.mp (abs_diff_eq_zero_iff adm sa sc) (.syllogism .and_perm .and_weak))))
+      .or_weak
+  -- Combine: H → sign_disj
+  -- First distribute: H ∧ (A∨B) → (H∧A) ∨ (H∧B) using and_or_dist
+  -- Outer case split on sign_ab disjunction
+  let H_to_sign_disj : Derivable F EqX al Premises
+      (eq_Q a b ∧ᶠ eq_Q b c →ᶠ sign_disj) :=
+    .syllogism (pair_h I_comb H_to_disj_ab)
+      (.syllogism and_or_dist (or_elim_rule
+        -- H ∧ |sa-sb|=0: inner case split on sign_bc disjunction
+        -- Keep (H ∧ |sa-sb|=0) paired with the bc disjunction
+        (.syllogism (pair_h I_comb (.syllogism .and_weak H_to_disj_bc))
+          (.syllogism and_or_dist (or_elim_rule
+            -- (H ∧ |sa-sb|=0) ∧ |sb-sc|=0 → case_C
+            (.syllogism (pair_h (.syllogism .and_weak and_proj2) and_proj2) case_C)
+            -- (H ∧ |sa-sb|=0) ∧ sg(nb+nc)=0 → case_B
+            (.syllogism (pair_h (.syllogism .and_weak .and_weak) and_proj2) case_B))))
+        -- H ∧ sg(na+nb)=0
+        case_A))
+  let H_to_sign_ac : Derivable F EqX al Premises
+      (eq_Q a b ∧ᶠ eq_Q b c →ᶠ
+       Formula.eq0 (Term.app2 Term.mul
+         (Term.app2 Term.abs_diff sa sc)
+         (Term.app Term.sg (Term.app2 Term.add na nc))) .zero) :=
+    .syllogism H_to_sign_disj
+      (Derivable.mp (mul_eq_zero_iff adm _ _) (.syllogism .and_perm .and_weak))
+  -- ══════════════════════════════════════════════════════════════════════
+  -- COMBINE: H → eq_Q(a, c)
+  -- ══════════════════════════════════════════════════════════════════════
+  let unfold_ac := body_eq ▸ lam2_correct_nf adm body a c (by
+    simp only [body, a, c, na, nc, da, dc, sa, sc,
+      Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+      add_closed_subst, abs_diff_closed_subst, mul_closed_subst, rat_num_closed_subst,
+      rat_den_closed_subst, rat_sign_closed_subst, sg_closed_subst,
+      Term.weaken, Term.rename, Term.Renaming.shift])
+  let H_to_nf_ac_zero : Derivable F EqX al Premises
+      (eq_Q a b ∧ᶠ eq_Q b c →ᶠ
+       Formula.eq0 (Term.app2 Term.add
+         (Term.app2 Term.abs_diff (Term.app2 Term.mul na dc) (Term.app2 Term.mul nc da))
+         (Term.app2 Term.mul (Term.app2 Term.abs_diff sa sc)
+           (Term.app Term.sg (Term.app2 Term.add na nc)))) .zero) :=
+    .syllogism (pair_h H_to_cross_ac H_to_sign_ac)
+      (.mp (add_eq_zero_iff adm _ _) (.syllogism .and_perm .and_weak))
+  let core : Derivable F EqX al Premises
+      (eq_Q a b ∧ᶠ eq_Q b c →ᶠ eq_Q a c) :=
+    .syllogism (pair_h (weaken_intro_h unfold_ac) H_to_nf_ac_zero) .trans0
+  univ_gen (univ_gen (univ_gen core))
+
 
 -- ── Additive group ─────────────────────────────────────────────────────────
+
+/-- geq(x, y) =₀ sg_bar(y ∸ x). -/
+private def geq_unfold (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.geq x y) (.app Term.sg_bar (Term.app2 Term.monus y x))) :=
+  lam2_correct_nf adm
+    (.app Term.sg_bar (Term.app2 Term.monus (.var .vz) (.var (.vs .vz))))
+    x y (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+        sg_bar_closed_subst, monus_closed_subst, weaken_subst0_eta])
 
 /-- ⊢ ∀a,b. eq_Q(add_Q(a, b), add_Q(b, a)) -/
 def add_Q_comm :
@@ -3411,7 +4944,483 @@ def add_Q_comm :
       (Formula.all Ty.nat (Formula.all Ty.nat
         (eq_Q (Term.app2 Term.add_Q (.var (.vs .vz)) (.var .vz))
               (Term.app2 Term.add_Q (.var .vz) (.var (.vs .vz)))))) :=
-  sorry
+  let a : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat := .var (.vs .vz)
+  let b : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat := .var .vz
+  let sa := Term.app Term.rat_sign a
+  let sb := Term.app Term.rat_sign b
+  let pa := Term.app Term.rat_num a
+  let pb := Term.app Term.rat_num b
+  let da := Term.app Term.rat_den a
+  let db := Term.app Term.rat_den b
+  let body : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat :=
+    let n₁ := Term.var (.vs .vz)
+    let n₂ := Term.var .vz
+    let s₁ := Term.app Term.rat_sign n₁
+    let s₂ := Term.app Term.rat_sign n₂
+    let p₁ := Term.app Term.rat_num n₁
+    let p₂ := Term.app Term.rat_num n₂
+    let d₁ := Term.app Term.rat_den n₁
+    let d₂ := Term.app Term.rat_den n₂
+    let ac := Term.app2 Term.mul p₁ d₂
+    let bc := Term.app2 Term.mul p₂ d₁
+    let same := Term.app Term.sg_bar (Term.app2 Term.abs_diff s₁ s₂)
+    Term.app3 Term.rat_encode
+      (Term.app3 Term.ite_nat same s₁
+        (Term.app3 Term.ite_nat (Term.app2 Term.geq ac bc) s₁ s₂))
+      (Term.app3 Term.ite_nat same (Term.app2 Term.add ac bc) (Term.app2 Term.abs_diff ac bc))
+      (Term.app Term.pd (Term.app2 Term.mul d₁ d₂))
+  have body_eq : (Term.add_Q : Term F (Ty.nat :: Ty.nat :: Γ) _) =
+      Term.lam (Term.lam body) := by rfl
+  let ac_ab := Term.app2 Term.mul pa db
+  let bc_ab := Term.app2 Term.mul pb da
+  let same_ab := Term.app Term.sg_bar (Term.app2 Term.abs_diff sa sb)
+  let sign_ab := Term.app3 Term.ite_nat same_ab sa
+    (Term.app3 Term.ite_nat (Term.app2 Term.geq ac_ab bc_ab) sa sb)
+  let num_ab := Term.app3 Term.ite_nat same_ab
+    (Term.app2 Term.add ac_ab bc_ab)
+    (Term.app2 Term.abs_diff ac_ab bc_ab)
+  let den_ab := Term.app Term.pd (Term.app2 Term.mul da db)
+  let same_ba := Term.app Term.sg_bar (Term.app2 Term.abs_diff sb sa)
+  let sign_ba := Term.app3 Term.ite_nat same_ba sb
+    (Term.app3 Term.ite_nat (Term.app2 Term.geq bc_ab ac_ab) sb sa)
+  let num_ba := Term.app3 Term.ite_nat same_ba
+    (Term.app2 Term.add bc_ab ac_ab)
+    (Term.app2 Term.abs_diff bc_ab ac_ab)
+  let den_ba := Term.app Term.pd (Term.app2 Term.mul db da)
+  have nf_ab : (body.subst0 (b.weaken)).subst0 a =
+      Term.app3 Term.rat_encode sign_ab num_ab den_ab := by
+    simp only [body, a, b, sign_ab, num_ab, den_ab, same_ab, ac_ab, bc_ab,
+      sa, sb, pa, pb, da, db,
+      Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
+      rat_encode_closed_subst, rat_sign_closed_subst, rat_num_closed_subst,
+      rat_den_closed_subst, ite_nat_closed_subst, sg_bar_closed_subst,
+      abs_diff_closed_subst, add_closed_subst, mul_closed_subst,
+      geq_closed_subst, pd_closed_subst, weaken_subst0_eta]
+  have nf_ba : (body.subst0 (a.weaken)).subst0 b =
+      Term.app3 Term.rat_encode sign_ba num_ba den_ba := by
+    simp only [body, a, b, sign_ba, num_ba, den_ba, same_ba,
+      sa, sb, pa, pb, da, db, ac_ab, bc_ab,
+      Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
+      rat_encode_closed_subst, rat_sign_closed_subst, rat_num_closed_subst,
+      rat_den_closed_subst, ite_nat_closed_subst, sg_bar_closed_subst,
+      abs_diff_closed_subst, add_closed_subst, mul_closed_subst,
+      geq_closed_subst, pd_closed_subst, weaken_subst0_eta]
+  let unfold_ab := body_eq ▸ lam2_correct_nf adm body a b nf_ab
+  let unfold_ba := body_eq ▸ lam2_correct_nf adm body b a nf_ba
+  let h_same := sg_bar_congr (abs_diff_comm adm sa sb)
+  let h_num : Derivable F EqX al Premises (Formula.eq0 num_ab num_ba) :=
+    let h_sum := add_comm adm ac_ab bc_ab
+    let h_diff := abs_diff_comm adm ac_ab bc_ab
+    let h_x := ite_nat_congr_x (b := same_ab) (y := Term.app2 Term.abs_diff ac_ab bc_ab) h_sum
+    let h_y := ite_nat_congr_y (b := same_ab) (x := Term.app2 Term.add bc_ab ac_ab) h_diff
+    let h_xy := Derivable.mp (Derivable.mp h_y (Derivable.mp h_x and_intro)) .trans0
+    Derivable.mp (Derivable.mp (ite_nat_congr_b (x := Term.app2 Term.add bc_ab ac_ab)
+      (y := Term.app2 Term.abs_diff bc_ab ac_ab) h_same) (Derivable.mp h_xy and_intro)) .trans0
+  let h_den : Derivable F EqX al Premises (Formula.eq0 den_ab den_ba) :=
+    pd_congr (mul_comm adm da db)
+  let result_ab := Term.app2 Term.add_Q a b
+  let result_ba := Term.app2 Term.add_Q b a
+  let rn_ab := Term.app Term.rat_num result_ab
+  let rd_ab := Term.app Term.rat_den result_ab
+  let rs_ab := Term.app Term.rat_sign result_ab
+  let rn_ba := Term.app Term.rat_num result_ba
+  let rd_ba := Term.app Term.rat_den result_ba
+  let rs_ba := Term.app Term.rat_sign result_ba
+  let h_rn_ab : Derivable F EqX al Premises (Formula.eq0 rn_ab num_ab) :=
+    .mp (.mp (rat_num_rat_encode adm sign_ab num_ab den_ab
+      (isEven_cases adm sign_ab)) (.mp (rat_num_congr unfold_ab) and_intro)) .trans0
+  let h_rn_ba : Derivable F EqX al Premises (Formula.eq0 rn_ba num_ba) :=
+    .mp (.mp (rat_num_rat_encode adm sign_ba num_ba den_ba
+      (isEven_cases adm sign_ba)) (.mp (rat_num_congr unfold_ba) and_intro)) .trans0
+  let h_rd_ab_nf : Derivable F EqX al Premises
+      (Formula.eq0 rd_ab (.app .succ den_ab)) :=
+    .mp (.mp (rat_den_rat_encode adm sign_ab num_ab den_ab)
+      (.mp (rat_den_congr unfold_ab) and_intro)) .trans0
+  let h_rd_ba_nf : Derivable F EqX al Premises
+      (Formula.eq0 rd_ba (.app .succ den_ba)) :=
+    .mp (.mp (rat_den_rat_encode adm sign_ba num_ba den_ba)
+      (.mp (rat_den_congr unfold_ba) and_intro)) .trans0
+  let h_sden_eq : Derivable F EqX al Premises
+      (Formula.eq0 (.app .succ den_ab) (.app .succ den_ba)) :=
+    qfer_no_premise_nat_nf h_den (r := .app .succ (.var .vz))
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map, pd_closed_subst, mul_closed_subst,
+          rat_den_closed_subst])
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map, pd_closed_subst, mul_closed_subst,
+          rat_den_closed_subst])
+  let h_rd_eq : Derivable F EqX al Premises (Formula.eq0 rd_ab rd_ba) :=
+    .mp (.mp (.mp h_rd_ba_nf .sym0) (.mp (.mp (.mp h_sden_eq (.mp h_rd_ab_nf and_intro)) .trans0) and_intro)) .trans0
+  let h_rn_eq : Derivable F EqX al Premises (Formula.eq0 rn_ab rn_ba) :=
+    .mp (.mp (.mp h_rn_ba .sym0)
+      (.mp (.mp (.mp h_num (.mp h_rn_ab and_intro)) .trans0) and_intro)) .trans0
+  let h_lhs := mul_congr_l h_rn_eq rd_ba
+  let h_rhs := mul_congr_r rn_ba h_rd_eq
+  let h_prod_eq : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul rn_ab rd_ba)
+        (Term.app2 Term.mul rn_ba rd_ab)) :=
+    Derivable.mp (Derivable.mp (Derivable.mp h_rhs .sym0) (Derivable.mp h_lhs and_intro)) .trans0
+  let h_cross : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.abs_diff
+        (Term.app2 Term.mul rn_ab rd_ba) (Term.app2 Term.mul rn_ba rd_ab)) .zero) :=
+    Derivable.mp h_prod_eq
+      (Derivable.mp (abs_diff_eq_zero_iff adm _ _) (.syllogism .and_perm .and_weak))
+  let sg_nn := Term.app Term.sg (Term.app2 Term.add num_ab num_ab)
+  let abs_rs := Term.app2 Term.abs_diff rs_ab rs_ba
+  let h_sign_mul_red : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul abs_rs
+        (Term.app Term.sg (Term.app2 Term.add rn_ab rn_ba)))
+        (Term.app2 Term.mul abs_rs sg_nn)) :=
+    let h_rn_ba_num_ab : Derivable F EqX al Premises (Formula.eq0 rn_ba num_ab) :=
+      Derivable.mp (Derivable.mp (Derivable.mp h_num .sym0)
+        (Derivable.mp h_rn_ba and_intro)) .trans0
+    mul_congr_r abs_rs (sg_congr
+      (Derivable.mp (Derivable.mp (add_congr_r num_ab h_rn_ba_num_ab)
+        (Derivable.mp (add_congr_l h_rn_ab rn_ba) and_intro)) .trans0))
+  let h_num_disj : Derivable F EqX al Premises
+      (Formula.eq0 num_ab .zero ∨ᶠ ¬ᶠFormula.eq0 num_ab .zero) :=
+    eq0_decidable'.mp (.forall_ax num_ab)
+  let b1_pp_zero : Derivable F EqX al Premises
+      (Formula.eq0 num_ab .zero →ᶠ
+       Formula.eq0 (Term.app2 Term.add num_ab num_ab) .zero) :=
+    .syllogism (pair_h
+      (qfer_nat_nf (r := Term.app2 Term.add (.var .vz) (.var .vz))
+        (rs := Term.app2 Term.add num_ab num_ab) (rt := Term.app2 Term.add .zero .zero)
+        (by rfl) (by rfl) I_comb
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2, add_closed_subst])
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2, add_closed_subst]))
+      (weaken_intro (add_zero_r adm .zero))) .trans0
+  let b1_sg_zero : Derivable F EqX al Premises
+      (Formula.eq0 num_ab .zero →ᶠ Formula.eq0 sg_nn .zero) :=
+    .syllogism (pair_h
+      (qfer_nat_nf (r := Term.app Term.sg (.var .vz))
+        (rs := Term.app Term.sg (Term.app2 Term.add num_ab num_ab)) (rt := Term.app Term.sg .zero)
+        (by rfl) (by rfl) b1_pp_zero
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, sg_closed_subst, Term.app2])
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, sg_closed_subst]))
+      (weaken_intro sg_zero)) .trans0
+  let case_b1 : Derivable F EqX al Premises
+      (Formula.eq0 num_ab .zero →ᶠ Formula.eq0 (Term.app2 Term.mul abs_rs sg_nn) .zero) :=
+    .syllogism (pair_h
+      (qfer_nat_nf (r := Term.app2 Term.mul abs_rs.weaken (.var .vz))
+        (rs := Term.app2 Term.mul abs_rs sg_nn) (rt := Term.app2 Term.mul abs_rs .zero)
+        (by rfl) (by rfl) b1_sg_zero
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+            mul_closed_subst, weaken_subst0_eta])
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+            mul_closed_subst, weaken_subst0_eta]))
+      (weaken_intro (mul_zero adm _))) .trans0
+  -- ═══════ Chain: sign_ab = sign_ba → mul(abs_rs, sg_nn) = 0 ═══════
+  let enc_ab := Term.app3 Term.rat_encode sign_ab num_ab den_ab
+  let enc_ba := Term.app3 Term.rat_encode sign_ba num_ba den_ba
+  let sign_to_enc : Derivable F EqX al Premises
+      (Formula.eq0 sign_ab sign_ba →ᶠ Formula.eq0 enc_ab enc_ba) :=
+    .syllogism (pair_h
+      (qfer_nat_nf (by rfl) (by rfl) I_comb
+        (r := Term.app3 Term.rat_encode (.var .vz) (Term.weaken num_ab) (Term.weaken den_ab))
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3,
+            rat_encode_closed_subst, weaken_subst0_eta]; rfl)
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3,
+            rat_encode_closed_subst, weaken_subst0_eta]))
+      (weaken_intro (rat_encode_congr .refl0 h_num h_den)))
+    .trans0
+  let h1_enc := .syllogism (pair_h (weaken_intro unfold_ab) I_comb) .trans0
+  let enc_to_result : Derivable F EqX al Premises
+      (Formula.eq0 enc_ab enc_ba →ᶠ Formula.eq0 result_ab result_ba) :=
+    .syllogism (pair_h h1_enc (weaken_intro (.mp unfold_ba .sym0))) .trans0
+  let result_to_rs : Derivable F EqX al Premises
+      (Formula.eq0 result_ab result_ba →ᶠ Formula.eq0 rs_ab rs_ba) :=
+    qfer_nat_nf (by rfl) (by rfl) I_comb
+      (r := .app Term.rat_sign (.var .vz))
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map, rat_sign_closed_subst]; rfl)
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map, rat_sign_closed_subst]; rfl)
+  let rs_to_abs : Derivable F EqX al Premises
+      (Formula.eq0 rs_ab rs_ba →ᶠ Formula.eq0 abs_rs .zero) :=
+    .mp (abs_diff_eq_zero_iff adm rs_ab rs_ba) (.syllogism .and_perm .and_weak)
+  let abs_to_mul : Derivable F EqX al Premises
+      (Formula.eq0 abs_rs .zero →ᶠ
+       Formula.eq0 (Term.app2 Term.mul abs_rs sg_nn) .zero) :=
+    .syllogism (pair_h
+      (qfer_nat_nf (by rfl) (by rfl) I_comb
+        (r := Term.app2 Term.mul (.var .vz) (Term.weaken sg_nn))
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+            mul_closed_subst, weaken_subst0_eta])
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+            mul_closed_subst, weaken_subst0_eta]))
+      (weaken_intro (mul_zero_l adm sg_nn)))
+    .trans0
+  let sign_to_mul : Derivable F EqX al Premises
+      (Formula.eq0 sign_ab sign_ba →ᶠ
+       Formula.eq0 (Term.app2 Term.mul abs_rs sg_nn) .zero) :=
+    .syllogism sign_to_enc (.syllogism enc_to_result
+      (.syllogism result_to_rs (.syllogism rs_to_abs abs_to_mul)))
+  -- ═══════ Case A: same_ab = S0 → sign_ab = sign_ba ═══════
+  let inner_ab := Term.app3 Term.ite_nat (Term.app2 Term.geq ac_ab bc_ab) sa sb
+  let inner_ba := Term.app3 Term.ite_nat (Term.app2 Term.geq bc_ab ac_ab) sb sa
+  let h_sign_ab_sa : Derivable F EqX al Premises
+      (Formula.eq0 same_ab (.app .succ .zero) →ᶠ Formula.eq0 sign_ab sa) :=
+    .syllogism (pair_h
+      (qfer_nat_nf (by rfl) (by rfl) I_comb
+        (r := Term.app3 Term.ite_nat (.var .vz) (Term.weaken sa) (Term.weaken inner_ab))
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3,
+            ite_nat_closed_subst, weaken_subst0_eta]; rfl)
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3,
+            ite_nat_closed_subst, weaken_subst0_eta]))
+      (weaken_intro (ite_nat_one (adm := adm) sa inner_ab)))
+    .trans0
+  let h_same_ba_S0 : Derivable F EqX al Premises
+      (Formula.eq0 same_ab (.app .succ .zero) →ᶠ Formula.eq0 same_ba (.app .succ .zero)) :=
+    .syllogism (pair_h (weaken_intro (.mp h_same .sym0)) I_comb) .trans0
+  let h_sign_ba_sb : Derivable F EqX al Premises
+      (Formula.eq0 same_ba (.app .succ .zero) →ᶠ Formula.eq0 sign_ba sb) :=
+    .syllogism (pair_h
+      (qfer_nat_nf (by rfl) (by rfl) I_comb
+        (r := Term.app3 Term.ite_nat (.var .vz) (Term.weaken sb) (Term.weaken inner_ba))
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3,
+            ite_nat_closed_subst, weaken_subst0_eta]; rfl)
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3,
+            ite_nat_closed_subst, weaken_subst0_eta]))
+      (weaken_intro (ite_nat_one (adm := adm) sb inner_ba)))
+    .trans0
+  let h_sa_eq_sb : Derivable F EqX al Premises
+      (Formula.eq0 same_ab (.app .succ .zero) →ᶠ Formula.eq0 sa sb) :=
+    .syllogism (sg_bar_eq_S0_implies_zero (adm := adm) _)
+      (.mp (abs_diff_eq_zero_iff adm sa sb) .and_weak)
+  let caseA : Derivable F EqX al Premises
+      (Formula.eq0 same_ab (.app .succ .zero) →ᶠ
+       Formula.eq0 (Term.app2 Term.mul abs_rs sg_nn) .zero) :=
+    let h_ab_sb := .syllogism (pair_h h_sign_ab_sa h_sa_eq_sb) .trans0
+    let h_ba_sb := .syllogism h_same_ba_S0 h_sign_ba_sb
+    .syllogism (.syllogism (pair_h h_ab_sb (.syllogism h_ba_sb .sym0)) .trans0) sign_to_mul
+  -- ═══════ Case B: same_ab = 0 → mul(abs_rs, sg_nn) = 0 ═══════
+  -- When same_ab = 0: sign = inner (geq branch), num = abs_diff(ac,bc)
+  let h_sign_ab_inner : Derivable F EqX al Premises
+      (Formula.eq0 same_ab .zero →ᶠ Formula.eq0 sign_ab inner_ab) :=
+    .syllogism (pair_h
+      (qfer_nat_nf (by rfl) (by rfl) I_comb
+        (r := Term.app3 Term.ite_nat (.var .vz) (Term.weaken sa) (Term.weaken inner_ab))
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3,
+            ite_nat_closed_subst, weaken_subst0_eta]; rfl)
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3,
+            ite_nat_closed_subst, weaken_subst0_eta]))
+      (weaken_intro (ite_nat_zero (adm := adm) sa inner_ab))) .trans0
+  let h_same_ba_zero : Derivable F EqX al Premises
+      (Formula.eq0 same_ab .zero →ᶠ Formula.eq0 same_ba .zero) :=
+    .syllogism (pair_h (weaken_intro (.mp h_same .sym0)) I_comb) .trans0
+  let h_sign_ba_inner : Derivable F EqX al Premises
+      (Formula.eq0 same_ab .zero →ᶠ Formula.eq0 sign_ba inner_ba) :=
+    .syllogism h_same_ba_zero
+      (.syllogism (pair_h
+        (qfer_nat_nf (by rfl) (by rfl) I_comb
+          (r := Term.app3 Term.ite_nat (.var .vz) (Term.weaken sb) (Term.weaken inner_ba))
+          (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3,
+              ite_nat_closed_subst, weaken_subst0_eta]; rfl)
+          (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3,
+              ite_nat_closed_subst, weaken_subst0_eta]))
+        (weaken_intro (ite_nat_zero (adm := adm) sb inner_ba))) .trans0)
+  let h_num_ab_diff : Derivable F EqX al Premises
+      (Formula.eq0 same_ab .zero →ᶠ
+       Formula.eq0 num_ab (Term.app2 Term.abs_diff ac_ab bc_ab)) :=
+    .syllogism (pair_h
+      (qfer_nat_nf (by rfl) (by rfl) I_comb
+        (r := Term.app3 Term.ite_nat (.var .vz)
+          (Term.weaken (Term.app2 Term.add ac_ab bc_ab))
+          (Term.weaken (Term.app2 Term.abs_diff ac_ab bc_ab)))
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3,
+            ite_nat_closed_subst, add_closed_subst, abs_diff_closed_subst,
+            mul_closed_subst, rat_num_closed_subst, rat_den_closed_subst,
+            weaken_subst0_eta]; rfl)
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3,
+            ite_nat_closed_subst, add_closed_subst, abs_diff_closed_subst,
+            mul_closed_subst, rat_num_closed_subst, rat_den_closed_subst,
+            weaken_subst0_eta]))
+      (weaken_intro (ite_nat_zero (adm := adm)
+        (Term.app2 Term.add ac_ab bc_ab) (Term.app2 Term.abs_diff ac_ab bc_ab)))) .trans0
+  -- Relate inner values to sg_bar via geq_unfold
+  let inner_ab_eq : Derivable F EqX al Premises
+      (Formula.eq0 inner_ab (Term.app3 Term.ite_nat
+        (.app Term.sg_bar (Term.app2 Term.monus bc_ab ac_ab)) sa sb)) :=
+    ite_nat_congr_b (x := sa) (y := sb) (geq_unfold adm ac_ab bc_ab)
+  let inner_ba_eq : Derivable F EqX al Premises
+      (Formula.eq0 inner_ba (Term.app3 Term.ite_nat
+        (.app Term.sg_bar (Term.app2 Term.monus ac_ab bc_ab)) sb sa)) :=
+    ite_nat_congr_b (x := sb) (y := sa) (geq_unfold adm bc_ab ac_ab)
+  -- From monus=0, derive sg_bar=S0
+  let monus_to_sgbar_S0 (x y : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat) :
+      Derivable F EqX al Premises
+        (Formula.eq0 (Term.app2 Term.monus x y) .zero →ᶠ
+         Formula.eq0 (.app Term.sg_bar (Term.app2 Term.monus x y)) (.app .succ .zero)) :=
+    .syllogism (pair_h
+      (qfer_nat_nf (by rfl) (by rfl) I_comb
+        (r := .app Term.sg_bar (.var .vz))
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map,
+            sg_bar_closed_subst])
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map,
+            sg_bar_closed_subst]))
+      (weaken_intro sg_bar_zero)) .trans0
+  -- ite evaluations from sg_bar values
+  -- sg_bar(bc∸ac)=0 → ite(sg_bar(bc∸ac), sa, sb) = sb
+  let h_ite_ab_zero : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.sg_bar (Term.app2 Term.monus bc_ab ac_ab)) .zero →ᶠ
+       Formula.eq0 (Term.app3 Term.ite_nat
+         (.app Term.sg_bar (Term.app2 Term.monus bc_ab ac_ab)) sa sb) sb) :=
+    .syllogism (pair_h
+      (qfer_nat_nf (by rfl) (by rfl) I_comb
+        (r := Term.app3 Term.ite_nat (.var .vz) (Term.weaken sa) (Term.weaken sb))
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3,
+            ite_nat_closed_subst, weaken_subst0_eta])
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3,
+            ite_nat_closed_subst, weaken_subst0_eta]))
+      (weaken_intro (ite_nat_zero (adm := adm) sa sb))) .trans0
+  -- sg_bar(bc∸ac)=S0 → ite(sg_bar(bc∸ac), sa, sb) = sa
+  let h_ite_ab_S0 : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.sg_bar (Term.app2 Term.monus bc_ab ac_ab)) (.app .succ .zero) →ᶠ
+       Formula.eq0 (Term.app3 Term.ite_nat
+         (.app Term.sg_bar (Term.app2 Term.monus bc_ab ac_ab)) sa sb) sa) :=
+    .syllogism (pair_h
+      (qfer_nat_nf (by rfl) (by rfl) I_comb
+        (r := Term.app3 Term.ite_nat (.var .vz) (Term.weaken sa) (Term.weaken sb))
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3,
+            ite_nat_closed_subst, weaken_subst0_eta])
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3,
+            ite_nat_closed_subst, weaken_subst0_eta]))
+      (weaken_intro (ite_nat_one (adm := adm) sa sb))) .trans0
+  -- sg_bar(ac∸bc)=S0 → ite(sg_bar(ac∸bc), sb, sa) = sb
+  let h_ite_ba_S0 : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.sg_bar (Term.app2 Term.monus ac_ab bc_ab)) (.app .succ .zero) →ᶠ
+       Formula.eq0 (Term.app3 Term.ite_nat
+         (.app Term.sg_bar (Term.app2 Term.monus ac_ab bc_ab)) sb sa) sb) :=
+    .syllogism (pair_h
+      (qfer_nat_nf (by rfl) (by rfl) I_comb
+        (r := Term.app3 Term.ite_nat (.var .vz) (Term.weaken sb) (Term.weaken sa))
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3,
+            ite_nat_closed_subst, weaken_subst0_eta])
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3,
+            ite_nat_closed_subst, weaken_subst0_eta]))
+      (weaken_intro (ite_nat_one (adm := adm) sb sa))) .trans0
+  -- sg_bar(ac∸bc)=0 → ite(sg_bar(ac∸bc), sb, sa) = sa
+  let h_ite_ba_zero : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.sg_bar (Term.app2 Term.monus ac_ab bc_ab)) .zero →ᶠ
+       Formula.eq0 (Term.app3 Term.ite_nat
+         (.app Term.sg_bar (Term.app2 Term.monus ac_ab bc_ab)) sb sa) sa) :=
+    .syllogism (pair_h
+      (qfer_nat_nf (by rfl) (by rfl) I_comb
+        (r := Term.app3 Term.ite_nat (.var .vz) (Term.weaken sb) (Term.weaken sa))
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3,
+            ite_nat_closed_subst, weaken_subst0_eta])
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3,
+            ite_nat_closed_subst, weaken_subst0_eta]))
+      (weaken_intro (ite_nat_zero (adm := adm) sb sa))) .trans0
+  -- Derived: conditional inner value evaluations
+  -- sg_bar(bc∸ac)=0 → inner_ab = sb
+  let h_inner_ab_sb : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.sg_bar (Term.app2 Term.monus bc_ab ac_ab)) .zero →ᶠ
+       Formula.eq0 inner_ab sb) :=
+    .syllogism (pair_h (weaken_intro inner_ab_eq) h_ite_ab_zero) .trans0
+  -- bc∸ac=0 → sg_bar(bc∸ac)=S0 → inner_ab = sa
+  let h_inner_ab_sa_from_mon_ba : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.monus bc_ab ac_ab) .zero →ᶠ
+       Formula.eq0 inner_ab sa) :=
+    .syllogism (pair_h (weaken_intro inner_ab_eq) (.syllogism (monus_to_sgbar_S0 bc_ab ac_ab) h_ite_ab_S0)) .trans0
+  -- ac∸bc=0 → sg_bar(ac∸bc)=S0 → inner_ba = sb
+  let h_inner_ba_sb_from_mon_ab : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.monus ac_ab bc_ab) .zero →ᶠ
+       Formula.eq0 inner_ba sb) :=
+    .syllogism (pair_h (weaken_intro inner_ba_eq) (.syllogism (monus_to_sgbar_S0 ac_ab bc_ab) h_ite_ba_S0)) .trans0
+  -- sg_bar(ac∸bc)=0 → inner_ba = sa
+  let h_inner_ba_sa : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.sg_bar (Term.app2 Term.monus ac_ab bc_ab)) .zero →ᶠ
+       Formula.eq0 inner_ba sa) :=
+    .syllogism (pair_h (weaken_intro inner_ba_eq) h_ite_ba_zero) .trans0
+  -- ── Sub-case B1: same_ab=0 ∧ ac∸bc=0 ──
+  -- B1a: ... ∧ sg_bar(bc∸ac)=S0 → both monus 0 → ac=bc → num=0
+  let caseB1a : Derivable F EqX al Premises
+      ((Formula.eq0 same_ab .zero ∧ᶠ
+        Formula.eq0 (Term.app2 Term.monus ac_ab bc_ab) .zero) ∧ᶠ
+       Formula.eq0 (.app Term.sg_bar (Term.app2 Term.monus bc_ab ac_ab)) (.app .succ .zero) →ᶠ
+       Formula.eq0 (Term.app2 Term.mul abs_rs sg_nn) .zero) :=
+    let get_same := Derivable.syllogism .and_weak .and_weak
+    let get_mon_ab := Derivable.syllogism .and_weak and_proj2
+    let get_sgbar := and_proj2
+    let h_mon_ba := .syllogism get_sgbar (sg_bar_eq_S0_implies_zero (adm := adm) _)
+    let h_ac_eq := .syllogism (pair_h get_mon_ab h_mon_ba) (monus_eq_zero_antisym adm ac_ab bc_ab)
+    let h_diff := .syllogism h_ac_eq
+      (.mp (abs_diff_eq_zero_iff adm ac_ab bc_ab) (.syllogism .and_perm .and_weak))
+    let h_num := .syllogism (pair_h (.syllogism get_same h_num_ab_diff) h_diff) .trans0
+    .syllogism h_num case_b1
+  -- B1b: ... ∧ sg_bar(bc∸ac)=0 → sign_ab=sb=sign_ba → sign_to_mul
+  let caseB1b : Derivable F EqX al Premises
+      ((Formula.eq0 same_ab .zero ∧ᶠ
+        Formula.eq0 (Term.app2 Term.monus ac_ab bc_ab) .zero) ∧ᶠ
+       Formula.eq0 (.app Term.sg_bar (Term.app2 Term.monus bc_ab ac_ab)) .zero →ᶠ
+       Formula.eq0 (Term.app2 Term.mul abs_rs sg_nn) .zero) :=
+    let get_same := Derivable.syllogism .and_weak .and_weak
+    let get_mon_ab := Derivable.syllogism .and_weak and_proj2
+    let get_sgbar := and_proj2
+    let h_sab := .syllogism
+      (pair_h (.syllogism get_same h_sign_ab_inner) (.syllogism get_sgbar h_inner_ab_sb)) .trans0
+    let h_sba := .syllogism
+      (pair_h (.syllogism get_same h_sign_ba_inner) (.syllogism get_mon_ab h_inner_ba_sb_from_mon_ab)) .trans0
+    .syllogism (.syllogism (pair_h h_sab (.syllogism h_sba .sym0)) .trans0) sign_to_mul
+  let caseB1 : Derivable F EqX al Premises
+      (Formula.eq0 same_ab .zero ∧ᶠ
+       Formula.eq0 (Term.app2 Term.monus ac_ab bc_ab) .zero →ᶠ
+       Formula.eq0 (Term.app2 Term.mul abs_rs sg_nn) .zero) :=
+    .syllogism
+      (pair_h I_comb (weaken_intro (sg_bar_cases adm (Term.app2 Term.monus bc_ab ac_ab))))
+      (.syllogism and_or_dist (or_elim_rule caseB1a caseB1b))
+  -- ── Sub-case B2: same_ab=0 ∧ bc∸ac=0 ──
+  -- B2a: ... ∧ sg_bar(ac∸bc)=S0 → both monus 0 → ac=bc → num=0
+  let caseB2a : Derivable F EqX al Premises
+      ((Formula.eq0 same_ab .zero ∧ᶠ
+        Formula.eq0 (Term.app2 Term.monus bc_ab ac_ab) .zero) ∧ᶠ
+       Formula.eq0 (.app Term.sg_bar (Term.app2 Term.monus ac_ab bc_ab)) (.app .succ .zero) →ᶠ
+       Formula.eq0 (Term.app2 Term.mul abs_rs sg_nn) .zero) :=
+    let get_same := Derivable.syllogism .and_weak .and_weak
+    let get_mon_ba := Derivable.syllogism .and_weak and_proj2
+    let get_sgbar := and_proj2
+    let h_mon_ab := .syllogism get_sgbar (sg_bar_eq_S0_implies_zero (adm := adm) _)
+    let h_ac_eq := .syllogism (pair_h h_mon_ab get_mon_ba) (monus_eq_zero_antisym adm ac_ab bc_ab)
+    let h_diff := .syllogism h_ac_eq
+      (.mp (abs_diff_eq_zero_iff adm ac_ab bc_ab) (.syllogism .and_perm .and_weak))
+    let h_num := .syllogism (pair_h (.syllogism get_same h_num_ab_diff) h_diff) .trans0
+    .syllogism h_num case_b1
+  -- B2b: ... ∧ sg_bar(ac∸bc)=0 → sign_ab=sa=sign_ba → sign_to_mul
+  let caseB2b : Derivable F EqX al Premises
+      ((Formula.eq0 same_ab .zero ∧ᶠ
+        Formula.eq0 (Term.app2 Term.monus bc_ab ac_ab) .zero) ∧ᶠ
+       Formula.eq0 (.app Term.sg_bar (Term.app2 Term.monus ac_ab bc_ab)) .zero →ᶠ
+       Formula.eq0 (Term.app2 Term.mul abs_rs sg_nn) .zero) :=
+    let get_same := Derivable.syllogism .and_weak .and_weak
+    let get_mon_ba := Derivable.syllogism .and_weak and_proj2
+    let get_sgbar := and_proj2
+    let h_sab := .syllogism
+      (pair_h (.syllogism get_same h_sign_ab_inner) (.syllogism get_mon_ba h_inner_ab_sa_from_mon_ba)) .trans0
+    let h_sba := .syllogism
+      (pair_h (.syllogism get_same h_sign_ba_inner) (.syllogism get_sgbar h_inner_ba_sa)) .trans0
+    .syllogism (.syllogism (pair_h h_sab (.syllogism h_sba .sym0)) .trans0) sign_to_mul
+  let caseB2 : Derivable F EqX al Premises
+      (Formula.eq0 same_ab .zero ∧ᶠ
+       Formula.eq0 (Term.app2 Term.monus bc_ab ac_ab) .zero →ᶠ
+       Formula.eq0 (Term.app2 Term.mul abs_rs sg_nn) .zero) :=
+    .syllogism
+      (pair_h I_comb (weaken_intro (sg_bar_cases adm (Term.app2 Term.monus ac_ab bc_ab))))
+      (.syllogism and_or_dist (or_elim_rule caseB2a caseB2b))
+  -- Combine B1 + B2 via monus_disjunct
+  let caseB : Derivable F EqX al Premises
+      (Formula.eq0 same_ab .zero →ᶠ
+       Formula.eq0 (Term.app2 Term.mul abs_rs sg_nn) .zero) :=
+    .syllogism
+      (pair_h I_comb (weaken_intro (monus_disjunct adm ac_ab bc_ab)))
+      (.syllogism and_or_dist (or_elim_rule caseB1 caseB2))
+  -- ═══════ Final assembly ═══════
+  let h_cases : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul abs_rs sg_nn) .zero) :=
+    .mp (sg_bar_cases adm (Term.app2 Term.abs_diff sa sb))
+      (or_elim_rule caseA caseB)
+  let h_sign_zero : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul abs_rs
+        (Term.app Term.sg (Term.app2 Term.add rn_ab rn_ba))) .zero) :=
+    .mp (.mp h_cases (.mp h_sign_mul_red and_intro)) .trans0
+  univ_gen (univ_gen (eq_Q_from_components adm h_cross h_sign_zero))
 
 /-- ⊢ ∀a,b,c. eq_Q(add_Q(add_Q(a,b), c), add_Q(a, add_Q(b,c))) -/
 def add_Q_assoc :
@@ -3430,7 +5439,850 @@ def add_Q_zero :
     Derivable F EqX al Premises (Γ := Γ)
       (Formula.all Ty.nat
         (eq_Q (Term.app2 Term.add_Q (.var .vz) Term.zero_Q) (.var .vz))) :=
-  sorry
+  let a : Term F (Ty.nat :: Γ) Ty.nat := .var .vz
+  let sa := Term.app Term.rat_sign a
+  let pa := Term.app Term.rat_num a
+  let da := Term.app Term.rat_den a
+  let zero := (Term.zero_Q : Term F (Ty.nat :: Γ) Ty.nat)
+  let sz := Term.app Term.rat_sign zero
+  let pz := Term.app Term.rat_num zero
+  let dz := Term.app Term.rat_den zero
+  let body : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat :=
+    let n₁ := Term.var (.vs .vz)
+    let n₂ := Term.var .vz
+    let s₁ := Term.app Term.rat_sign n₁
+    let s₂ := Term.app Term.rat_sign n₂
+    let p₁ := Term.app Term.rat_num n₁
+    let p₂ := Term.app Term.rat_num n₂
+    let d₁ := Term.app Term.rat_den n₁
+    let d₂ := Term.app Term.rat_den n₂
+    let ac := Term.app2 Term.mul p₁ d₂
+    let bc := Term.app2 Term.mul p₂ d₁
+    let same := Term.app Term.sg_bar (Term.app2 Term.abs_diff s₁ s₂)
+    Term.app3 Term.rat_encode
+      (Term.app3 Term.ite_nat same s₁
+        (Term.app3 Term.ite_nat (Term.app2 Term.geq ac bc) s₁ s₂))
+      (Term.app3 Term.ite_nat same (Term.app2 Term.add ac bc) (Term.app2 Term.abs_diff ac bc))
+      (Term.app Term.pd (Term.app2 Term.mul d₁ d₂))
+  have body_eq : (Term.add_Q : Term F (Ty.nat :: Γ) _) =
+      Term.lam (Term.lam body) := by rfl
+  let same_nf := Term.app Term.sg_bar (Term.app2 Term.abs_diff sa sz)
+  let a_cross := Term.app2 Term.mul pa dz
+  let b_cross := Term.app2 Term.mul pz da
+  let sign_nf := Term.app3 Term.ite_nat same_nf sa
+    (Term.app3 Term.ite_nat (Term.app2 Term.geq a_cross b_cross) sa sz)
+  let num_nf := Term.app3 Term.ite_nat same_nf
+    (Term.app2 Term.add a_cross b_cross)
+    (Term.app2 Term.abs_diff a_cross b_cross)
+  let den_nf := Term.app Term.pd (Term.app2 Term.mul da dz)
+  have nf : (body.subst0 (zero.weaken)).subst0 a =
+      Term.app3 Term.rat_encode sign_nf num_nf den_nf := by
+    simp only [body, a, zero, sign_nf, num_nf, den_nf, same_nf, a_cross, b_cross,
+      sa, sz, pa, pz, da, dz,
+      Term.zero_Q, Term.pair, Term.subst0, Term.subst, Term.subst0_map,
+      Term.app3, Term.app2, Term.ofNat,
+      rat_encode_closed_subst, rat_sign_closed_subst, rat_num_closed_subst,
+      rat_den_closed_subst, ite_nat_closed_subst, sg_bar_closed_subst,
+      abs_diff_closed_subst, add_closed_subst, mul_closed_subst,
+      geq_closed_subst, pd_closed_subst, weaken_subst0_eta]
+  let h_unfold : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add_Q a zero)
+        (Term.app3 Term.rat_encode sign_nf num_nf den_nf)) :=
+    body_eq ▸ lam2_correct_nf adm body a zero nf
+  -- zero_Q component values
+  let hsz : Derivable F EqX al Premises
+      (Formula.eq0 sz (.app .succ .zero)) :=
+    rat_sign_zero_Q (adm := adm)
+  let hpz : Derivable F EqX al Premises
+      (Formula.eq0 pz .zero) :=
+    rat_num_zero_Q (adm := adm)
+  let hdz : Derivable F EqX al Premises
+      (Formula.eq0 dz (.app .succ .zero)) :=
+    rat_den_zero_Q (adm := adm)
+  -- a_cross = pa * dz =₀ pa * S0 =₀ pa
+  let h_ac : Derivable F EqX al Premises (Formula.eq0 a_cross pa) :=
+    .mp (.mp (mul_one_r adm pa) (.mp (mul_congr_r pa hdz) and_intro)) .trans0
+  -- b_cross = pz * da =₀ 0 * da =₀ 0
+  let h_bc : Derivable F EqX al Premises (Formula.eq0 b_cross .zero) :=
+    .mp (.mp (mul_zero_l adm da) (.mp (mul_congr_l hpz da) and_intro)) .trans0
+  -- num_nf: ite(same, ac+bc, |ac-bc|) = ite(same, pa, pa) = pa
+  let h_sum : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add a_cross b_cross) pa) :=
+    .mp (.mp (add_zero_r adm pa)
+      (.mp (.mp (.mp (add_congr_r pa h_bc) (.mp (add_congr_l h_ac b_cross) and_intro)) .trans0)
+        and_intro)) .trans0
+  let h_diff : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.abs_diff a_cross b_cross) pa) :=
+    .mp (.mp (abs_diff_zero_r adm pa)
+      (.mp (.mp (.mp (abs_diff_congr_r pa h_bc)
+        (.mp (abs_diff_congr_l h_ac b_cross) and_intro)) .trans0)
+        and_intro)) .trans0
+  let h_num : Derivable F EqX al Premises (Formula.eq0 num_nf pa) :=
+    .mp (.mp (ite_nat_sg_bar_same adm _ pa)
+      (.mp (.mp (.mp (ite_nat_congr_y (b := same_nf) (x := pa) h_diff)
+        (.mp (ite_nat_congr_x (b := same_nf) (y := Term.app2 Term.abs_diff a_cross b_cross) h_sum) and_intro)) .trans0)
+        and_intro)) .trans0
+  -- sign_nf: ite(same, sa, ite(geq(ac,bc), sa, sz)) = ite(same, sa, sa) = sa
+  let h_geq : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.geq a_cross b_cross) (.app .succ .zero)) :=
+    .mp (.mp (geq_zero_r adm pa)
+      (.mp (.mp (.mp (geq_congr_r pa h_bc) (.mp (geq_congr_l h_ac b_cross) and_intro)) .trans0)
+        and_intro)) .trans0
+  let h_inner : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app3 Term.ite_nat (Term.app2 Term.geq a_cross b_cross) sa sz) sa) :=
+    .mp (.mp (ite_nat_one adm sa sz) (.mp (ite_nat_congr_b (x := sa) (y := sz) h_geq) and_intro)) .trans0
+  let h_sign_nf : Derivable F EqX al Premises (Formula.eq0 sign_nf sa) :=
+    .mp (.mp (ite_nat_sg_bar_same adm _ sa) (.mp (ite_nat_congr_y (b := same_nf) (x := sa) h_inner) and_intro)) .trans0
+  -- den_nf = pd(da * dz) =₀ pd(da * S0) =₀ pd(da)
+  let h_den : Derivable F EqX al Premises (Formula.eq0 den_nf (Term.app Term.pd da)) :=
+    pd_congr (.mp (.mp (mul_one_r adm da) (.mp (mul_congr_r da hdz) and_intro)) .trans0)
+  -- S(den_nf) =₀ da
+  let rat_den_body : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat :=
+    .app .succ (.app Term.snd_pair (.var .vz))
+  let h_da_unfold : Derivable F EqX al Premises
+      (Formula.eq0 da (.app .succ (.app Term.snd_pair a))) :=
+    lam_correct_nf rat_den_body a (by
+      simp only [rat_den_body, a, Term.subst0, Term.subst, Term.subst0_map,
+        snd_pair_closed_subst])
+  let h_pd_da : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app Term.pd da) (.app Term.snd_pair a)) :=
+    .mp (.mp (pd_succ adm (.app Term.snd_pair a))
+      (.mp (pd_congr h_da_unfold) and_intro)) .trans0
+  let h_s_pd_da : Derivable F EqX al Premises
+      (Formula.eq0 (.app .succ (Term.app Term.pd da)) (.app .succ (.app Term.snd_pair a))) :=
+    qfer_no_premise_nat_nf h_pd_da
+      (r := .app .succ (.var .vz))
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map])
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map])
+  let h_s_pd_da_eq_da : Derivable F EqX al Premises
+      (Formula.eq0 (.app .succ (Term.app Term.pd da)) da) :=
+    .mp (.mp (.mp h_da_unfold .sym0) (.mp h_s_pd_da and_intro)) .trans0
+  let h_s_den_nf : Derivable F EqX al Premises (Formula.eq0 (.app .succ den_nf) da) :=
+    .mp (.mp h_s_pd_da_eq_da
+      (.mp (qfer_no_premise_nat_nf h_den (r := .app .succ (.var .vz))
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, pd_closed_subst])
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, pd_closed_subst]))
+        and_intro)) .trans0
+  -- Result components
+  let result := Term.app2 Term.add_Q a zero
+  let rn := Term.app Term.rat_num result
+  let rd := Term.app Term.rat_den result
+  let rs := Term.app Term.rat_sign result
+  -- rn =₀ pa
+  let h_rn : Derivable F EqX al Premises (Formula.eq0 rn pa) :=
+    .mp (.mp h_num (.mp (.mp (.mp (rat_num_rat_encode adm sign_nf num_nf den_nf
+      (isEven_cases adm sign_nf)) (.mp (rat_num_congr h_unfold) and_intro)) .trans0)
+      and_intro)) .trans0
+  -- rd =₀ da
+  let h_rd : Derivable F EqX al Premises (Formula.eq0 rd da) :=
+    .mp (.mp h_s_den_nf (.mp (.mp (.mp (rat_den_rat_encode adm sign_nf num_nf den_nf)
+      (.mp (rat_den_congr h_unfold) and_intro)) .trans0) and_intro)) .trans0
+  -- Cross-product: |rn*da - pa*rd| =₀ 0
+  let h_cross : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.abs_diff
+        (Term.app2 Term.mul rn da) (Term.app2 Term.mul pa rd)) .zero) :=
+    .mp (.mp (abs_diff_self adm _) (.mp (.mp (.mp (abs_diff_congr_r _ (mul_congr_r pa h_rd))
+      (.mp (abs_diff_congr_l (mul_congr_l h_rn da) _) and_intro)) .trans0) and_intro)) .trans0
+  -- Sign condition: |rs - sa| * sg(rn + pa) =₀ 0
+  let h_mul_red := mul_congr_r _ (sg_congr (add_congr_l h_rn pa))
+  let sg_pp := Term.app Term.sg (Term.app2 Term.add pa pa)
+  let abs_rs_sa := Term.app2 Term.abs_diff rs sa
+  -- Case B1: pa=0 → sg(pa+pa)=0 → product=0
+  let h_pa_disj := .mp eq0_decidable' (.forall_ax pa)
+  let b1_pp_zero :=
+    .syllogism (pair_h
+      (qfer_nat_nf (r := Term.app2 Term.add (.var .vz) (.var .vz))
+        (rs := Term.app2 Term.add pa pa) (rt := Term.app2 Term.add .zero .zero)
+        (by rfl) (by rfl) I_comb
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2, add_closed_subst]; rfl)
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2, add_closed_subst]))
+      (weaken_intro (add_zero_r adm .zero))) .trans0
+  let b1_sg_zero :=
+    .syllogism (pair_h
+      (qfer_nat_nf (r := Term.app Term.sg (.var .vz))
+        (rs := Term.app Term.sg (Term.app2 Term.add pa pa)) (rt := Term.app Term.sg .zero)
+        (by rfl) (by rfl) b1_pp_zero
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, sg_closed_subst, add_closed_subst, Term.app2]; rfl)
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, sg_closed_subst]))
+      (weaken_intro sg_zero)) .trans0
+  let case_b1 :=
+    .syllogism (pair_h
+      (qfer_nat_nf (r := Term.app2 Term.mul abs_rs_sa.weaken (.var .vz))
+        (rs := Term.app2 Term.mul abs_rs_sa sg_pp) (rt := Term.app2 Term.mul abs_rs_sa .zero)
+        (by rfl) (by rfl) b1_sg_zero
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+            mul_closed_subst, abs_diff_closed_subst, rat_sign_closed_subst,
+            add_Q_closed_subst, sg_closed_subst, add_closed_subst,
+            rat_num_closed_subst, weaken_subst0_eta]; rfl)
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+            mul_closed_subst, abs_diff_closed_subst, rat_sign_closed_subst,
+            add_Q_closed_subst, weaken_subst0_eta]))
+      (weaken_intro (mul_zero adm _))) .trans0
+  -- Case B2: ¬(pa=0) → need |rs - sa| = 0
+  let S0 : Term F (Ty.nat :: Γ) Ty.nat := .app .succ .zero
+  let ie_fpa := Term.app Term.isEven (Term.app Term.fst_pair a)
+  let h_sa_unfold : Derivable F EqX al Premises (Formula.eq0 sa ie_fpa) :=
+    lam_correct_nf (Term.app Term.isEven (Term.app Term.fst_pair (.var .vz)) :
+      Term F (Ty.nat :: Ty.nat :: Γ) _) a (by
+      simp only [Term.subst0, Term.subst, Term.subst0_map,
+        isEven_closed_subst, fst_pair_closed_subst]; rfl)
+  let h_ie := isEven_cases adm (Term.app Term.fst_pair a)
+  let h_sa_cases : Derivable F EqX al Premises
+      (Formula.eq0 sa S0 ∨ᶠ Formula.eq0 sa .zero) :=
+    let lift_case (v : Term F (Ty.nat :: Γ) Ty.nat) :
+        Derivable F EqX al Premises (Formula.eq0 ie_fpa v →ᶠ Formula.eq0 sa v) :=
+      .syllogism (pair_h (weaken_intro h_sa_unfold) I_comb) .trans0
+    .mp h_ie (or_elim_rule (.syllogism (lift_case _) .or_weak) (.syllogism (lift_case _) or_inr))
+  -- h_rs_enc = rat_sign(rat_encode(sign_nf, num_nf, den_nf))
+  let h_rs_enc := rat_sign_congr h_unfold
+  -- lift: sa =₀ X → sign_nf =₀ X
+  let lift_sign (X : Term F (Ty.nat :: Γ) Ty.nat) :
+      Derivable F EqX al Premises (Formula.eq0 sa X →ᶠ Formula.eq0 sign_nf X) :=
+    .syllogism (pair_h (weaken_intro h_sign_nf) I_comb) .trans0
+  -- Sub-case sa =₀ S0:
+  let h_isE_S0 : Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
+      (Formula.eq0 (.app Term.isEven S0) .zero) :=
+    let step1 := isEven_succ adm (.zero : Term F (Ty.nat :: Γ) _)
+    let step2 := sg_bar_congr (isEven_zero (Γ := Ty.nat :: Γ))
+    let step3 := sg_bar_succ adm (.zero : Term F (Ty.nat :: Γ) _)
+    .mp (.mp step3 (.mp (.mp (.mp step2 (.mp step1 and_intro)) .trans0) and_intro)) .trans0
+  let h_pos := rat_sign_rat_encode_pos adm S0 num_nf den_nf h_isE_S0
+  let h_rs_cond_S0 := qfer_nat_nf (by rfl) (by rfl) (lift_sign S0)
+    (r := Term.app Term.rat_sign (Term.app3 Term.rat_encode (.var .vz) num_nf.weaken den_nf.weaken))
+    (rs := Term.app Term.rat_sign (Term.app3 Term.rat_encode sign_nf num_nf den_nf))
+    (rt := Term.app Term.rat_sign (Term.app3 Term.rat_encode (.app .succ .zero) num_nf den_nf))
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
+        rat_sign_closed_subst, rat_encode_closed_subst, weaken_subst0_eta])
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
+        rat_sign_closed_subst, rat_encode_closed_subst, weaken_subst0_eta]; rfl)
+  let h_rs_S0 : Derivable F EqX al Premises
+      (Formula.eq0 sa S0 →ᶠ Formula.eq0 rs S0) :=
+    .syllogism (pair_h (weaken_intro h_rs_enc)
+      (.syllogism (pair_h h_rs_cond_S0 (weaken_intro h_pos)) .trans0)) .trans0
+  let h_abs_S0_S0 := abs_diff_self adm S0
+  let h_abs_step1_S0 := qfer_nat_nf (by rfl) (by rfl) I_comb
+    (r := Term.app2 Term.abs_diff rs.weaken (.var .vz))
+    (rs := Term.app2 Term.abs_diff rs sa) (rt := Term.app2 Term.abs_diff rs S0)
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+        abs_diff_closed_subst, rat_sign_closed_subst, add_Q_closed_subst,
+        weaken_subst0_eta])
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+        abs_diff_closed_subst, rat_sign_closed_subst, add_Q_closed_subst,
+        weaken_subst0_eta])
+  let h_abs_step2_S0 := qfer_nat_nf (by rfl) (by rfl) h_rs_S0
+    (r := Term.app2 Term.abs_diff (.var .vz) S0.weaken)
+    (rs := Term.app2 Term.abs_diff rs S0) (rt := Term.app2 Term.abs_diff S0 S0)
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+        abs_diff_closed_subst, rat_sign_closed_subst, add_Q_closed_subst,
+        weaken_subst0_eta])
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+        abs_diff_closed_subst, weaken_subst0_eta])
+  let h_abs_zero_S0 : Derivable F EqX al Premises
+      (Formula.eq0 sa S0 →ᶠ Formula.eq0 abs_rs_sa .zero) :=
+    .syllogism (pair_h h_abs_step1_S0 (.syllogism (pair_h h_abs_step2_S0
+      (weaken_intro h_abs_S0_S0)) .trans0)) .trans0
+  let h_product_from_abs : Derivable F EqX al Premises
+      (Formula.eq0 abs_rs_sa .zero →ᶠ Formula.eq0 (Term.app2 Term.mul abs_rs_sa sg_pp) .zero) :=
+    .syllogism (pair_h
+      (qfer_nat_nf (by rfl) (by rfl) I_comb
+        (r := Term.app2 Term.mul (.var .vz) sg_pp.weaken)
+        (rs := Term.app2 Term.mul abs_rs_sa sg_pp) (rt := Term.app2 Term.mul .zero sg_pp)
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+            mul_closed_subst, abs_diff_closed_subst, sg_closed_subst, add_closed_subst,
+            rat_sign_closed_subst, add_Q_closed_subst, rat_num_closed_subst,
+            weaken_subst0_eta])
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+            mul_closed_subst, sg_closed_subst, add_closed_subst,
+            rat_num_closed_subst, weaken_subst0_eta]))
+      (weaken_intro (mul_zero_l adm sg_pp))) .trans0
+  let case_b2_sub1 := .syllogism h_abs_zero_S0 h_product_from_abs
+  -- Sub-case sa =₀ 0 (under ¬(pa=0)):
+  let h_ne_0_S0 : Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
+      (¬ᶠFormula.eq0 (Term.app2 Term.abs_diff .zero S0) .zero) :=
+    let h_fwd := .mp (abs_diff_eq_zero_iff adm (.zero : Term F (Ty.nat :: Γ) _) S0) .and_weak
+    .syllogism (.syllogism h_fwd .sym0)
+      (.mp .succ_ne_zero (.forall_ax (.zero : Term F (Ty.nat :: Γ) _)))
+  let h_sgb_abs_0_S0 : Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
+      (Formula.eq0 (.app Term.sg_bar (Term.app2 Term.abs_diff .zero S0)) .zero) :=
+    .mp h_ne_0_S0 (.mp (sg_bar_eq_zero_iff adm (Term.app2 Term.abs_diff .zero S0))
+      (.syllogism .and_perm .and_weak))
+  let h_sgnf_when_0 : Derivable F EqX al Premises
+      (Formula.eq0 sa .zero →ᶠ Formula.eq0 sign_nf .zero) := lift_sign .zero
+  let two_nnf := Term.app2 Term.mul (Term.ofNat 2) num_nf
+  let nnf := Term.app2 Term.add num_nf num_nf
+  let h_rs_unfold_0 := rat_sign_rat_encode_unfold adm (.zero : Term F (Ty.nat :: Γ) _) num_nf den_nf
+  let h_monus_ie0 := monus_congr_r two_nnf (isEven_zero (Γ := Ty.nat :: Γ))
+  let h_two_nnf_eq_nnf :=
+    let h_ms := mul_succ_l adm (.app .succ .zero : Term F (Ty.nat :: Γ) _) num_nf
+    let h_m1 := .mp (.mp (mul_one_r adm num_nf)
+      (.mp (mul_comm adm (.app .succ .zero) num_nf) and_intro)) .trans0
+    .mp (.mp (add_congr_l h_m1 num_nf) (.mp h_ms and_intro)) .trans0
+  let h_monus_s0_0 : Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
+      (Formula.eq0 (Term.app2 Term.monus two_nnf (.app .succ .zero)) (.app Term.pd nnf)) :=
+    let hm1 := monus_congr_l h_two_nnf_eq_nnf (.app .succ .zero)
+    let hm2 := monus_succ adm nnf .zero
+    let hm3 := pd_congr (monus_zero adm nnf)
+    .mp (.mp hm3 (.mp (.mp (.mp hm2 (.mp hm1 and_intro)) .trans0) and_intro)) .trans0
+  let h_ie_chain_0 : Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
+      (Formula.eq0 (.app Term.rat_sign (Term.app3 Term.rat_encode .zero num_nf den_nf))
+        (.app Term.isEven (.app Term.pd nnf))) :=
+    .mp (.mp (isEven_congr (.mp (.mp h_monus_s0_0 (.mp h_monus_ie0 and_intro)) .trans0))
+      (.mp h_rs_unfold_0 and_intro)) .trans0
+  -- ¬(pa=0) → isEven(pd(nnf)) = 0
+  let h_num_fwd : Derivable F EqX al Premises
+      (Formula.eq0 num_nf .zero →ᶠ Formula.eq0 pa .zero) :=
+    .syllogism (pair_h (weaken_intro (.mp h_num .sym0)) I_comb) .trans0
+  let h_nnf_ne : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 pa .zero →ᶠ ¬ᶠFormula.eq0 nnf .zero) :=
+    .syllogism (contrapositive h_num_fwd)
+      (contrapositive (.syllogism (.mp (add_eq_zero_iff adm num_nf num_nf) .and_weak) .and_weak))
+  let h_nnf_succ : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 pa .zero →ᶠ Formula.eq0 nnf (.app .succ (.app Term.pd nnf))) :=
+    .syllogism h_nnf_ne (ne_zero_eq_succ_pd adm nnf)
+  let h_ie_nnf_eq : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 pa .zero →ᶠ
+       Formula.eq0 (.app Term.isEven nnf) (.app Term.isEven (.app .succ (.app Term.pd nnf)))) :=
+    qfer_nat_nf (by rfl) (by rfl) h_nnf_succ
+      (r := .app Term.isEven (.var .vz))
+      (rs := .app Term.isEven nnf)
+      (rt := .app Term.isEven (.app .succ (.app Term.pd nnf)))
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map,
+          isEven_closed_subst, add_closed_subst, rat_num_closed_subst,
+          add_Q_closed_subst, Term.app2])
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map,
+          isEven_closed_subst, pd_closed_subst, add_closed_subst,
+          rat_num_closed_subst, add_Q_closed_subst, Term.app2])
+  let h_ie_nnf_sgb : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 pa .zero →ᶠ
+       Formula.eq0 (.app Term.isEven nnf)
+         (.app Term.sg_bar (.app Term.isEven (.app Term.pd nnf)))) :=
+    .syllogism (pair_h h_ie_nnf_eq (weaken_intro (isEven_succ adm (.app Term.pd nnf)))) .trans0
+  let h_ie_pd_zero : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 pa .zero →ᶠ
+       Formula.eq0 (.app Term.isEven (.app Term.pd nnf)) .zero) :=
+    .syllogism
+      (.syllogism (pair_h (.syllogism h_ie_nnf_sgb .sym0) (weaken_intro (isEven_double adm num_nf))) .trans0)
+      (sg_bar_eq_S0_implies_zero adm (.app Term.isEven (.app Term.pd nnf)))
+  let h_neg_rs : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 pa .zero →ᶠ
+       Formula.eq0 (.app Term.rat_sign (Term.app3 Term.rat_encode .zero num_nf den_nf)) .zero) :=
+    .syllogism (pair_h (weaken_intro h_ie_chain_0) h_ie_pd_zero) .trans0
+  let h_rs_cond_0 := qfer_nat_nf (by rfl) (by rfl) h_sgnf_when_0
+    (r := Term.app Term.rat_sign (Term.app3 Term.rat_encode (.var .vz) num_nf.weaken den_nf.weaken))
+    (rs := Term.app Term.rat_sign (Term.app3 Term.rat_encode sign_nf num_nf den_nf))
+    (rt := Term.app Term.rat_sign (Term.app3 Term.rat_encode .zero num_nf den_nf))
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
+        rat_sign_closed_subst, rat_encode_closed_subst, weaken_subst0_eta])
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
+        rat_sign_closed_subst, rat_encode_closed_subst, weaken_subst0_eta])
+  let h_rs_0 : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 pa .zero ∧ᶠ Formula.eq0 sa .zero →ᶠ Formula.eq0 rs .zero) :=
+    .syllogism (pair_h
+      (.syllogism (pair_h (.syllogism .and_weak (weaken_intro h_rs_enc))
+        (.syllogism and_proj2 h_rs_cond_0)) .trans0)
+      (.syllogism .and_weak h_neg_rs)) .trans0
+  let h_abs_zero_0 : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 pa .zero ∧ᶠ Formula.eq0 sa .zero →ᶠ Formula.eq0 abs_rs_sa .zero) :=
+    .syllogism (.syllogism (pair_h h_rs_0 (.syllogism and_proj2 .sym0)) .trans0)
+      (.mp (abs_diff_eq_zero_iff adm rs sa) (.syllogism .and_perm .and_weak))
+  let case_b2_sub2 := .syllogism h_abs_zero_0 h_product_from_abs
+  -- Assemble case B2
+  let case_b2 : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 pa .zero →ᶠ Formula.eq0 (Term.app2 Term.mul abs_rs_sa sg_pp) .zero) :=
+    .syllogism (pair_h I_comb (weaken_intro h_sa_cases))
+      (.syllogism and_or_dist (or_elim_rule (.syllogism and_proj2 case_b2_sub1) case_b2_sub2))
+  -- Final assembly
+  let h_reduced := .mp h_pa_disj (or_elim_rule case_b1 case_b2)
+  let h_sign : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul abs_rs_sa
+        (Term.app Term.sg (Term.app2 Term.add rn pa))) .zero) :=
+    .mp (.mp h_reduced (.mp h_mul_red and_intro)) .trans0
+  univ_gen (eq_Q_from_components adm h_cross h_sign)
+
+/-- ⊢ ∀a. eq_Q(add_Q(a, neg_Q(a)), zero_Q) -/
+-- Helper: unfold neg_Q(a) and derive component equalities
+private def add_Q_neg_core :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all Ty.nat
+        (eq_Q (Term.app2 Term.add_Q (.var .vz)
+                (Term.app Term.neg_Q (.var .vz)))
+              Term.zero_Q)) :=
+  let a : Term F (Ty.nat :: Γ) Ty.nat := .var .vz
+  let sa := Term.app Term.rat_sign a
+  let pa := Term.app Term.rat_num a
+  let da := Term.app Term.rat_den a
+  let na := Term.app Term.neg_Q a
+  let sn := Term.app Term.rat_sign na
+  let pn := Term.app Term.rat_num na
+  let dn := Term.app Term.rat_den na
+  -- ── Unfold neg_Q(a) ──
+  let neg_Q_body : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat :=
+    Term.app3 Term.rat_encode
+      (Term.app2 Term.monus (.app .succ .zero)
+        (.app Term.rat_sign (.var .vz)))
+      (.app Term.rat_num (.var .vz))
+      (.app Term.snd_pair (.var .vz))
+  have neg_Q_eq : (Term.neg_Q : Term F (Ty.nat :: Γ) _) = Term.lam neg_Q_body := by rfl
+  let na_sign := Term.app2 Term.monus (.app .succ .zero : Term F (Ty.nat :: Γ) _) sa
+  let na_den := Term.app Term.snd_pair a
+  have neg_Q_nf : neg_Q_body.subst0 a =
+      Term.app3 Term.rat_encode na_sign pa na_den := by
+    simp only [neg_Q_body, a, na_sign, na_den, sa, pa,
+      Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
+      rat_encode_closed_subst, monus_closed_subst, rat_sign_closed_subst,
+      rat_num_closed_subst, snd_pair_closed_subst]
+  let h_neg_unfold : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app Term.neg_Q a) (Term.app3 Term.rat_encode na_sign pa na_den)) :=
+    neg_Q_eq ▸ lam_correct_nf neg_Q_body a neg_Q_nf
+  -- ── Unfold add_Q(a, neg_Q(a)) ──
+  let body : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat :=
+    let n₁ := Term.var (.vs .vz)
+    let n₂ := Term.var .vz
+    let s₁ := Term.app Term.rat_sign n₁
+    let s₂ := Term.app Term.rat_sign n₂
+    let p₁ := Term.app Term.rat_num n₁
+    let p₂ := Term.app Term.rat_num n₂
+    let d₁ := Term.app Term.rat_den n₁
+    let d₂ := Term.app Term.rat_den n₂
+    let ac := Term.app2 Term.mul p₁ d₂
+    let bc := Term.app2 Term.mul p₂ d₁
+    let same := Term.app Term.sg_bar (Term.app2 Term.abs_diff s₁ s₂)
+    Term.app3 Term.rat_encode
+      (Term.app3 Term.ite_nat same s₁
+        (Term.app3 Term.ite_nat (Term.app2 Term.geq ac bc) s₁ s₂))
+      (Term.app3 Term.ite_nat same (Term.app2 Term.add ac bc) (Term.app2 Term.abs_diff ac bc))
+      (Term.app Term.pd (Term.app2 Term.mul d₁ d₂))
+  have body_eq : (Term.add_Q : Term F (Ty.nat :: Γ) _) =
+      Term.lam (Term.lam body) := by rfl
+  let same_nf := Term.app Term.sg_bar (Term.app2 Term.abs_diff sa sn)
+  let ac := Term.app2 Term.mul pa dn
+  let bc := Term.app2 Term.mul pn da
+  let sign_nf := Term.app3 Term.ite_nat same_nf sa
+    (Term.app3 Term.ite_nat (Term.app2 Term.geq ac bc) sa sn)
+  let num_nf := Term.app3 Term.ite_nat same_nf
+    (Term.app2 Term.add ac bc)
+    (Term.app2 Term.abs_diff ac bc)
+  let den_nf := Term.app Term.pd (Term.app2 Term.mul da dn)
+  have nf : (body.subst0 (na.weaken)).subst0 a =
+      Term.app3 Term.rat_encode sign_nf num_nf den_nf := by
+    simp only [body, a, na, sign_nf, num_nf, den_nf, same_nf, ac, bc,
+      sa, sn, pa, pn, da, dn,
+      Term.neg_Q, Term.pair, Term.subst0, Term.subst, Term.subst0_map,
+      Term.app3, Term.app2, Term.ofNat,
+      rat_encode_closed_subst, rat_sign_closed_subst, rat_num_closed_subst,
+      rat_den_closed_subst, ite_nat_closed_subst, sg_bar_closed_subst,
+      abs_diff_closed_subst, add_closed_subst, mul_closed_subst,
+      geq_closed_subst, pd_closed_subst, neg_Q_closed_subst, weaken_subst0_eta]
+  let h_unfold : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add_Q a na)
+        (Term.app3 Term.rat_encode sign_nf num_nf den_nf)) :=
+    body_eq ▸ lam2_correct_nf adm body a na nf
+  -- ── neg_Q component equalities ──
+  -- pn =₀ pa
+  let h_pn : Derivable F EqX al Premises (Formula.eq0 pn pa) :=
+    .mp (.mp (rat_num_rat_encode adm na_sign pa na_den (isEven_cases adm na_sign))
+      (.mp (rat_num_congr h_neg_unfold) and_intro)) .trans0
+  -- dn =₀ S(snd_pair(a))
+  let h_dn1 : Derivable F EqX al Premises
+      (Formula.eq0 dn (.app .succ na_den)) :=
+    .mp (.mp (rat_den_rat_encode adm na_sign pa na_den)
+      (.mp (rat_den_congr h_neg_unfold) and_intro)) .trans0
+  -- da =₀ S(snd_pair(a))
+  let h_da1 : Derivable F EqX al Premises
+      (Formula.eq0 da (.app .succ (.app Term.snd_pair a))) :=
+    lam_correct_nf (.app .succ (.app Term.snd_pair (.var .vz))
+      : Term F (Ty.nat :: Ty.nat :: Γ) _) a (by
+      simp only [Term.subst0, Term.subst, Term.subst0_map, snd_pair_closed_subst])
+  -- dn =₀ da
+  let h_dn : Derivable F EqX al Premises (Formula.eq0 dn da) :=
+    .mp (.mp (.mp h_da1 .sym0) (.mp h_dn1 and_intro)) .trans0
+  -- ── Cross products equal ──
+  let h_ac : Derivable F EqX al Premises (Formula.eq0 ac (Term.app2 Term.mul pa da)) :=
+    mul_congr_r pa h_dn
+  let h_bc : Derivable F EqX al Premises (Formula.eq0 bc (Term.app2 Term.mul pa da)) :=
+    mul_congr_l h_pn da
+  -- |ac - bc| =₀ 0
+  let h_diff : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.abs_diff ac bc) .zero) :=
+    .mp (.mp (abs_diff_self adm _) (.mp (.mp (.mp (abs_diff_congr_r _ h_bc)
+      (.mp (abs_diff_congr_l h_ac _) and_intro)) .trans0) and_intro)) .trans0
+  -- ── num_nf =₀ 0 ──
+  -- Step: num_nf =₀ ite(same_nf, ac+bc, 0)
+  let h_num_ite : Derivable F EqX al Premises (Formula.eq0 num_nf
+      (Term.app3 Term.ite_nat same_nf (Term.app2 Term.add ac bc) .zero)) :=
+    ite_nat_congr_y (b := same_nf) (x := Term.app2 Term.add ac bc) h_diff
+  -- pa=0 → pa*da =₀ 0
+  let h_pa_da_zero : Derivable F EqX al Premises
+      (Formula.eq0 pa .zero →ᶠ
+       Formula.eq0 (Term.app2 Term.mul pa da) .zero) :=
+    .syllogism (pair_h
+      (qfer_nat_nf (by rfl) (by rfl) I_comb
+        (r := Term.app2 Term.mul (.var .vz) da.weaken)
+        (rs := Term.app2 Term.mul pa da)
+        (rt := Term.app2 Term.mul .zero da)
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+            mul_closed_subst, rat_den_closed_subst, weaken_subst0_eta])
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+            mul_closed_subst, rat_den_closed_subst, weaken_subst0_eta]))
+      (weaken_intro (mul_zero_l adm da))) .trans0
+  -- pa=0 → pa*da + pa*da =₀ 0+0
+  let h_sum_pa_da : Derivable F EqX al Premises
+      (Formula.eq0 pa .zero →ᶠ
+       Formula.eq0 (Term.app2 Term.add (Term.app2 Term.mul pa da) (Term.app2 Term.mul pa da))
+         (Term.app2 Term.add .zero .zero)) :=
+    qfer_nat_nf (by rfl) (by rfl) h_pa_da_zero
+      (r := Term.app2 Term.add (.var .vz) (.var .vz))
+      (rs := Term.app2 Term.add (Term.app2 Term.mul pa da) (Term.app2 Term.mul pa da))
+      (rt := Term.app2 Term.add .zero .zero)
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+          add_closed_subst, mul_closed_subst, rat_num_closed_subst,
+          rat_den_closed_subst])
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+          add_closed_subst])
+  -- ac+bc =₀ pa*da + pa*da (unconditional)
+  let h_sum_eq : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add ac bc)
+        (Term.app2 Term.add (Term.app2 Term.mul pa da) (Term.app2 Term.mul pa da))) :=
+    .mp (.mp (add_congr_r _ h_bc) (.mp (add_congr_l h_ac bc) and_intro)) .trans0
+  -- pa=0 → ac+bc =₀ 0
+  let h_sum_zero : Derivable F EqX al Premises
+      (Formula.eq0 pa .zero →ᶠ Formula.eq0 (Term.app2 Term.add ac bc) .zero) :=
+    .syllogism (pair_h (weaken_intro h_sum_eq) h_sum_pa_da)
+      (.syllogism .trans0 (.syllogism (pair_h I_comb (weaken_intro (add_zero_r adm .zero))) .trans0))
+  -- pa=0 → ite(same_nf, ac+bc, 0) =₀ ite(same_nf, 0, 0)
+  let h_ite_zero : Derivable F EqX al Premises
+      (Formula.eq0 pa .zero →ᶠ
+       Formula.eq0 (Term.app3 Term.ite_nat same_nf (Term.app2 Term.add ac bc) .zero)
+         (Term.app3 Term.ite_nat same_nf .zero .zero)) :=
+    qfer_nat_nf (by rfl) (by rfl) h_sum_zero
+      (r := Term.app3 Term.ite_nat same_nf.weaken (.var .vz) (.zero : Term F (Ty.nat :: Ty.nat :: Γ) _))
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
+          ite_nat_closed_subst, sg_bar_closed_subst, abs_diff_closed_subst,
+          rat_sign_closed_subst, neg_Q_closed_subst, add_closed_subst,
+          mul_closed_subst, rat_num_closed_subst, rat_den_closed_subst,
+          weaken_subst0_eta])
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
+          ite_nat_closed_subst, sg_bar_closed_subst, abs_diff_closed_subst,
+          rat_sign_closed_subst, neg_Q_closed_subst,
+          weaken_subst0_eta])
+  -- ite(same_nf, 0, 0) =₀ 0 (unconditional, by ite_nat_sg_bar_same)
+  let h_ite_same : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app3 Term.ite_nat same_nf .zero .zero) .zero) :=
+    ite_nat_sg_bar_same adm _ .zero
+  -- Case B1: pa=0 → num_nf =₀ 0
+  let case_b1 : Derivable F EqX al Premises
+      (Formula.eq0 pa .zero →ᶠ Formula.eq0 num_nf .zero) :=
+    .syllogism (pair_h (weaken_intro h_num_ite)
+      (.syllogism (pair_h h_ite_zero (weaken_intro h_ite_same)) .trans0)) .trans0
+  -- ── Case B2: pa≠0 → same_nf =₀ 0, then num_nf =₀ 0 ──
+  let S0 : Term F (Ty.nat :: Γ) Ty.nat := .app .succ .zero
+  let h_sn_enc := rat_sign_congr h_neg_unfold
+  -- sa cases
+  let h_sa_unfold : Derivable F EqX al Premises (Formula.eq0 sa
+      (.app Term.isEven (.app Term.fst_pair a))) :=
+    lam_correct_nf (Term.app Term.isEven (Term.app Term.fst_pair (.var .vz)) :
+      Term F (Ty.nat :: Ty.nat :: Γ) _) a (by
+      simp only [Term.subst0, Term.subst, Term.subst0_map,
+        isEven_closed_subst, fst_pair_closed_subst])
+  let h_sa_vals : Derivable F EqX al Premises
+      (Formula.eq0 sa S0 ∨ᶠ Formula.eq0 sa .zero) :=
+    let lift_sa (v : Term F (Ty.nat :: Γ) Ty.nat) :
+        Derivable F EqX al Premises
+          (Formula.eq0 (.app Term.isEven (.app Term.fst_pair a)) v →ᶠ Formula.eq0 sa v) :=
+      .syllogism (pair_h (weaken_intro h_sa_unfold) I_comb) .trans0
+    .mp (isEven_cases adm (Term.app Term.fst_pair a))
+      (or_elim_rule (.syllogism (lift_sa _) .or_weak) (.syllogism (lift_sa _) or_inr))
+  -- sa=X → na_sign =₀ monus(S0, X)
+  let lift_na_sign (X : Term F (Ty.nat :: Γ) Ty.nat) :
+      Derivable F EqX al Premises (Formula.eq0 sa X →ᶠ
+        Formula.eq0 na_sign (Term.app2 Term.monus S0 X)) :=
+    qfer_nat_nf (by rfl) (by rfl) I_comb
+      (r := Term.app2 Term.monus S0.weaken (.var .vz))
+      (rs := Term.app2 Term.monus S0 sa) (rt := Term.app2 Term.monus S0 X)
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+          monus_closed_subst, rat_sign_closed_subst, weaken_subst0_eta])
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+          monus_closed_subst, weaken_subst0_eta])
+  -- sa=X → sn =₀ rat_sign(rat_encode(monus(S0,X), pa, na_den))
+  let lift_sn (X : Term F (Ty.nat :: Γ) Ty.nat) :
+      Derivable F EqX al Premises (Formula.eq0 sa X →ᶠ
+        Formula.eq0 sn (.app Term.rat_sign
+          (Term.app3 Term.rat_encode (Term.app2 Term.monus S0 X) pa na_den))) :=
+    .syllogism (pair_h (weaken_intro h_sn_enc) (qfer_nat_nf (by rfl) (by rfl) (lift_na_sign X)
+      (r := .app Term.rat_sign (Term.app3 Term.rat_encode (.var .vz) pa.weaken na_den.weaken))
+      (rs := .app Term.rat_sign (Term.app3 Term.rat_encode na_sign pa na_den))
+      (rt := .app Term.rat_sign (Term.app3 Term.rat_encode (Term.app2 Term.monus S0 X) pa na_den))
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
+          rat_sign_closed_subst, rat_encode_closed_subst, monus_closed_subst,
+          snd_pair_closed_subst, weaken_subst0_eta])
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
+          rat_sign_closed_subst, rat_encode_closed_subst, monus_closed_subst,
+          weaken_subst0_eta]))) .trans0
+  -- ── Sub-case sa=0: sn =₀ S0, |0-S0| = S0, sg_bar(S0) = 0 ──
+  -- isEven(S0) =₀ 0
+  let h_isE_S0 : Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
+      (Formula.eq0 (.app Term.isEven S0) .zero) :=
+    let step1 := isEven_succ adm (.zero : Term F (Ty.nat :: Γ) _)
+    let step2 := sg_bar_congr (isEven_zero (Γ := Ty.nat :: Γ))
+    let step3 := sg_bar_succ adm (.zero : Term F (Ty.nat :: Γ) _)
+    .mp (.mp step3 (.mp (.mp (.mp step2 (.mp step1 and_intro)) .trans0) and_intro)) .trans0
+  -- rat_sign(rat_encode(S0, pa, na_den)) =₀ S0 (unconditional, positive case)
+  let h_pos := rat_sign_rat_encode_pos adm S0 pa na_den h_isE_S0
+  -- monus(S0, 0) =₀ S0
+  let h_monus_S0_0 := monus_zero adm S0
+  -- rat_sign(rat_encode(monus(S0,0), pa, na_den)) =₀ S0
+  let h_enc_monus_0 : Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
+      (Formula.eq0 (.app Term.rat_sign (Term.app3 Term.rat_encode (Term.app2 Term.monus S0 .zero) pa na_den)) S0) :=
+    .mp (.mp h_pos (.mp (qfer_no_premise_nat_nf h_monus_S0_0
+      (r := .app Term.rat_sign (Term.app3 Term.rat_encode (.var .vz) pa.weaken na_den.weaken))
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
+          rat_sign_closed_subst, rat_encode_closed_subst, monus_closed_subst,
+          snd_pair_closed_subst, weaken_subst0_eta])
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
+          rat_sign_closed_subst, rat_encode_closed_subst,
+          snd_pair_closed_subst, weaken_subst0_eta])) and_intro)) .trans0
+  -- sa=0 → sn =₀ S0
+  let h_sn_when_0 : Derivable F EqX al Premises
+      (Formula.eq0 sa .zero →ᶠ Formula.eq0 sn S0) :=
+    .syllogism (pair_h (lift_sn .zero) (weaken_intro h_enc_monus_0)) .trans0
+  -- sa=0 → |sa-sn| =₀ S0 (chain: sa=0, sn=S0, |0-S0|=S0)
+  let h_abs_0 : Derivable F EqX al Premises
+      (Formula.eq0 sa .zero →ᶠ Formula.eq0 (Term.app2 Term.abs_diff sa sn) S0) :=
+    .syllogism (pair_h
+      (qfer_nat_nf (by rfl) (by rfl) h_sn_when_0
+        (r := Term.app2 Term.abs_diff (.zero : Term F (Ty.nat :: Ty.nat :: Γ) _) (.var .vz))
+        (rs := Term.app2 Term.abs_diff .zero sn)
+        (rt := Term.app2 Term.abs_diff .zero S0)
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+            abs_diff_closed_subst, rat_sign_closed_subst, neg_Q_closed_subst, weaken_subst0_eta])
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+            abs_diff_closed_subst, weaken_subst0_eta]))
+      (qfer_nat_nf (by rfl) (by rfl) I_comb
+        (r := Term.app2 Term.abs_diff (.var .vz) sn.weaken)
+        (rs := Term.app2 Term.abs_diff sa sn)
+        (rt := Term.app2 Term.abs_diff .zero sn)
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+            abs_diff_closed_subst, rat_sign_closed_subst, neg_Q_closed_subst, weaken_subst0_eta])
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+            abs_diff_closed_subst, rat_sign_closed_subst, neg_Q_closed_subst, weaken_subst0_eta])))
+      (.syllogism (.syllogism .and_perm .trans0) (.syllogism (pair_h I_comb (weaken_intro (abs_diff_zero_l adm S0))) .trans0))
+  -- sa=0 → same_nf =₀ 0
+  let h_same_0 : Derivable F EqX al Premises
+      (Formula.eq0 sa .zero →ᶠ Formula.eq0 same_nf .zero) :=
+    .syllogism (pair_h
+      (qfer_nat_nf (by rfl) (by rfl) h_abs_0
+        (r := .app Term.sg_bar (.var .vz))
+        (rs := .app Term.sg_bar (Term.app2 Term.abs_diff sa sn))
+        (rt := .app Term.sg_bar S0)
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map,
+            sg_bar_closed_subst, abs_diff_closed_subst, rat_sign_closed_subst,
+            neg_Q_closed_subst, weaken_subst0_eta])
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map,
+            sg_bar_closed_subst, weaken_subst0_eta]))
+      (weaken_intro (sg_bar_succ adm (.zero : Term F (Ty.nat :: Γ) _)))) .trans0
+  -- ── Sub-case sa=S0: need pa≠0 → sn =₀ 0 ──
+  -- rat_sign(rat_encode(0, pa, na_den)) chain (reproducing rat_sign_rat_encode_neg logic)
+  let h_rs_unfold_S0 := rat_sign_rat_encode_unfold adm (.zero : Term F (Ty.nat :: Γ) _) pa na_den
+  let two_pa := Term.app2 Term.mul (Term.ofNat 2) pa
+  let ppa := Term.app2 Term.add pa pa
+  let h_monus_ie0 := monus_congr_r two_pa (isEven_zero (Γ := Ty.nat :: Γ))
+  let h_two_pa_eq_ppa :=
+    let h_ms := mul_succ_l adm (.app .succ .zero : Term F (Ty.nat :: Γ) _) pa
+    let h_m1 := .mp (.mp (mul_one_r adm pa)
+      (.mp (mul_comm adm (.app .succ .zero) pa) and_intro)) .trans0
+    .mp (.mp (add_congr_l h_m1 pa) (.mp h_ms and_intro)) .trans0
+  let h_monus_s0 : Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
+      (Formula.eq0 (Term.app2 Term.monus two_pa S0) (.app Term.pd ppa)) :=
+    let hm1 := monus_congr_l h_two_pa_eq_ppa S0
+    let hm2 := monus_succ adm ppa .zero
+    let hm3 := pd_congr (monus_zero adm ppa)
+    .mp (.mp hm3 (.mp (.mp (.mp hm2 (.mp hm1 and_intro)) .trans0) and_intro)) .trans0
+  -- rat_sign(rat_encode(0, pa, na_den)) =₀ isEven(pd(ppa))
+  let h_ie_chain : Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
+      (Formula.eq0 (.app Term.rat_sign (Term.app3 Term.rat_encode .zero pa na_den))
+        (.app Term.isEven (.app Term.pd ppa))) :=
+    .mp (.mp (isEven_congr (.mp (.mp h_monus_s0 (.mp h_monus_ie0 and_intro)) .trans0))
+      (.mp h_rs_unfold_S0 and_intro)) .trans0
+  -- ¬(pa=0) → isEven(pd(ppa)) =₀ 0
+  let h_ppa_ne : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 pa .zero →ᶠ ¬ᶠFormula.eq0 ppa .zero) :=
+    contrapositive (.syllogism (.mp (add_eq_zero_iff adm pa pa) .and_weak) .and_weak)
+  let h_ppa_succ : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 pa .zero →ᶠ Formula.eq0 ppa (.app .succ (.app Term.pd ppa))) :=
+    .syllogism h_ppa_ne (ne_zero_eq_succ_pd adm ppa)
+  let h_ie_ppa_eq : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 pa .zero →ᶠ
+       Formula.eq0 (.app Term.isEven ppa) (.app Term.isEven (.app .succ (.app Term.pd ppa)))) :=
+    qfer_nat_nf (by rfl) (by rfl) h_ppa_succ
+      (r := .app Term.isEven (.var .vz))
+      (rs := .app Term.isEven ppa)
+      (rt := .app Term.isEven (.app .succ (.app Term.pd ppa)))
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map,
+          isEven_closed_subst, add_closed_subst, rat_num_closed_subst, Term.app2])
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map,
+          isEven_closed_subst, pd_closed_subst, add_closed_subst,
+          rat_num_closed_subst, Term.app2])
+  let h_ie_ppa_sgb : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 pa .zero →ᶠ
+       Formula.eq0 (.app Term.isEven ppa)
+         (.app Term.sg_bar (.app Term.isEven (.app Term.pd ppa)))) :=
+    .syllogism (pair_h h_ie_ppa_eq (weaken_intro (isEven_succ adm (.app Term.pd ppa)))) .trans0
+  let h_ie_pd_zero : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 pa .zero →ᶠ
+       Formula.eq0 (.app Term.isEven (.app Term.pd ppa)) .zero) :=
+    .syllogism
+      (.syllogism (pair_h (.syllogism h_ie_ppa_sgb .sym0) (weaken_intro (isEven_double adm pa))) .trans0)
+      (sg_bar_eq_S0_implies_zero adm (.app Term.isEven (.app Term.pd ppa)))
+  -- ¬(pa=0) → rat_sign(rat_encode(0, pa, na_den)) =₀ 0
+  let h_neg_rs : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 pa .zero →ᶠ
+       Formula.eq0 (.app Term.rat_sign (Term.app3 Term.rat_encode .zero pa na_den)) .zero) :=
+    .syllogism (pair_h (weaken_intro h_ie_chain) h_ie_pd_zero) .trans0
+  -- monus(S0, S0) =₀ 0
+  let h_monus_S0_S0 := monus_self adm S0
+  -- rat_sign(rat_encode(monus(S0,S0), pa, na_den)) =₀ rat_sign(rat_encode(0, pa, na_den))
+  let h_enc_monus_S0 : Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
+      (Formula.eq0 (.app Term.rat_sign (Term.app3 Term.rat_encode (Term.app2 Term.monus S0 S0) pa na_den))
+        (.app Term.rat_sign (Term.app3 Term.rat_encode .zero pa na_den))) :=
+    qfer_no_premise_nat_nf h_monus_S0_S0
+      (r := .app Term.rat_sign (Term.app3 Term.rat_encode (.var .vz) pa.weaken na_den.weaken))
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
+          rat_sign_closed_subst, rat_encode_closed_subst, monus_closed_subst,
+          snd_pair_closed_subst, weaken_subst0_eta])
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
+          rat_sign_closed_subst, rat_encode_closed_subst,
+          snd_pair_closed_subst, weaken_subst0_eta])
+  -- ¬(pa=0) ∧ sa=S0 → sn =₀ 0
+  -- Chain: sa=S0 → sn =₀ rat_sign(rat_encode(monus(S0,S0), pa, na_den)) =₀ rat_sign(rat_encode(0, pa, na_den))
+  --        ¬(pa=0) → rat_sign(rat_encode(0, pa, na_den)) =₀ 0
+  let h_sn_cond_S0 : Derivable F EqX al Premises
+      (Formula.eq0 sa S0 →ᶠ Formula.eq0 sn
+        (.app Term.rat_sign (Term.app3 Term.rat_encode .zero pa na_den))) :=
+    .syllogism (pair_h (lift_sn S0) (weaken_intro h_enc_monus_S0)) .trans0
+  let h_sn_when_S0 : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 pa .zero ∧ᶠ Formula.eq0 sa S0 →ᶠ Formula.eq0 sn .zero) :=
+    .syllogism (pair_h (.syllogism and_proj2 h_sn_cond_S0) (.syllogism .and_weak h_neg_rs)) .trans0
+  -- ¬(pa=0) ∧ sa=S0 → |sa-sn| =₀ |S0-0| =₀ S0
+  let h_abs_S0 : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 pa .zero ∧ᶠ Formula.eq0 sa S0 →ᶠ
+       Formula.eq0 (Term.app2 Term.abs_diff sa sn) S0) :=
+    .syllogism (pair_h
+      (qfer_nat_nf (by rfl) (by rfl) h_sn_when_S0
+        (r := Term.app2 Term.abs_diff sa.weaken (.var .vz))
+        (rs := Term.app2 Term.abs_diff sa sn)
+        (rt := Term.app2 Term.abs_diff sa .zero)
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+            abs_diff_closed_subst, rat_sign_closed_subst, neg_Q_closed_subst, weaken_subst0_eta])
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+            abs_diff_closed_subst, rat_sign_closed_subst, weaken_subst0_eta]))
+      (.syllogism and_proj2
+        (qfer_nat_nf (by rfl) (by rfl) I_comb
+          (r := Term.app2 Term.abs_diff (.var .vz) (.zero : Term F (Ty.nat :: Ty.nat :: Γ) _))
+          (rs := Term.app2 Term.abs_diff sa .zero)
+          (rt := Term.app2 Term.abs_diff S0 .zero)
+          (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+              abs_diff_closed_subst, rat_sign_closed_subst, weaken_subst0_eta])
+          (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+              abs_diff_closed_subst, weaken_subst0_eta]))))
+      (.syllogism .trans0 (.syllogism (pair_h I_comb (weaken_intro (abs_diff_zero_r adm S0))) .trans0))
+  -- ¬(pa=0) ∧ sa=S0 → same_nf =₀ 0
+  let h_same_S0 : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 pa .zero ∧ᶠ Formula.eq0 sa S0 →ᶠ Formula.eq0 same_nf .zero) :=
+    .syllogism (pair_h
+      (qfer_nat_nf (by rfl) (by rfl) h_abs_S0
+        (r := .app Term.sg_bar (.var .vz))
+        (rs := .app Term.sg_bar (Term.app2 Term.abs_diff sa sn))
+        (rt := .app Term.sg_bar S0)
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map,
+            sg_bar_closed_subst, abs_diff_closed_subst, rat_sign_closed_subst,
+            neg_Q_closed_subst, weaken_subst0_eta])
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map,
+            sg_bar_closed_subst, weaken_subst0_eta]))
+      (weaken_intro (sg_bar_succ adm (.zero : Term F (Ty.nat :: Γ) _)))) .trans0
+  -- ¬(pa=0) → same_nf =₀ 0 (combine sub-cases via or_elim on sa)
+  let h_same_zero : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 pa .zero →ᶠ Formula.eq0 same_nf .zero) :=
+    .syllogism (pair_h I_comb (weaken_intro h_sa_vals))
+      (.syllogism and_or_dist (or_elim_rule
+        (let swap := .syllogism .and_perm h_same_S0
+         .syllogism (pair_h and_proj2 .and_weak) swap)
+        (.syllogism and_proj2 h_same_0)))
+  -- ¬(pa=0) → ite(same_nf, ac+bc, |ac-bc|) =₀ ite(0, ac+bc, |ac-bc|) =₀ |ac-bc| =₀ 0
+  let h_ite_when_ne : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 pa .zero →ᶠ Formula.eq0 num_nf .zero) :=
+    .syllogism (pair_h
+      (qfer_nat_nf (by rfl) (by rfl) h_same_zero
+        (r := Term.app3 Term.ite_nat (.var .vz)
+          (Term.app2 Term.add ac bc).weaken
+          (Term.app2 Term.abs_diff ac bc).weaken)
+        (rs := num_nf)
+        (rt := Term.app3 Term.ite_nat .zero (Term.app2 Term.add ac bc) (Term.app2 Term.abs_diff ac bc))
+        (by simp only [num_nf, Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
+            ite_nat_closed_subst, sg_bar_closed_subst, abs_diff_closed_subst,
+            add_closed_subst, mul_closed_subst, rat_sign_closed_subst, neg_Q_closed_subst,
+            rat_num_closed_subst, rat_den_closed_subst, weaken_subst0_eta])
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
+            ite_nat_closed_subst, abs_diff_closed_subst, add_closed_subst,
+            mul_closed_subst, rat_num_closed_subst, rat_den_closed_subst,
+            neg_Q_closed_subst, weaken_subst0_eta]))
+      (weaken_intro (ite_nat_zero adm (Term.app2 Term.add ac bc) (Term.app2 Term.abs_diff ac bc))))
+      (.syllogism .trans0 (.syllogism (pair_h I_comb (weaken_intro h_diff)) .trans0))
+  -- Case B2
+  let case_b2 : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 pa .zero →ᶠ Formula.eq0 num_nf .zero) := h_ite_when_ne
+  -- ── Combine cases: num_nf =₀ 0 ──
+  let h_pa_disj := .mp eq0_decidable' (.forall_ax pa)
+  let h_num_zero : Derivable F EqX al Premises (Formula.eq0 num_nf .zero) :=
+    .mp h_pa_disj (or_elim_rule case_b1 case_b2)
+  -- ── Result components for eq_Q_from_components ──
+  let result := Term.app2 Term.add_Q a na
+  let rn := Term.app Term.rat_num result
+  let rd := Term.app Term.rat_den result
+  let rs := Term.app Term.rat_sign result
+  let zero := (Term.zero_Q : Term F (Ty.nat :: Γ) Ty.nat)
+  let sz := Term.app Term.rat_sign zero
+  let nz := Term.app Term.rat_num zero
+  let dz := Term.app Term.rat_den zero
+  -- rn =₀ num_nf (via rat_num_rat_encode on the add_Q result)
+  let h_rn : Derivable F EqX al Premises (Formula.eq0 rn .zero) :=
+    .mp (.mp h_num_zero (.mp (.mp (.mp
+      (rat_num_rat_encode adm sign_nf num_nf den_nf (isEven_cases adm sign_nf))
+      (.mp (rat_num_congr h_unfold) and_intro)) .trans0) and_intro)) .trans0
+  -- nz =₀ 0
+  let h_nz : Derivable F EqX al Premises (Formula.eq0 nz .zero) :=
+    rat_num_zero_Q (adm := adm)
+  -- dz =₀ S0
+  let h_dz : Derivable F EqX al Premises (Formula.eq0 dz S0) :=
+    rat_den_zero_Q (adm := adm)
+  -- Cross product: |rn*dz - nz*rd| =₀ |0*dz - 0*rd| =₀ |0-0| =₀ 0
+  let h_rn_dz : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul rn dz) .zero) :=
+    .mp (.mp (mul_zero_l adm dz) (.mp (mul_congr_l h_rn dz) and_intro)) .trans0
+  let h_nz_rd : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul nz rd) .zero) :=
+    .mp (.mp (mul_zero_l adm rd) (.mp (mul_congr_l h_nz rd) and_intro)) .trans0
+  let h_cross : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.abs_diff
+        (Term.app2 Term.mul rn dz) (Term.app2 Term.mul nz rd)) .zero) :=
+    .mp (.mp (abs_diff_self adm _) (.mp (.mp (.mp (abs_diff_congr_r _ h_nz_rd)
+      (.mp (abs_diff_congr_l h_rn_dz _) and_intro)) .trans0) and_intro)) .trans0
+  -- Sign product: |rs-sz| * sg(rn+nz) =₀ 0
+  -- sg(rn+nz) =₀ sg(0+0) =₀ sg(0) =₀ 0
+  let h_rn_nz_sum : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add rn nz) .zero) :=
+    let step1 := add_congr_l h_rn nz
+    let step2 := add_congr_r (.zero : Term F _ _) h_nz
+    let step3 := add_zero_r adm (.zero : Term F _ _)
+    .mp (.mp step3 (.mp (.mp (.mp step2 (.mp step1 and_intro)) .trans0) and_intro)) .trans0
+  let h_sg_zero : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app Term.sg (Term.app2 Term.add rn nz)) .zero) :=
+    .mp (.mp sg_zero (.mp (sg_congr h_rn_nz_sum) and_intro)) .trans0
+  let h_sign : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul
+        (Term.app2 Term.abs_diff rs sz)
+        (Term.app Term.sg (Term.app2 Term.add rn nz))) .zero) :=
+    .mp (.mp (mul_zero adm _) (.mp (mul_congr_r _ h_sg_zero) and_intro)) .trans0
+  univ_gen (eq_Q_from_components adm h_cross h_sign)
 
 /-- ⊢ ∀a. eq_Q(add_Q(a, neg_Q(a)), zero_Q) -/
 def add_Q_neg :
@@ -3439,7 +6291,7 @@ def add_Q_neg :
         (eq_Q (Term.app2 Term.add_Q (.var .vz)
                 (Term.app Term.neg_Q (.var .vz)))
               Term.zero_Q)) :=
-  sorry
+  add_Q_neg_core adm
 
 -- ── Multiplicative monoid ──────────────────────────────────────────────────
 
@@ -3532,7 +6384,479 @@ def mul_Q_one :
     Derivable F EqX al Premises (Γ := Γ)
       (Formula.all Ty.nat
         (eq_Q (Term.app2 Term.mul_Q (.var .vz) Term.one_Q) (.var .vz))) :=
-  sorry
+  let a : Term F (Ty.nat :: Γ) Ty.nat := .var .vz
+  let sa := Term.app Term.rat_sign a
+  let na := Term.app Term.rat_num a
+  let da := Term.app Term.rat_den a
+  let one : Term F (Ty.nat :: Γ) Ty.nat := Term.one_Q
+  let s1 := Term.app Term.rat_sign one
+  let n1 := Term.app Term.rat_num one
+  let d1 := Term.app Term.rat_den one
+  -- Body of mul_Q
+  let body : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat :=
+    Term.app3 Term.rat_encode
+      (Term.app Term.sg_bar (Term.app2 Term.abs_diff
+        (Term.app Term.rat_sign (.var (.vs .vz)))
+        (Term.app Term.rat_sign (.var .vz))))
+      (Term.app2 Term.mul
+        (Term.app Term.rat_num (.var (.vs .vz)))
+        (Term.app Term.rat_num (.var .vz)))
+      (Term.app Term.pd (Term.app2 Term.mul
+        (Term.app Term.rat_den (.var (.vs .vz)))
+        (Term.app Term.rat_den (.var .vz))))
+  have body_eq : (Term.mul_Q : Term F (Ty.nat :: Γ) _) =
+      Term.lam (Term.lam body) := by rfl
+  -- NF: mul_Q(a, one_Q) reduces to rat_encode(sign_nf, num_nf, den_nf)
+  let sign_nf := Term.app Term.sg_bar (Term.app2 Term.abs_diff sa s1)
+  let num_nf := Term.app2 Term.mul na n1
+  let den_nf := Term.app Term.pd (Term.app2 Term.mul da d1)
+  have nf : (body.subst0 (one.weaken)).subst0 a =
+      Term.app3 Term.rat_encode sign_nf num_nf den_nf := by
+    simp only [body, a, one, sign_nf, num_nf, den_nf, sa, s1, na, n1, da, d1,
+      Term.one_Q, Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
+      Term.ofNat,
+      rat_encode_closed_subst, sg_bar_closed_subst, abs_diff_closed_subst,
+      mul_closed_subst, rat_num_closed_subst, rat_den_closed_subst,
+      rat_sign_closed_subst, pd_closed_subst, weaken_subst0_eta]
+  let h_unfold : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul_Q a one)
+        (Term.app3 Term.rat_encode sign_nf num_nf den_nf)) :=
+    body_eq ▸ lam2_correct_nf adm body a one nf
+  -- one_Q component values
+  let hs1 : Derivable F EqX al Premises
+      (Formula.eq0 s1 (.app .succ .zero)) :=
+    rat_sign_one_Q (adm := adm)
+  let hn1 : Derivable F EqX al Premises
+      (Formula.eq0 n1 (.app .succ .zero)) :=
+    rat_num_one_Q (adm := adm)
+  let hd1 : Derivable F EqX al Premises
+      (Formula.eq0 d1 (.app .succ .zero)) :=
+    rat_den_one_Q (adm := adm)
+  -- num_nf = mul(na, n1) =₀ mul(na, S0) =₀ na
+  let h_num_s : Derivable F EqX al Premises
+      (Formula.eq0 num_nf (Term.app2 Term.mul na (.app .succ .zero))) :=
+    mul_congr_r na hn1
+  let h_num : Derivable F EqX al Premises (Formula.eq0 num_nf na) :=
+    .mp (.mp (mul_one_r adm na) (.mp h_num_s and_intro)) .trans0
+  -- den_nf = pd(mul(da, d1)) =₀ pd(mul(da, S0)) =₀ pd(da)
+  let h_den_s : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul da d1)
+        (Term.app2 Term.mul da (.app .succ .zero))) :=
+    mul_congr_r da hd1
+  let h_den_s2 : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul da d1) da) :=
+    .mp (.mp (mul_one_r adm da) (.mp h_den_s and_intro)) .trans0
+  let h_den : Derivable F EqX al Premises
+      (Formula.eq0 den_nf (Term.app Term.pd da)) :=
+    pd_congr h_den_s2
+  -- rat_den(a) unfolds to S(snd_pair(a))
+  let rat_den_body : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat :=
+    .app .succ (.app Term.snd_pair (.var .vz))
+  let h_da_unfold : Derivable F EqX al Premises
+      (Formula.eq0 da (.app .succ (.app Term.snd_pair a))) :=
+    lam_correct_nf rat_den_body a (by
+      simp only [rat_den_body, a, Term.subst0, Term.subst, Term.subst0_map,
+        snd_pair_closed_subst])
+  -- S(pd(da)) =₀ S(pd(S(snd_pair(a)))) =₀ S(snd_pair(a)) =₀ da
+  let h_pd_da : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app Term.pd da)
+        (.app Term.snd_pair a)) :=
+    .mp (.mp (pd_succ adm (.app Term.snd_pair a))
+      (.mp (pd_congr h_da_unfold) and_intro)) .trans0
+  let h_s_pd_da : Derivable F EqX al Premises
+      (Formula.eq0 (.app .succ (Term.app Term.pd da))
+        (.app .succ (.app Term.snd_pair a))) :=
+    qfer_no_premise_nat_nf h_pd_da
+      (r := .app .succ (.var .vz))
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map])
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map])
+  let h_s_pd_da_eq_da : Derivable F EqX al Premises
+      (Formula.eq0 (.app .succ (Term.app Term.pd da)) da) :=
+    .mp (.mp (.mp h_da_unfold .sym0) (.mp h_s_pd_da and_intro)) .trans0
+  -- S(den_nf) =₀ S(pd(da)) =₀ da
+  let h_s_den_nf : Derivable F EqX al Premises
+      (Formula.eq0 (.app .succ den_nf) da) :=
+    .mp (.mp h_s_pd_da_eq_da
+      (.mp (qfer_no_premise_nat_nf h_den
+        (r := .app .succ (.var .vz))
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map,
+            pd_closed_subst])
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map,
+            pd_closed_subst])) and_intro)) .trans0
+  -- Abbreviations for result components
+  let result := Term.app2 Term.mul_Q a one
+  let rn := Term.app Term.rat_num result
+  let rd := Term.app Term.rat_den result
+  let rs := Term.app Term.rat_sign result
+  -- rat_num(result) =₀ na
+  let h_rn_enc := rat_num_congr h_unfold
+  let h_rn_nf : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_num (Term.app3 Term.rat_encode sign_nf num_nf den_nf))
+        num_nf) :=
+    rat_num_rat_encode adm sign_nf num_nf den_nf (isEven_cases adm sign_nf)
+  let h_rn : Derivable F EqX al Premises (Formula.eq0 rn na) :=
+    .mp (.mp h_num (.mp (.mp (.mp h_rn_nf (.mp h_rn_enc and_intro)) .trans0) and_intro)) .trans0
+  -- rat_den(result) =₀ da
+  let h_rd_enc := rat_den_congr h_unfold
+  let h_rd_nf : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_den (Term.app3 Term.rat_encode sign_nf num_nf den_nf))
+        (.app .succ den_nf)) :=
+    rat_den_rat_encode adm sign_nf num_nf den_nf
+  let h_rd : Derivable F EqX al Premises (Formula.eq0 rd da) :=
+    .mp (.mp h_s_den_nf
+      (.mp (.mp (.mp h_rd_nf (.mp h_rd_enc and_intro)) .trans0) and_intro)) .trans0
+  -- Cross-product condition: |rn * da - na * rd| =₀ 0
+  let h_cross_l := mul_congr_l h_rn da   -- rn * da =₀ na * da
+  let h_cross_r := mul_congr_r na h_rd   -- na * rd =₀ na * da
+  let h_cross_abs : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.abs_diff
+        (Term.app2 Term.mul rn da) (Term.app2 Term.mul na rd))
+        (Term.app2 Term.abs_diff
+          (Term.app2 Term.mul na da) (Term.app2 Term.mul na da))) :=
+    .mp (.mp (abs_diff_congr_r _ h_cross_r)
+      (.mp (abs_diff_congr_l h_cross_l _) and_intro)) .trans0
+  let h_cross : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.abs_diff
+        (Term.app2 Term.mul rn da) (Term.app2 Term.mul na rd))
+        .zero) :=
+    .mp (.mp (abs_diff_self adm _) (.mp h_cross_abs and_intro)) .trans0
+  -- Sign condition: |rs - sa| * sg(rn + na) =₀ 0
+  -- Step A: Reduce unconditionally: sg(rn + na) =₀ sg(na + na)
+  let h_mul_red : Derivable F EqX al Premises
+      (Formula.eq0
+        (Term.app2 Term.mul (Term.app2 Term.abs_diff rs sa)
+          (Term.app Term.sg (Term.app2 Term.add rn na)))
+        (Term.app2 Term.mul (Term.app2 Term.abs_diff rs sa)
+          (Term.app Term.sg (Term.app2 Term.add na na)))) :=
+    mul_congr_r _ (sg_congr (add_congr_l h_rn na))
+  -- Step B: Case split na =₀ 0 ∨ ¬(na =₀ 0)
+  let h_na_disj : Derivable F EqX al Premises
+      (Formula.eq0 na .zero ∨ᶠ ¬ᶠFormula.eq0 na .zero) :=
+    .mp eq0_decidable' (.forall_ax na)
+  -- Case B1: na =₀ 0 �� |rs-sa| * sg(na+na) =₀ 0
+  let b1_nn_zero : Derivable F EqX al Premises
+      (Formula.eq0 na .zero →ᶠ
+       Formula.eq0 (Term.app2 Term.add na na) .zero) :=
+    .syllogism (pair_h
+      (qfer_nat_nf (r := Term.app2 Term.add (.var .vz) (.var .vz))
+        (rs := Term.app2 Term.add na na) (rt := Term.app2 Term.add .zero .zero)
+        (by rfl) (by rfl) I_comb
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+            add_closed_subst])
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+            add_closed_subst]))
+      (weaken_intro (add_zero_r adm .zero))) .trans0
+  let b1_sg_zero : Derivable F EqX al Premises
+      (Formula.eq0 na .zero →ᶠ
+       Formula.eq0 (Term.app Term.sg (Term.app2 Term.add na na)) .zero) :=
+    .syllogism (pair_h
+      (qfer_nat_nf (r := Term.app Term.sg (.var .vz))
+        (rs := Term.app Term.sg (Term.app2 Term.add na na))
+        (rt := Term.app Term.sg .zero)
+        (by rfl) (by rfl) b1_nn_zero
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map,
+            sg_closed_subst, add_closed_subst, Term.app2])
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map,
+            sg_closed_subst]))
+      (weaken_intro sg_zero)) .trans0
+  let abs_rs_sa := Term.app2 Term.abs_diff rs sa
+  let case_b1 : Derivable F EqX al Premises
+      (Formula.eq0 na .zero →ᶠ
+       Formula.eq0 (Term.app2 Term.mul abs_rs_sa
+         (Term.app Term.sg (Term.app2 Term.add na na))) .zero) :=
+    .syllogism (pair_h
+      (qfer_nat_nf (r := Term.app2 Term.mul abs_rs_sa.weaken (.var .vz))
+        (rs := Term.app2 Term.mul abs_rs_sa
+          (Term.app Term.sg (Term.app2 Term.add na na)))
+        (rt := Term.app2 Term.mul abs_rs_sa .zero)
+        (by rfl) (by rfl) b1_sg_zero
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+            mul_closed_subst, abs_diff_closed_subst, rat_sign_closed_subst,
+            mul_Q_closed_subst, sg_closed_subst, add_closed_subst,
+            rat_num_closed_subst, weaken_subst0_eta])
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+            mul_closed_subst, abs_diff_closed_subst, rat_sign_closed_subst,
+            mul_Q_closed_subst, weaken_subst0_eta]))
+      (weaken_intro (mul_zero adm _))) .trans0
+  -- Case B2: ¬(na =₀ 0) → |rs-sa| * sg(na+na) =₀ 0
+  -- Strategy: show |rs - sa| =₀ 0 unconditionally when na ≠ 0,
+  -- via sub-case on sa ∈ {S0, 0} (from isEven_cases on fst_pair(a)).
+  -- First, get sa =₀ S0 ∨ sa =₀ 0
+  let ie_fpa := Term.app Term.isEven (Term.app Term.fst_pair a)
+  let h_sa_unfold : Derivable F EqX al Premises (Formula.eq0 sa ie_fpa) :=
+    lam_correct_nf (Term.app Term.isEven (Term.app Term.fst_pair (.var .vz)) :
+      Term F (Ty.nat :: Ty.nat :: Γ) _) a (by
+      simp only [Term.subst0, Term.subst, Term.subst0_map,
+        isEven_closed_subst, fst_pair_closed_subst]; rfl)
+  let h_ie := isEven_cases adm (Term.app Term.fst_pair a)
+  let h_sa_cases : Derivable F EqX al Premises
+      (Formula.eq0 sa (.app .succ .zero) ∨ᶠ Formula.eq0 sa .zero) :=
+    let lift_case (v : Term F (Ty.nat :: Γ) Ty.nat) :
+        Derivable F EqX al Premises (Formula.eq0 ie_fpa v →ᶠ Formula.eq0 sa v) :=
+      .syllogism (pair_h (weaken_intro h_sa_unfold) I_comb) .trans0
+    .mp h_ie (or_elim_rule
+      (.syllogism (lift_case _) .or_weak)
+      (.syllogism (lift_case _) or_inr))
+  -- Unconditional: sign_nf =₀ sg_bar(|sa - S0|) (via s1 =₀ S0)
+  let h_sign_nf_reduce : Derivable F EqX al Premises
+      (Formula.eq0 sign_nf
+        (Term.app Term.sg_bar (Term.app2 Term.abs_diff sa (.app .succ .zero)))) :=
+    sg_bar_congr (abs_diff_congr_r sa hs1)
+  -- rs_enc = rat_sign(rat_encode(sign_nf, num_nf, den_nf))
+  let h_rs_enc := rat_sign_congr h_unfold
+  -- Sub-case sa =₀ S0: rs =₀ S0 → |rs - sa| =₀ 0
+  -- |S0 - S0| = 0 → sg_bar(0) = S0 → sign_nf =₀ S0 → isEven(S0) =₀ 0 →
+  -- rat_sign_encode_pos → rs_enc =₀ S0 → rs =₀ S0 → |rs - S0| =₀ 0
+  let h_abs_S0_S0 := abs_diff_self adm (.app .succ .zero : Term F (Ty.nat :: Γ) _)
+  let h_sgnf_when_S0 : Derivable F EqX al Premises
+      (Formula.eq0 sa (.app .succ .zero) →ᶠ Formula.eq0 sign_nf (.app .succ .zero)) :=
+    let S0w : Term F (Ty.nat :: Ty.nat :: Γ) _ := (Term.app .succ .zero : Term F (Ty.nat :: Γ) _).weaken
+    let h_abs_cond := qfer_nat_nf
+      (r := Term.app2 Term.abs_diff (.var .vz) S0w)
+      (rs := Term.app2 Term.abs_diff sa (.app .succ .zero))
+      (rt := Term.app2 Term.abs_diff (.app .succ .zero) (.app .succ .zero))
+      (by rfl) (by rfl) I_comb
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+          abs_diff_closed_subst, rat_sign_closed_subst, weaken_subst0_eta]; rfl)
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+          abs_diff_closed_subst, weaken_subst0_eta]; rfl)
+    let h_abs_zero := .syllogism (pair_h h_abs_cond (weaken_intro h_abs_S0_S0)) .trans0
+    let h_sgb := .syllogism (pair_h
+      (qfer_nat_nf (r := Term.app Term.sg_bar (.var .vz))
+        (rs := Term.app Term.sg_bar (Term.app2 Term.abs_diff sa (.app .succ .zero)))
+        (rt := Term.app Term.sg_bar .zero)
+        (by rfl) (by rfl) h_abs_zero
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map,
+            sg_bar_closed_subst, abs_diff_closed_subst, rat_sign_closed_subst, Term.app2]; rfl)
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map,
+            sg_bar_closed_subst]))
+      (weaken_intro (sg_bar_zero (Γ := Ty.nat :: Γ)))) .trans0
+    .syllogism (pair_h (weaken_intro h_sign_nf_reduce) h_sgb) .trans0
+  -- isEven(S0) =₀ 0 (standalone computation)
+  let h_isE_S0 : Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
+      (Formula.eq0 (.app Term.isEven (.app .succ .zero)) .zero) :=
+    let step1 := isEven_succ adm (.zero : Term F (Ty.nat :: Γ) _)
+    let step2 := sg_bar_congr (isEven_zero (Γ := Ty.nat :: Γ))
+    let step3 := sg_bar_succ adm (.zero : Term F (Ty.nat :: Γ) _)
+    let chain12 := .mp (.mp step2 (.mp step1 and_intro)) .trans0
+    .mp (.mp step3 (.mp chain12 and_intro)) .trans0
+  -- ======== Sub-case sa =₀ S0: show rs =₀ S0, hence |rs-sa| =₀ 0 ========
+  let S0 : Term F (Ty.nat :: Γ) Ty.nat := .app .succ .zero
+  let h_pos := rat_sign_rat_encode_pos adm (S0 : Term F (Ty.nat :: Γ) _) num_nf den_nf h_isE_S0
+  let h_rs_cond_S0 := qfer_nat_nf (by rfl) (by rfl) h_sgnf_when_S0
+    (r := Term.app Term.rat_sign (Term.app3 Term.rat_encode (.var .vz) num_nf.weaken den_nf.weaken))
+    (rs := Term.app Term.rat_sign (Term.app3 Term.rat_encode sign_nf num_nf den_nf))
+    (rt := Term.app Term.rat_sign (Term.app3 Term.rat_encode (.app .succ .zero) num_nf den_nf))
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
+        rat_sign_closed_subst, rat_encode_closed_subst, weaken_subst0_eta])
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
+        rat_sign_closed_subst, rat_encode_closed_subst, weaken_subst0_eta])
+  let h_rs_S0 : Derivable F EqX al Premises
+      (Formula.eq0 sa S0 →ᶠ Formula.eq0 rs S0) :=
+    .syllogism (pair_h (weaken_intro h_rs_enc)
+      (.syllogism (pair_h h_rs_cond_S0 (weaken_intro h_pos)) .trans0)) .trans0
+  let sg_nn := Term.app Term.sg (Term.app2 Term.add na na)
+  let h_abs_step1_S0 := qfer_nat_nf (by rfl) (by rfl) I_comb
+    (r := Term.app2 Term.abs_diff rs.weaken (.var .vz))
+    (rs := Term.app2 Term.abs_diff rs sa) (rt := Term.app2 Term.abs_diff rs S0)
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+        abs_diff_closed_subst, rat_sign_closed_subst, mul_Q_closed_subst,
+        weaken_subst0_eta])
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+        abs_diff_closed_subst, rat_sign_closed_subst, mul_Q_closed_subst,
+        weaken_subst0_eta])
+  let h_abs_step2_S0 := qfer_nat_nf (by rfl) (by rfl) h_rs_S0
+    (r := Term.app2 Term.abs_diff (.var .vz) S0.weaken)
+    (rs := Term.app2 Term.abs_diff rs S0)
+    (rt := Term.app2 Term.abs_diff S0 S0)
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+        abs_diff_closed_subst, rat_sign_closed_subst, mul_Q_closed_subst,
+        weaken_subst0_eta])
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+        abs_diff_closed_subst, weaken_subst0_eta])
+  let h_abs_zero_S0 : Derivable F EqX al Premises
+      (Formula.eq0 sa S0 →ᶠ Formula.eq0 (Term.app2 Term.abs_diff rs sa) .zero) :=
+    .syllogism (pair_h h_abs_step1_S0 (.syllogism (pair_h h_abs_step2_S0
+      (weaken_intro h_abs_S0_S0)) .trans0)) .trans0
+  let h_product_from_abs : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.abs_diff rs sa) .zero →ᶠ
+       Formula.eq0 (Term.app2 Term.mul (Term.app2 Term.abs_diff rs sa) sg_nn) .zero) :=
+    .syllogism (pair_h
+      (qfer_nat_nf (by rfl) (by rfl) I_comb
+        (r := Term.app2 Term.mul (.var .vz) sg_nn.weaken)
+        (rs := Term.app2 Term.mul (Term.app2 Term.abs_diff rs sa) sg_nn)
+        (rt := Term.app2 Term.mul .zero sg_nn)
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+            mul_closed_subst, abs_diff_closed_subst, sg_closed_subst, add_closed_subst,
+            rat_sign_closed_subst, mul_Q_closed_subst, rat_num_closed_subst,
+            weaken_subst0_eta])
+        (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+            mul_closed_subst, sg_closed_subst, add_closed_subst,
+            rat_num_closed_subst, weaken_subst0_eta]))
+      (weaken_intro (mul_zero_l adm sg_nn))) .trans0
+  let case_b2_sub1 : Derivable F EqX al Premises
+      (Formula.eq0 sa S0 →ᶠ
+       Formula.eq0 (Term.app2 Term.mul (Term.app2 Term.abs_diff rs sa) sg_nn) .zero) :=
+    .syllogism h_abs_zero_S0 h_product_from_abs
+  -- ======== Sub-case sa =₀ 0: show rs =₀ 0 (under ¬(na=0)), hence |rs-sa| =₀ 0 ========
+  -- Step 1: sa=0 → sign_nf=0 (via |0-S0| ≠ 0 → sg_bar(|0-S0|) = 0)
+  let h_ne_0_S0 : Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
+      (¬ᶠFormula.eq0 (Term.app2 Term.abs_diff .zero S0) .zero) :=
+    let h_fwd := .mp (abs_diff_eq_zero_iff adm (.zero : Term F (Ty.nat :: Γ) _) S0) .and_weak
+    .syllogism (.syllogism h_fwd .sym0)
+      (.mp .succ_ne_zero (.forall_ax (.zero : Term F (Ty.nat :: Γ) _)))
+  let h_sgb_abs_0_S0 : Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
+      (Formula.eq0 (.app Term.sg_bar (Term.app2 Term.abs_diff .zero S0)) .zero) :=
+    .mp h_ne_0_S0 (.mp (sg_bar_eq_zero_iff adm (Term.app2 Term.abs_diff .zero S0))
+      (.syllogism .and_perm .and_weak))
+  let h_sgnf_when_0 : Derivable F EqX al Premises
+      (Formula.eq0 sa .zero →ᶠ Formula.eq0 sign_nf .zero) :=
+    let S0w : Term F (Ty.nat :: Ty.nat :: Γ) _ := (Term.app .succ .zero : Term F (Ty.nat :: Γ) _).weaken
+    let h_abs_cond_0 := qfer_nat_nf
+      (r := Term.app2 Term.abs_diff (.var .vz) S0w)
+      (rs := Term.app2 Term.abs_diff sa (.app .succ .zero))
+      (rt := Term.app2 Term.abs_diff .zero (.app .succ .zero))
+      (by rfl) (by rfl) I_comb
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+          abs_diff_closed_subst, rat_sign_closed_subst, weaken_subst0_eta]; rfl)
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+          abs_diff_closed_subst, weaken_subst0_eta]; rfl)
+    let h_sgb_cond_0 := qfer_nat_nf (by rfl) (by rfl) h_abs_cond_0
+      (r := .app Term.sg_bar (.var .vz))
+      (rs := Term.app Term.sg_bar (Term.app2 Term.abs_diff sa (.app .succ .zero)))
+      (rt := Term.app Term.sg_bar (Term.app2 Term.abs_diff .zero (.app .succ .zero)))
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map,
+          sg_bar_closed_subst, abs_diff_closed_subst, rat_sign_closed_subst, Term.app2])
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map,
+          sg_bar_closed_subst, abs_diff_closed_subst, Term.app2])
+    .syllogism (pair_h (weaken_intro h_sign_nf_reduce)
+      (.syllogism (pair_h h_sgb_cond_0 (weaken_intro h_sgb_abs_0_S0)) .trans0)) .trans0
+  -- Step 2: Standalone chain for rat_sign(rat_encode(0, num_nf, den_nf))
+  -- = isEven(pd(2*num_nf ∸ isEven(0)))  (replicate rat_sign_rat_encode_neg logic)
+  let two_nnf := Term.app2 Term.mul (Term.ofNat 2) num_nf
+  let nnf := Term.app2 Term.add num_nf num_nf
+  let h_rs_unfold_0 := rat_sign_rat_encode_unfold adm
+    (.zero : Term F (Ty.nat :: Γ) _) num_nf den_nf
+  let h_monus_ie0 := monus_congr_r two_nnf (isEven_zero (Γ := Ty.nat :: Γ))
+  let h_two_nnf_eq_nnf :=
+    let h_ms := mul_succ_l adm (.app .succ .zero : Term F (Ty.nat :: Γ) _) num_nf
+    let h_m1 := .mp (.mp (mul_one_r adm num_nf)
+      (.mp (mul_comm adm (.app .succ .zero) num_nf) and_intro)) .trans0
+    .mp (.mp (add_congr_l h_m1 num_nf) (.mp h_ms and_intro)) .trans0
+  let h_monus_s0_0 : Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
+      (Formula.eq0 (Term.app2 Term.monus two_nnf (.app .succ .zero))
+        (.app Term.pd nnf)) :=
+    let hm1 := monus_congr_l h_two_nnf_eq_nnf (.app .succ .zero)
+    let hm2 := monus_succ adm nnf .zero
+    let hm3 := pd_congr (monus_zero adm nnf)
+    .mp (.mp hm3 (.mp (.mp (.mp hm2 (.mp hm1 and_intro)) .trans0) and_intro)) .trans0
+  let h_tgt_0 := .mp (.mp h_monus_s0_0 (.mp h_monus_ie0 and_intro)) .trans0
+  let h_ie_tgt_0 := isEven_congr h_tgt_0
+  let h_ie_chain_0 : Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
+      (Formula.eq0 (.app Term.rat_sign (Term.app3 Term.rat_encode .zero num_nf den_nf))
+        (.app Term.isEven (.app Term.pd nnf))) :=
+    .mp (.mp h_ie_tgt_0 (.mp h_rs_unfold_0 and_intro)) .trans0
+  -- Step 3: ¬(na=0) → isEven(pd(nnf)) = 0
+  let h_num_fwd : Derivable F EqX al Premises
+      (Formula.eq0 num_nf .zero →ᶠ Formula.eq0 na .zero) :=
+    .syllogism (pair_h (weaken_intro (.mp h_num .sym0)) I_comb) .trans0
+  let h_num_ne : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 na .zero →ᶠ ¬ᶠFormula.eq0 num_nf .zero) :=
+    contrapositive h_num_fwd
+  let h_nnf_ne_from_num : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 num_nf .zero →ᶠ ¬ᶠFormula.eq0 nnf .zero) :=
+    let h_fwd := .mp (add_eq_zero_iff adm num_nf num_nf) .and_weak
+    contrapositive (.syllogism h_fwd .and_weak)
+  let h_nnf_ne : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 na .zero →ᶠ ¬ᶠFormula.eq0 nnf .zero) :=
+    .syllogism h_num_ne h_nnf_ne_from_num
+  let h_nnf_succ : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 na .zero →ᶠ
+       Formula.eq0 nnf (.app .succ (.app Term.pd nnf))) :=
+    .syllogism h_nnf_ne (ne_zero_eq_succ_pd adm nnf)
+  let h_ie_nnf_eq : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 na .zero →ᶠ
+       Formula.eq0 (.app Term.isEven nnf)
+         (.app Term.isEven (.app .succ (.app Term.pd nnf)))) :=
+    qfer_nat_nf (by rfl) (by rfl) h_nnf_succ
+      (r := .app Term.isEven (.var .vz))
+      (rs := .app Term.isEven nnf)
+      (rt := .app Term.isEven (.app .succ (.app Term.pd nnf)))
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map,
+          isEven_closed_subst, add_closed_subst, rat_num_closed_subst,
+          mul_Q_closed_subst, Term.app2])
+      (by simp only [Term.subst0, Term.subst, Term.subst0_map,
+          isEven_closed_subst, pd_closed_subst, add_closed_subst,
+          rat_num_closed_subst, mul_Q_closed_subst, Term.app2])
+  let h_ie_succ_pd := isEven_succ adm (.app Term.pd nnf)
+  let h_ie_nnf_sgb : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 na .zero →ᶠ
+       Formula.eq0 (.app Term.isEven nnf)
+         (.app Term.sg_bar (.app Term.isEven (.app Term.pd nnf)))) :=
+    .syllogism (pair_h h_ie_nnf_eq (weaken_intro h_ie_succ_pd)) .trans0
+  let h_ie_double_nnf := isEven_double adm num_nf
+  let h_sgb_ie_pd_eq_S0 : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 na .zero →ᶠ
+       Formula.eq0 (.app Term.sg_bar (.app Term.isEven (.app Term.pd nnf)))
+         (.app .succ .zero)) :=
+    .syllogism (pair_h (.syllogism h_ie_nnf_sgb .sym0) (weaken_intro h_ie_double_nnf)) .trans0
+  let h_ie_pd_zero : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 na .zero →ᶠ
+       Formula.eq0 (.app Term.isEven (.app Term.pd nnf)) .zero) :=
+    .syllogism h_sgb_ie_pd_eq_S0
+      (sg_bar_eq_S0_implies_zero adm (.app Term.isEven (.app Term.pd nnf)))
+  -- Step 4: ¬(na=0) → rat_sign(rat_encode(0, num_nf, den_nf)) =₀ 0
+  let h_neg_rs : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 na .zero →ᶠ
+       Formula.eq0 (.app Term.rat_sign (Term.app3 Term.rat_encode .zero num_nf den_nf)) .zero) :=
+    .syllogism (pair_h (weaken_intro h_ie_chain_0) h_ie_pd_zero) .trans0
+  -- Step 5: sa=0 → rs_enc =₀ rat_sign(rat_encode(0, num_nf, den_nf))
+  let h_rs_cond_0 := qfer_nat_nf (by rfl) (by rfl) h_sgnf_when_0
+    (r := Term.app Term.rat_sign (Term.app3 Term.rat_encode (.var .vz) num_nf.weaken den_nf.weaken))
+    (rs := Term.app Term.rat_sign (Term.app3 Term.rat_encode sign_nf num_nf den_nf))
+    (rt := Term.app Term.rat_sign (Term.app3 Term.rat_encode .zero num_nf den_nf))
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
+        rat_sign_closed_subst, rat_encode_closed_subst, weaken_subst0_eta])
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
+        rat_sign_closed_subst, rat_encode_closed_subst, weaken_subst0_eta])
+  -- Step 6: ¬(na=0) ∧ sa=0 → rs =₀ 0
+  let h_rs_0 : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 na .zero ∧ᶠ Formula.eq0 sa .zero →ᶠ Formula.eq0 rs .zero) :=
+    .syllogism (pair_h
+      (.syllogism (pair_h (.syllogism .and_weak (weaken_intro h_rs_enc))
+        (.syllogism and_proj2 h_rs_cond_0)) .trans0)
+      (.syllogism .and_weak h_neg_rs)) .trans0
+  -- Step 7: ¬(na=0) ∧ sa=0 → |rs - sa| =₀ 0
+  let h_rs_eq_sa : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 na .zero ∧ᶠ Formula.eq0 sa .zero →ᶠ Formula.eq0 rs sa) :=
+    .syllogism (pair_h h_rs_0 (.syllogism and_proj2 .sym0)) .trans0
+  let h_abs_zero_0 : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 na .zero ∧ᶠ Formula.eq0 sa .zero →ᶠ
+       Formula.eq0 (Term.app2 Term.abs_diff rs sa) .zero) :=
+    .syllogism h_rs_eq_sa (.mp (abs_diff_eq_zero_iff adm rs sa) (.syllogism .and_perm .and_weak))
+  let case_b2_sub2 : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 na .zero ∧ᶠ Formula.eq0 sa .zero →ᶠ
+       Formula.eq0 (Term.app2 Term.mul (Term.app2 Term.abs_diff rs sa) sg_nn) .zero) :=
+    .syllogism h_abs_zero_0 h_product_from_abs
+  -- ======== Final assembly ========
+  let case_b2 : Derivable F EqX al Premises
+      (¬ᶠFormula.eq0 na .zero →ᶠ
+       Formula.eq0 (Term.app2 Term.mul (Term.app2 Term.abs_diff rs sa) sg_nn) .zero) :=
+    .syllogism (pair_h I_comb (weaken_intro h_sa_cases))
+      (.syllogism and_or_dist (or_elim_rule
+        (.syllogism and_proj2 case_b2_sub1)
+        case_b2_sub2))
+  let h_reduced : Derivable F EqX al Premises
+      (Formula.eq0
+        (Term.app2 Term.mul (Term.app2 Term.abs_diff rs sa) sg_nn) .zero) :=
+    .mp h_na_disj (or_elim_rule case_b1 case_b2)
+  let h_sign : Derivable F EqX al Premises
+      (Formula.eq0
+        (Term.app2 Term.mul (Term.app2 Term.abs_diff rs sa)
+          (Term.app Term.sg (Term.app2 Term.add rn na)))
+        .zero) :=
+    .mp (.mp h_reduced (.mp h_mul_red and_intro)) .trans0
+  univ_gen (eq_Q_from_components adm h_cross h_sign)
 
 -- ── Distributivity ─────────────────────────────────────────────────────────
 
@@ -3604,11 +6928,294 @@ def lt_Q_mul_pos :
             (Term.app2 Term.mul_Q (.var (.vs .vz)) (.var .vz))))) :=
   sorry
 
+/-- neg_Q(zero_Q) =₀ zero_Q -/
+private def neg_Q_zero_Q :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.eq0 (.app Term.neg_Q Term.zero_Q) Term.zero_Q) :=
+  -- neg_Q = lam(rat_encode(monus(S0, rat_sign(vz)), rat_num(vz), snd_pair(vz)))
+  let neg_Q_body : Term F (Ty.nat :: Γ) Ty.nat :=
+    Term.app3 Term.rat_encode
+      (Term.app2 Term.monus (.app .succ .zero)
+        (.app Term.rat_sign (.var .vz)))
+      (.app Term.rat_num (.var .vz))
+      (.app Term.snd_pair (.var .vz))
+  have neg_Q_eq : (Term.neg_Q : Term F Γ _) = Term.lam neg_Q_body := by rfl
+  have neg_Q_nf : neg_Q_body.subst0 Term.zero_Q =
+      Term.app3 Term.rat_encode
+        (Term.app2 Term.monus (.app .succ .zero) (.app Term.rat_sign Term.zero_Q))
+        (.app Term.rat_num Term.zero_Q)
+        (.app Term.snd_pair Term.zero_Q) := by
+    simp only [neg_Q_body, Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
+      rat_encode_closed_subst, monus_closed_subst, rat_sign_closed_subst,
+      rat_num_closed_subst, snd_pair_closed_subst]
+  let h_unfold := neg_Q_eq ▸ lam_correct_nf neg_Q_body Term.zero_Q neg_Q_nf
+  -- monus(S0, rat_sign(zero_Q)) =₀ monus(S0, S0) =₀ 0
+  let h_monus := .mp (.mp (monus_self adm (.app Term.succ Term.zero))
+    (.mp (monus_congr_r (.app .succ .zero) (rat_sign_zero_Q (adm := adm)))
+      and_intro)) Derivable.trans0
+  -- neg_Q(zero_Q) =₀ rat_encode(0, 0, 0)
+  let h1 := .mp (.mp (rat_encode_congr h_monus
+    (rat_num_zero_Q (adm := adm)) (snd_pair_pair adm Term.zero Term.zero))
+    (.mp h_unfold and_intro)) Derivable.trans0
+  -- rat_encode(0, 0, 0) =₀ pair(monus(mul(2,0), isEven(0)), 0)
+  let enc_body : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.pair
+      (Term.app2 Term.monus
+        (Term.app2 Term.mul (Term.ofNat 2) (.var (.vs .vz)))
+        (.app Term.isEven (.var (.vs (.vs .vz)))))
+      (.var .vz)
+  have enc_eq : (Term.rat_encode : Term F Γ _) = Term.lam (Term.lam (Term.lam enc_body)) := by rfl
+  let z := (Term.zero : Term F Γ Ty.nat)
+  have enc_nf : ((enc_body.subst0 (z.weaken.weaken)).subst0 z.weaken).subst0 z =
+      Term.app2 Term.pair
+        (Term.app2 Term.monus (Term.app2 Term.mul (Term.ofNat 2) z) (.app Term.isEven z))
+        z := by
+    simp only [enc_body, Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+      Term.ofNat, pair_closed_subst, monus_closed_subst, mul_closed_subst, isEven_closed_subst,
+      weaken_subst0_eta]
+  let h_enc_unfold := enc_eq ▸ lam3_correct_nf adm enc_body z z z enc_nf
+  -- mul(2, 0) =₀ 0, isEven(0) =₀ S0, so monus(0, S0) =₀ 0
+  let h_mon := .mp (.mp (monus_zero_l adm (.app .succ .zero))
+    (.mp (.mp (.mp (monus_congr_r _ isEven_zero) (.mp (monus_congr_l (mul_zero adm (Term.ofNat 2)) _) and_intro))
+      Derivable.trans0) and_intro)) Derivable.trans0
+  -- pair(0, 0) = zero_Q
+  let h2 := .mp (.mp (pair_congr h_mon Derivable.refl0)
+    (.mp h_enc_unfold and_intro)) Derivable.trans0
+  -- Chain: neg_Q(zero_Q) =₀ rat_encode(0,0,0) =₀ pair(0,0) = zero_Q
+  .mp (.mp h2 (.mp h1 and_intro)) Derivable.trans0
+
+/-- sub_Q(one_Q, zero_Q) =₀ add_Q(one_Q, zero_Q) -/
+private def sub_Q_one_zero_unfold :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.eq0 (Term.app2 Term.sub_Q Term.one_Q Term.zero_Q)
+        (Term.app2 Term.add_Q Term.one_Q Term.zero_Q)) :=
+  let sub_body : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.add_Q (.var (.vs .vz)) (.app Term.neg_Q (.var .vz))
+  have sub_eq : (Term.sub_Q : Term F Γ _) = Term.lam (Term.lam sub_body) := by rfl
+  have sub_nf : (sub_body.subst0 (Term.zero_Q.weaken (σ := Ty.nat))).subst0 Term.one_Q =
+      Term.app2 Term.add_Q Term.one_Q (.app Term.neg_Q Term.zero_Q) := by
+    simp only [sub_body, Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+      add_Q_closed_subst, neg_Q_closed_subst, weaken_subst0_eta]
+  let h_unfold := sub_eq ▸ lam2_correct_nf adm sub_body Term.one_Q Term.zero_Q sub_nf
+  let h_congr := qfer_no_premise_nat_nf (neg_Q_zero_Q (adm := adm))
+    (r := Term.app2 Term.add_Q Term.one_Q.weaken (.var .vz))
+    (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map,
+        add_Q_closed_subst, weaken_subst0_eta])
+    (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map,
+        add_Q_closed_subst, weaken_subst0_eta])
+  .mp (.mp h_congr (.mp h_unfold and_intro)) Derivable.trans0
+
+/-- add_Q(one_Q, zero_Q) =₀ one_Q -/
+private def add_Q_one_zero (adm : AdmissibleEqX EqX) :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.eq0 (Term.app2 Term.add_Q Term.one_Q Term.zero_Q) Term.one_Q) :=
+  -- add_Q body with var (vs vz) = n₁ (first arg), var vz = n₂ (second arg)
+  let add_body : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat :=
+    (let n₁ := Term.var (.vs .vz)
+     let n₂ := Term.var .vz
+     let s₁ := Term.app Term.rat_sign n₁
+     let p₁ := Term.app Term.rat_num n₁
+     let d₁ := Term.app Term.rat_den n₁
+     let s₂ := Term.app Term.rat_sign n₂
+     let p₂ := Term.app Term.rat_num n₂
+     let d₂ := Term.app Term.rat_den n₂
+     let a  := Term.app2 Term.mul p₁ d₂
+     let b  := Term.app2 Term.mul p₂ d₁
+     let same := Term.app Term.sg_bar (Term.app2 Term.abs_diff s₁ s₂)
+     let result_num := Term.app3 Term.ite_nat same
+       (Term.app2 Term.add a b)
+       (Term.app2 Term.abs_diff a b)
+     let result_sign := Term.app3 Term.ite_nat same s₁
+       (Term.app3 Term.ite_nat (Term.app2 Term.geq a b) s₁ s₂)
+     let result_den_m1 := Term.app Term.pd (Term.app2 Term.mul d₁ d₂)
+     Term.app3 Term.rat_encode result_sign result_num result_den_m1)
+  have add_eq : (Term.add_Q : Term F Γ _) = Term.lam (Term.lam add_body) := by rfl
+  -- Substituted components: one_Q is outer (vs vz), zero_Q is inner (vz)
+  let s₁ : Term F Γ Ty.nat := .app Term.rat_sign Term.one_Q
+  let p₁ : Term F Γ Ty.nat := .app Term.rat_num Term.one_Q
+  let d₁ : Term F Γ Ty.nat := .app Term.rat_den Term.one_Q
+  let s₂ : Term F Γ Ty.nat := .app Term.rat_sign Term.zero_Q
+  let p₂ : Term F Γ Ty.nat := .app Term.rat_num Term.zero_Q
+  let d₂ : Term F Γ Ty.nat := .app Term.rat_den Term.zero_Q
+  let a : Term F Γ Ty.nat  := Term.app2 Term.mul p₁ d₂
+  let b : Term F Γ Ty.nat  := Term.app2 Term.mul p₂ d₁
+  let same : Term F Γ Ty.nat := Term.app Term.sg_bar (Term.app2 Term.abs_diff s₁ s₂)
+  let result_num : Term F Γ Ty.nat := Term.app3 Term.ite_nat same
+    (Term.app2 Term.add a b) (Term.app2 Term.abs_diff a b)
+  let result_sign : Term F Γ Ty.nat := Term.app3 Term.ite_nat same s₁
+    (Term.app3 Term.ite_nat (Term.app2 Term.geq a b) s₁ s₂)
+  let result_den_m1 : Term F Γ Ty.nat := Term.app Term.pd (Term.app2 Term.mul d₁ d₂)
+  let nf : Term F Γ Ty.nat := Term.app3 Term.rat_encode result_sign result_num result_den_m1
+  have add_nf : (add_body.subst0 (Term.zero_Q.weaken (σ := Ty.nat))).subst0 Term.one_Q = nf := by
+    simp only [add_body, nf, result_sign, result_num, result_den_m1, same, a, b,
+      s₁, p₁, d₁, s₂, p₂, d₂,
+      Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
+      rat_encode_closed_subst, ite_nat_closed_subst, sg_bar_closed_subst,
+      abs_diff_closed_subst, mul_closed_subst, add_closed_subst, pd_closed_subst,
+      rat_sign_closed_subst, rat_num_closed_subst, rat_den_closed_subst,
+      geq_closed_subst, weaken_subst0_eta]
+  let h_unfold := add_eq ▸ lam2_correct_nf adm add_body Term.one_Q Term.zero_Q add_nf
+  -- Component values
+  let hs₁ := rat_sign_one_Q (adm := adm) (Γ := Γ)   -- s₁ =₀ S0
+  let hs₂ := rat_sign_zero_Q (adm := adm) (Γ := Γ)   -- s₂ =₀ S0
+  let hp₁ := rat_num_one_Q (adm := adm) (Γ := Γ)     -- p₁ =₀ S0
+  let hp₂ := rat_num_zero_Q (adm := adm) (Γ := Γ)    -- p₂ =₀ 0
+  let hd₁ := rat_den_one_Q (adm := adm) (Γ := Γ)     -- d₁ =₀ S0
+  let hd₂ := rat_den_zero_Q (adm := adm) (Γ := Γ)    -- d₂ =₀ S0
+  -- a = mul(p₁, d₂) =₀ mul(S0, S0) =₀ S0
+  let ha : Derivable F EqX al Premises (Formula.eq0 a (.app .succ .zero)) :=
+    .mp (.mp (mul_one_r adm (.app .succ .zero))
+    (.mp (.mp (.mp (mul_congr_r (.app .succ .zero) hd₂)
+      (.mp (mul_congr_l hp₁ d₂) and_intro)) Derivable.trans0) and_intro)) Derivable.trans0
+  -- b = mul(p₂, d₁) =₀ mul(0, S0) =₀ 0
+  let hb : Derivable F EqX al Premises (Formula.eq0 b .zero) :=
+    .mp (.mp (mul_zero_l adm (.app .succ .zero))
+    (.mp (.mp (.mp (mul_congr_r .zero hd₁)
+      (.mp (mul_congr_l hp₂ d₁) and_intro)) Derivable.trans0) and_intro)) Derivable.trans0
+  -- same = sg_bar(|s₁ - s₂|) =₀ sg_bar(|S0 - S0|) =₀ sg_bar(0) =₀ S0
+  -- Step 1: |s₁ - s₂| =₀ |S0 - s₂| (via s₁ =₀ S0)
+  let h_abs_l : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.abs_diff s₁ s₂)
+        (Term.app2 Term.abs_diff (.app .succ .zero) s₂)) :=
+    qfer_no_premise_nat_nf hs₁
+      (r := Term.app2 Term.abs_diff (.var .vz) s₂.weaken)
+      (by simp only [s₁, Term.subst0, Term.app2, Term.subst, Term.subst0_map,
+          abs_diff_closed_subst, weaken_subst0_eta])
+      (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map,
+          abs_diff_closed_subst, weaken_subst0_eta])
+  -- Step 2: |S0 - s₂| =₀ |S0 - S0| (via s₂ =₀ S0)
+  let h_abs_r : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.abs_diff (.app .succ .zero) s₂)
+        (Term.app2 Term.abs_diff (.app .succ .zero) (.app .succ .zero))) :=
+    qfer_no_premise_nat_nf hs₂
+      (r := Term.app2 Term.abs_diff (Term.app Term.succ Term.zero).weaken (.var .vz))
+      (by simp only [s₂, Term.subst0, Term.app2, Term.subst, Term.subst0_map,
+          abs_diff_closed_subst, weaken_subst0_eta])
+      (by simp only [s₂, Term.subst0, Term.app2, Term.subst, Term.subst0_map,
+          abs_diff_closed_subst, weaken_subst0_eta])
+  -- Chain: |s₁ - s₂| =₀ |S0 - S0| =₀ 0
+  let h_abs_ss : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.abs_diff s₁ s₂) .zero) :=
+    .mp (.mp (abs_diff_self adm (.app .succ .zero))
+      (.mp (.mp (.mp h_abs_r (.mp h_abs_l and_intro)) Derivable.trans0)
+        and_intro)) Derivable.trans0
+  let h_same := .mp (.mp (sg_bar_zero (Γ := Γ))
+    (.mp (sg_bar_congr h_abs_ss) and_intro)) Derivable.trans0
+  -- result_sign = ite(same, s₁, ...) =₀ ite(S0, S0, ...) =₀ S0
+  let h_rsign1 := ite_nat_congr_b (x := s₁)
+    (y := Term.app3 Term.ite_nat (Term.app2 Term.geq a b) s₁ s₂) h_same
+  let h_rsign2 := ite_nat_one adm s₁ (Term.app3 Term.ite_nat (Term.app2 Term.geq a b) s₁ s₂)
+  let h_rsign3 := .mp (.mp h_rsign2 (.mp h_rsign1 and_intro)) Derivable.trans0
+  let h_rsign := .mp (.mp hs₁ (.mp h_rsign3 and_intro)) Derivable.trans0
+  -- result_num = ite(same, add(a, b), ...) =₀ ite(S0, ...) =₀ add(a, b) =₀ add(S0, 0) =₀ S0
+  let h_rnum1 := ite_nat_congr_b (x := Term.app2 Term.add a b)
+    (y := Term.app2 Term.abs_diff a b) h_same
+  let h_rnum2 := ite_nat_one adm (Term.app2 Term.add a b) (Term.app2 Term.abs_diff a b)
+  let h_rnum3 := .mp (.mp h_rnum2 (.mp h_rnum1 and_intro)) Derivable.trans0
+  -- add(a, b) =₀ add(S0, 0) =₀ S0
+  let h_ab := .mp (.mp (add_zero_r adm (.app .succ .zero))
+    (.mp (.mp (.mp (add_congr_r (.app .succ .zero) hb)
+      (.mp (add_congr_l ha b) and_intro)) Derivable.trans0) and_intro)) Derivable.trans0
+  let h_rnum := .mp (.mp h_ab (.mp h_rnum3 and_intro)) Derivable.trans0
+  -- result_den_m1 = pd(mul(d₁, d₂)) =₀ pd(mul(S0, S0)) =₀ pd(S0) =₀ 0
+  let h_dd := .mp (.mp (mul_one_r adm (.app .succ .zero))
+    (.mp (.mp (.mp (mul_congr_r (.app .succ .zero) hd₂)
+      (.mp (mul_congr_l hd₁ d₂) and_intro)) Derivable.trans0) and_intro)) Derivable.trans0
+  let h_rden := .mp (.mp (pd_succ adm Term.zero) (.mp (pd_congr h_dd) and_intro)) Derivable.trans0
+  -- NF = rat_encode(result_sign, result_num, result_den_m1) =₀ rat_encode(S0, S0, 0) = one_Q
+  -- We need rat_encode(S0, S0, 0) =₀ one_Q
+  -- rat_encode(S0, S0, 0) = pair(monus(mul(2, S0), isEven(S0)), 0) = pair(monus(2, 0), 0) = pair(2, 0) = one_Q
+  let enc_body : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.pair
+      (Term.app2 Term.monus
+        (Term.app2 Term.mul (Term.ofNat 2) (.var (.vs .vz)))
+        (.app Term.isEven (.var (.vs (.vs .vz)))))
+      (.var .vz)
+  have enc_eq : (Term.rat_encode : Term F Γ _) = Term.lam (Term.lam (Term.lam enc_body)) := by rfl
+  let one := (.app Term.succ Term.zero : Term F Γ Ty.nat)
+  have enc_nf2 : ((enc_body.subst0 ((Term.zero : Term F Γ _).weaken.weaken)).subst0 one.weaken).subst0 one =
+      Term.app2 Term.pair
+        (Term.app2 Term.monus (Term.app2 Term.mul (Term.ofNat 2) one)
+          (.app Term.isEven one))
+        (Term.zero : Term F Γ _) := by
+    simp only [enc_body, one, Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+      Term.ofNat, pair_closed_subst, monus_closed_subst, mul_closed_subst,
+      isEven_closed_subst, weaken_subst0_eta]
+  let h_enc := enc_eq ▸ lam3_correct_nf adm enc_body one one Term.zero enc_nf2
+  -- mul(2, S0) =₀ 2
+  let h_mul2 := mul_one_r adm (Term.ofNat 2)
+  -- isEven(S0) =₀ sg_bar(isEven(0)) =₀ sg_bar(S0) =₀ 0
+  let h_isE1 := .mp (.mp (sg_bar_succ adm Term.zero)
+    (.mp (.mp (.mp (sg_bar_congr isEven_zero)
+      (.mp (isEven_succ adm Term.zero) and_intro)) Derivable.trans0) and_intro)) Derivable.trans0
+  -- monus(2, 0) =₀ 2
+  let h_mon2 := .mp (.mp (monus_zero adm (Term.ofNat 2))
+    (.mp (.mp (.mp (monus_congr_r _ h_isE1) (.mp (monus_congr_l h_mul2 _) and_intro))
+      Derivable.trans0) and_intro)) Derivable.trans0
+  -- pair(2, 0) = one_Q (syntactically)
+  let h_pair2 := pair_congr h_mon2 (Derivable.refl0 (t := Term.zero))
+  -- rat_encode(S0, S0, 0) =₀ pair(2, 0) = one_Q
+  let h_enc_val := .mp (.mp h_pair2 (.mp h_enc and_intro)) Derivable.trans0
+  -- NF =₀ rat_encode(S0, S0, 0) =₀ one_Q
+  let h_nf_to_enc := rat_encode_congr h_rsign h_rnum h_rden
+  let h_nf_to_one := .mp (.mp h_enc_val (.mp h_nf_to_enc and_intro)) Derivable.trans0
+  -- add_Q(one_Q, zero_Q) =₀ NF =₀ one_Q
+  .mp (.mp h_nf_to_one (.mp h_unfold and_intro)) Derivable.trans0
+
+/-- sub_Q(one_Q, zero_Q) =₀ one_Q -/
+private def sub_Q_one_zero (adm : AdmissibleEqX EqX) :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.eq0 (Term.app2 Term.sub_Q Term.one_Q Term.zero_Q) Term.one_Q) :=
+  .mp (.mp (add_Q_one_zero adm)
+    (.mp (sub_Q_one_zero_unfold (adm := adm)) and_intro)) Derivable.trans0
+
 /-- ⊢ lt_Q(zero_Q, one_Q) -/
 def zero_lt_one_Q :
     Derivable F EqX al Premises (Γ := Γ)
       (lt_Q Term.zero_Q Term.one_Q) :=
-  sorry
+  -- lt_Q(zero_Q, one_Q) = eq0(lt_Q_dec(zero_Q, one_Q), 0)
+  -- lt_Q_dec(zero_Q, one_Q) = add(|rat_sign(D) - S0|, sg_bar(rat_num(D)))
+  -- where D = sub_Q(one_Q, zero_Q) =₀ one_Q
+  let lt_body : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat :=
+    let diff := Term.app2 Term.sub_Q (.var .vz) (.var (.vs .vz))
+    Term.app2 Term.add
+      (Term.app2 Term.abs_diff (.app Term.rat_sign diff) (.app .succ .zero))
+      (.app Term.sg_bar (.app Term.rat_num diff))
+  have lt_eq : (Term.lt_Q_dec : Term F Γ _) = Term.lam (Term.lam lt_body) := by rfl
+  let D : Term F Γ Ty.nat := Term.app2 Term.sub_Q Term.one_Q Term.zero_Q
+  have lt_nf : (lt_body.subst0 (Term.one_Q.weaken (σ := Ty.nat))).subst0 Term.zero_Q =
+      Term.app2 Term.add
+        (Term.app2 Term.abs_diff (.app Term.rat_sign D) (.app .succ .zero))
+        (.app Term.sg_bar (.app Term.rat_num D)) := by
+    simp only [lt_body, D, Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+      sub_Q_closed_subst, add_closed_subst, abs_diff_closed_subst, rat_sign_closed_subst,
+      sg_bar_closed_subst, rat_num_closed_subst, weaken_subst0_eta]
+  let h_unfold := lt_eq ▸ lam2_correct_nf adm lt_body Term.zero_Q Term.one_Q lt_nf
+  -- D = sub_Q(one_Q, zero_Q) =₀ one_Q
+  let hD := sub_Q_one_zero adm (Γ := Γ)
+  -- rat_sign(D) =₀ rat_sign(one_Q) =₀ S0
+  let h_sign := .mp (.mp (rat_sign_one_Q (adm := adm))
+    (.mp (rat_sign_congr hD) and_intro)) Derivable.trans0
+  -- |rat_sign(D) - S0| =₀ |S0 - S0| =₀ 0
+  let h_abs := .mp (.mp (abs_diff_self adm (Term.app Term.succ Term.zero))
+    (.mp (qfer_no_premise_nat_nf h_sign
+      (r := Term.app2 Term.abs_diff (.var .vz) (Term.app Term.succ Term.zero).weaken)
+      (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map,
+          abs_diff_closed_subst, weaken_subst0_eta])
+      (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map,
+          abs_diff_closed_subst, weaken_subst0_eta])) and_intro)) Derivable.trans0
+  -- rat_num(D) =₀ rat_num(one_Q) =₀ S0
+  let h_num := .mp (.mp (rat_num_one_Q (adm := adm))
+    (.mp (rat_num_congr hD) and_intro)) Derivable.trans0
+  -- sg_bar(rat_num(D)) =₀ sg_bar(S0) =₀ 0
+  let h_sgb := .mp (.mp (sg_bar_succ adm Term.zero)
+    (.mp (sg_bar_congr h_num) and_intro)) Derivable.trans0
+  -- add(0, 0) =₀ 0
+  let h_sum := .mp (.mp (add_zero_r adm Term.zero)
+    (.mp (.mp (.mp (add_congr_r .zero h_sgb)
+      (.mp (add_congr_l h_abs _) and_intro)) Derivable.trans0) and_intro)) Derivable.trans0
+  -- Chain: lt_Q_dec(zero_Q, one_Q) =₀ add(...) =₀ 0
+  .mp (.mp h_sum (.mp h_unfold and_intro)) Derivable.trans0
 
 -- ── Congruence (eq_Q respects operations) ──────────────────────────────────
 
