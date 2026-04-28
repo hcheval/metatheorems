@@ -7371,6 +7371,47 @@ def add_Q_congr :
             (Term.app2 Term.add_Q (.var (.vs (.vs .vz))) (.var .vz))))))) :=
   sorry
 
+/-- S(pd(S(x)*S(y))) =₀ S(x)*S(y). Products of successors are successors, so S∘pd is identity. -/
+private def succ_pd_mul_succ (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app .succ (.app Term.pd (Term.app2 Term.mul (.app .succ x) (.app .succ y))))
+                   (Term.app2 Term.mul (.app .succ x) (.app .succ y))) :=
+  let k := Term.app2 Term.add (Term.app2 Term.mul x (.app .succ y)) y
+  let h1 := mul_succ_l adm x (.app .succ y)
+  let h2 := add_succ adm (Term.app2 Term.mul x (.app .succ y)) y
+  let h_eq := .mp (.mp h2 (.mp h1 and_intro)) .trans0
+  let h_pd := pd_succ adm k
+  let h_pd_eq := .mp (.mp h_pd (.mp (pd_congr h_eq) and_intro)) .trans0
+  .mp (.mp (.mp h_eq .sym0) (.mp (succ_congr h_pd_eq) and_intro)) .trans0
+
+/-- S(pd(da*dc)) =₀ da*dc where da = rat_den(a), dc = rat_den(c). -/
+private def succ_pd_den_mul (a c : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app .succ (.app Term.pd
+          (Term.app2 Term.mul (.app Term.rat_den a) (.app Term.rat_den c))))
+        (Term.app2 Term.mul (.app Term.rat_den a) (.app Term.rat_den c))) :=
+  let spa := Term.app Term.snd_pair a
+  let spc := Term.app Term.snd_pair c
+  let h_da := rat_den_unfold_eq a
+  let h_dc := rat_den_unfold_eq c
+  let h_prod := .mp (.mp (mul_congr_r _ h_dc) (.mp (mul_congr_l h_da _) and_intro)) .trans0
+  let h_core := succ_pd_mul_succ adm spa spc
+  let h1 := succ_congr (pd_congr h_prod)
+  .mp (.mp (.mp h_prod .sym0) (.mp (.mp (.mp h_core (.mp h1 and_intro)) .trans0) and_intro)) .trans0
+
+/-- ⊢ ∀a,c,d. eq_Q(c,d) → eq_Q(mul_Q(a,c), mul_Q(a,d)).
+    Right congruence: when the first argument is fixed. -/
+private def mul_Q_right_congr :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all Ty.nat (Formula.all Ty.nat (Formula.all Ty.nat
+        (eq_Q (.var (.vs .vz)) (.var .vz)
+          →ᶠ eq_Q
+            (Term.app2 Term.mul_Q (.var (.vs (.vs .vz))) (.var (.vs .vz)))
+            (Term.app2 Term.mul_Q (.var (.vs (.vs .vz))) (.var .vz)))))) :=
+  sorry
+
+
+
 /-- ⊢ ∀a,b,c,d. eq_Q(a,b) ∧ eq_Q(c,d) → eq_Q(mul_Q(a,c), mul_Q(b,d)) -/
 def mul_Q_congr :
     Derivable F EqX al Premises (Γ := Γ)
@@ -7380,7 +7421,54 @@ def mul_Q_congr :
           →ᶠ eq_Q
             (Term.app2 Term.mul_Q (.var (.vs (.vs (.vs .vz)))) (.var (.vs .vz)))
             (Term.app2 Term.mul_Q (.var (.vs (.vs .vz))) (.var .vz))))))) :=
-  sorry
+  -- Variables: a = var 3, b = var 2, c = var 1, d = var 0
+  let a : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat := .var (.vs (.vs (.vs .vz)))
+  let b : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat := .var (.vs (.vs .vz))
+  let c : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat := .var (.vs .vz)
+  let d : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat := .var .vz
+  let mac := Term.app2 Term.mul_Q a c
+  let mad := Term.app2 Term.mul_Q a d
+  let mbd := Term.app2 Term.mul_Q b d
+  let mda := Term.app2 Term.mul_Q d a
+  let mdb := Term.app2 Term.mul_Q d b
+  -- Step 1: eq_Q(c,d) → eq_Q(mul_Q(a,c), mul_Q(a,d))  [right congr]
+  let rc := mul_Q_right_congr
+  let rc_inst_a := Derivable.mp (Derivable.mp (Derivable.mp rc (.forall_ax a)) (.forall_ax c)) (.forall_ax d)
+  -- rc_inst_a : eq_Q(c,d) → eq_Q(mul_Q(a,c), mul_Q(a,d))
+  -- Step 2: eq_Q(a,b) → eq_Q(mul_Q(a,d), mul_Q(b,d))  [left congr via comm]
+  -- mul_Q(a,d) =_Q mul_Q(d,a) (comm)
+  let comm_ad := Derivable.mp (Derivable.mp (mul_Q_comm (adm := adm)) (.forall_ax a)) (.forall_ax d)
+  -- eq_Q(a,b) → eq_Q(mul_Q(d,a), mul_Q(d,b)) (right congr with d fixed)
+  let rc_inst_d := Derivable.mp (Derivable.mp (Derivable.mp rc (.forall_ax d)) (.forall_ax a)) (.forall_ax b)
+  -- mul_Q(d,b) =_Q mul_Q(b,d) (comm)
+  let comm_db := Derivable.mp (Derivable.mp (mul_Q_comm (adm := adm)) (.forall_ax d)) (.forall_ax b)
+  -- Chain: eq_Q(a,b) → eq_Q(mul_Q(a,d), mul_Q(d,a)) ∧ eq_Q(mul_Q(d,a), mul_Q(d,b))
+  --        → eq_Q(mul_Q(a,d), mul_Q(d,b))
+  --        → eq_Q(mul_Q(a,d), mul_Q(d,b)) ∧ eq_Q(mul_Q(d,b), mul_Q(b,d))
+  --        → eq_Q(mul_Q(a,d), mul_Q(b,d))
+  -- trans: ∀x,y,z. eq_Q(x,y) ∧ eq_Q(y,z) → eq_Q(x,z)
+  let trans := eq_Q_trans (adm := adm)
+  let trans_inst (x y z : Term F _ Ty.nat) :=
+    Derivable.mp (Derivable.mp (Derivable.mp trans (.forall_ax x)) (.forall_ax y)) (.forall_ax z)
+  -- eq_Q(a,b) → eq_Q(mul_Q(d,a), mul_Q(d,b))
+  -- step2a: eq_Q(a,b) → eq_Q(mul_Q(a,d), mul_Q(d,b))
+  --   = trans(mul_Q(a,d), mul_Q(d,a), mul_Q(d,b)) applied to (comm_ad, rc_inst_d(eq_Q(a,b)))
+  let step2a : Derivable F EqX al Premises
+      (eq_Q a b →ᶠ eq_Q mad mdb) :=
+    let t1 := trans_inst mad mda mdb
+    .syllogism (pair_h (weaken_intro comm_ad) rc_inst_d) t1
+  -- step2b: eq_Q(a,b) → eq_Q(mul_Q(a,d), mul_Q(b,d))
+  --   = trans(mul_Q(a,d), mul_Q(d,b), mul_Q(b,d)) applied to (step2a, comm_db)
+  let step2b : Derivable F EqX al Premises
+      (eq_Q a b →ᶠ eq_Q mad mbd) :=
+    .syllogism (pair_h step2a (weaken_intro comm_db)) (trans_inst mad mdb mbd)
+  -- Step 3: Combine using eq_Q_trans
+  -- eq_Q(a,b) ∧ eq_Q(c,d) → eq_Q(mac, mad) ∧ eq_Q(mad, mbd) → eq_Q(mac, mbd)
+  let combined : Derivable F EqX al Premises
+      (eq_Q a b ∧ᶠ eq_Q c d →ᶠ eq_Q mac mbd) :=
+    .syllogism (pair_h (.syllogism and_proj2 rc_inst_a) (.syllogism .and_weak step2b))
+      (trans_inst mac mad mbd)
+  univ_gen (univ_gen (univ_gen (univ_gen combined)))
 
 end RationalOrderedField
 
