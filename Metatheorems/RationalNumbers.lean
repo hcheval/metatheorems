@@ -7360,6 +7360,16 @@ def zero_lt_one_Q :
 
 -- ── Congruence (eq_Q respects operations) ──────────────────────────────────
 
+/-- Right congruence for add_Q: eq_Q(c,d) → eq_Q(add_Q(a,c), add_Q(a,d)). -/
+private def add_Q_right_congr :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all Ty.nat (Formula.all Ty.nat (Formula.all Ty.nat
+        (eq_Q (.var (.vs .vz)) (.var .vz)
+          →ᶠ eq_Q
+            (Term.app2 Term.add_Q (.var (.vs (.vs .vz))) (.var (.vs .vz)))
+            (Term.app2 Term.add_Q (.var (.vs (.vs .vz))) (.var .vz)))))) :=
+  sorry
+
 /-- ⊢ ∀a,b,c,d. eq_Q(a,b) ∧ eq_Q(c,d) → eq_Q(add_Q(a,c), add_Q(b,d)) -/
 def add_Q_congr :
     Derivable F EqX al Premises (Γ := Γ)
@@ -7369,7 +7379,39 @@ def add_Q_congr :
           →ᶠ eq_Q
             (Term.app2 Term.add_Q (.var (.vs (.vs (.vs .vz)))) (.var (.vs .vz)))
             (Term.app2 Term.add_Q (.var (.vs (.vs .vz))) (.var .vz))))))) :=
-  sorry
+  let a : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Ty.nat :: Γ) _ := .var (.vs (.vs (.vs .vz)))
+  let b : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Ty.nat :: Γ) _ := .var (.vs (.vs .vz))
+  let c : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Ty.nat :: Γ) _ := .var (.vs .vz)
+  let d : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Ty.nat :: Γ) _ := .var .vz
+  let aac := Term.app2 Term.add_Q a c
+  let aad := Term.app2 Term.add_Q a d
+  let abd := Term.app2 Term.add_Q b d
+  let ada := Term.app2 Term.add_Q d a
+  let adb := Term.app2 Term.add_Q d b
+  -- Right congr
+  let rc := add_Q_right_congr
+  let rc_inst_a := Derivable.mp (Derivable.mp (Derivable.mp rc (.forall_ax a)) (.forall_ax c)) (.forall_ax d)
+  -- Commutativity instances
+  let comm_ad := Derivable.mp (Derivable.mp (add_Q_comm (adm := adm)) (.forall_ax a)) (.forall_ax d)
+  let rc_inst_d := Derivable.mp (Derivable.mp (Derivable.mp rc (.forall_ax d)) (.forall_ax a)) (.forall_ax b)
+  let comm_db := Derivable.mp (Derivable.mp (add_Q_comm (adm := adm)) (.forall_ax d)) (.forall_ax b)
+  -- trans helper
+  let trans := eq_Q_trans (adm := adm)
+  let trans_inst (x y z : Term F _ Ty.nat) :=
+    Derivable.mp (Derivable.mp (Derivable.mp trans (.forall_ax x)) (.forall_ax y)) (.forall_ax z)
+  -- eq_Q(a,b) → eq_Q(add_Q(a,d), add_Q(d,b)) via comm_ad + right_congr
+  let step2a : Derivable F EqX al Premises (eq_Q a b →ᶠ eq_Q aad adb) :=
+    let t1 := trans_inst aad ada adb
+    .syllogism (pair_h (weaken_intro comm_ad) rc_inst_d) t1
+  -- eq_Q(a,b) → eq_Q(add_Q(a,d), add_Q(b,d)) via step2a + comm_db
+  let step2b : Derivable F EqX al Premises (eq_Q a b →ᶠ eq_Q aad abd) :=
+    .syllogism (pair_h step2a (weaken_intro comm_db)) (trans_inst aad adb abd)
+  -- Combine: eq_Q(a,b) ∧ eq_Q(c,d) → eq_Q(aac, aad) ∧ eq_Q(aad, abd) → eq_Q(aac, abd)
+  let combined : Derivable F EqX al Premises
+      (eq_Q a b ∧ᶠ eq_Q c d →ᶠ eq_Q aac abd) :=
+    .syllogism (pair_h (.syllogism and_proj2 rc_inst_a) (.syllogism .and_weak step2b))
+      (trans_inst aac aad abd)
+  univ_gen (univ_gen (univ_gen (univ_gen combined)))
 
 /-- S(pd(S(x)*S(y))) =₀ S(x)*S(y). Products of successors are successors, so S∘pd is identity. -/
 private def succ_pd_mul_succ (x y : Term F Γ Ty.nat) :
