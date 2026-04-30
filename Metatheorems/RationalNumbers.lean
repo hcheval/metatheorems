@@ -7452,9 +7452,6 @@ private def mul_Q_right_congr :
             (Term.app2 Term.mul_Q (.var (.vs (.vs .vz))) (.var .vz)))))) :=
   sorry
 
-
-
-/-- ⊢ ∀a,b,c,d. eq_Q(a,b) ∧ eq_Q(c,d) → eq_Q(mul_Q(a,c), mul_Q(b,d)) -/
 def mul_Q_congr :
     Derivable F EqX al Premises (Γ := Γ)
       (Formula.all Ty.nat (Formula.all Ty.nat (Formula.all Ty.nat (Formula.all Ty.nat
@@ -7495,15 +7492,16 @@ def mul_Q_congr :
   -- eq_Q(a,b) → eq_Q(mul_Q(d,a), mul_Q(d,b))
   -- step2a: eq_Q(a,b) → eq_Q(mul_Q(a,d), mul_Q(d,b))
   --   = trans(mul_Q(a,d), mul_Q(d,a), mul_Q(d,b)) applied to (comm_ad, rc_inst_d(eq_Q(a,b)))
+  let t1 : Derivable F EqX al Premises
+      (eq_Q mad mda ∧ᶠ eq_Q mda mdb →ᶠ eq_Q mad mdb) := trans_inst mad mda mdb
   let step2a : Derivable F EqX al Premises
       (eq_Q a b →ᶠ eq_Q mad mdb) :=
-    let t1 := trans_inst mad mda mdb
     .syllogism (pair_h (weaken_intro comm_ad) rc_inst_d) t1
-  -- step2b: eq_Q(a,b) → eq_Q(mul_Q(a,d), mul_Q(b,d))
-  --   = trans(mul_Q(a,d), mul_Q(d,b), mul_Q(b,d)) applied to (step2a, comm_db)
+  let t2 : Derivable F EqX al Premises
+      (eq_Q mad mdb ∧ᶠ eq_Q mdb mbd →ᶠ eq_Q mad mbd) := trans_inst mad mdb mbd
   let step2b : Derivable F EqX al Premises
       (eq_Q a b →ᶠ eq_Q mad mbd) :=
-    .syllogism (pair_h step2a (weaken_intro comm_db)) (trans_inst mad mdb mbd)
+    .syllogism (pair_h step2a (weaken_intro comm_db)) t2
   -- Step 3: Combine using eq_Q_trans
   -- eq_Q(a,b) ∧ eq_Q(c,d) → eq_Q(mac, mad) ∧ eq_Q(mad, mbd) → eq_Q(mac, mbd)
   let combined : Derivable F EqX al Premises
