@@ -7450,6 +7450,12 @@ private def mul_Q_right_congr :
           →ᶠ eq_Q
             (Term.app2 Term.mul_Q (.var (.vs (.vs .vz))) (.var (.vs .vz)))
             (Term.app2 Term.mul_Q (.var (.vs (.vs .vz))) (.var .vz)))))) :=
+  -- TODO: Full proof requires ~200 lines of Hilbert-style reasoning:
+  -- 1. Unfold mul_Q(a,c) and mul_Q(a,d) via lam2_correct_nf
+  -- 2. Extract cross: nc*dd = nd*dc from eq_Q(c,d)
+  -- 3. Cross part: na*nc*(da*dd) = na*nd*(da*dc) via rearrangement
+  -- 4. Sign part: case analysis on sc=sd vs nc+nd=0
+  -- 5. Combine via eq_Q_from_components
   sorry
 
 def mul_Q_congr :
