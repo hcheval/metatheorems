@@ -7576,7 +7576,69 @@ private def mul_Q_right_congr :
           (Term.app2 Term.mul (.app Term.rat_num mac) (.app Term.rat_den mad))
           (Term.app2 Term.mul (.app Term.rat_num mad) (.app Term.rat_den mac)))
         .zero) :=
-    sorry -- Cross part (~60 lines of rearrangement)
+    -- rat_num(mac)*rat_den(mad) = num_ac*(da*dd) and rat_num(mad)*rat_den(mac) = num_ad*(da*dc)
+    -- by substituting the component equalities
+    let lhs_eq : Derivable F EqX al Premises
+        (Formula.eq0 (Term.app2 Term.mul (.app Term.rat_num mac) (.app Term.rat_den mad))
+          (Term.app2 Term.mul num_ac (Term.app2 Term.mul da dd))) :=
+      .mp (.mp (mul_congr_r _ h_den_ad_eq) (.mp (mul_congr_l h_num_ac _) and_intro)) .trans0
+    let rhs_eq : Derivable F EqX al Premises
+        (Formula.eq0 (Term.app2 Term.mul (.app Term.rat_num mad) (.app Term.rat_den mac))
+          (Term.app2 Term.mul num_ad (Term.app2 Term.mul da dc))) :=
+      .mp (.mp (mul_congr_r _ h_den_ac_eq) (.mp (mul_congr_l h_num_ad _) and_intro)) .trans0
+    -- abs_diff(LHS, RHS) = abs_diff(num_ac*(da*dd), num_ad*(da*dc))
+    let h_ad := abs_diff_congr lhs_eq rhs_eq
+    -- Now: num_ac*(da*dd) = (na*nc)*(da*dd). Rearrange to (na*da)*(nc*dd).
+    -- (na*nc)*(da*dd) = na*(nc*(da*dd)) [assoc]
+    -- = na*((nc*da)*dd) [assoc on nc,da,dd... wait, nc*(da*dd)]
+    -- Simpler: (na*nc)*(da*dd) and (na*nd)*(da*dc)
+    -- multiply H_to_eq_cd (nc*dd = nd*dc) by na*da on the left:
+    -- (na*da)*(nc*dd) = (na*da)*(nd*dc)
+    let H_scaled := .syllogism H_to_eq_cd (mul_congr_r_imp (Term.app2 Term.mul na da))
+    -- Show: (na*nc)*(da*dd) = (na*da)*(nc*dd) and (na*nd)*(da*dc) = (na*da)*(nd*dc)
+    -- Both by associativity + commutativity
+    -- (na*nc)*(da*dd) = na*(nc*(da*dd)) = na*((da*nc)*dd) ... hmm
+    -- Actually: (na*nc)*(da*dd) = ((na*nc)*da)*dd [assoc.sym on (na*nc),da,dd]
+    --         = (na*(nc*da))*dd [assoc on na,nc,da]
+    --         = (na*(da*nc))*dd [comm nc,da]
+    --         = ((na*da)*nc)*dd [assoc.sym on na,da,nc]
+    --         = (na*da)*(nc*dd) [assoc on (na*da),nc,dd]
+    let e1 := .mp (mul_assoc adm (Term.app2 Term.mul na nc) da dd) .sym0
+    let e2 := mul_congr_l (mul_assoc adm na nc da) dd
+    let e3 := mul_congr_l (mul_congr_r na (mul_comm adm nc da)) dd
+    let e4 := mul_congr_l (.mp (mul_assoc adm na da nc) .sym0) dd
+    let e5 := mul_assoc adm (Term.app2 Term.mul na da) nc dd
+    let lhs_rearr : Derivable F EqX al Premises
+        (Formula.eq0 (Term.app2 Term.mul num_ac (Term.app2 Term.mul da dd))
+          (Term.app2 Term.mul (Term.app2 Term.mul na da) (Term.app2 Term.mul nc dd))) :=
+      .mp (.mp e5 (.mp (.mp (.mp e4 (.mp (.mp (.mp e3 (.mp (.mp (.mp e2 (.mp e1 and_intro))
+        .trans0) and_intro)) .trans0) and_intro)) .trans0) and_intro)) .trans0
+    -- Symmetric for RHS: (na*nd)*(da*dc) = (na*da)*(nd*dc)
+    let f1 := .mp (mul_assoc adm (Term.app2 Term.mul na nd) da dc) .sym0
+    let f2 := mul_congr_l (mul_assoc adm na nd da) dc
+    let f3 := mul_congr_l (mul_congr_r na (mul_comm adm nd da)) dc
+    let f4 := mul_congr_l (.mp (mul_assoc adm na da nd) .sym0) dc
+    let f5 := mul_assoc adm (Term.app2 Term.mul na da) nd dc
+    let rhs_rearr : Derivable F EqX al Premises
+        (Formula.eq0 (Term.app2 Term.mul num_ad (Term.app2 Term.mul da dc))
+          (Term.app2 Term.mul (Term.app2 Term.mul na da) (Term.app2 Term.mul nd dc))) :=
+      .mp (.mp f5 (.mp (.mp (.mp f4 (.mp (.mp (.mp f3 (.mp (.mp (.mp f2 (.mp f1 and_intro))
+        .trans0) and_intro)) .trans0) and_intro)) .trans0) and_intro)) .trans0
+    -- H → (na*da)*(nc*dd) = (na*da)*(nd*dc) [from H_scaled]
+    -- H → num_ac*(da*dd) = (na*da)*(nc*dd) = (na*da)*(nd*dc) = num_ad*(da*dc)
+    let H_to_prod_eq : Derivable F EqX al Premises
+        (eq_Q c d →ᶠ Formula.eq0 (Term.app2 Term.mul num_ac (Term.app2 Term.mul da dd))
+          (Term.app2 Term.mul num_ad (Term.app2 Term.mul da dc))) :=
+      .syllogism (pair_h (weaken_intro_h lhs_rearr) H_scaled) .trans0
+      |> fun h => .syllogism (pair_h h (weaken_intro_h (.mp rhs_rearr .sym0))) .trans0
+    -- abs_diff of originals = abs_diff of products = 0
+    let H_to_ad_zero : Derivable F EqX al Premises
+        (eq_Q c d →ᶠ Formula.eq0
+          (Term.app2 Term.abs_diff (Term.app2 Term.mul num_ac (Term.app2 Term.mul da dd))
+            (Term.app2 Term.mul num_ad (Term.app2 Term.mul da dc))) .zero) :=
+      .syllogism H_to_prod_eq
+        (.mp (abs_diff_eq_zero_iff adm _ _) (.syllogism .and_perm .and_weak))
+    .syllogism (pair_h (weaken_intro_h h_ad) H_to_ad_zero) .trans0
   -- ═══ SIGN PART ═══
   let H_to_sign : Derivable F EqX al Premises
       (eq_Q c d →ᶠ Formula.eq0
