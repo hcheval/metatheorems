@@ -7646,7 +7646,7 @@ private def mul_Q_right_congr :
           (Term.app2 Term.abs_diff (.app Term.rat_sign mac) (.app Term.rat_sign mad))
           (Term.app Term.sg (Term.app2 Term.add (.app Term.rat_num mac) (.app Term.rat_num mad))))
         .zero) :=
-    sorry -- Sign part (~80 lines of case analysis)
+    sorry
   -- ═══ COMBINE ═══
   -- Unfold eq_Q_dec(mac, mad)
   let eqd2 : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat :=
