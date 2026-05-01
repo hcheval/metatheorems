@@ -7450,13 +7450,145 @@ private def mul_Q_right_congr :
           →ᶠ eq_Q
             (Term.app2 Term.mul_Q (.var (.vs (.vs .vz))) (.var (.vs .vz)))
             (Term.app2 Term.mul_Q (.var (.vs (.vs .vz))) (.var .vz)))))) :=
-  -- TODO: Full proof requires ~200 lines of Hilbert-style reasoning:
-  -- 1. Unfold mul_Q(a,c) and mul_Q(a,d) via lam2_correct_nf
-  -- 2. Extract cross: nc*dd = nd*dc from eq_Q(c,d)
-  -- 3. Cross part: na*nc*(da*dd) = na*nd*(da*dc) via rearrangement
-  -- 4. Sign part: case analysis on sc=sd vs nc+nd=0
-  -- 5. Combine via eq_Q_from_components
-  sorry
+  let a : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat := .var (.vs (.vs .vz))
+  let c : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat := .var (.vs .vz)
+  let d : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat := .var .vz
+  let na := Term.app Term.rat_num a
+  let nc := Term.app Term.rat_num c
+  let nd := Term.app Term.rat_num d
+  let da := Term.app Term.rat_den a
+  let dc := Term.app Term.rat_den c
+  let dd := Term.app Term.rat_den d
+  let sa := Term.app Term.rat_sign a
+  let sc := Term.app Term.rat_sign c
+  let sd := Term.app Term.rat_sign d
+  let mac := Term.app2 Term.mul_Q a c
+  let mad := Term.app2 Term.mul_Q a d
+  -- Unfold mul_Q body
+  let body : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat :=
+    Term.app3 Term.rat_encode
+      (Term.app Term.sg_bar (Term.app2 Term.abs_diff
+        (Term.app Term.rat_sign (.var (.vs .vz)))
+        (Term.app Term.rat_sign (.var .vz))))
+      (Term.app2 Term.mul
+        (Term.app Term.rat_num (.var (.vs .vz)))
+        (Term.app Term.rat_num (.var .vz)))
+      (Term.app Term.pd (Term.app2 Term.mul
+        (Term.app Term.rat_den (.var (.vs .vz)))
+        (Term.app Term.rat_den (.var .vz))))
+  have body_eq : (Term.mul_Q : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Γ) _) =
+      Term.lam (Term.lam body) := by rfl
+  let sign_ac := Term.app Term.sg_bar (Term.app2 Term.abs_diff sa sc)
+  let num_ac := Term.app2 Term.mul na nc
+  let den_ac := Term.app Term.pd (Term.app2 Term.mul da dc)
+  let sign_ad := Term.app Term.sg_bar (Term.app2 Term.abs_diff sa sd)
+  let num_ad := Term.app2 Term.mul na nd
+  let den_ad := Term.app Term.pd (Term.app2 Term.mul da dd)
+  have nf_ac : (body.subst0 (c.weaken)).subst0 a =
+      Term.app3 Term.rat_encode sign_ac num_ac den_ac := by
+    simp only [body, a, c, sa, sc, na, nc, da, dc, sign_ac, num_ac, den_ac,
+      Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
+      rat_encode_closed_subst, sg_bar_closed_subst, abs_diff_closed_subst,
+      mul_closed_subst, rat_num_closed_subst, rat_den_closed_subst,
+      rat_sign_closed_subst, pd_closed_subst,
+      Term.weaken, Term.rename, Term.Renaming.shift]
+  have nf_ad : (body.subst0 (d.weaken)).subst0 a =
+      Term.app3 Term.rat_encode sign_ad num_ad den_ad := by
+    simp only [body, a, d, sa, sd, na, nd, da, dd, sign_ad, num_ad, den_ad,
+      Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
+      rat_encode_closed_subst, sg_bar_closed_subst, abs_diff_closed_subst,
+      mul_closed_subst, rat_num_closed_subst, rat_den_closed_subst,
+      rat_sign_closed_subst, pd_closed_subst,
+      Term.weaken, Term.rename, Term.Renaming.shift]
+  let unfold_ac : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul_Q a c) (Term.app3 Term.rat_encode sign_ac num_ac den_ac)) :=
+    body_eq ▸ lam2_correct_nf adm body a c nf_ac
+  let unfold_ad : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul_Q a d) (Term.app3 Term.rat_encode sign_ad num_ad den_ad)) :=
+    body_eq ▸ lam2_correct_nf adm body a d nf_ad
+  -- Component equalities for mac
+  let h_num_ac : Derivable F EqX al Premises (Formula.eq0 (.app Term.rat_num mac) num_ac) :=
+    .mp (.mp (rat_num_rat_encode adm sign_ac num_ac den_ac (isEven_cases adm sign_ac))
+      (.mp (rat_num_congr unfold_ac) and_intro)) .trans0
+  let h_den_ac : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_den mac) (.app .succ den_ac)) :=
+    .mp (.mp (rat_den_rat_encode adm sign_ac num_ac den_ac)
+      (.mp (rat_den_congr unfold_ac) and_intro)) .trans0
+  -- S(pd(da*dc)) = da*dc
+  let h_spd_ac := succ_pd_den_mul adm a c
+  -- rat_den(mac) = da*dc
+  let h_den_ac_eq : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_den mac) (Term.app2 Term.mul da dc)) :=
+    .mp (.mp h_spd_ac (.mp h_den_ac and_intro)) .trans0
+  -- Component equalities for mad (symmetric)
+  let h_num_ad : Derivable F EqX al Premises (Formula.eq0 (.app Term.rat_num mad) num_ad) :=
+    .mp (.mp (rat_num_rat_encode adm sign_ad num_ad den_ad (isEven_cases adm sign_ad))
+      (.mp (rat_num_congr unfold_ad) and_intro)) .trans0
+  let h_den_ad : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_den mad) (.app .succ den_ad)) :=
+    .mp (.mp (rat_den_rat_encode adm sign_ad num_ad den_ad)
+      (.mp (rat_den_congr unfold_ad) and_intro)) .trans0
+  let h_den_ad_eq : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_den mad) (Term.app2 Term.mul da dd)) :=
+    .mp (.mp (succ_pd_den_mul adm a d) (.mp h_den_ad and_intro)) .trans0
+  -- ═══ Extract from hypothesis eq_Q(c,d) ═══
+  -- Unfold eq_Q_dec(c,d) to |nc*dd - nd*dc| + |sc-sd|*sg(nc+nd)
+  let eqd_body : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.add
+      (Term.app2 Term.abs_diff
+        (Term.app2 Term.mul (Term.app Term.rat_num (.var (.vs .vz))) (Term.app Term.rat_den (.var .vz)))
+        (Term.app2 Term.mul (Term.app Term.rat_num (.var .vz)) (Term.app Term.rat_den (.var (.vs .vz)))))
+      (Term.app2 Term.mul
+        (Term.app2 Term.abs_diff (Term.app Term.rat_sign (.var (.vs .vz))) (Term.app Term.rat_sign (.var .vz)))
+        (Term.app Term.sg (Term.app2 Term.add (Term.app Term.rat_num (.var (.vs .vz))) (Term.app Term.rat_num (.var .vz)))))
+  have eqd_body_eq : (Term.eq_Q_dec : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Γ) _) =
+      Term.lam (Term.lam eqd_body) := by rfl
+  let cross_cd := Term.app2 Term.abs_diff (Term.app2 Term.mul nc dd) (Term.app2 Term.mul nd dc)
+  let sign_cd := Term.app2 Term.mul (Term.app2 Term.abs_diff sc sd)
+      (Term.app Term.sg (Term.app2 Term.add nc nd))
+  have eqd_nf : (eqd_body.subst0 (d.weaken)).subst0 c =
+      Term.app2 Term.add cross_cd sign_cd := by
+    simp only [eqd_body, c, d, nc, nd, dc, dd, sc, sd, cross_cd, sign_cd,
+      Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+      add_closed_subst, abs_diff_closed_subst, mul_closed_subst,
+      rat_num_closed_subst, rat_den_closed_subst, rat_sign_closed_subst,
+      sg_closed_subst, Term.weaken, Term.rename, Term.Renaming.shift]
+  let unfold_eqd := eqd_body_eq ▸ lam2_correct_nf adm eqd_body c d eqd_nf
+  let H_to_nf : Derivable F EqX al Premises
+      (eq_Q c d →ᶠ Formula.eq0 (Term.app2 Term.add cross_cd sign_cd) .zero) :=
+    .syllogism (pair_h (weaken_intro_h (.mp unfold_eqd .sym0)) I_comb) .trans0
+  let H_to_cross_cd : Derivable F EqX al Premises
+      (eq_Q c d →ᶠ Formula.eq0 cross_cd .zero) :=
+    .syllogism H_to_nf (.syllogism (Derivable.mp (add_eq_zero_iff adm cross_cd sign_cd) .and_weak) .and_weak)
+  let H_to_sign_cd : Derivable F EqX al Premises
+      (eq_Q c d →ᶠ Formula.eq0 sign_cd .zero) :=
+    .syllogism H_to_nf (.syllogism (Derivable.mp (add_eq_zero_iff adm cross_cd sign_cd) .and_weak) and_proj2)
+  let H_to_eq_cd : Derivable F EqX al Premises
+      (eq_Q c d →ᶠ Formula.eq0 (Term.app2 Term.mul nc dd) (Term.app2 Term.mul nd dc)) :=
+    .syllogism H_to_cross_cd (abs_diff_zero_fwd adm _ _)
+  -- ═══ CROSS PART ═══
+  -- Need: |num_ac * den_mad - num_ad * den_mac| = 0
+  -- i.e., |na*nc*(da*dd) - na*nd*(da*dc)| = 0
+  -- Rearrange: (na*da)*(nc*dd) = (na*da)*(nd*dc), follows from nc*dd = nd*dc
+  let H_to_cross : Derivable F EqX al Premises
+      (eq_Q c d →ᶠ Formula.eq0
+        (Term.app2 Term.abs_diff
+          (Term.app2 Term.mul (.app Term.rat_num mac) (.app Term.rat_den mad))
+          (Term.app2 Term.mul (.app Term.rat_num mad) (.app Term.rat_den mac)))
+        .zero) :=
+    sorry -- Cross part (~60 lines of rearrangement)
+  -- ═══ SIGN PART ═══
+  let H_to_sign : Derivable F EqX al Premises
+      (eq_Q c d →ᶠ Formula.eq0
+        (Term.app2 Term.mul
+          (Term.app2 Term.abs_diff (.app Term.rat_sign mac) (.app Term.rat_sign mad))
+          (Term.app Term.sg (Term.app2 Term.add (.app Term.rat_num mac) (.app Term.rat_num mad))))
+        .zero) :=
+    sorry -- Sign part (~80 lines of case analysis)
+  -- ═══ COMBINE ═══
+  let core : Derivable F EqX al Premises (eq_Q c d →ᶠ eq_Q mac mad) :=
+    sorry -- Combine cross + sign via eq_Q_from_components pattern
+  univ_gen (univ_gen (univ_gen core))
 
 def mul_Q_congr :
     Derivable F EqX al Premises (Γ := Γ)
