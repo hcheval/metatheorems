@@ -7648,8 +7648,39 @@ private def mul_Q_right_congr :
         .zero) :=
     sorry -- Sign part (~80 lines of case analysis)
   -- ═══ COMBINE ═══
+  -- Unfold eq_Q_dec(mac, mad)
+  let eqd2 : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.add
+      (Term.app2 Term.abs_diff
+        (Term.app2 Term.mul (Term.app Term.rat_num (.var (.vs .vz))) (Term.app Term.rat_den (.var .vz)))
+        (Term.app2 Term.mul (Term.app Term.rat_num (.var .vz)) (Term.app Term.rat_den (.var (.vs .vz)))))
+      (Term.app2 Term.mul
+        (Term.app2 Term.abs_diff (Term.app Term.rat_sign (.var (.vs .vz))) (Term.app Term.rat_sign (.var .vz)))
+        (Term.app Term.sg (Term.app2 Term.add (Term.app Term.rat_num (.var (.vs .vz))) (Term.app Term.rat_num (.var .vz)))))
+  have eqd2_eq : (Term.eq_Q_dec : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Γ) _) =
+      Term.lam (Term.lam eqd2) := by rfl
+  let cross_mm := Term.app2 Term.abs_diff
+    (Term.app2 Term.mul (.app Term.rat_num mac) (.app Term.rat_den mad))
+    (Term.app2 Term.mul (.app Term.rat_num mad) (.app Term.rat_den mac))
+  let sign_mm := Term.app2 Term.mul
+    (Term.app2 Term.abs_diff (.app Term.rat_sign mac) (.app Term.rat_sign mad))
+    (Term.app Term.sg (Term.app2 Term.add (.app Term.rat_num mac) (.app Term.rat_num mad)))
+  have eqd2_nf : (eqd2.subst0 (mad.weaken)).subst0 mac =
+      Term.app2 Term.add cross_mm sign_mm := by
+    simp only [eqd2, mac, mad, cross_mm, sign_mm,
+      Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+      add_closed_subst, abs_diff_closed_subst, mul_closed_subst,
+      rat_num_closed_subst, rat_den_closed_subst, rat_sign_closed_subst,
+      sg_closed_subst, mul_Q_closed_subst, weaken_subst0_eta]
+  let unfold_mm := eqd2_eq ▸ lam2_correct_nf adm eqd2 mac mad eqd2_nf
+  -- H → NF(mac,mad) = 0
+  let H_to_nf_zero : Derivable F EqX al Premises
+      (eq_Q c d →ᶠ Formula.eq0 (Term.app2 Term.add cross_mm sign_mm) .zero) :=
+    .syllogism (pair_h H_to_cross H_to_sign)
+      (Derivable.mp (add_eq_zero_iff adm cross_mm sign_mm) (.syllogism .and_perm .and_weak))
+  -- eq_Q_dec(mac,mad) = NF → NF = 0 → eq_Q_dec(mac,mad) = 0
   let core : Derivable F EqX al Premises (eq_Q c d →ᶠ eq_Q mac mad) :=
-    sorry -- Combine cross + sign via eq_Q_from_components pattern
+    .syllogism (pair_h (weaken_intro_h unfold_mm) H_to_nf_zero) .trans0
   univ_gen (univ_gen (univ_gen core))
 
 def mul_Q_congr :
