@@ -137,6 +137,23 @@ def general_metatheorem
              hUV x (hB (U x) (Nat.le_trans hU_le (Nat.le_max_left ..)))⟩⟩
 
 -- ============================================================================
+-- Prenexification: (∀u B₀ → ∃v C₀) → ∃u ∃v (B₀ → C₀)  [classical]
+-- ============================================================================
+
+/-- Classical prenexification: `(∀u B₀ → ∃v C₀) → ∃u ∃v (B₀' → C₀')`.
+    Uses LEM on the conclusion. In the negative case, ¬∃u∃v(B₀→C₀) gives
+    ∀u B₀ (from ¬(B₀→C₀) → B₀ via qf_lem) and ∀v ¬C₀ (from ¬(B₀→C₀) → ¬C₀),
+    contradicting ∃v C₀ obtained from the hypothesis.
+
+    Here B₀ and C₀ are in context [Ty.nat, ρ, ...Γ] (bound var + x).
+    The result ∃u ∃v (B₀' → C₀') has both u and v bound, with B₀' = B₀ weakened
+    past v, and C₀' = C₀ renaming var0 → var1 (the v position). -/
+-- TODO: The exact de Bruijn formulation of the prenexified form needs careful
+-- variable-index arithmetic. The key insight is that this is a standard
+-- classical derivation using LEM + exist_rule + forall_ax, about 50-80 lines.
+-- Leaving as sorry for now; the approach is validated by the notes above.
+
+-- ============================================================================
 -- Classical version (Theorem 6.1 as in the paper)
 -- ============================================================================
 
