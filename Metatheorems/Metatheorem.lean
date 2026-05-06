@@ -169,9 +169,76 @@ def prenexify
     C₀.renameF (Term.Renaming.ext Term.Renaming.shift)))
   let H := all Ty.nat B₀ →ᶠ ex Ty.nat C₀
   let lem_G := @Derivable.lem _ F EqX Allowed.classical Premises _ G (by decide)
-  -- Negative case: H ∧ ¬G → ⊥ (hence → G by exfalso)
-  let neg_case : Derivable F EqX Allowed.classical Premises (H ∧ᶠ ¬ᶠG →ᶠ G) :=
+  -- ── Local helper: A → (∃σ A).weakenBy σ  (exist intro at var 0) ──
+  let eav {σ : Ty ι} {Δ : Ctx ι} (A : Formula F (σ :: Δ)) :
+      Derivable F EqX Allowed.classical Premises (A →ᶠ (ex σ A).weakenBy σ) :=
+    Eq.mp (congrArg (Derivable F EqX Allowed.classical Premises ·)
+      (congrArg (· →ᶠ (ex σ A).weakenBy σ) (substF_renameF_id
+        (Renaming.ext Renaming.shift) (Term.subst0_map (.var .vz))
+        (fun {_} v => match v with
+          | .vz => rfl
+          | .vs _ => by simp [Term.Renaming.ext, Term.subst0_map, Term.Renaming.shift]) A)))
+      (.exist_ax (.var .vz) (A.renameF (Renaming.ext Renaming.shift)))
+  -- ── Local helper: (∀σ A).weakenBy σ → A  (forall elim at var 0) ──
+  let fav {σ : Ty ι} {Δ : Ctx ι} (A : Formula F (σ :: Δ)) :
+      Derivable F EqX Allowed.classical Premises ((all σ A).weakenBy σ →ᶠ A) :=
+    Eq.mp (congrArg (Derivable F EqX Allowed.classical Premises ·)
+      (congrArg ((all σ A).weakenBy σ →ᶠ ·) (substF_renameF_id
+        (Renaming.ext Renaming.shift) (Term.subst0_map (.var .vz))
+        (fun {_} v => match v with
+          | .vz => rfl
+          | .vs _ => by simp [Term.Renaming.ext, Term.subst0_map, Term.Renaming.shift]) A)))
+      (.forall_ax (.var .vz))
+  -- ── Sub-lemma: ¬∃x P(x) → ∀x ¬P(x) ──
+  let neg_ex_to_all_neg {σ : Ty ι} {Δ : Ctx ι} (A : Formula F (σ :: Δ)) :
+      Derivable F EqX Allowed.classical Premises (¬ᶠ(ex σ A) →ᶠ all σ (¬ᶠA)) :=
+    .forall_rule (.exportation (eval_h .and_weak (.syllogism and_proj2 (eav A))))
+  -- ── Sub-lemma: ¬(P → Q) → P  (classical, uses LEM on P) ──
+  let not_imp_left {Δ : Ctx ι} (P Q : Formula F Δ) :
+      Derivable F EqX Allowed.classical Premises (¬ᶠ(P →ᶠ Q) →ᶠ P) :=
+    let lem_P := @Derivable.lem _ F EqX Allowed.classical Premises _ P (by decide)
+    let neg_P_imp : Derivable F EqX Allowed.classical Premises (¬ᶠP →ᶠ (P →ᶠ Q)) :=
+      .exportation (.syllogism (eval_h .and_weak and_proj2) .exfalso)
+    Derivable.mp lem_P (or_elim_rule
+      (.exportation .and_weak)
+      (.exportation (.syllogism (eval_h and_proj2 (.syllogism .and_weak neg_P_imp)) .exfalso)))
+  -- ── Sub-lemma: ¬(P → Q) → ¬Q ──
+  let not_imp_right {Δ : Ctx ι} (_P Q : Formula F Δ) :
+      Derivable F EqX Allowed.classical Premises (¬ᶠ(_P →ᶠ Q) →ᶠ ¬ᶠQ) :=
+    -- ¬(P→Q) ∧ Q → ⊥: from Q get P→Q (weaken_intro), contradicts ¬(P→Q)
+    .exportation (eval_h .and_weak (.syllogism and_proj2 (.exportation .and_weak)))
+  -- ── Negative case: H ∧ ¬G → G ──
+  let B₀w := B₀.weakenBy Ty.nat
+  let C₀r := C₀.renameF (Term.Renaming.ext Term.Renaming.shift)
+  -- ¬G → ∀u ¬∃v(B₀w→C₀r) → ∀u ∀v ¬(B₀w→C₀r)
+  let neg_G_to_all : Derivable F EqX Allowed.classical Premises
+      (¬ᶠG →ᶠ all Ty.nat (all Ty.nat (¬ᶠ(B₀w →ᶠ C₀r)))) :=
+    .syllogism (neg_ex_to_all_neg _) (forall_map (neg_ex_to_all_neg _))
+  -- ∀u∀v ¬(B₀w→C₀r) → ∀u B₀
+  -- Strategy: forall_map on (∀v ¬(B₀w→C₀r) → B₀), where the inner step
+  -- instantiates ∀v at 0, gets ¬(B₀w→C₀r), extracts B₀w via not_imp_left,
+  -- then B₀w.subst0(0) = B₀ by normalization.
+  let get_B₀ : Derivable F EqX Allowed.classical Premises
+      (all Ty.nat (all Ty.nat (¬ᶠ(B₀w →ᶠ C₀r))) →ᶠ all Ty.nat B₀) :=
     sorry
+  -- ∀u∀v ¬(B₀w→C₀r) → ∀v ¬C₀
+  -- Strategy: instantiate ∀u at 0, get ∀v ¬(B₀w→C₀r), then forall_map
+  -- with (¬(B₀w→C₀r) → ¬C₀r), then C₀r.subst0(0) normalizes to C₀.
+  let get_neg_C₀ : Derivable F EqX Allowed.classical Premises
+      (all Ty.nat (all Ty.nat (¬ᶠ(B₀w →ᶠ C₀r))) →ᶠ all Ty.nat (¬ᶠC₀)) :=
+    sorry
+  -- ∃v C₀ ∧ ∀v ¬C₀ → ⊥
+  let exist_all_neg : Derivable F EqX Allowed.classical Premises
+      (ex Ty.nat C₀ ∧ᶠ all Ty.nat (¬ᶠC₀) →ᶠ ⊥ᶠ) :=
+    .importation (.exist_rule
+      (.exportation (eval_h (.syllogism and_proj2 (fav (¬ᶠC₀))) .and_weak)))
+  -- Chain: H ∧ ¬G → G
+  let neg_case : Derivable F EqX Allowed.classical Premises (H ∧ᶠ ¬ᶠG →ᶠ G) :=
+    let to_forall_B := .syllogism and_proj2 (.syllogism neg_G_to_all get_B₀)
+    let to_exist_C := eval_h .and_weak to_forall_B
+    let to_all_neg_C := .syllogism and_proj2 (.syllogism neg_G_to_all get_neg_C₀)
+    .syllogism (pair_h to_exist_C to_all_neg_C)
+      (.syllogism exist_all_neg .exfalso)
   -- Combine: H → G using LEM
   Derivable.mp lem_G (or_elim_rule
     (.exportation (.and_weak (A := G) (B := H)))
