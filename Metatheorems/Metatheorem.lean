@@ -141,17 +141,41 @@ def general_metatheorem
 -- ============================================================================
 
 /-- Classical prenexification: `(∀u B₀ → ∃v C₀) → ∃u ∃v (B₀' → C₀')`.
-    Uses LEM on the conclusion. In the negative case, ¬∃u∃v(B₀→C₀) gives
-    ∀u B₀ (from ¬(B₀→C₀) → B₀ via qf_lem) and ∀v ¬C₀ (from ¬(B₀→C₀) → ¬C₀),
-    contradicting ∃v C₀ obtained from the hypothesis.
 
-    Here B₀ and C₀ are in context [Ty.nat, ρ, ...Γ] (bound var + x).
-    The result ∃u ∃v (B₀' → C₀') has both u and v bound, with B₀' = B₀ weakened
-    past v, and C₀' = C₀ renaming var0 → var1 (the v position). -/
--- TODO: The exact de Bruijn formulation of the prenexified form needs careful
--- variable-index arithmetic. The key insight is that this is a standard
--- classical derivation using LEM + exist_rule + forall_ax, about 50-80 lines.
--- Leaving as sorry for now; the approach is validated by the notes above.
+    B₀, C₀ are in context `[Ty.nat, ρ, Γ]` (bound var 0 + x at var 1).
+    The prenexified form `∃u ∃v (B₀' → C₀')` lives in `[ρ, Γ]` with:
+    - B₀' = B₀.weakenBy Ty.nat (u at var 1, x at var 2)
+    - C₀' = C₀.renameF (ext shift) (v at var 0, x at var 2)
+
+    Proof by LEM on the conclusion:
+    - Positive case: done
+    - Negative case: ¬∃u∃v(B₀'→C₀') gives ∀u∀v ¬(B₀'→C₀'). From ¬(P→Q) and
+      qf_lem on P: B₀ holds for all u (→ ∃v C₀ from hypothesis) and ¬C₀ holds
+      for all v (→ contradiction). -/
+def prenexify
+    {ι : Type} {F : ι → Ty ι}
+    {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
+    {Premises : PremiseSet F}
+    {Γ : Ctx ι} {ρ : Ty ι}
+    {B₀ C₀ : Formula F (Ty.nat :: ρ :: Γ)}
+    (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
+    (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true) :
+    let B₀' := B₀.weakenBy Ty.nat
+    let C₀' := C₀.renameF (Term.Renaming.ext Term.Renaming.shift)
+    @Derivable ι F EqX Allowed.classical Premises (ρ :: Γ)
+      ((all Ty.nat B₀ →ᶠ ex Ty.nat C₀) →ᶠ
+       ex Ty.nat (ex Ty.nat (B₀' →ᶠ C₀'))) :=
+  let G := ex Ty.nat (ex Ty.nat (B₀.weakenBy Ty.nat →ᶠ
+    C₀.renameF (Term.Renaming.ext Term.Renaming.shift)))
+  let H := all Ty.nat B₀ →ᶠ ex Ty.nat C₀
+  let lem_G := @Derivable.lem _ F EqX Allowed.classical Premises _ G (by decide)
+  -- Negative case: H ∧ ¬G → ⊥ (hence → G by exfalso)
+  let neg_case : Derivable F EqX Allowed.classical Premises (H ∧ᶠ ¬ᶠG →ᶠ G) :=
+    sorry
+  -- Combine: H → G using LEM
+  Derivable.mp lem_G (or_elim_rule
+    (.exportation (.and_weak (A := G) (B := H)))
+    (.exportation (.syllogism .and_perm neg_case)))
 
 -- ============================================================================
 -- Classical version (Theorem 6.1 as in the paper)
