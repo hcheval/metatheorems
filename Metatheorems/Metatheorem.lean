@@ -218,15 +218,57 @@ def prenexify
   -- Strategy: forall_map on (∀v ¬(B₀w→C₀r) → B₀), where the inner step
   -- instantiates ∀v at 0, gets ¬(B₀w→C₀r), extracts B₀w via not_imp_left,
   -- then B₀w.subst0(0) = B₀ by normalization.
+  -- (A.weakenBy σ).subst0 t = A for any context
+  let wsf {Δ : Ctx ι} {σ : Ty ι} (A : Formula F Δ) (t : Term F Δ σ) :
+      (A.weakenBy σ).subst0 t = A :=
+    substF_renameF_id Term.Renaming.shift (Term.subst0_map t) (fun {_} _ => rfl) A
   let get_B₀ : Derivable F EqX Allowed.classical Premises
       (all Ty.nat (all Ty.nat (¬ᶠ(B₀w →ᶠ C₀r))) →ᶠ all Ty.nat B₀) :=
-    sorry
+    let C₀r_z := C₀r.subst0 Term.zero
+    have nf : (¬ᶠ(B₀w →ᶠ C₀r)).subst0 (Term.zero : Term F (Ty.nat :: ρ :: Γ) _) =
+        (¬ᶠ(B₀ →ᶠ C₀r_z)) := by
+      show Formula.imp (Formula.imp (B₀w.subst0 Term.zero) C₀r_z) ⊥ᶠ =
+           Formula.imp (Formula.imp B₀ C₀r_z) ⊥ᶠ
+      rw [wsf B₀ (Term.zero : Term F (Ty.nat :: ρ :: Γ) _)]
+    forall_map (.syllogism (.forall_ax Term.zero)
+      (Eq.mp (congrArg (Derivable F EqX Allowed.classical Premises ·)
+        (congrArg (· →ᶠ B₀) nf.symm)) (not_imp_left B₀ C₀r_z)))
   -- ∀u∀v ¬(B₀w→C₀r) → ∀v ¬C₀
   -- Strategy: instantiate ∀u at 0, get ∀v ¬(B₀w→C₀r), then forall_map
   -- with (¬(B₀w→C₀r) → ¬C₀r), then C₀r.subst0(0) normalizes to C₀.
   let get_neg_C₀ : Derivable F EqX Allowed.classical Premises
       (all Ty.nat (all Ty.nat (¬ᶠ(B₀w →ᶠ C₀r))) →ᶠ all Ty.nat (¬ᶠC₀)) :=
-    sorry
+    -- Instantiate outer ∀u at zero: get ∀v ¬(B₀w' → C₀r')
+    -- where B₀w' = B₀w.subst0 zero, C₀r' = C₀r.subst0 zero
+    -- C₀r = C₀.renameF (ext shift), so C₀r.subst0 zero = C₀ by substF_renameF_id
+    -- Then forall_map with not_imp_right gives ∀v ¬C₀
+    let B₀w_z := B₀w.subst0 Term.zero
+    -- C₀r.substF(Subst.ext(subst0_map zero)) = C₀
+    -- This is NOT C₀r.subst0 zero (which is direct subst0_map).
+    -- The ∀v binder pushes subst0 through Subst.ext.
+    -- C₀r = C₀.renameF(ext shift). Under Subst.ext(subst0_map zero):
+    -- vz → vz (by Subst.ext), vs w → (subst0_map(zero)(w)).weaken
+    -- At ext_shift(vz) = vz: Subst.ext gives var vz. ✓
+    -- At ext_shift(vs w) = vs(vs w): Subst.ext(vs(vs w)) = (subst0_map(zero)(vs w)).weaken = (var w).weaken = var(vs w). ✓
+    -- Step 1: forall_map with not_imp_right on inner ∀v
+    -- ∀u∀v ¬(B₀w→C₀r) → ∀u∀v ¬C₀r
+    let step1 := forall_map (forall_map (not_imp_right B₀w C₀r))
+    -- Step 2: instantiate ∀u at zero → ∀v ¬C₀r becomes ∀v ¬C₀
+    -- C₀r.substF(Subst.ext(subst0_map zero)) = C₀ (identity on C₀'s variables)
+    have C₀r_nf : C₀r.substF (Term.Subst.ext (Term.subst0_map (Term.zero : Term F (ρ :: Γ) _))) = C₀ :=
+      substF_renameF_id (Term.Renaming.ext Term.Renaming.shift)
+        (Term.Subst.ext (Term.subst0_map Term.zero))
+        (fun {_} v => match v with
+          | .vz => rfl
+          | .vs _ => rfl) C₀
+    have nf_neg : (all Ty.nat (¬ᶠC₀r)).subst0 (Term.zero : Term F (ρ :: Γ) _) =
+        all Ty.nat (¬ᶠC₀) := by
+      change all Ty.nat (Formula.imp (C₀r.substF (Term.Subst.ext (Term.subst0_map Term.zero))) ⊥ᶠ) =
+             all Ty.nat (¬ᶠC₀)
+      rw [C₀r_nf]; rfl
+    .syllogism step1 (.syllogism (.forall_ax Term.zero)
+      (Eq.mp (congrArg (Derivable F EqX Allowed.classical Premises ·)
+        (congrArg (· →ᶠ all Ty.nat (¬ᶠC₀)) nf_neg.symm)) I_comb))
   -- ∃v C₀ ∧ ∀v ¬C₀ → ⊥
   let exist_all_neg : Derivable F EqX Allowed.classical Premises
       (ex Ty.nat C₀ ∧ᶠ all Ty.nat (¬ᶠC₀) →ᶠ ⊥ᶠ) :=
