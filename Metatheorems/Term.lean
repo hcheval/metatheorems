@@ -83,6 +83,14 @@ inductive Term {ι : Type} (F : ι → Ty ι) : Ctx ι → Ty ι → Type where
   | func  : (f : ι) → Term F Γ (F f)
   /-- Zero element 0_{X_i} for base type X_i. -/
   | zeroX : (i : ι) → Term F Γ (Ty.base i)
+  /-- The inhabitant of the unit type. -/
+  | unitI : Term F Γ Ty.unit
+  /-- Pairing. -/
+  | mkPair : Term F Γ ρ → Term F Γ τ → Term F Γ (ρ ×ₜ τ)
+  /-- First projection. -/
+  | fst   : Term F Γ (ρ ×ₜ τ) → Term F Γ ρ
+  /-- Second projection. -/
+  | snd   : Term F Γ (ρ ×ₜ τ) → Term F Γ τ
 
 namespace Term
 
@@ -134,6 +142,10 @@ def rename (r : Renaming Γ Δ) : Term F Γ τ → Term F Δ τ
   | .prec ρ'       => .prec ρ'
   | .func f        => .func f
   | .zeroX i       => .zeroX i
+  | .unitI         => .unitI
+  | .mkPair a b    => .mkPair (rename r a) (rename r b)
+  | .fst p         => .fst (rename r p)
+  | .snd p         => .snd (rename r p)
 
 /-- Weaken a term: embed from context Γ into extended context (σ :: Γ). -/
 def weaken : Term F Γ τ → Term F (σ :: Γ) τ :=

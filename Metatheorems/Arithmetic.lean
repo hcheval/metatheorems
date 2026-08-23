@@ -161,6 +161,9 @@ def eqAtType_refl {Γ : Ctx ι} {ρ : Ty ι} (s : Term F Γ ρ) :
   match ρ with
   | .nat    => .refl0
   | .base _ => adm.eqx_refl s
+  | .unit   => .refl0
+  | .prod ρ' σ' =>
+    .mp (eqAtType_refl (Term.snd s)) (.mp (eqAtType_refl (Term.fst s)) and_intro)
   | .arr ρ' σ' =>
     -- eqAtType (ρ'→σ') s s = ∀x:ρ'. eqAtType σ' (s.weaken x) (s.weaken x)
     -- IH in context ρ'::Γ; then weaken_intro + forall_rule + mp to close ∀
@@ -182,6 +185,9 @@ def eqAtType_sym {Γ : Ctx ι} {ρ : Ty ι} {s t : Term F Γ ρ} :
   match ρ with
   | .nat    => .sym0
   | .base _ => adm.eqx_sym
+  | .unit   => self_imp_h
+  | .prod ρ' σ' =>
+    pair_h (.syllogism .and_weak eqAtType_sym) (.syllogism and_proj2 eqAtType_sym)
   | .arr ρ' σ' =>
     let P_st : Formula F (ρ' :: Γ) :=
       eqAtType EqX σ' (Term.app s.weaken (.var .vz)) (Term.app t.weaken (.var .vz))
@@ -197,6 +203,13 @@ def eqAtType_trans {Γ : Ctx ι} {ρ : Ty ι} {s t u : Term F Γ ρ} :
   match ρ with
   | .nat    => .trans0
   | .base _ => adm.eqx_trans
+  | .unit   => .and_weak
+  | .prod ρ' σ' =>
+    pair_h
+      (.syllogism (pair_h (.syllogism .and_weak .and_weak) (.syllogism and_proj2 .and_weak))
+        eqAtType_trans)
+      (.syllogism (pair_h (.syllogism .and_weak and_proj2) (.syllogism and_proj2 and_proj2))
+        eqAtType_trans)
   | .arr ρ' σ' =>
     let P_st : Formula F (ρ' :: Γ) :=
       eqAtType EqX σ' (Term.app s.weaken (.var .vz)) (Term.app t.weaken (.var .vz))
@@ -248,6 +261,11 @@ private theorem eqAtType_substF (adm : AdmissibleEqX EqX) {τ : Ty ι} {Γ Δ : 
   induction τ generalizing Γ Δ σ with
   | nat => rfl
   | base i => exact adm.substF_nat u v σ
+  | unit => rfl
+  | prod ρ' σ' ih₁ ih₂ =>
+    simp only [eqAtType, Formula.substF, Term.subst]
+    rw [ih₁, ih₂]
+    rfl
   | arr ρ' σ' _ ih =>
     simp only [eqAtType, Formula.substF]
     congr 1; rw [ih]

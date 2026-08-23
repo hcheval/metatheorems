@@ -190,6 +190,8 @@ private def Ty.interpret_default' {ι : Type} {X : ι → Type} {F : ι → Ty �
   | .nat    => Nat.zero
   | .base i => si.zeroInterp i
   | .arr _ τ => fun _ => Ty.interpret_default' si τ
+  | .unit    => ()
+  | .prod ρ τ => (Ty.interpret_default' si ρ, Ty.interpret_default' si τ)
 
 -- The QF-ER helpers below use section variables {EqX} and (eqxi) automatically.
 -- They avoid `induction` in `def` bodies to prevent the "code generator does not
@@ -201,6 +203,9 @@ private def eqAtType_default_ctr {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
   match ρ, s, t with
   | .nat,      _, _  => ()
   | .base i,   s, t  => eqxi.counterDefault i s t
+  | .unit,     _, _  => ()
+  | .prod ρ' τ, s, t =>
+    (eqAtType_default_ctr ρ' (Term.fst s) (Term.fst t), eqAtType_default_ctr τ (Term.snd s) (Term.snd t))
   | .arr ρ' τ, s, t  =>
     (Ty.interpret_default' si ρ',
      eqAtType_default_ctr τ (s.weaken.app (.var .vz)) (t.weaken.app (.var .vz)))
@@ -211,6 +216,9 @@ private def eqAtType_default_wit {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
   match ρ, s, t with
   | .nat,      _, _  => ()
   | .base i,   s, t  => eqxi.witnessDefault i s t
+  | .unit,     _, _  => ()
+  | .prod ρ' τ, s, t =>
+    (eqAtType_default_wit ρ' (Term.fst s) (Term.fst t), eqAtType_default_wit τ (Term.snd s) (Term.snd t))
   | .arr ρ' τ, s, t  =>
     fun _ => eqAtType_default_wit τ (s.weaken.app (.var .vz)) (t.weaken.app (.var .vz))
 
@@ -224,6 +232,13 @@ private lemma dialecticaWitness_eqAtType_ss (eqxi : EqXInterp X F si EqX) (ρ : 
   induction ρ with
   | nat    => intro Γ s t; simp only [eqAtType, dialecticaWitness]; exact ⟨fun _ _ => rfl⟩
   | base i => intro Γ s t; exact eqxi.witnessSubsingleton i s t
+  | unit   => intro Γ s t; simp only [eqAtType, dialecticaWitness]; exact ⟨fun _ _ => rfl⟩
+  | prod ρ' τ ih_ρ ih_τ =>
+    intro Γ s t
+    simp only [eqAtType, dialecticaWitness]
+    exact ⟨fun a b => Prod.ext
+      ((ih_ρ (Term.fst s) (Term.fst t)).elim a.1 b.1)
+      ((ih_τ (Term.snd s) (Term.snd t)).elim a.2 b.2)⟩
   | arr ρ' τ _ ih_τ =>
     intro Γ s t
     simp only [eqAtType, dialecticaWitness]
@@ -237,6 +252,16 @@ private def eqAtType_to_semEq {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
   match ρ, s, t, env, h with
   | .nat, s, t, env, h => h.property ()
   | .base i, s, t, env, h => eqxi.extract i s t env h
+  | .unit, s, t, env, h => rfl
+  | .prod ρ' τ, s, t, env, h => by
+      have h₁ : dialecticaRealizerCtx si (eqAtType EqX ρ' (Term.fst s) (Term.fst t)) env :=
+        ⟨h.val.1, fun y => (h.property (y, dialecticaDefaultCounter si _)).1⟩
+      have h₂ : dialecticaRealizerCtx si (eqAtType EqX τ (Term.snd s) (Term.snd t)) env :=
+        ⟨h.val.2, fun y => (h.property (dialecticaDefaultCounter si _, y)).2⟩
+      have e₁ := eqAtType_to_semEq ρ' (Term.fst s) (Term.fst t) env h₁
+      have e₂ := eqAtType_to_semEq τ (Term.snd s) (Term.snd t) env h₂
+      simp only [Term.interpret] at e₁ e₂
+      exact Prod.ext e₁ e₂
   | .arr ρ' τ, s, t, env, h => by
       funext z
       have hz : dialecticaRealizerCtx si
@@ -257,6 +282,13 @@ private def eqAtType_from_semEq {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
   match ρ, s, t, env, h with
   | .nat, s, t, env, h => ⟨(), fun () => h⟩
   | .base i, s, t, env, h => eqxi.realize i s t env h
+  | .unit, s, t, env, h => ⟨(), fun () => rfl⟩
+  | .prod ρ' τ, s, t, env, h =>
+      let r₁ := eqAtType_from_semEq ρ' (Term.fst s) (Term.fst t) env (by
+        simp only [Term.interpret]; exact congrArg Prod.fst h)
+      let r₂ := eqAtType_from_semEq τ (Term.snd s) (Term.snd t) env (by
+        simp only [Term.interpret]; exact congrArg Prod.snd h)
+      ⟨(r₁.val, r₂.val), fun y => ⟨r₁.property y.1, r₂.property y.2⟩⟩
   | .arr ρ' τ, s, t, env, h =>
       have eq_z : ∀ z : Ty.interpret X ρ',
           Term.interpret si (Term.app s.weaken (.var .vz)) (z, env) =
@@ -463,6 +495,8 @@ private lemma Ty.interpret_nonempty {ι : Type} {X : ι → Type} {F : ι → Ty
   | nat    => exact ⟨Nat.zero⟩
   | base i => exact ⟨si.zeroInterp i⟩
   | arr _ _ _ ihτ => exact ⟨fun _ => ihτ.some⟩
+  | unit => exact ⟨()⟩
+  | prod _ _ ihρ ihτ => exact ⟨(ihρ.some, ihτ.some)⟩
 
 /-- Both `𝕎 X A` and `ℂ X A` are nonempty. -/
 private lemma dialectica_nonempty {ι : Type} {X : ι → Type} {F : ι → Ty ι}

@@ -71,6 +71,8 @@ def Ty.interpret_default {ι : Type} {X : ι → Type} {F : ι → Ty ι}
   | .nat    => Nat.zero
   | .base i => si.zeroInterp i
   | .arr ρ τ => fun _ => Ty.interpret_default si τ
+  | .unit    => ()
+  | .prod ρ τ => (Ty.interpret_default si ρ, Ty.interpret_default si τ)
 
 mutual
 /-- Computable default witness for any formula's Dialectica translation. -/

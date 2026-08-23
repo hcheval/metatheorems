@@ -86,6 +86,9 @@ def isQF : Formula F Γ → Bool
     equivalent to their negative translations in the base theory. -/
 def isPurelyUniversal : Formula F Γ → Bool
   | .all _ A => A.isPurelyUniversal
+  -- closed under ∧ as well: `eqAtType` at a product type is a conjunction of two
+  -- ∀-formulas, which is still ∃-free and ∨-free, hence still trivially realized.
+  | .and A B => A.isPurelyUniversal && B.isPurelyUniversal
   | A        => A.isQF
 
 -- ============================================================================
@@ -236,6 +239,11 @@ def eqAtType {ι : Type} {F : ι → Ty ι}
     (ρ : Ty ι) → Term F Γ ρ → Term F Γ ρ → Formula F Γ
   | Ty.nat,      s, t => Formula.eq0 s t
   | Ty.base i,   s, t => EqX i s t
+  -- all inhabitants of `unit` are equal, so this is trivially true
+  | Ty.unit,     _, _ => Formula.eq0 Term.zero Term.zero
+  | Ty.prod ρ τ, s, t =>
+      Formula.and (eqAtType EqX ρ (Term.fst s) (Term.fst t))
+        (eqAtType EqX τ (Term.snd s) (Term.snd t))
   | Ty.arr ρ τ,  s, t =>
       -- ∀x^ρ. (s x =_τ t x)
       Formula.all ρ (eqAtType EqX τ
