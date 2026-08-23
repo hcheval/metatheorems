@@ -307,6 +307,23 @@ theorem interpret_castTy {si : SpaceInterp X F} {ρ σ : Ty ι} (h : ρ = σ)
   cases h; rfl
 
 
+/-- Interpreting a substitution built from a renaming just relocates the environment. -/
+theorem interpretSubst_of_renaming {si : SpaceInterp X F} :
+    ∀ {Γ Δ : Ctx ι} (r : Term.Renaming Γ Δ) (envΔ : Ctx.interpret X Δ)
+      (envΓ : Ctx.interpret X Γ),
+      (∀ {σ} (v : Var Γ σ), Ctx.lookup (r v) envΔ = Ctx.lookup v envΓ) →
+      Ctx.interpretSubst si (fun v => Term.var (r v)) envΔ = envΓ
+  | [],      _, _, _,    _, _ => rfl
+  | _ :: Γ', _, r, envΔ, envΓ, h => by
+      show (Term.interpret si (Term.var (r .vz)) envΔ,
+            Ctx.interpretSubst si (fun v => Term.var (r (.vs v))) envΔ) = envΓ
+      have h1 : Term.interpret si (Term.var (r .vz)) envΔ = envΓ.1 := h .vz
+      have h2 := interpretSubst_of_renaming (si := si) (fun v => r (.vs v)) envΔ envΓ.2
+        (fun v => h (.vs v))
+      rw [h1, h2]
+      rfl
+
+
 -- ============================================================================
 -- Per-rule syntactic realizers
 -- ============================================================================
@@ -541,6 +558,54 @@ def sSuccInj : SRealizer si (Γ := Γ)
    fun env y => by
      simp only [dialecticaMatrix, Term.interpret, Ctx.lookup]
      exact fun h => Nat.succ.inj h⟩
+
+
+/-- `∀`-rule: from `B.weakenBy ρ → A` infer `B → ∀x A`.
+
+Note the syntactic version needs no `∀ env` on the hypothesis: one term in context
+`ρ :: Γ` already works at every environment, which is what the semantic version had to
+simulate by quantifying. -/
+def sForallRule {ρ : Ty ι} {B : Formula F Γ} {A : Formula F (ρ :: Γ)}
+    (h : SRealizer si (Formula.weakenBy ρ B →ᶠ A)) :
+    SRealizer si (B →ᶠ Formula.all ρ A) :=
+  let hw : wTy (Formula.weakenBy ρ B) = wTy B := (wTy_cTy_renameF B Term.Renaming.shift).1
+  let hc : cTy (Formula.weakenBy ρ B) = cTy B := (wTy_cTy_renameF B Term.Renaming.shift).2
+  let rn : Term.Renaming (ρ :: Γ) (ρ :: wTy B :: Γ) :=
+    Term.Renaming.ext Term.Renaming.shift
+  let sb : Term.Subst F (ρ :: Γ) (cTy (Formula.all ρ A) :: wTy B :: Γ) := fun v =>
+    match v with
+    | .vz   => .fst (.var .vz)
+    | .vs w => .var (.vs (.vs w))
+  let hf := h.val.rename rn
+  let hg := h.val.subst sb
+  SRealizer.imp
+    (.lam (.lam (.app (.fst hf) (Term.castTy hw.symm (.var (.vs .vz))))))
+    (.lam (.lam (Term.castTy hc
+      (.app (.app (.snd hg) (Term.castTy hw.symm (.var (.vs .vz)))) (.snd (.var .vz))))))
+    (fun env w y hm => by
+      have hrn : ∀ (u : Ty.interpret X ρ) (v : Ty.interpret X (wTy B)),
+          Term.interpret si hf (u, v, env) = Term.interpret si h.val (u, env) :=
+        fun u v => Term.interpret_rename_gen si rn h.val (u, v, env) (u, env)
+          (fun x => by cases x <;> rfl)
+      have hsb : ∀ (p : Ty.interpret X (cTy (Formula.all ρ A)))
+          (v : Ty.interpret X (wTy B)),
+          Term.interpret si hg (p, v, env) = Term.interpret si h.val (p.1, env) := by
+        intro p v
+        rw [Term.interpret_substF]
+        congr 1
+        show Ctx.interpretSubst si (fun {_} => sb) (p, v, env) = (p.1, env)
+        show (Term.interpret si (sb .vz) (p, v, env),
+              Ctx.interpretSubst si (fun w => sb (.vs w)) (p, v, env)) = (p.1, env)
+        have hid : (fun {τ : Ty ι} (w : Var Γ τ) => sb (.vs w))
+            = (fun {τ : Ty ι} (w : Var Γ τ) => Term.var (Var.vs (Var.vs w))) := rfl
+        rw [hid, interpretSubst_of_renaming (si := si) (fun w => Var.vs (Var.vs w))
+          (p, v, env) env (fun _ => rfl)]
+        rfl
+      simp only [Term.interpret, interpret_castTy, Ctx.lookup, hrn, hsb] at hm ⊢
+      refine h.property (y.1, env) (cast (congrArg (Ty.interpret X) hw.symm) w, y.2) ?_
+      refine (dialecticaMatrix_weaken si B env y.1 _ _).mpr ?_
+      rw [cast_cancel (dialecticaWitness_weaken ρ B).symm]
+      simpa using hm)
 
 
 end Rules
