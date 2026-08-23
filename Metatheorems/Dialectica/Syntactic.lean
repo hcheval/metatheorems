@@ -9,6 +9,8 @@ import Metatheorems.Arithmetic
 
 namespace Metatheorems
 
+open Formula
+
 /-!
 # Syntactic Dialectica witnesses
 
@@ -291,5 +293,182 @@ theorem matrixTerm_correct {si : SpaceInterp X F} :
         cases v with
         | vz => rfl
         | vs v' => simpa [Term.Renaming.ext, Ctx.lookup] using hr v'
+
+-- ============================================================================
+-- Per-rule syntactic realizers
+-- ============================================================================
+
+section Rules
+
+variable {si : SpaceInterp X F}
+
+/-- Build a realizer of an implication from its two components. The Dialectica clause for
+`→` is exactly "given a counter `(w, y)`, if the antecedent's matrix holds at `w` against
+the counter `g w y`, then the consequent's holds at `f w` against `y`". -/
+def SRealizer.imp {A B : Formula F Γ}
+    (f : Term F Γ (wTy A →ₜ wTy B)) (g : Term F Γ (wTy A →ₜ cTy B →ₜ cTy A))
+    (h : ∀ (env : Ctx.interpret X Γ) (w : Ty.interpret X (wTy A))
+           (y : Ty.interpret X (cTy B)),
+        dialecticaMatrix si A env w (Term.interpret si g env w y) →
+        dialecticaMatrix si B env (Term.interpret si f env w) y) :
+    SRealizer si (A →ᶠ B) :=
+  ⟨.mkPair f g, fun env y => h env y.1 y.2⟩
+
+/-- `⊥ → A`. -/
+def sExfalso {A : Formula F Γ} : SRealizer si (⊥ᶠ →ᶠ A) :=
+  SRealizer.imp (.lam (Term.weaken (defaultWTerm A))) (.lam (.lam .unitI))
+    (fun _ _ _ hf => absurd hf (by simp [dialecticaMatrix]))
+
+/-- `A ∧ B → A`. -/
+def sAndWeak {A B : Formula F Γ} : SRealizer si (A ∧ᶠ B →ᶠ A) :=
+  SRealizer.imp (.lam (.fst (.var .vz)))
+    (.lam (.lam (.mkPair (.var .vz) (Term.weaken (Term.weaken (defaultCTerm B))))))
+    (fun _ _ _ h => h.1)
+
+/-- `A ∧ B → B ∧ A`. -/
+def sAndPerm {A B : Formula F Γ} : SRealizer si (A ∧ᶠ B →ᶠ B ∧ᶠ A) :=
+  SRealizer.imp (.lam (.mkPair (.snd (.var .vz)) (.fst (.var .vz))))
+    (.lam (.lam (.mkPair (.snd (.var .vz)) (.fst (.var .vz)))))
+    (fun _ _ _ h => ⟨h.2, h.1⟩)
+
+/-- `A → A ∨ B`: tag `0` selects the left disjunct. -/
+def sOrWeak {A B : Formula F Γ} : SRealizer si (A →ᶠ A ∨ᶠ B) :=
+  SRealizer.imp
+    (.lam (.mkPair .zero (.mkPair (.var .vz) (Term.weaken (defaultWTerm B)))))
+    (.lam (.lam (.fst (.var .vz))))
+    (fun _ _ _ h => ⟨fun _ => h, fun hne => absurd rfl hne⟩)
+
+/-- `A ∨ B → B ∨ A`. -/
+def sOrPerm {A B : Formula F Γ} : SRealizer si (A ∨ᶠ B →ᶠ B ∨ᶠ A) :=
+  SRealizer.imp
+    (.lam (.mkPair (Term.natCase (.fst (.var .vz)) (.app .succ .zero) .zero)
+      (.mkPair (.snd (.snd (.var .vz))) (.fst (.snd (.var .vz))))))
+    (.lam (.lam (.mkPair (.snd (.var .vz)) (.fst (.var .vz)))))
+    (fun env w y h => by
+      simp only [dialecticaMatrix, Term.interpret] at h ⊢
+      rcases Classical.em ((w.1 : Nat) = 0) with hz | hz
+      · rw [interpret_natCase_zero _ _ _ _ (by simpa [Term.interpret] using hz)]
+        exact ⟨fun hc => absurd hc (by simp [Term.interpret]), fun _ => h.1 hz⟩
+      · obtain ⟨m, hm⟩ := Nat.exists_eq_succ_of_ne_zero hz
+        rw [interpret_natCase_succ _ _ _ _ m (by simpa [Term.interpret] using hm)]
+        exact ⟨fun _ => h.2 hz, fun hc => absurd (by simp [Term.interpret]) hc⟩)
+
+/-- `A ∨ A → A`. -/
+def sOrContract {A : Formula F Γ} : SRealizer si (A ∨ᶠ A →ᶠ A) :=
+  SRealizer.imp
+    (.lam (Term.natCase (.fst (.var .vz)) (.fst (.snd (.var .vz))) (.snd (.snd (.var .vz)))))
+    (.lam (.lam (.mkPair (.var .vz) (.var .vz))))
+    (fun env w y h => by
+      simp only [dialecticaMatrix, Term.interpret] at h ⊢
+      rcases Classical.em ((w.1 : Nat) = 0) with hz | hz
+      · rw [interpret_natCase_zero _ _ _ _ (by simpa [Term.interpret] using hz)]
+        simpa [Term.interpret] using h.1 hz
+      · obtain ⟨m, hm⟩ := Nat.exists_eq_succ_of_ne_zero hz
+        rw [interpret_natCase_succ _ _ _ _ m (by simpa [Term.interpret] using hm)]
+        simpa [Term.interpret] using h.2 hz)
+
+/-- Modus ponens. -/
+def sMP {A B : Formula F Γ} (hA : SRealizer si A) (hAB : SRealizer si (A →ᶠ B)) :
+    SRealizer si B :=
+  ⟨.app (.fst hAB.val) hA.val,
+   fun env y => hAB.property env (Term.interpret si hA.val env, y) (hA.property env _)⟩
+
+/-- Syllogism. -/
+def sSyllogism {A B C : Formula F Γ}
+    (hAB : SRealizer si (A →ᶠ B)) (hBC : SRealizer si (B →ᶠ C)) :
+    SRealizer si (A →ᶠ C) :=
+  SRealizer.imp
+    (.lam (.app (Term.weaken (.fst hBC.val)) (.app (Term.weaken (.fst hAB.val)) (.var .vz))))
+    (.lam (.lam (.app (.app (Term.weaken (Term.weaken (.snd hAB.val))) (.var (.vs .vz)))
+      (.app (.app (Term.weaken (Term.weaken (.snd hBC.val)))
+          (.app (Term.weaken (Term.weaken (.fst hAB.val))) (.var (.vs .vz))))
+        (.var .vz)))))
+    (fun env w y h => by
+      simp only [Term.interpret, Term.interpret_weaken] at h ⊢
+      exact hBC.property env (_, y) (hAB.property env (w, _) h))
+
+/-- Exportation: `A ∧ B → C` gives `A → B → C`. -/
+def sExportation {A B C : Formula F Γ} (h : SRealizer si (A ∧ᶠ B →ᶠ C)) :
+    SRealizer si (A →ᶠ B →ᶠ C) :=
+  SRealizer.imp
+    (.lam (.mkPair
+      (.lam (.app (Term.weaken (Term.weaken (.fst h.val)))
+        (.mkPair (.var (.vs .vz)) (.var .vz))))
+      (.lam (.lam (.snd (.app (.app (Term.weaken (Term.weaken (Term.weaken (.snd h.val))))
+        (.mkPair (.var (.vs (.vs .vz))) (.var (.vs .vz)))) (.var .vz)))))))
+    (.lam (.lam (.fst (.app (.app (Term.weaken (Term.weaken (.snd h.val)))
+      (.mkPair (.var (.vs .vz)) (.fst (.var .vz)))) (.snd (.var .vz))))))
+    (fun env w y hm => by
+      simp only [Term.interpret, Term.interpret_weaken] at hm ⊢
+      exact fun hB => h.property env ((w, y.1), y.2) ⟨hm, hB⟩)
+
+/-- Importation: `A → B → C` gives `A ∧ B → C`. -/
+def sImportation {A B C : Formula F Γ} (h : SRealizer si (A →ᶠ B →ᶠ C)) :
+    SRealizer si (A ∧ᶠ B →ᶠ C) :=
+  SRealizer.imp
+    (.lam (.app (.fst (.app (Term.weaken (.fst h.val)) (.fst (.var .vz)))) (.snd (.var .vz))))
+    (.lam (.lam (.mkPair
+      (.app (.app (Term.weaken (Term.weaken (.snd h.val))) (.fst (.var (.vs .vz))))
+        (.mkPair (.snd (.var (.vs .vz))) (.var .vz)))
+      (.app (.app (.snd (.app (Term.weaken (Term.weaken (.fst h.val)))
+          (.fst (.var (.vs .vz))))) (.snd (.var (.vs .vz)))) (.var .vz)))))
+    (fun env w y hm => by
+      simp only [Term.interpret, Term.interpret_weaken] at hm ⊢
+      exact h.property env (w.1, w.2, y) hm.1 hm.2)
+
+
+/-- Contraction `A → A ∧ A` — the one rule that needs `matrixTerm`: the counter component
+must return whichever of the two counters actually defeats the witness. -/
+def sAndContract {A : Formula F Γ} : SRealizer si (A →ᶠ A ∧ᶠ A) :=
+  SRealizer.imp (.lam (.mkPair (.var .vz) (.var .vz)))
+    (.lam (.lam (Term.natCase
+      (matrixTerm (fun v => .vs (.vs v)) A (.var (.vs .vz)) (.fst (.var .vz)))
+      (.snd (.var .vz)) (.fst (.var .vz)))))
+    (fun env w y hm => by
+      have hlk : ∀ {σ : Ty ι} (v : Var Γ σ),
+          Ctx.lookup ((fun v => Var.vs (Var.vs v)) v) (y, w, env) = Ctx.lookup v env :=
+        fun _ => rfl
+      have hcorr := matrixTerm_correct (si := si) (fun v => Var.vs (Var.vs v)) A
+        (.var (.vs .vz)) (.fst (.var .vz)) (y, w, env) env hlk
+      simp only [Term.interpret, Ctx.lookup] at hcorr hm ⊢
+      rcases Classical.em (dialecticaMatrix si A env w y.1) with hy | hy
+      · rw [interpret_natCase_zero _ _ _ _ (hcorr.mpr hy)] at hm
+        simp only [Term.interpret, Ctx.lookup] at hm
+        exact ⟨hy, hm⟩
+      · obtain ⟨m, hmm⟩ := Nat.exists_eq_succ_of_ne_zero (fun hc => hy (hcorr.mp hc))
+        rw [interpret_natCase_succ _ _ _ _ m hmm] at hm
+        simp only [Term.interpret, Ctx.lookup] at hm
+        exact absurd hm hy)
+
+/-- Expansion: `A → B` gives `C ∨ A → C ∨ B`. -/
+def sExpansion {A B C : Formula F Γ} (h : SRealizer si (A →ᶠ B)) :
+    SRealizer si (C ∨ᶠ A →ᶠ C ∨ᶠ B) :=
+  SRealizer.imp
+    (.lam (.mkPair (.fst (.var .vz)) (.mkPair (.fst (.snd (.var .vz)))
+      (.app (Term.weaken (.fst h.val)) (.snd (.snd (.var .vz)))))))
+    (.lam (.lam (.mkPair (.fst (.var .vz))
+      (.app (.app (Term.weaken (Term.weaken (.snd h.val)))
+        (.snd (.snd (.var (.vs .vz))))) (.snd (.var .vz))))))
+    (fun env w y hm => by
+      simp only [dialecticaMatrix, Term.interpret, Term.interpret_weaken] at hm ⊢
+      exact ⟨hm.1, fun hne => h.property env (w.2.2, y.2) (hm.2 hne)⟩)
+
+/-- Reflexivity of `=₀`. -/
+def sRefl0 {t : Term F Γ Ty.nat} : SRealizer si (Formula.eq0 t t) :=
+  ⟨.unitI, fun _ _ => rfl⟩
+
+/-- Symmetry of `=₀`. -/
+def sSym0 {s t : Term F Γ Ty.nat} :
+    SRealizer si (Formula.eq0 s t →ᶠ Formula.eq0 t s) :=
+  SRealizer.imp (.lam .unitI) (.lam (.lam .unitI)) (fun _ _ _ h => h.symm)
+
+/-- Transitivity of `=₀`. -/
+def sTrans0 {s t u : Term F Γ Ty.nat} :
+    SRealizer si (Formula.eq0 s t ∧ᶠ Formula.eq0 t u →ᶠ Formula.eq0 s u) :=
+  SRealizer.imp (.lam .unitI) (.lam (.lam (.mkPair .unitI .unitI)))
+    (fun _ _ _ h => h.1.trans h.2)
+
+
+end Rules
 
 end Metatheorems
