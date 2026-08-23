@@ -6,3 +6,4 @@ import Metatheorems.Derivable
 import Metatheorems.Semantics
 import Metatheorems.Dialectica
 import Metatheorems.NDTranslation
+import Metatheorems.RationalNumbers

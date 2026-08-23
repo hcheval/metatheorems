@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Horatiu
 -/
 import Metatheorems.Semantics
+import Metatheorems.StrongMajorizability
 
 
 namespace Metatheorems
@@ -162,5 +163,28 @@ theorem all_closed_terms_majorizable {ι : Type} {X : ι → Type} {F : ι → T
     {ρ : Ty ι} (t : Term F ([] : Ctx ι) ρ) : IsMajorizable am t := by
   obtain ⟨t_star, ht⟩ := all_terms_majorizable am t
   exact ⟨fun n => t_star n (), fun n hn => ht n hn () () True.intro⟩
+
+-- ============================================================================
+-- Bridge to `MajorizabilityRel` (what the metatheorem consumes)
+-- ============================================================================
+
+/-- `AbstractMajorizability` contains `MajorizabilityRel`: same `maj`, and `nat_order` /
+`app_compat` are `maj_le` / `maj_app` with explicit arguments. -/
+def AbstractMajorizability.toRel {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    {si : SpaceInterp X F} (am : AbstractMajorizability si) : MajorizabilityRel si where
+  maj := am.maj
+  maj_le h := am.nat_order _ _ h
+  maj_app hf hx := am.app_compat _ _ _ _ hf hx
+
+/-- **The point of the syntactic route.** A closed term's interpretation has a majorant,
+outright — instantiate `all_closed_terms_majorizable` at the threshold `N`. This is exactly
+the `U_star` / `V_star` that `metatheorem_core_of_majorants` asks for. -/
+theorem majorant_of_closed_term {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    {si : SpaceInterp X F} (am : AbstractMajorizability si)
+    {ρ : Ty ι} (t : Term F ([] : Ctx ι) ρ) :
+    ∃ x_star : Ty.interpret X ρ.hat,
+      am.toRel.maj ρ x_star (Term.interpret si t ()) := by
+  obtain ⟨t_star, ht⟩ := all_closed_terms_majorizable am t
+  exact ⟨t_star am.N, ht am.N (Nat.le_refl _)⟩
 
 end Metatheorems

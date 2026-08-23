@@ -389,4 +389,77 @@ theorem metatheorem_core
   -- C(x, V(x)) holds by the semantic content
   exact ⟨V x, Nat.le_trans hV_le (Nat.le_max_right ..), hUV x hBU⟩
 
+/-- `metatheorem_core` with the majorants supplied explicitly instead of obtained from a
+total `majorizer`.
+
+This is the form that is actually usable: it needs only `MajorizabilityRel` (which is
+inhabited — `bezemRel`) together with majorants for the two extracted functionals. The
+total-majorizer version is the special case `U_star := majorizer U`, `V_star := majorizer V`.
+-/
+theorem metatheorem_core_of_majorants
+    {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    {si : SpaceInterp X F}
+    (mj : MajorizabilityRel si)
+    {ρ : Ty ι}
+    (B C : Ty.interpret X ρ → Nat → Prop)
+    (U V : Ty.interpret X ρ → Nat)
+    (U_star V_star : Ty.interpret X (ρ →ₜ Ty.nat).hat)
+    (hU : mj.maj (ρ →ₜ Ty.nat) U_star U)
+    (hV : mj.maj (ρ →ₜ Ty.nat) V_star V)
+    (hUV : ∀ x : Ty.interpret X ρ, B x (U x) → C x (V x)) :
+    ∃ Φ : Ty.interpret X ρ.hat → Nat,
+    ∀ (x : Ty.interpret X ρ) (x_star : Ty.interpret X ρ.hat),
+      mj.maj ρ x_star x →
+      (∀ u : Nat, u ≤ Φ x_star → B x u) →
+      ∃ v : Nat, v ≤ Φ x_star ∧ C x v := by
+  refine ⟨fun x_star => Nat.max (U_star x_star) (V_star x_star), ?_⟩
+  intro x x_star hx hB
+  have hV_le : V x ≤ V_star x_star := mj.maj_le (mj.maj_app hV hx)
+  have hU_le : U x ≤ U_star x_star := mj.maj_le (mj.maj_app hU hx)
+  have hBU : B x (U x) := hB (U x) (Nat.le_trans hU_le (Nat.le_max_left ..))
+  exact ⟨V x, Nat.le_trans hV_le (Nat.le_max_right ..), hUV x hBU⟩
+
+/-- **The extraction half of the metatheorem**, on its own.
+
+Steps 1–3 of `general_metatheorem` — apply Dialectica soundness, project the two
+functionals `U`, `V` out of the witness, and reduce the matrix back to the interpreted
+formula. No majorizability is involved, and the result is data: `.val.1` and `.val.2` are
+Lean functions that compute.
+
+Compose with `metatheorem_core_of_majorants` to obtain a uniform bound. -/
+def general_metatheorem_extract
+    {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    (si : SpaceInterp X F)
+    {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
+    (eqxi : EqXInterp X F si EqX)
+    {Premises : PremiseSet F}
+    (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
+      ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
+    {ρ : Ty ι}
+    {B₀ C₀ : Formula F [Ty.nat, ρ]}
+    (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
+    (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
+    (prf : @Derivable ι F EqX Allowed.extended Premises []
+      (all ρ (imp (all .nat B₀) (ex .nat C₀)))) :
+    { UV : (Ty.interpret X ρ → Nat) × (Ty.interpret X ρ → Nat) //
+      ∀ x : Ty.interpret X ρ,
+        Formula.interpret si B₀ (UV.1 x, (x, ())) →
+        Formula.interpret si C₀ (UV.2 x, (x, ())) } :=
+  let r := @dialectica_soundness_ctx' ι X F si EqX eqxi Premises premise_realizer _ _ prf
+  let r₀ := r ()
+  let w := r₀.val
+  let h := r₀.property
+  let V : Ty.interpret X ρ → Nat := fun x => ((w x).1 (dialecticaDefaultWitness si _)).1
+  let U : Ty.interpret X ρ → Nat := fun x =>
+    ((w x).2 (dialecticaDefaultWitness si _) (dialecticaDefaultCounter si _)).1
+  ⟨(U, V), by
+    intro x hBx
+    let wP := dialecticaDefaultWitness si (all Ty.nat B₀)
+    let cQ := dialecticaDefaultCounter si (ex Ty.nat C₀)
+    have h_spec := h (x, (wP, cQ))
+    simp only [dialecticaMatrix] at h_spec
+    rw [dialecticaMatrix_iff_interpFormula si B₀ hB_qf hB_vf] at h_spec
+    rw [dialecticaMatrix_iff_interpFormula si C₀ hC_qf hC_vf] at h_spec
+    exact h_spec hBx⟩
+
 end Metatheorems

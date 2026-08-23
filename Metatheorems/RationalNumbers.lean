@@ -500,26 +500,8 @@ variable {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) →
 
 -- ── Congruence helpers (outside section to avoid Γ capture) ──────────────
 
-/-- s =₀ t → mul(s, u) =₀ mul(t, u) -/
-private def mul_congr_l {Γ : Ctx ι}
-    {s t : Term F Γ Ty.nat} (h : Derivable F EqX al Premises (Formula.eq0 s t))
-    (u : Term F Γ Ty.nat) :
-    Derivable F EqX al Premises (Formula.eq0 (Term.app2 Term.mul s u) (Term.app2 Term.mul t u)) :=
-  qfer_no_premise_nat_nf h (r := Term.app2 Term.mul (.var .vz) u.weaken)
-    (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map, mul_closed_subst]
-        exact congrArg _ (Term.weaken_subst0 u s))
-    (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map, mul_closed_subst]
-        exact congrArg _ (Term.weaken_subst0 u t))
-
-/-- s =₀ t → mul(u, s) =₀ mul(u, t) -/
-private def mul_congr_r {Γ : Ctx ι} (u : Term F Γ Ty.nat)
-    {s t : Term F Γ Ty.nat} (h : Derivable F EqX al Premises (Formula.eq0 s t)) :
-    Derivable F EqX al Premises (Formula.eq0 (Term.app2 Term.mul u s) (Term.app2 Term.mul u t)) :=
-  qfer_no_premise_nat_nf h (r := Term.app2 Term.mul u.weaken (.var .vz))
-    (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map, mul_closed_subst]
-        exact congrArg (Term.app · s) (congrArg (Term.app Term.mul ·) (Term.weaken_subst0 u s)))
-    (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map, mul_closed_subst]
-        exact congrArg (Term.app · t) (congrArg (Term.app Term.mul ·) (Term.weaken_subst0 u t)))
+-- `mul_congr_l` / `mul_congr_r` now live in `Arithmetic.lean` (non-private); the local
+-- duplicates that used to sit here were removed to avoid the name clash.
 
 /-- s =₀ t → sg(s) =₀ sg(t) -/
 private def sg_congr {Γ : Ctx ι} {s t : Term F Γ Ty.nat}
@@ -4927,6 +4909,53 @@ def eq_Q_trans :
   univ_gen (univ_gen (univ_gen core))
 
 
+/-- `Term.weaken_subst0` with `subst0` unfolded, so it still fires after `Formula.subst0`
+has been simped through to bare `Term.subst`. -/
+theorem subst_subst0_map_weaken {Γ : Ctx ι} {τ ρ : Ty ι}
+    (t : Term F Γ τ) (s : Term F Γ ρ) :
+    Term.subst (Term.subst0_map s) (Term.weaken t) = t :=
+  Term.weaken_subst0 t s
+
+/-- Normalize `Formula.subst0` / `Term.subst` through the closed rational-arithmetic terms.
+
+Instantiating a ∀-lemma whose body mentions `eq_Q` leaves `Formula.subst0 … t` in the type.
+Forcing that against a hand-written formula by `isDefEq` means traversing `eq_Q_dec` — a large
+closed term — once per quantifier, which exhausts the heartbeat budget. `q_norm` does the same
+reduction by rewriting with the `_closed_subst` lemmas instead, which is cheap and total.
+
+Use as `by have h := …; simpa only [q_norm_lemmas] using h`, or via `q_norm using h`. -/
+syntax "q_norm" "using" term : tactic
+
+macro_rules
+  | `(tactic| q_norm using $h:term) =>
+    `(tactic| simpa only [eq_Q, Formula.subst0, Formula.substF, Term.subst0, Term.subst,
+        Term.subst0_map, Term.Subst.ext, Term.app2, Term.weaken_subst_ext,
+        Term.weaken_subst0, subst_subst0_map_weaken,
+        add_closed_subst, mul_closed_subst, monus_closed_subst, abs_diff_closed_subst,
+        pd_closed_subst, sg_bar_closed_subst, sg_closed_subst, isEven_closed_subst,
+        isOdd_closed_subst, triag_closed_subst, exp2_closed_subst, ite_nat_closed_subst,
+        geq_closed_subst, max_closed_subst, min_closed_subst, pair_closed_subst,
+        inv_triag_closed_subst, fst_pair_closed_subst, snd_pair_closed_subst,
+        div2_closed_subst, rat_num_closed_subst, rat_den_closed_subst,
+        rat_sign_closed_subst, rat_encode_closed_subst, neg_Q_closed_subst,
+        add_Q_closed_subst, sub_Q_closed_subst, mul_Q_closed_subst, abs_Q_closed_subst,
+        lt_Q_dec_closed_subst, le_Q_dec_closed_subst, eq_Q_dec_closed_subst,
+        encode_nat_Q_closed_subst, pow2neg_Q_closed_subst, zero_Q_closed_subst,
+        one_Q_closed_subst] using $h)
+
+/-- `eq_Q_trans` instantiated at three explicit terms.
+
+Stating the resulting formula once, here, is what keeps the three nested `forall_ax`
+substitutions from being `whnf`'d blindly through `eq_Q_dec` at every use site — which is
+what exhausts the heartbeat budget. Use this rather than chaining `.forall_ax` inline. -/
+def eq_Q_trans_inst (adm : AdmissibleEqX EqX) (x y z : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (eq_Q x y ∧ᶠ eq_Q y z →ᶠ eq_Q x z) := by
+  have h := Derivable.mp (Derivable.mp (Derivable.mp
+    (eq_Q_trans (adm := adm) (al := al) (Premises := Premises) (Γ := Γ))
+    (.forall_ax x)) (.forall_ax y)) (.forall_ax z)
+  q_norm using h
+
+
 -- ── Additive group ─────────────────────────────────────────────────────────
 
 /-- geq(x, y) =₀ sg_bar(y ∸ x). -/
@@ -5421,6 +5450,17 @@ def add_Q_comm :
         (Term.app Term.sg (Term.app2 Term.add rn_ab rn_ba))) .zero) :=
     .mp (.mp h_cases (.mp h_sign_mul_red and_intro)) .trans0
   univ_gen (univ_gen (eq_Q_from_components adm h_cross h_sign_zero))
+
+
+/-- `add_Q_comm` instantiated at two explicit terms, with the resulting formula stated.
+See `q_norm` for why the inline `.forall_ax` chain is not affordable. -/
+def add_Q_comm_inst (adm : AdmissibleEqX EqX) (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (eq_Q (Term.app2 Term.add_Q x y) (Term.app2 Term.add_Q y x)) := by
+  have h := Derivable.mp (Derivable.mp
+    (add_Q_comm (adm := adm) (al := al) (Premises := Premises) (Γ := Γ)) (.forall_ax x))
+    (.forall_ax y)
+  q_norm using h
 
 /-- ⊢ ∀a,b,c. eq_Q(add_Q(add_Q(a,b), c), add_Q(a, add_Q(b,c))) -/
 def add_Q_assoc :
@@ -6367,6 +6407,17 @@ def mul_Q_comm :
   -- Lift to eq_Q and universalize
   univ_gen (univ_gen (@eq_Q_from_nat_eq _ _ _ _ _ adm _ _ _ h_eq))
 
+
+/-- `mul_Q_comm` instantiated at two explicit terms, with the resulting formula stated.
+See `q_norm` for why the inline `.forall_ax` chain is not affordable. -/
+def mul_Q_comm_inst (adm : AdmissibleEqX EqX) (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (eq_Q (Term.app2 Term.mul_Q x y) (Term.app2 Term.mul_Q y x)) := by
+  have h := Derivable.mp (Derivable.mp
+    (mul_Q_comm (adm := adm) (al := al) (Premises := Premises) (Γ := Γ)) (.forall_ax x))
+    (.forall_ax y)
+  q_norm using h
+
 /-- ⊢ ∀a,b,c. eq_Q(mul_Q(mul_Q(a,b), c), mul_Q(a, mul_Q(b,c))) -/
 def mul_Q_assoc :
     Derivable F EqX al Premises (Γ := Γ)
@@ -6960,11 +7011,11 @@ def lt_Q_irrefl :
       (Formula.eq0 (Term.app2 Term.sub_Q a a) add_neg) :=
     sub_eq ▸ lam2_correct_nf adm sub_body a a sub_nf
   -- eq_Q(sub_Q(a,a), zero_Q) via eq_Q(add_neg, zero_Q) and sub = add_neg
-  let h_eq_neg := Derivable.mp (add_Q_neg (adm := adm)) (.forall_ax a)
+  let h_eq_neg : Derivable F EqX al Premises (eq_Q add_neg Term.zero_Q) := by
+    have h := Derivable.mp (add_Q_neg (adm := adm) (al := al) (Premises := Premises)) (.forall_ax a)
+    q_norm using h
   let h_eq_sub_neg := @eq_Q_from_nat_eq _ _ _ _ _ adm _ _ _ h_sub_unfold
-  let trans_inst := Derivable.mp (Derivable.mp (Derivable.mp
-    (eq_Q_trans (adm := adm)) (.forall_ax (Term.app2 Term.sub_Q a a)))
-    (.forall_ax add_neg)) (.forall_ax Term.zero_Q)
+  let trans_inst := eq_Q_trans_inst adm (Term.app2 Term.sub_Q a a) add_neg Term.zero_Q
   let h_eq_sub_zero : Derivable F EqX al Premises (eq_Q (Term.app2 Term.sub_Q a a) Term.zero_Q) :=
     Derivable.mp (Derivable.mp h_eq_neg (.mp h_eq_sub_neg and_intro)) trans_inst
   -- From eq_Q(sub, zero_Q): rat_num(sub)*S(0) = 0 → rat_num(sub) = 0
@@ -7026,8 +7077,14 @@ def lt_Q_irrefl :
       (Formula.eq0 (.app .succ abs_term) .zero →ᶠ ⊥ᶠ) :=
     .mp .succ_ne_zero (.forall_ax abs_term)
   -- lt_Q(a,a) → lt_Q_dec(a,a)=0 → S(abs_term)=0 → ⊥
-  univ_gen (.syllogism (pair_h (weaken_intro_h h_lt_eq_succ) I_comb)
-    (.syllogism .trans0 h_ne))
+  -- `trans0` needs `S(abs) = lt_Q_dec(a,a)` on the left, so flip `h_lt_eq_succ` first.
+  let h_succ_sym : Derivable F EqX al Premises
+      (Formula.eq0 (.app .succ abs_term) (Term.app2 Term.lt_Q_dec a a)) :=
+    .mp h_lt_eq_succ .sym0
+  let step : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.lt_Q_dec a a) Term.zero →ᶠ ⊥ᶠ) :=
+    .syllogism (pair_h (weaken_intro_h h_succ_sym) I_comb) (.syllogism .trans0 h_ne)
+  univ_gen step
 
 /-- ⊢ ∀a,b,c. lt_Q(a, b) ∧ lt_Q(b, c) → lt_Q(a, c)  (transitivity) -/
 def lt_Q_trans :
@@ -7370,6 +7427,17 @@ private def add_Q_right_congr :
             (Term.app2 Term.add_Q (.var (.vs (.vs .vz))) (.var .vz)))))) :=
   sorry
 
+
+/-- `add_Q_right_congr` instantiated at three explicit terms, with the resulting formula
+stated. See `q_norm`. -/
+private def add_Q_right_congr_inst (adm : AdmissibleEqX EqX) (x y z : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (eq_Q y z →ᶠ eq_Q (Term.app2 Term.add_Q x y) (Term.app2 Term.add_Q x z)) := by
+  have h := Derivable.mp (Derivable.mp (Derivable.mp
+    (add_Q_right_congr (EqX := EqX) (al := al) (Premises := Premises) (Γ := Γ))
+    (.forall_ax x)) (.forall_ax y)) (.forall_ax z)
+  q_norm using h
+
 /-- ⊢ ∀a,b,c,d. eq_Q(a,b) ∧ eq_Q(c,d) → eq_Q(add_Q(a,c), add_Q(b,d)) -/
 def add_Q_congr :
     Derivable F EqX al Premises (Γ := Γ)
@@ -7389,16 +7457,13 @@ def add_Q_congr :
   let ada := Term.app2 Term.add_Q d a
   let adb := Term.app2 Term.add_Q d b
   -- Right congr
-  let rc := add_Q_right_congr
-  let rc_inst_a := Derivable.mp (Derivable.mp (Derivable.mp rc (.forall_ax a)) (.forall_ax c)) (.forall_ax d)
+  let rc_inst_a := add_Q_right_congr_inst adm a c d
   -- Commutativity instances
-  let comm_ad := Derivable.mp (Derivable.mp (add_Q_comm (adm := adm)) (.forall_ax a)) (.forall_ax d)
-  let rc_inst_d := Derivable.mp (Derivable.mp (Derivable.mp rc (.forall_ax d)) (.forall_ax a)) (.forall_ax b)
-  let comm_db := Derivable.mp (Derivable.mp (add_Q_comm (adm := adm)) (.forall_ax d)) (.forall_ax b)
+  let comm_ad := add_Q_comm_inst adm a d
+  let rc_inst_d := add_Q_right_congr_inst adm d a b
+  let comm_db := add_Q_comm_inst adm d b
   -- trans helper
-  let trans := eq_Q_trans (adm := adm)
-  let trans_inst (x y z : Term F _ Ty.nat) :=
-    Derivable.mp (Derivable.mp (Derivable.mp trans (.forall_ax x)) (.forall_ax y)) (.forall_ax z)
+  let trans_inst (x y z : Term F _ Ty.nat) := eq_Q_trans_inst adm x y z
   -- eq_Q(a,b) → eq_Q(add_Q(a,d), add_Q(d,b)) via comm_ad + right_congr
   let step2a : Derivable F EqX al Premises (eq_Q a b →ᶠ eq_Q aad adb) :=
     let t1 := trans_inst aad ada adb
@@ -7646,6 +7711,30 @@ private def mul_Q_right_congr :
           (Term.app2 Term.abs_diff (.app Term.rat_sign mac) (.app Term.rat_sign mad))
           (Term.app Term.sg (Term.app2 Term.add (.app Term.rat_num mac) (.app Term.rat_num mad))))
         .zero) :=
+    -- PLAN (checked against the available lemmas; not yet written).
+    -- Write `numS := rat_num mac + rat_num mad`, `signD := |rat_sign mac − rat_sign mad|`.
+    -- Both branches finish through `mul_eq_zero_iff adm signD (sg numS) |> and_proj2`,
+    -- fed `.or_weak` (left) or `or_inr` (right). Split with `sg_bar_cases adm numS`, using
+    -- the under-hypothesis idiom `.syllogism (pair_h I_comb (weaken_intro …))
+    --   (.syllogism and_or_dist (or_elim_rule … …))`.
+    --
+    -- Branch `sg_bar numS =₀ S0`: `sg_bar_eq_S0_implies_zero` gives `numS =₀ 0`; then
+    --   `.qfer (r := .app Term.sg (.var .vz))` plus `sg_zero` gives `sg numS =₀ 0`. No H needed.
+    --
+    -- Branch `sg_bar numS =₀ 0` (so `numS ≠ 0`): must show `rat_sign mac =₀ rat_sign mad`,
+    -- then `abs_diff_eq_zero_iff` closes. Steps:
+    --   1. `h_num_ac`/`h_num_ad` rewrite `numS` to `na*nc + na*nd`. From `numS ≠ 0`:
+    --      `na ≠ 0`, and `nc ≠ 0 ∨ nd ≠ 0`.
+    --   2. `H_to_eq_cd : nc*dd =₀ nd*dc` upgrades that to `nc ≠ 0 ∧ nd ≠ 0`: if `nc =₀ 0`
+    --      then `nd*dc =₀ 0`, and `dc` is a successor (`rat_den_unfold_eq`), so
+    --      `mul_succ_eq_zero_imp` gives `nd =₀ 0` — contradicting step 1. Symmetrically.
+    --   3. `H_to_sign_cd : |sc − sd| * sg(nc + nd) =₀ 0` with `nc + nd ≠ 0`: `mul_eq_zero_iff`
+    --      forward plus `sg_zero_fwd` kills the right disjunct, leaving `sc =₀ sd`.
+    --   4. `sc =₀ sd` ⟹ `sign_ac =₀ sign_ad` (`abs_diff_congr_r`, `sg_bar_congr`)
+    --      ⟹ `isEven sign_ac =₀ isEven sign_ad` (`isEven_congr`).
+    --   5. `isEven_cases adm sign_ac`, and in each branch `rat_sign_rat_encode_pos` /
+    --      `rat_sign_rat_encode_neg` (the latter needs `num_ac ≠ 0`, which is step 1+2)
+    --      applied through `unfold_ac`/`unfold_ad` gives `rat_sign mac =₀ rat_sign mad`.
     sorry
   -- ═══ COMBINE ═══
   -- Unfold eq_Q_dec(mac, mad)
@@ -7683,6 +7772,17 @@ private def mul_Q_right_congr :
     .syllogism (pair_h (weaken_intro_h unfold_mm) H_to_nf_zero) .trans0
   univ_gen (univ_gen (univ_gen core))
 
+
+/-- `mul_Q_right_congr` instantiated at three explicit terms, with the resulting formula
+stated. See `q_norm`. -/
+private def mul_Q_right_congr_inst (adm : AdmissibleEqX EqX) (x y z : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (eq_Q y z →ᶠ eq_Q (Term.app2 Term.mul_Q x y) (Term.app2 Term.mul_Q x z)) := by
+  have h := Derivable.mp (Derivable.mp (Derivable.mp
+    (mul_Q_right_congr (adm := adm) (al := al) (Premises := Premises) (Γ := Γ))
+    (.forall_ax x)) (.forall_ax y)) (.forall_ax z)
+  q_norm using h
+
 def mul_Q_congr :
     Derivable F EqX al Premises (Γ := Γ)
       (Formula.all Ty.nat (Formula.all Ty.nat (Formula.all Ty.nat (Formula.all Ty.nat
@@ -7702,24 +7802,21 @@ def mul_Q_congr :
   let mda := Term.app2 Term.mul_Q d a
   let mdb := Term.app2 Term.mul_Q d b
   -- Step 1: eq_Q(c,d) → eq_Q(mul_Q(a,c), mul_Q(a,d))  [right congr]
-  let rc := mul_Q_right_congr
-  let rc_inst_a := Derivable.mp (Derivable.mp (Derivable.mp rc (.forall_ax a)) (.forall_ax c)) (.forall_ax d)
+  let rc_inst_a := mul_Q_right_congr_inst adm a c d
   -- rc_inst_a : eq_Q(c,d) → eq_Q(mul_Q(a,c), mul_Q(a,d))
   -- Step 2: eq_Q(a,b) → eq_Q(mul_Q(a,d), mul_Q(b,d))  [left congr via comm]
   -- mul_Q(a,d) =_Q mul_Q(d,a) (comm)
-  let comm_ad := Derivable.mp (Derivable.mp (mul_Q_comm (adm := adm)) (.forall_ax a)) (.forall_ax d)
+  let comm_ad := mul_Q_comm_inst adm a d
   -- eq_Q(a,b) → eq_Q(mul_Q(d,a), mul_Q(d,b)) (right congr with d fixed)
-  let rc_inst_d := Derivable.mp (Derivable.mp (Derivable.mp rc (.forall_ax d)) (.forall_ax a)) (.forall_ax b)
+  let rc_inst_d := mul_Q_right_congr_inst adm d a b
   -- mul_Q(d,b) =_Q mul_Q(b,d) (comm)
-  let comm_db := Derivable.mp (Derivable.mp (mul_Q_comm (adm := adm)) (.forall_ax d)) (.forall_ax b)
+  let comm_db := mul_Q_comm_inst adm d b
   -- Chain: eq_Q(a,b) → eq_Q(mul_Q(a,d), mul_Q(d,a)) ∧ eq_Q(mul_Q(d,a), mul_Q(d,b))
   --        → eq_Q(mul_Q(a,d), mul_Q(d,b))
   --        → eq_Q(mul_Q(a,d), mul_Q(d,b)) ∧ eq_Q(mul_Q(d,b), mul_Q(b,d))
   --        → eq_Q(mul_Q(a,d), mul_Q(b,d))
   -- trans: ∀x,y,z. eq_Q(x,y) ∧ eq_Q(y,z) → eq_Q(x,z)
-  let trans := eq_Q_trans (adm := adm)
-  let trans_inst (x y z : Term F _ Ty.nat) :=
-    Derivable.mp (Derivable.mp (Derivable.mp trans (.forall_ax x)) (.forall_ax y)) (.forall_ax z)
+  let trans_inst (x y z : Term F _ Ty.nat) := eq_Q_trans_inst adm x y z
   -- eq_Q(a,b) → eq_Q(mul_Q(d,a), mul_Q(d,b))
   -- step2a: eq_Q(a,b) → eq_Q(mul_Q(a,d), mul_Q(d,b))
   --   = trans(mul_Q(a,d), mul_Q(d,a), mul_Q(d,b)) applied to (comm_ad, rc_inst_d(eq_Q(a,b)))

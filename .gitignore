@@ -1,1 +1,18 @@
 /.lake
+
+# LaTeX build artifacts
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+
+# PDFs (papers and build output)
+*.pdf
+
+# Editor / tooling scratch
+_mcp_snippet_*.lean
+*.bak
+.claude/memory/
+.claude/worktrees/
