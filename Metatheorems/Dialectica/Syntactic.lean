@@ -729,6 +729,56 @@ def sInduction {A : Formula F (Ty.nat :: Γ)}
        exact hiff.mp hconc⟩
 
 
+/-- A **term** realizing `eqAtType EqX ρ s t`, given that the two sides are semantically
+equal. Recursion on `ρ`: trivial at `nat` and `unit`, componentwise at products, a `lam`
+at arrows, and `eqxi.realizeTerm` at the base types. -/
+def sEqAtType {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) →
+      Formula F Γ} {si : SpaceInterp X F} (eqxi : EqXInterp X F si EqX) :
+    ∀ (ρ : Ty ι) {Γ : Ctx ι} (s t : Term F Γ ρ),
+      (∀ env : Ctx.interpret X Γ, Term.interpret si s env = Term.interpret si t env) →
+      SRealizer si (eqAtType EqX ρ s t)
+  | .nat,      _, _, _, h => ⟨.unitI, fun env _ => h env⟩
+  | .base i,   _, s, t, h =>
+      ⟨eqxi.realizeTerm i s t, fun env y => eqxi.realizeTerm_sound i s t env (h env) y⟩
+  | .unit,     _, _, _, _ => ⟨.unitI, fun _ _ => rfl⟩
+  | .prod ρ' τ, _, s, t, h =>
+      let r₁ := sEqAtType eqxi ρ' (.fst s) (.fst t) (fun env => congrArg Prod.fst (h env))
+      let r₂ := sEqAtType eqxi τ (.snd s) (.snd t) (fun env => congrArg Prod.snd (h env))
+      ⟨.mkPair r₁.val r₂.val, fun env y => ⟨r₁.property env y.1, r₂.property env y.2⟩⟩
+  | .arr ρ' τ, _, s, t, h =>
+      let r := sEqAtType eqxi τ (.app (Term.weaken s) (.var .vz)) (.app (Term.weaken t) (.var .vz))
+        (fun env => by
+          obtain ⟨v, e⟩ := env
+          simp only [Term.interpret, Term.interpret_weaken, Ctx.lookup]
+          exact congrFun (h e) v)
+      ⟨.lam r.val, fun env y => r.property (y.1, env) y.2⟩
+
+section EqRules
+
+variable {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) →
+    Formula F Γ} {si : SpaceInterp X F} (eqxi : EqXInterp X F si EqX)
+
+/-- Recursor at zero. -/
+def sRecZero {ρ : Ty ι} {y : Term F Γ ρ} {z : Term F Γ (ρ →ₜ Ty.nat →ₜ ρ)} :
+    SRealizer si (eqAtType EqX ρ (Term.app3 (.prec ρ) y z Term.zero) y) :=
+  sEqAtType eqxi ρ _ _ (fun _ => by simp [Term.interpret, Term.app3])
+
+/-- Recursor at a successor. -/
+def sRecSucc {ρ : Ty ι} {y : Term F Γ ρ} {z : Term F Γ (ρ →ₜ Ty.nat →ₜ ρ)}
+    {x : Term F Γ Ty.nat} :
+    SRealizer si (eqAtType EqX ρ
+      (Term.app3 (.prec ρ) y z (Term.app Term.succ x))
+      (Term.app2 z (Term.app3 (.prec ρ) y z x) x)) :=
+  sEqAtType eqxi ρ _ _ (fun _ => by simp [Term.interpret, Term.app3, Term.app2])
+
+/-- β-equality. -/
+def sBetaEq {ρ τ : Ty ι} {body : Term F (ρ :: Γ) τ} {u : Term F Γ ρ} :
+    SRealizer si (eqAtType EqX τ (Term.app (.lam body) u) (Term.subst0 body u)) :=
+  sEqAtType eqxi τ _ _ (fun _ => by simp [Term.interpret, Term.interpret_subst0])
+
+end EqRules
+
+
 end Rules
 
 end Metatheorems

@@ -736,5 +736,19 @@ structure EqXInterp {ι : Type} (X : ι → Type) (F : ι → Ty ι)
   extract : ∀ (i : ι) {Γ : Ctx ι} (s t : Term F Γ (Ty.base i)) (env : Ctx.interpret X Γ),
       dialecticaRealizerCtx si (EqX i s t) env →
       Term.interpret si s env = Term.interpret si t env
+  /-- A **term** realizing `EqX i s t`, for the syntactic development.
+
+      `realize` above produces a semantic value, which cannot be majorized. The
+      equality predicate of a space must therefore also be realized *syntactically* —
+      the syntactic analogue of condition 4. For `ι = Empty` this is vacuous. -/
+  realizeTerm : ∀ (i : ι) {Γ : Ctx ι} (s t : Term F Γ (Ty.base i)),
+      Term F Γ (wTy (EqX i s t))
+  /-- `realizeTerm` is correct wherever the two sides are semantically equal. -/
+  realizeTerm_sound : ∀ (i : ι) {Γ : Ctx ι} (s t : Term F Γ (Ty.base i))
+      (env : Ctx.interpret X Γ),
+      Term.interpret si s env = Term.interpret si t env →
+      ∀ y : dialecticaCounter X (EqX i s t),
+        dialecticaMatrix si (EqX i s t) env
+          (Term.interpret si (realizeTerm i s t) env) y
 
 end Metatheorems
