@@ -608,6 +608,53 @@ def sForallRule {ρ : Ty ι} {B : Formula F Γ} {A : Formula F (ρ :: Γ)}
       simpa using hm)
 
 
+/-- `∃`-rule: from `A → B.weakenBy ρ` infer `∃x A → B`. -/
+def sExistRule {ρ : Ty ι} {B : Formula F Γ} {A : Formula F (ρ :: Γ)}
+    (h : SRealizer si (A →ᶠ Formula.weakenBy ρ B)) :
+    SRealizer si (Formula.ex ρ A →ᶠ B) :=
+  let hw : wTy (Formula.weakenBy ρ B) = wTy B := (wTy_cTy_renameF B Term.Renaming.shift).1
+  let hc : cTy (Formula.weakenBy ρ B) = cTy B := (wTy_cTy_renameF B Term.Renaming.shift).2
+  let sb1 : Term.Subst F (ρ :: Γ) (wTy (Formula.ex ρ A) :: Γ) := fun v =>
+    match v with
+    | .vz   => .fst (.var .vz)
+    | .vs w => .var (.vs w)
+  let sb2 : Term.Subst F (ρ :: Γ) (cTy B :: wTy (Formula.ex ρ A) :: Γ) := fun v =>
+    match v with
+    | .vz   => .fst (.var (.vs .vz))
+    | .vs w => .var (.vs (.vs w))
+  SRealizer.imp
+    (.lam (Term.castTy hw (.app (.fst (h.val.subst sb1)) (.snd (.var .vz)))))
+    (.lam (.lam (.app (.app (.snd (h.val.subst sb2)) (.snd (.var (.vs .vz))))
+      (Term.castTy hc.symm (.var .vz)))))
+    (fun env w y hm => by
+      have hs1 : Term.interpret si (h.val.subst sb1) (w, env)
+          = Term.interpret si h.val (w.1, env) := by
+        rw [Term.interpret_substF]; congr 1
+        show (Term.interpret si (sb1 .vz) (w, env),
+              Ctx.interpretSubst si (fun u => sb1 (.vs u)) (w, env)) = (w.1, env)
+        have hid : (fun {τ : Ty ι} (u : Var Γ τ) => sb1 (.vs u))
+            = (fun {τ : Ty ι} (u : Var Γ τ) => Term.var (Var.vs u)) := rfl
+        rw [hid, interpretSubst_of_renaming (si := si) (fun u => Var.vs u) (w, env) env
+          (fun _ => rfl)]
+        rfl
+      have hs2 : ∀ (z : Ty.interpret X (cTy B)),
+          Term.interpret si (h.val.subst sb2) (z, w, env)
+            = Term.interpret si h.val (w.1, env) := by
+        intro z
+        rw [Term.interpret_substF]; congr 1
+        show (Term.interpret si (sb2 .vz) (z, w, env),
+              Ctx.interpretSubst si (fun u => sb2 (.vs u)) (z, w, env)) = (w.1, env)
+        have hid : (fun {τ : Ty ι} (u : Var Γ τ) => sb2 (.vs u))
+            = (fun {τ : Ty ι} (u : Var Γ τ) => Term.var (Var.vs (Var.vs u))) := rfl
+        rw [hid, interpretSubst_of_renaming (si := si) (fun u => Var.vs (Var.vs u))
+          (z, w, env) env (fun _ => rfl)]
+        rfl
+      simp only [Term.interpret, interpret_castTy, Ctx.lookup, hs1, hs2] at hm ⊢
+      have hstep := h.property (w.1, env) (w.2, cast (congrArg (Ty.interpret X) hc.symm) y) hm
+      have hfwd := (dialecticaMatrix_weaken si B env w.1 _ _).mp hstep
+      rwa [cast_cancel (dialecticaCounter_weaken ρ B).symm] at hfwd)
+
+
 end Rules
 
 end Metatheorems
