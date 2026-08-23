@@ -858,6 +858,41 @@ def sMarkov {si : SpaceInterp X F} {ρ : Ty ι} {A₀ : Formula F (ρ :: Γ)}
       convert h2 using 3 <;> first | rfl | exact Subsingleton.elim _ _)
 
 
+/-- Independence of premise, `(∀x A₀ → ∃y B) → ∃y (∀x A₀ → B)` for quantifier-free
+∨-free `A₀`. -/
+def sIP {si : SpaceInterp X F} {ρ σ : Ty ι}
+    {A₀ : Formula F (σ :: Γ)} {B : Formula F (ρ :: Γ)}
+    (hqf : A₀.isQF = true) (hvf : A₀.isVFree = true) :
+    SRealizer si ((Formula.all σ A₀ →ᶠ Formula.ex ρ B) →ᶠ
+      Formula.ex ρ ((Formula.all σ A₀).weakenBy ρ →ᶠ B)) :=
+  let hWA : wTy ((Formula.all σ A₀).weakenBy ρ) = wTy (Formula.all σ A₀) :=
+    (wTy_cTy_renameF (Formula.all σ A₀) Term.Renaming.shift).1
+  let hCA : cTy ((Formula.all σ A₀).weakenBy ρ) = cTy (Formula.all σ A₀) :=
+    (wTy_cTy_renameF (Formula.all σ A₀) Term.Renaming.shift).2
+  SRealizer.imp
+    (.lam (.mkPair
+      (.fst (.app (.fst (.var .vz)) (.lam (Term.defaultOf (wTy A₀)))))
+      (.mkPair
+        (.lam (.snd (.app (.fst (.var (.vs .vz))) (Term.castTy hWA (.var .vz)))))
+        (.lam (.lam (Term.castTy hCA.symm
+          (.app (.app (.snd (.var (.vs (.vs .vz)))) (Term.castTy hWA (.var (.vs .vz))))
+            (.var .vz))))))))
+    (.lam (.lam (.mkPair (Term.castTy hWA (.fst (.var .vz))) (.snd (.var .vz)))))
+    (fun env w y hprem => by
+      have hss := dialecticaWitness_subsingleton (X := X) A₀ hqf hvf
+      haveI := hss.1
+      haveI := hss.2
+      haveI ssWAll : Subsingleton (𝕎 X (Formula.all σ A₀)) :=
+        ⟨fun f g => funext (fun _ => Subsingleton.elim _ _)⟩
+      simp only [Term.interpret, interpret_castTy, interpret_defaultOf, Ctx.lookup] at hprem ⊢
+      rw [show (fun _ => Ty.interpret_default si (wTy A₀))
+          = cast (congrArg (Ty.interpret X) hWA) y.1 from ssWAll.elim _ _]
+      intro hA
+      refine hprem ?_
+      have key := (dialecticaMatrix_weaken si (Formula.all σ A₀) env _ y.1 _).mp hA
+      rwa [cast_cancel (dialecticaCounter_weaken ρ (Formula.all σ A₀)).symm] at key)
+
+
 end Rules
 
 end Metatheorems
