@@ -893,6 +893,46 @@ def sIP {si : SpaceInterp X F} {ρ σ : Ty ι}
       rwa [cast_cancel (dialecticaCounter_weaken ρ (Formula.all σ A₀)).symm] at key)
 
 
+/-- Axiom of choice, `∀x ∃y A → ∃Y ∀x A[Y x/y]`. -/
+def sAC {si : SpaceInterp X F} {ρ τ : Ty ι} {A : Formula F (τ :: ρ :: Γ)} :
+    SRealizer si ((Formula.all ρ (Formula.ex τ A)) →ᶠ
+      Formula.ex (ρ →ₜ τ) (Formula.all ρ (Formula.substF Formula.acSubst A))) :=
+  let hwA : wTy (Formula.substF Formula.acSubst A) = wTy A :=
+    (wTy_cTy_substF A (Formula.acSubst (ρ := ρ) (τ := τ))).1
+  let hcA : cTy (Formula.substF Formula.acSubst A) = cTy A :=
+    (wTy_cTy_substF A (Formula.acSubst (ρ := ρ) (τ := τ))).2
+  SRealizer.imp
+    (.lam (.mkPair
+      (.lam (.fst (.app (.var (.vs .vz)) (.var .vz))))
+      (.lam (Term.castTy hwA.symm (.snd (.app (.var (.vs .vz)) (.var .vz)))))))
+    (.lam (.lam (.mkPair (.fst (.var .vz)) (Term.castTy hcA (.snd (.var .vz))))))
+    (fun env w y h => by
+      have acSubst_env : ∀ (x : Ty.interpret X ρ) (Y : Ty.interpret X ρ → Ty.interpret X τ),
+          Ctx.interpretSubst si (Formula.acSubst (ρ := ρ) (τ := τ) (F := F) (Γ := Γ))
+            (x, Y, env) = (Y x, x, env) := fun x Y => by
+        simp only [Formula.acSubst, Ctx.interpretSubst, Term.interpret, Ctx.lookup]
+        refine Prod.ext rfl (Prod.ext rfl ?_)
+        have h1 : (fun {τ' : Ty ι} (v : Var Γ τ') =>
+                    (Term.var (Var.vs (Var.vs v)) : Term F (ρ :: (ρ →ₜ τ) :: Γ) τ')) =
+                  (fun {τ' : Ty ι} (v : Var Γ τ') =>
+                    (Term.var (Var.vs v) : Term F ((ρ →ₜ τ) :: Γ) τ').weaken) := by
+          funext τ' v; rfl
+        rw [h1, Ctx.interpretSubst_weaken_eq]
+        have h2 : (fun {τ' : Ty ι} (v : Var Γ τ') =>
+                    (Term.var (Var.vs v) : Term F ((ρ →ₜ τ) :: Γ) τ')) =
+                  (fun {τ' : Ty ι} (v : Var Γ τ') => (Term.var v : Term F Γ τ').weaken) := by
+          funext τ' v; rfl
+        rw [h2, Ctx.interpretSubst_weaken_eq, Ctx.interpretSubst_id]
+      simp only [dialecticaMatrix, Term.interpret, interpret_castTy, Ctx.lookup] at h ⊢
+      rw [← cast_cancel (dialectica_types_substF (X := X) A
+        (Formula.acSubst (ρ := ρ) (τ := τ))).2 y.2]
+      rw [dialecticaMatrix_substF si A Formula.acSubst
+        (y.1, fun z => (w z).1, env) ((w y.1).2)
+        (cast (dialectica_types_substF (X := X) A (Formula.acSubst (ρ := ρ) (τ := τ))).2 y.2)]
+      rw [acSubst_env y.1 (fun z => (w z).1)]
+      exact h)
+
+
 end Rules
 
 end Metatheorems
