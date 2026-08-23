@@ -50,6 +50,20 @@ def Term.defaultOf : (ρ : Ty ι) → Term F Γ ρ
   | .arr _ τ  => .lam (Term.defaultOf τ)
   | .prod ρ τ => .mkPair (Term.defaultOf ρ) (Term.defaultOf τ)
 
+/-- `Term.defaultOf` is closed, so its interpretation does not depend on the environment. -/
+@[simp] theorem interpret_defaultOf {si : SpaceInterp X F} :
+    ∀ (ρ : Ty ι) {Δ : Ctx ι} (env : Ctx.interpret X Δ),
+      Term.interpret si (Term.defaultOf ρ) env = Ty.interpret_default si ρ
+  | .nat,      _, _ => rfl
+  | .base _,   _, _ => rfl
+  | .unit,     _, _ => rfl
+  | .arr _ τ,  _, _ => by
+      funext x; simp only [Term.defaultOf, Term.interpret, Ty.interpret_default]
+      exact interpret_defaultOf τ _
+  | .prod ρ τ, _, _ => by
+      simp only [Term.defaultOf, Term.interpret, Ty.interpret_default]
+      exact Prod.ext (interpret_defaultOf ρ _) (interpret_defaultOf τ _)
+
 /-- Syntactic counterpart of `dialecticaDefaultWitness`. -/
 def defaultWTerm (A : Formula F Γ) : Term F Γ (wTy A) := Term.defaultOf _
 
@@ -817,6 +831,31 @@ def sQfer {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F
         ssW.elim _ _
       rw [← hwW]
       exact hrσ.property y)
+
+
+/-- Markov's principle, `¬¬∃x A₀ → ∃x A₀` for quantifier-free ∨-free `A₀`. -/
+def sMarkov {si : SpaceInterp X F} {ρ : Ty ι} {A₀ : Formula F (ρ :: Γ)}
+    (hqf : A₀.isQF = true) (hvf : A₀.isVFree = true) :
+    SRealizer si (¬ᶠ(¬ᶠ(Formula.ex ρ A₀)) →ᶠ Formula.ex ρ A₀) :=
+  let nex : Term F Γ (wTy (¬ᶠ(Formula.ex ρ A₀))) :=
+    .mkPair (.lam .unitI) (.lam (.lam (Term.defaultOf (cTy A₀))))
+  SRealizer.imp
+    (.lam (.mkPair
+      (.fst (.fst (.app (.app (.snd (.var .vz)) (Term.weaken nex)) .unitI)))
+      (Term.defaultOf (wTy A₀))))
+    (.lam (.lam (.mkPair (Term.weaken (Term.weaken nex)) .unitI)))
+    (fun env w y hprem => by
+      have hss := dialecticaWitness_subsingleton (X := X) A₀ hqf hvf
+      simp only [Formula.neg, dialecticaMatrix, Term.interpret, Term.interpret_weaken,
+        Ctx.lookup, interpret_defaultOf, nex] at hprem ⊢
+      have hy : y = Term.interpret si (Term.defaultOf (cTy A₀)) env := hss.2.elim _ _
+      rw [hy, show Ty.interpret_default si (wTy A₀)
+            = (w.2 (Term.interpret si nex env) ()).1.2 from hss.1.elim _ _]
+      have h2 := Classical.not_not.mp hprem
+      -- witness and counter differ only by subsingleton elements
+      haveI := hss.1
+      haveI := hss.2
+      convert h2 using 3 <;> first | rfl | exact Subsingleton.elim _ _)
 
 
 end Rules
