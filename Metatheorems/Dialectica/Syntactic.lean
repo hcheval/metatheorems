@@ -5,6 +5,7 @@ Authors: Horatiu
 -/
 import Metatheorems.Dialectica.Defs
 import Metatheorems.Majorizability
+import Metatheorems.Arithmetic
 
 namespace Metatheorems
 
@@ -175,5 +176,190 @@ theorem extract_majorants {X : ι → Type} {si : SpaceInterp X F}
   ⟨majorant_of_closed_term am _, majorant_of_closed_term am _⟩
 
 end Extract
+
+-- ============================================================================
+-- The matrix, on object-level witness/counter types
+-- ============================================================================
+
+/-- `dialecticaMatrix` retyped against `wTy`/`cTy`.
+
+Identical clause by clause; only the *types* of the witness and counter differ, and by
+`interpret_wTy`/`interpret_cTy` those agree with the originals. Working here rather than
+through a cast keeps every downstream statement transport-free. -/
+def sMatrix {X : ι → Type} (si : SpaceInterp X F) :
+    {Γ : Ctx ι} → (A : Formula F Γ) → Ctx.interpret X Γ →
+    Ty.interpret X (wTy A) → Ty.interpret X (cTy A) → Prop
+  | _, .bot,     _,   _,  _  => False
+  | _, .eq0 s t, env, _,  _  => Term.interpret si s env = Term.interpret si t env
+  | _, .and A B, env, w,  y  => sMatrix si A env w.1 y.1 ∧ sMatrix si B env w.2 y.2
+  | _, .or  A B, env, w,  y  =>
+      (w.1 = (0 : Nat) → sMatrix si A env w.2.1 y.1) ∧
+      (w.1 ≠ (0 : Nat) → sMatrix si B env w.2.2 y.2)
+  | _, .imp A B, env, w,  y  =>
+      sMatrix si A env y.1 (w.2 y.1 y.2) → sMatrix si B env (w.1 y.1) y.2
+  | _, .ex  _ A, env, w,  y  => sMatrix si A (w.1, env) w.2 y
+  | _, .all _ A, env, w,  y  => sMatrix si A (y.1, env) (w y.1) y.2
+
+/-- A Dialectica realizer whose witness is a **closed-over term**: one `Term`, valid in
+every environment. -/
+def SRealizer {X : ι → Type} (si : SpaceInterp X F) {Γ : Ctx ι} (A : Formula F Γ) : Type :=
+  { t : Term F Γ (wTy A) //
+      ∀ (env : Ctx.interpret X Γ) (y : Ty.interpret X (cTy A)),
+        sMatrix si A env (Term.interpret si t env) y }
+
+-- ============================================================================
+-- A minimal object-level conditional, and the two evaluation lemmas it needs
+-- ============================================================================
+
+variable {X : ι → Type}
+
+/-- `natCase n a b` is `a` when `n` is zero and `b` otherwise. Built from the recursor,
+so it needs no arithmetic beyond `prec`. -/
+def Term.natCase {ρ : Ty ι} (n : Term F Γ Ty.nat) (a b : Term F Γ ρ) : Term F Γ ρ :=
+  Term.app3 (.prec ρ) a (.lam (.lam (Term.weaken (Term.weaken b)))) n
+
+theorem interpret_natCase_zero {si : SpaceInterp X F} {ρ : Ty ι}
+    (n : Term F Γ Ty.nat) (a b : Term F Γ ρ) (env : Ctx.interpret X Γ)
+    (h : Term.interpret si n env = (0 : Nat)) :
+    Term.interpret si (Term.natCase n a b) env = Term.interpret si a env := by
+  simp only [Term.natCase, Term.app3, Term.interpret]
+  rw [h]; rfl
+
+theorem interpret_natCase_succ {si : SpaceInterp X F} {ρ : Ty ι}
+    (n : Term F Γ Ty.nat) (a b : Term F Γ ρ) (env : Ctx.interpret X Γ)
+    (m : Nat) (h : Term.interpret si n env = Nat.succ m) :
+    Term.interpret si (Term.natCase n a b) env = Term.interpret si b env := by
+  simp only [Term.natCase, Term.app3, Term.interpret]
+  rw [h]
+  show Term.interpret si (Term.weaken (Term.weaken b)) (_, _, env) = _
+  rw [Term.interpret_weaken, Term.interpret_weaken]
+
+theorem interpret_pd_fun {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpret X Δ) :
+    Term.interpret si (Term.pd (F := F) (Γ := Δ)) env = Nat.pred := by
+  funext n
+  simp only [Term.pd, Term.app3, Term.interpret]
+  cases n <;> rfl
+
+private theorem rec_pred_eq_sub (x : Nat) :
+    ∀ n : Nat, (Nat.rec x (fun _ ih => Nat.pred ih) n : Nat) = x - n
+  | 0     => rfl
+  | m + 1 => by
+      show Nat.pred (Nat.rec x (fun _ ih => Nat.pred ih) m) = x - (m + 1)
+      rw [rec_pred_eq_sub x m, Nat.sub_succ]
+
+theorem interpret_monus_app {si : SpaceInterp X F} (s t : Term F Γ Ty.nat)
+    (env : Ctx.interpret X Γ) :
+    Term.interpret si (Term.app2 Term.monus s t) env
+      = Term.interpret si s env - Term.interpret si t env := by
+  simp only [Term.app2, Term.monus, Term.app3, Term.interpret, Ctx.lookup, interpret_pd_fun]
+  exact rec_pred_eq_sub _ _
+
+-- ============================================================================
+-- The matrix as a term (needed only for contraction)
+-- ============================================================================
+
+/-- A term computing the characteristic function of `sMatrix`: it evaluates to `0`
+exactly when the matrix holds.
+
+Dialectica needs this in one place only — contraction `A → A ∧ A`, whose counter
+component must pick whichever of two counters defeats the witness. Everything else is
+plumbing. -/
+def matrixTerm : {Γ : Ctx ι} → (A : Formula F Γ) →
+    Term F Γ (wTy A) → Term F Γ (cTy A) → Term F Γ Ty.nat
+  | _, .bot,     _, _ => .app .succ .zero
+  | _, .eq0 s t, _, _ =>
+      Term.natCase (Term.app2 Term.monus s t) (Term.app2 Term.monus t s) (.app .succ .zero)
+  | _, .and A B, w, y =>
+      Term.natCase (matrixTerm A (.fst w) (.fst y)) (matrixTerm B (.snd w) (.snd y))
+        (.app .succ .zero)
+  | _, .or  A B, w, y =>
+      Term.natCase (.fst w)
+        (matrixTerm A (.fst (.snd w)) (.fst y))
+        (matrixTerm B (.snd (.snd w)) (.snd y))
+  | _, .imp A B, w, y =>
+      Term.natCase (matrixTerm A (.fst y) (.app (.app (.snd w) (.fst y)) (.snd y)))
+        (matrixTerm B (.app (.fst w) (.fst y)) (.snd y))
+        .zero
+  | _, .ex  _ A, w, y =>
+      (matrixTerm A (Term.weaken (.snd w)) (Term.weaken y)).subst0 (.fst w)
+  | _, .all _ A, w, y =>
+      (matrixTerm A (.app (Term.weaken w) (.var .vz)) (Term.weaken (.snd y))).subst0 (.fst y)
+
+/-- Case analysis on `natCase`, packaged for use below. -/
+private theorem natCase_cases {si : SpaceInterp X F} {ρ : Ty ι}
+    (n : Term F Γ Ty.nat) (a b : Term F Γ ρ) (env : Ctx.interpret X Γ) :
+    (Term.interpret si n env = (0 : Nat) ∧
+      Term.interpret si (Term.natCase n a b) env = Term.interpret si a env) ∨
+    (Term.interpret si n env ≠ (0 : Nat) ∧
+      Term.interpret si (Term.natCase n a b) env = Term.interpret si b env) := by
+  rcases Classical.em ((Term.interpret si n env : Nat) = (0 : Nat)) with hz | hz
+  · exact Or.inl ⟨hz, interpret_natCase_zero n a b env hz⟩
+  · refine Or.inr ⟨hz, ?_⟩
+    obtain ⟨m, hm⟩ := Nat.exists_eq_succ_of_ne_zero hz
+    exact interpret_natCase_succ n a b env m hm
+
+/-- **`matrixTerm` computes the matrix.** -/
+theorem matrixTerm_correct {si : SpaceInterp X F} :
+    ∀ {Γ : Ctx ι} (A : Formula F Γ) (w : Term F Γ (wTy A)) (y : Term F Γ (cTy A))
+      (env : Ctx.interpret X Γ),
+      Term.interpret si (matrixTerm A w y) env = (0 : Nat) ↔
+        sMatrix si A env (Term.interpret si w env) (Term.interpret si y env)
+  | _, .bot, w, y, env => by
+      simp only [matrixTerm, sMatrix, Term.interpret]
+      exact ⟨fun h => absurd h (Nat.succ_ne_zero _), False.elim⟩
+  | _, .eq0 s t, w, y, env => by
+      simp only [matrixTerm, sMatrix]
+      rcases natCase_cases (si := si) (Term.app2 Term.monus s t)
+        (Term.app2 Term.monus t s) (.app .succ .zero) env with ⟨hz, he⟩ | ⟨hz, he⟩ <;>
+        rw [he] <;> rw [interpret_monus_app] at hz
+      · rw [interpret_monus_app, Nat.sub_eq_zero_iff_le]
+        rw [Nat.sub_eq_zero_iff_le] at hz
+        exact ⟨fun h => Nat.le_antisymm hz h, fun h => h ▸ Nat.le_refl _⟩
+      · simp only [Term.interpret]
+        refine ⟨fun h => absurd h (Nat.succ_ne_zero _), fun h => absurd ?_ hz⟩
+        rw [h]; exact Nat.sub_self _
+  | _, .and A B, w, y, env => by
+      simp only [matrixTerm, sMatrix, Term.interpret]
+      rcases natCase_cases (si := si) (matrixTerm A (.fst w) (.fst y))
+        (matrixTerm B (.snd w) (.snd y)) (.app .succ .zero) env with ⟨hz, he⟩ | ⟨hz, he⟩ <;>
+        rw [he]
+      · simp only [matrixTerm_correct A (.fst w) (.fst y) env] at hz
+        rw [matrixTerm_correct B (.snd w) (.snd y) env]
+        simp only [Term.interpret]
+        exact ⟨fun h => ⟨hz, h⟩, fun h => h.2⟩
+      · rw [ne_eq, matrixTerm_correct A (.fst w) (.fst y) env] at hz
+        exact ⟨fun h => absurd h (Nat.succ_ne_zero _), fun h => absurd h.1 hz⟩
+  | _, .or A B, w, y, env => by
+      simp only [matrixTerm, sMatrix, Term.interpret]
+      rcases natCase_cases (si := si) (.fst w)
+        (matrixTerm A (.fst (.snd w)) (.fst y))
+        (matrixTerm B (.snd (.snd w)) (.snd y)) env with ⟨hz, he⟩ | ⟨hz, he⟩ <;>
+        rw [he] <;> simp only [Term.interpret] at hz
+      · rw [matrixTerm_correct A _ _ env]
+        simp only [Term.interpret]
+        exact ⟨fun h => ⟨fun _ => h, fun hne => absurd hz hne⟩, fun h => h.1 hz⟩
+      · rw [matrixTerm_correct B _ _ env]
+        simp only [Term.interpret]
+        exact ⟨fun h => ⟨fun he0 => absurd he0 hz, fun _ => h⟩, fun h => h.2 hz⟩
+  | _, .imp A B, w, y, env => by
+      simp only [matrixTerm, sMatrix, Term.interpret]
+      rcases natCase_cases (si := si)
+        (matrixTerm A (.fst y) (.app (.app (.snd w) (.fst y)) (.snd y)))
+        (matrixTerm B (.app (.fst w) (.fst y)) (.snd y)) .zero env with ⟨hz, he⟩ | ⟨hz, he⟩ <;>
+        rw [he]
+      · simp only [matrixTerm_correct A _ _ env] at hz
+        rw [matrixTerm_correct B _ _ env]
+        simp only [Term.interpret]
+        exact ⟨fun h _ => h, fun h => h hz⟩
+      · rw [ne_eq, matrixTerm_correct A _ _ env] at hz
+        exact ⟨fun _ h => absurd h hz, fun _ => rfl⟩
+  | _, .ex ρ A, w, y, env => by
+      simp only [matrixTerm, sMatrix]
+      rw [Term.interpret_subst0, matrixTerm_correct A _ _ _]
+      simp only [Term.interpret_weaken, Term.interpret]
+  | _, .all ρ A, w, y, env => by
+      simp only [matrixTerm, sMatrix]
+      rw [Term.interpret_subst0, matrixTerm_correct A _ _ _]
+      simp only [Term.interpret_weaken, Term.interpret, Ctx.lookup]
 
 end Metatheorems

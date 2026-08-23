@@ -38,7 +38,7 @@ base type, we interpret:
   S_0       := ℕ
   S_{X_i}   := X i
   S_{ρ → τ} := S_τ ^ S_ρ  (function space) -/
-def Ty.interpret {ι : Type} (X : ι → Type) : Ty ι → Type
+@[reducible] def Ty.interpret {ι : Type} (X : ι → Type) : Ty ι → Type
   | .nat      => Nat
   | .base i   => X i
   | .arr ρ τ  => Ty.interpret X ρ → Ty.interpret X τ
