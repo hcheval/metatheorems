@@ -655,6 +655,80 @@ def sExistRule {ρ : Ty ι} {B : Formula F Γ} {A : Formula F (ρ :: Γ)}
       rwa [cast_cancel (dialecticaCounter_weaken ρ B).symm] at hfwd)
 
 
+/-- Induction. The witness is a primitive recursion `Term.prec (wTy A)` over the base
+witness and the step's map component — which is exactly why the witness type had to be an
+object-level type. -/
+def sInduction {A : Formula F (Ty.nat :: Γ)}
+    (hbase : SRealizer si (A.subst0 Term.zero))
+    (hstep : SRealizer si (Formula.all Ty.nat
+      (A →ᶠ Formula.substVar0 A (Term.app Term.succ (.var .vz))))) :
+    SRealizer si (Formula.all Ty.nat A) :=
+  let hw0 : wTy (A.subst0 Term.zero) = wTy A := (wTy_cTy_substF A (Term.subst0_map _)).1
+  let hwsv : wTy (A.substVar0 (Term.app Term.succ (.var .vz))) = wTy A :=
+    (wTy_cTy_substF A (Formula.Term.substVar0_map _)).1
+  let hcsv : cTy (A.substVar0 (Term.app Term.succ (.var .vz))) = cTy A :=
+    (wTy_cTy_substF A (Formula.Term.substVar0_map _)).2
+  let base' : Term F (Ty.nat :: Γ) (wTy A) := Term.castTy hw0 (Term.weaken hbase.val)
+  let step' : Term F (Ty.nat :: Γ) (wTy A →ₜ Ty.nat →ₜ wTy A) :=
+    .lam (.lam (Term.castTy hwsv
+      (.app (.fst (.app (Term.weaken (Term.weaken (Term.weaken hstep.val))) (.var .vz)))
+        (.var (.vs .vz)))))
+  ⟨.lam (Term.app3 (.prec (wTy A)) base' step' (.var .vz)),
+   fun env y => by
+     have hb : ∀ n : Nat, Term.interpret si base' (n, env)
+         = cast (congrArg (Ty.interpret X) hw0) (Term.interpret si hbase.val env) := by
+       intro n
+       simp only [base', interpret_castTy]
+       rw [Term.interpret_weaken]
+     have hs : ∀ (n : Nat) (ihv : Ty.interpret X (wTy A)) (k : Nat),
+         Term.interpret si step' (n, env) ihv k
+           = cast (congrArg (Ty.interpret X) hwsv)
+               ((Term.interpret si hstep.val env k).1 ihv) := by
+       intro n ihv k
+       simp only [step', Term.interpret, interpret_castTy, Ctx.lookup]
+       rw [Term.interpret_weaken, Term.interpret_weaken, Term.interpret_weaken]
+       rfl
+     simp only [dialecticaMatrix, Term.interpret, Term.app3, Ctx.lookup]
+     suffices hall : ∀ (m : Nat) (z : Ty.interpret X (cTy A)),
+         dialecticaMatrix si A (m, env)
+           (Nat.rec (Term.interpret si base' (y.1, env))
+             (fun n ihv => (Term.interpret si step' (y.1, env)) ihv n) m) z by
+       exact hall y.1 y.2
+     intro m
+     induction m with
+     | zero =>
+       intro z
+       show dialecticaMatrix si A (Nat.zero, env) (Term.interpret si base' (y.1, env)) z
+       rw [hb y.1]
+       have key := (dialecticaMatrix_subst0 si A Term.zero env
+         (cast (congrArg (Ty.interpret X) hw0) (Term.interpret si hbase.val env)) z).mp
+       simp only [Term.interpret] at key
+       apply key
+       rw [cast_cancel (dialecticaWitness_subst0 A Term.zero)]
+       exact hbase.property env _
+     | succ m ih =>
+       intro z
+       set Wm := Nat.rec (motive := fun _ => Ty.interpret X (wTy A))
+         (Term.interpret si base' (y.1, env))
+         (fun n ihv => (Term.interpret si step' (y.1, env)) ihv n) m with hWm
+       show dialecticaMatrix si A (Nat.succ m, env)
+         (Term.interpret si step' (y.1, env) Wm m) z
+       rw [hs y.1 Wm m]
+       set U := Term.interpret si hstep.val env with hU
+       have hprem := ih ((U m).2 Wm (cast (congrArg (Ty.interpret X) hcsv.symm) z))
+       have hconc := hstep.property env
+         (m, (Wm, cast (congrArg (Ty.interpret X) hcsv.symm) z)) hprem
+       have hiff := dialecticaMatrix_substVar0 si A (Term.app Term.succ (.var .vz)) m env
+         (cast (congrArg (Ty.interpret X) hwsv) ((U m).1 Wm)) z
+       have hcc : cast (dialectica_types_substF (X := X) A
+             (Term.substVar0_map (Term.app Term.succ (.var .vz)))).1.symm
+           (cast (congrArg (Ty.interpret X) hwsv) ((U m).1 Wm)) = (U m).1 Wm :=
+         eq_of_heq ((cast_heq _ _).trans (cast_heq _ _))
+       rw [hcc] at hiff
+       simp only [Term.interpret, Ctx.lookup] at hiff
+       exact hiff.mp hconc⟩
+
+
 end Rules
 
 end Metatheorems
