@@ -136,7 +136,7 @@ def Ctx.interpretSubst {ι : Type} {X : ι → Type} {F : ι → Ty ι}
 
 /-- General: evaluating a renamed term in env_Δ equals evaluating the original
     in env_Γ when the environments agree on variable lookups through the renaming. -/
-private lemma Term.interpret_rename_gen {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+lemma Term.interpret_rename_gen {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     (si : SpaceInterp X F) {Γ Δ : Ctx ι} {τ : Ty ι}
     (r : Renaming Γ Δ) (t : Term F Γ τ)
     (env_Δ : Ctx.interpret X Δ) (env_Γ : Ctx.interpret X Γ)

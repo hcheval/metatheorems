@@ -32,32 +32,40 @@ open Formula
 
 mutual
 
-/-- The Lean type of witnesses for A's Dialectica translation (Def. 3.0.1). -/
-def dialecticaWitness {ι : Type} (X : ι → Type) {F : ι → Ty ι} {Γ : Ctx ι} :
-    Formula F Γ → Type
-  | .bot        => Unit
-  | .eq0 _ _    => Unit
-  | .and A B    => dialecticaWitness X A × dialecticaWitness X B
-  -- the tag is a natural rather than a `Bool` so that the witness *type* is an
-  -- object-level type (`Ty` has no booleans): `0` selects the left disjunct.
-  | .or  A B    => Nat × dialecticaWitness X A × dialecticaWitness X B
-  | .imp A B    => (dialecticaWitness X A → dialecticaWitness X B) ×
-                   (dialecticaWitness X A → dialecticaCounter X B → dialecticaCounter X A)
-  | .ex  ρ A    => Ty.interpret X ρ × dialecticaWitness X A
-  | .all ρ A    => Ty.interpret X ρ → dialecticaWitness X A
+/-- The **object-level** type of witnesses for `A`'s Dialectica translation.
 
-/-- The Lean type of counters for A's Dialectica translation (Def. 3.0.1). -/
-def dialecticaCounter {ι : Type} (X : ι → Type) {F : ι → Ty ι} {Γ : Ctx ι} :
-    Formula F Γ → Type
-  | .bot        => Unit
-  | .eq0 _ _    => Unit
-  | .and A B    => dialecticaCounter X A × dialecticaCounter X B
-  | .or  A B    => dialecticaCounter X A × dialecticaCounter X B
-  | .imp A B    => dialecticaWitness X A × dialecticaCounter X B
-  | .ex  _ A    => dialecticaCounter X A
-  | .all ρ A    => Ty.interpret X ρ × dialecticaCounter X A
+Making this a `Ty ι` rather than a Lean `Type` is what lets a realizer be a `Term`, and
+hence be majorized by `all_closed_terms_majorizable`. -/
+def wTy : {Γ : Ctx ι} → Formula F Γ → Ty ι
+  | _, .bot      => .unit
+  | _, .eq0 _ _  => .unit
+  | _, .and A B  => wTy A ×ₜ wTy B
+  | _, .or  A B  => Ty.nat ×ₜ (wTy A ×ₜ wTy B)
+  | _, .imp A B  => (wTy A →ₜ wTy B) ×ₜ (wTy A →ₜ cTy B →ₜ cTy A)
+  | _, .ex  ρ A  => ρ ×ₜ wTy A
+  | _, .all ρ A  => ρ →ₜ wTy A
+
+/-- The **object-level** type of counters for `A`'s Dialectica translation. -/
+def cTy : {Γ : Ctx ι} → Formula F Γ → Ty ι
+  | _, .bot      => .unit
+  | _, .eq0 _ _  => .unit
+  | _, .and A B  => cTy A ×ₜ cTy B
+  | _, .or  A B  => cTy A ×ₜ cTy B
+  | _, .imp A B  => wTy A ×ₜ cTy B
+  | _, .ex  _ A  => cTy A
+  | _, .all ρ A  => ρ ×ₜ cTy A
 
 end
+
+/-- The Lean type of witnesses: the interpretation of the object-level witness type.
+Definitionally the familiar clause-by-clause definition — `Unit`, products, function
+spaces — so nothing that used the old definition changes. -/
+@[reducible] def dialecticaWitness {ι : Type} (X : ι → Type) {F : ι → Ty ι} {Γ : Ctx ι}
+    (A : Formula F Γ) : Type := Ty.interpret X (wTy A)
+
+/-- The Lean type of counters. -/
+@[reducible] def dialecticaCounter {ι : Type} (X : ι → Type) {F : ι → Ty ι} {Γ : Ctx ι}
+    (A : Formula F Γ) : Type := Ty.interpret X (cTy A)
 
 notation "𝕎" => dialecticaWitness
 notation "ℂ" => dialecticaCounter
@@ -272,41 +280,41 @@ def dialecticaDefault {ι : Type} {X : ι → Type}
 -- Type invariance under substitution
 -- ============================================================================
 
-/-- Both witness and counter types are invariant under formula substitution.
-    Proved together by mutual induction (imp uses both). -/
-theorem dialectica_types_substF {ι : Type} {X : ι → Type} {F : ι → Ty ι} {Γ : Ctx ι}
-    (A : Formula F Γ) :
+/-- Object-level type invariance under substF. -/
+theorem wTy_cTy_substF {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι} (A : Formula F Γ) :
     ∀ {Δ : Ctx ι} (s : Term.Subst F Γ Δ),
-    dialecticaWitness X (A.substF s) = dialecticaWitness X A ∧
-    dialecticaCounter X (A.substF s) = dialecticaCounter X A := by
+    wTy (A.substF s) = wTy A ∧ cTy (A.substF s) = cTy A := by
   induction A with
   | bot => intro Δ s; exact ⟨rfl, rfl⟩
   | eq0 _ _ => intro Δ s; exact ⟨rfl, rfl⟩
   | and _ _ ihA ihB =>
     intro Δ s
     obtain ⟨hwA, hcA⟩ := ihA s; obtain ⟨hwB, hcB⟩ := ihB s
-    simp only [Formula.substF, dialecticaWitness, dialecticaCounter]
-    exact ⟨by rw [hwA, hwB], by rw [hcA, hcB]⟩
+    exact ⟨by simp only [Formula.substF, wTy, hwA, hwB], by simp only [Formula.substF, cTy, hcA, hcB]⟩
   | or _ _ ihA ihB =>
     intro Δ s
     obtain ⟨hwA, hcA⟩ := ihA s; obtain ⟨hwB, hcB⟩ := ihB s
-    simp only [Formula.substF, dialecticaWitness, dialecticaCounter]
-    exact ⟨by rw [hwA, hwB], by rw [hcA, hcB]⟩
+    exact ⟨by simp only [Formula.substF, wTy, hwA, hwB], by simp only [Formula.substF, cTy, hcA, hcB]⟩
   | imp _ _ ihA ihB =>
     intro Δ s
     obtain ⟨hwA, hcA⟩ := ihA s; obtain ⟨hwB, hcB⟩ := ihB s
-    simp only [Formula.substF, dialecticaWitness, dialecticaCounter]
-    exact ⟨by rw [hwA, hwB, hcA, hcB], by rw [hwA, hcB]⟩
+    exact ⟨by simp only [Formula.substF, wTy, hwA, hwB, hcA, hcB],
+           by simp only [Formula.substF, cTy, hwA, hcB]⟩
   | all _ _ ihA =>
     intro Δ s
     obtain ⟨hwA, hcA⟩ := ihA (Term.Subst.ext s)
-    simp only [Formula.substF, dialecticaWitness, dialecticaCounter]
-    exact ⟨by rw [hwA], by rw [hcA]⟩
+    exact ⟨by simp only [Formula.substF, wTy, hwA], by simp only [Formula.substF, cTy, hcA]⟩
   | ex _ _ ihA =>
     intro Δ s
     obtain ⟨hwA, hcA⟩ := ihA (Term.Subst.ext s)
-    simp only [Formula.substF, dialecticaWitness, dialecticaCounter]
-    exact ⟨by rw [hwA], by rw [hcA]⟩
+    exact ⟨by simp only [Formula.substF, wTy, hwA], by simp only [Formula.substF, cTy, hcA]⟩
+
+/-- Witness and counter types are invariant under substF. -/
+theorem dialectica_types_substF {ι : Type} {X : ι → Type} {F : ι → Ty ι} {Γ : Ctx ι}
+    (A : Formula F Γ) {Δ : Ctx ι} (s : Term.Subst F Γ Δ) :
+    dialecticaWitness X (A.substF s) = dialecticaWitness X A ∧
+    dialecticaCounter X (A.substF s) = dialecticaCounter X A :=
+  ⟨congrArg _ (wTy_cTy_substF A s).1, congrArg _ (wTy_cTy_substF A s).2⟩
 
 /-- Corollaries: type invariance under subst0 and weaken. -/
 theorem dialecticaWitness_subst0 {ι : Type} {X : ι → Type} {F : ι → Ty ι}
@@ -323,43 +331,42 @@ theorem dialecticaCounter_subst0 {ι : Type} {X : ι → Type} {F : ι → Ty ι
 -- Type invariance under renaming (needed for ∀/∃-rule)
 -- ============================================================================
 
-/-- Both witness and counter types are invariant under formula renaming.
-    Proved by induction mirroring dialectica_types_substF. -/
-theorem dialectica_types_renameF {ι : Type} {X : ι → Type} {F : ι → Ty ι} {Γ : Ctx ι}
-    (A : Formula F Γ) :
-    ∀ {Δ : Ctx ι} (r : Renaming Γ Δ),
-    dialecticaWitness X (A.renameF r) = dialecticaWitness X A ∧
-    dialecticaCounter X (A.renameF r) = dialecticaCounter X A := by
+/-- Object-level type invariance under renameF. -/
+theorem wTy_cTy_renameF {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι} (A : Formula F Γ) :
+    ∀ {Δ : Ctx ι} (s : Term.Renaming Γ Δ),
+    wTy (A.renameF s) = wTy A ∧ cTy (A.renameF s) = cTy A := by
   induction A with
-  | bot => intro Δ r; exact ⟨rfl, rfl⟩
-  | eq0 _ _ => intro Δ r; exact ⟨rfl, rfl⟩
+  | bot => intro Δ s; exact ⟨rfl, rfl⟩
+  | eq0 _ _ => intro Δ s; exact ⟨rfl, rfl⟩
   | and _ _ ihA ihB =>
-    intro Δ r
-    obtain ⟨hwA, hcA⟩ := ihA r; obtain ⟨hwB, hcB⟩ := ihB r
-    simp only [Formula.renameF, dialecticaWitness, dialecticaCounter]
-    exact ⟨by rw [hwA, hwB], by rw [hcA, hcB]⟩
+    intro Δ s
+    obtain ⟨hwA, hcA⟩ := ihA s; obtain ⟨hwB, hcB⟩ := ihB s
+    exact ⟨by simp only [Formula.renameF, wTy, hwA, hwB], by simp only [Formula.renameF, cTy, hcA, hcB]⟩
   | or _ _ ihA ihB =>
-    intro Δ r
-    obtain ⟨hwA, hcA⟩ := ihA r; obtain ⟨hwB, hcB⟩ := ihB r
-    simp only [Formula.renameF, dialecticaWitness, dialecticaCounter]
-    exact ⟨by rw [hwA, hwB], by rw [hcA, hcB]⟩
+    intro Δ s
+    obtain ⟨hwA, hcA⟩ := ihA s; obtain ⟨hwB, hcB⟩ := ihB s
+    exact ⟨by simp only [Formula.renameF, wTy, hwA, hwB], by simp only [Formula.renameF, cTy, hcA, hcB]⟩
   | imp _ _ ihA ihB =>
-    intro Δ r
-    obtain ⟨hwA, hcA⟩ := ihA r; obtain ⟨hwB, hcB⟩ := ihB r
-    simp only [Formula.renameF, dialecticaWitness, dialecticaCounter]
-    exact ⟨by rw [hwA, hwB, hcA, hcB], by rw [hwA, hcB]⟩
+    intro Δ s
+    obtain ⟨hwA, hcA⟩ := ihA s; obtain ⟨hwB, hcB⟩ := ihB s
+    exact ⟨by simp only [Formula.renameF, wTy, hwA, hwB, hcA, hcB],
+           by simp only [Formula.renameF, cTy, hwA, hcB]⟩
   | all _ _ ihA =>
-    intro Δ r
-    obtain ⟨hwA, hcA⟩ := ihA (Renaming.ext r)
-    simp only [Formula.renameF, dialecticaWitness, dialecticaCounter]
-    exact ⟨by rw [hwA], by rw [hcA]⟩
+    intro Δ s
+    obtain ⟨hwA, hcA⟩ := ihA (Term.Renaming.ext s)
+    exact ⟨by simp only [Formula.renameF, wTy, hwA], by simp only [Formula.renameF, cTy, hcA]⟩
   | ex _ _ ihA =>
-    intro Δ r
-    obtain ⟨hwA, hcA⟩ := ihA (Renaming.ext r)
-    simp only [Formula.renameF, dialecticaWitness, dialecticaCounter]
-    exact ⟨by rw [hwA], by rw [hcA]⟩
+    intro Δ s
+    obtain ⟨hwA, hcA⟩ := ihA (Term.Renaming.ext s)
+    exact ⟨by simp only [Formula.renameF, wTy, hwA], by simp only [Formula.renameF, cTy, hcA]⟩
 
-/-- Type invariance under weakening (corollary). -/
+/-- Witness and counter types are invariant under renameF. -/
+theorem dialectica_types_renameF {ι : Type} {X : ι → Type} {F : ι → Ty ι} {Γ : Ctx ι}
+    (A : Formula F Γ) {Δ : Ctx ι} (s : Term.Renaming Γ Δ) :
+    dialecticaWitness X (A.renameF s) = dialecticaWitness X A ∧
+    dialecticaCounter X (A.renameF s) = dialecticaCounter X A :=
+  ⟨congrArg _ (wTy_cTy_renameF A s).1, congrArg _ (wTy_cTy_renameF A s).2⟩
+
 theorem dialecticaWitness_weaken {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     {Γ : Ctx ι} (ρ : Ty ι) (A : Formula F Γ) :
     dialecticaWitness X (A.weakenBy ρ) = dialecticaWitness X A :=
