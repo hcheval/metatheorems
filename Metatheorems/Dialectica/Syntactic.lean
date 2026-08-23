@@ -935,4 +935,64 @@ def sAC {si : SpaceInterp X F} {ρ τ : Ty ι} {A : Formula F (τ :: ρ :: Γ)} 
 
 end Rules
 
+-- ============================================================================
+-- Syntactic Dialectica soundness
+-- ============================================================================
+
+section Soundness
+
+variable {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) →
+    Formula F Γ} {si : SpaceInterp X F} {Premises : PremiseSet F}
+
+/-- **Dialectica soundness, syntactically.**
+
+Every derivation yields a *term* whose interpretation realizes the Dialectica matrix.
+Because the witness is a term, `all_closed_terms_majorizable` applies to it — which is what
+the semantic version could not offer.
+
+`spremise` is the syntactic counterpart of `premise_realizer`: a premise must come with a
+realizing term, not merely a realizing value. -/
+def syntactic_soundness (eqxi : EqXInterp X F si EqX)
+    (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B) :
+    {Γ : Ctx ι} → {A : Formula F Γ} →
+    @Derivable ι F EqX Allowed.extended Premises Γ A → SRealizer si A
+  | _, _, .premise ⟨_, hp⟩ => spremise _ _ hp
+  | _, _, .or_contract     => sOrContract
+  | _, _, .and_contract    => sAndContract
+  | _, _, .or_weak         => sOrWeak
+  | _, _, .and_weak        => sAndWeak
+  | _, _, .or_perm         => sOrPerm
+  | _, _, .and_perm        => sAndPerm
+  | _, _, .exfalso         => sExfalso
+  | _, _, .forall_ax t     => sForallAx t
+  | _, _, .exist_ax t _    => sExistAx t
+  | _, _, .mp hA hAB       => sMP (syntactic_soundness eqxi spremise hA)
+                                  (syntactic_soundness eqxi spremise hAB)
+  | _, _, .syllogism h₁ h₂ => sSyllogism (syntactic_soundness eqxi spremise h₁)
+                                         (syntactic_soundness eqxi spremise h₂)
+  | _, _, .exportation h'  => sExportation (syntactic_soundness eqxi spremise h')
+  | _, _, .importation h'  => sImportation (syntactic_soundness eqxi spremise h')
+  | _, _, .expansion h'    => sExpansion (syntactic_soundness eqxi spremise h')
+  | _, _, .forall_rule h'  => sForallRule (syntactic_soundness eqxi spremise h')
+  | _, _, .exist_rule h'   => sExistRule (syntactic_soundness eqxi spremise h')
+  | _, _, .univ_gen h'     => sUnivGen (syntactic_soundness eqxi spremise h')
+  | _, _, .succ_ne_zero    => sSuccNeZero
+  | _, _, .succ_inj        => sSuccInj
+  | _, _, .rec_zero        => sRecZero eqxi
+  | _, _, .rec_succ        => sRecSucc eqxi
+  | _, _, .beta_eq _ _     => sBetaEq eqxi
+  | _, _, .refl0           => sRefl0
+  | _, _, .sym0            => sSym0
+  | _, _, .trans0          => sTrans0
+  | _, _, .qfer hqf hvf h' => sQfer eqxi hqf hvf (syntactic_soundness eqxi spremise h')
+  | _, _, .induction hb hs => sInduction (syntactic_soundness eqxi spremise hb)
+                                         (syntactic_soundness eqxi spremise hs)
+  | _, _, .markov _ hqf hvf => sMarkov hqf hvf
+  | _, _, .ip _ hqf hvf     => sIP hqf hvf
+  | _, _, .ac _             => sAC
+  | _, _, .qfac _ _ _       => sAC
+  | _, _, .lem h_lem        => absurd h_lem (by decide)
+
+end Soundness
+
 end Metatheorems

@@ -8,3 +8,4 @@ import Metatheorems.Dialectica
 import Metatheorems.NDTranslation
 import Metatheorems.Dialectica.Syntactic
 import Metatheorems.RationalNumbers
+import Metatheorems.SyntacticMetatheorem
