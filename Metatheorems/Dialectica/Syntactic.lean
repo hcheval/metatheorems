@@ -294,6 +294,19 @@ theorem matrixTerm_correct {si : SpaceInterp X F} :
         | vz => rfl
         | vs v' => simpa [Term.Renaming.ext, Ctx.lookup] using hr v'
 
+/-- Transport a term along an equality of types. `wTy (A.subst0 t) = wTy A` is a theorem,
+not `rfl`, so the quantifier rules need this — exactly as the semantic development needs
+`cast` in the same places. -/
+def Term.castTy {ρ σ : Ty ι} (h : ρ = σ) (t : Term F Γ ρ) : Term F Γ σ :=
+  cast (congrArg (Term F Γ) h) t
+
+theorem interpret_castTy {si : SpaceInterp X F} {ρ σ : Ty ι} (h : ρ = σ)
+    (t : Term F Γ ρ) (env : Ctx.interpret X Γ) :
+    Term.interpret si (Term.castTy h t) env
+      = cast (congrArg (Ty.interpret X) h) (Term.interpret si t env) := by
+  cases h; rfl
+
+
 -- ============================================================================
 -- Per-rule syntactic realizers
 -- ============================================================================
@@ -467,6 +480,67 @@ def sTrans0 {s t u : Term F Γ Ty.nat} :
     SRealizer si (Formula.eq0 s t ∧ᶠ Formula.eq0 t u →ᶠ Formula.eq0 s u) :=
   SRealizer.imp (.lam .unitI) (.lam (.lam (.mkPair .unitI .unitI)))
     (fun _ _ _ h => h.1.trans h.2)
+
+
+/-- `∀`-axiom: `∀x A → A[t/x]`. -/
+def sForallAx {ρ : Ty ι} {A : Formula F (ρ :: Γ)} (t : Term F Γ ρ) :
+    SRealizer si (Formula.all ρ A →ᶠ A.subst0 t) :=
+  let hw : wTy (A.subst0 t) = wTy A := (wTy_cTy_substF A (Term.subst0_map t)).1
+  let hc : cTy (A.subst0 t) = cTy A := (wTy_cTy_substF A (Term.subst0_map t)).2
+  SRealizer.imp
+    (.lam (Term.castTy hw.symm (.app (.var .vz) (Term.weaken t))))
+    (.lam (.lam (.mkPair (Term.weaken (Term.weaken t)) (Term.castTy hc (.var .vz)))))
+    (fun env w y hm => by
+      simp only [Term.interpret, Term.interpret_weaken, interpret_castTy, Ctx.lookup] at hm ⊢
+      have key := (dialecticaMatrix_subst0 si A t env
+        (w (Term.interpret si t env)) (cast (congrArg (Ty.interpret X) hc) y)).mpr hm
+      rwa [cast_cancel (dialecticaCounter_subst0 A t)] at key)
+
+
+/-- `∃`-axiom: `A[t/x] → ∃x A`. -/
+def sExistAx {ρ : Ty ι} {A : Formula F (ρ :: Γ)} (t : Term F Γ ρ) :
+    SRealizer si (A.subst0 t →ᶠ Formula.ex ρ A) :=
+  let hw : wTy (A.subst0 t) = wTy A := (wTy_cTy_substF A (Term.subst0_map t)).1
+  let hc : cTy (A.subst0 t) = cTy A := (wTy_cTy_substF A (Term.subst0_map t)).2
+  SRealizer.imp
+    (.lam (.mkPair (Term.weaken t) (Term.castTy hw (.var .vz))))
+    (.lam (.lam (Term.castTy hc.symm (.var .vz))))
+    (fun env w y hm => by
+      simp only [Term.interpret, Term.interpret_weaken, interpret_castTy, Ctx.lookup] at hm ⊢
+      have key := (dialecticaMatrix_subst0 si A t env
+        (cast (congrArg (Ty.interpret X) hw) w) y).mp
+      rw [cast_cancel (dialecticaWitness_subst0 A t)] at key
+      exact key hm)
+
+/-- Universal generalization. -/
+def sUnivGen {ρ : Ty ι} {A : Formula F Γ} (r : SRealizer si A) :
+    SRealizer si (Formula.all ρ (A.weakenBy ρ)) :=
+  let hw : wTy (A.weakenBy ρ) = wTy A := (wTy_cTy_renameF A Term.Renaming.shift).1
+  ⟨.lam (Term.castTy hw.symm (Term.weaken r.val)),
+   fun env y => by
+     simp only [dialecticaMatrix, Term.interpret, Term.interpret_weaken, interpret_castTy]
+     refine (dialecticaMatrix_weaken si A env y.1 _ y.2).mpr ?_
+     rw [cast_cancel (dialecticaWitness_weaken ρ A).symm]
+     exact r.property env _⟩
+
+
+/-- `∀n. S n ≠ 0`. -/
+def sSuccNeZero : SRealizer si (Γ := Γ)
+    (Formula.all Ty.nat (Formula.eq0 (.app .succ (.var .vz)) .zero →ᶠ ⊥ᶠ)) :=
+  ⟨.lam (.mkPair (.lam .unitI) (.lam (.lam .unitI))),
+   fun env y => by
+     simp only [dialecticaMatrix, Term.interpret, Ctx.lookup]
+     exact fun h => Nat.succ_ne_zero _ h⟩
+
+/-- `∀m n. S m = S n → m = n`. -/
+def sSuccInj : SRealizer si (Γ := Γ)
+    (Formula.all Ty.nat (Formula.all Ty.nat
+      (Formula.eq0 (.app .succ (.var (.vs .vz))) (.app .succ (.var .vz))
+        →ᶠ Formula.eq0 (.var (.vs .vz)) (.var .vz)))) :=
+  ⟨.lam (.lam (.mkPair (.lam .unitI) (.lam (.lam .unitI)))),
+   fun env y => by
+     simp only [dialecticaMatrix, Term.interpret, Ctx.lookup]
+     exact fun h => Nat.succ.inj h⟩
 
 
 end Rules
