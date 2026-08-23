@@ -76,8 +76,8 @@ def dialectica_and_perm {Γ : Ctx ι} {A B : Formula F Γ} (env : Ctx.interpret 
 def dialectica_or_weak {Γ : Ctx ι} {A B : Formula F Γ} (env : Ctx.interpret X Γ)
     (inhW : 𝕎 X B) :
     dialecticaRealizerCtx si (A →ᶠ A ∨ᶠ B) env :=
-  ⟨⟨fun xA => (true, xA, inhW), fun _ yAB => yAB.1⟩,
-   fun ⟨_, ⟨yA, _⟩⟩ h => ⟨fun _ => h, fun hf => Bool.noConfusion hf⟩⟩
+  ⟨⟨fun xA => (0, xA, inhW), fun _ yAB => yAB.1⟩,
+   fun ⟨_, ⟨yA, _⟩⟩ h => ⟨fun _ => h, fun hf => absurd rfl hf⟩⟩
 
 -- ============================================================================
 -- ∨-permutation: A ∨ B → B ∨ A
@@ -85,10 +85,14 @@ def dialectica_or_weak {Γ : Ctx ι} {A B : Formula F Γ} (env : Ctx.interpret X
 
 def dialectica_or_perm {Γ : Ctx ι} {A B : Formula F Γ} (env : Ctx.interpret X Γ) :
     dialecticaRealizerCtx si (A ∨ᶠ B →ᶠ B ∨ᶠ A) env :=
-  ⟨⟨fun xAB => (!xAB.1, xAB.2.2, xAB.2.1), fun _ yBA => (yBA.2, yBA.1)⟩,
-   fun ⟨⟨z, _, _⟩, ⟨_, _⟩⟩ ⟨hT, hF⟩ =>
-     ⟨fun h => hF (by cases z <;> simp_all),
-      fun h => hT (by cases z <;> simp_all)⟩⟩
+  ⟨⟨fun xAB => ((if xAB.1 = 0 then 1 else 0), xAB.2.2, xAB.2.1),
+    fun _ yBA => (yBA.2, yBA.1)⟩,
+   fun ⟨⟨z, _, _⟩, ⟨_, _⟩⟩ ⟨hT, hF⟩ => by
+     by_cases hz : z = 0
+     · refine ⟨fun h => ?_, fun _ => hT hz⟩
+       simp only [hz, if_pos rfl] at h
+       exact absurd h one_ne_zero
+     · exact ⟨fun _ => hF hz, fun h => absurd (by simp [hz]) h⟩⟩
 
 -- ============================================================================
 -- ∨-contraction: A ∨ A → A
@@ -96,8 +100,12 @@ def dialectica_or_perm {Γ : Ctx ι} {A B : Formula F Γ} (env : Ctx.interpret X
 
 def dialectica_or_contract {Γ : Ctx ι} {A : Formula F Γ} (env : Ctx.interpret X Γ) :
     dialecticaRealizerCtx si (A ∨ᶠ A →ᶠ A) env :=
-  ⟨⟨fun xAA => if xAA.1 then xAA.2.1 else xAA.2.2, fun _ yA => (yA, yA)⟩,
-   fun ⟨⟨z, _, _⟩, yA⟩ h => by cases z <;> simp_all [dialecticaMatrix]⟩
+  ⟨⟨fun xAA => if xAA.1 = 0 then xAA.2.1 else xAA.2.2, fun _ yA => (yA, yA)⟩,
+   fun ⟨⟨z, _, _⟩, yA⟩ h => by
+     simp only [dialecticaMatrix] at h ⊢
+     by_cases hz : z = 0
+     · simpa [hz] using h.1 hz
+     · simpa [hz] using h.2 hz⟩
 
 -- ============================================================================
 -- ∧-contraction: A → A ∧ A
@@ -508,7 +516,7 @@ private lemma dialectica_nonempty {ι : Type} {X : ι → Type} {F : ι → Ty �
   | and _ _ ihA ihB =>
     exact ⟨⟨ihA.1.some, ihB.1.some⟩, ⟨ihA.2.some, ihB.2.some⟩⟩
   | or  _ _ ihA ihB =>
-    exact ⟨⟨true, ihA.1.some, ihB.1.some⟩, ⟨ihA.2.some, ihB.2.some⟩⟩
+    exact ⟨⟨0, ihA.1.some, ihB.1.some⟩, ⟨ihA.2.some, ihB.2.some⟩⟩
   | imp _ _ ihA ihB =>
     exact ⟨⟨fun _ => ihB.1.some, fun _ _ => ihA.2.some⟩, ⟨ihA.1.some, ihB.2.some⟩⟩
   | all ρ _ ihA =>

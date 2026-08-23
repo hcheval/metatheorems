@@ -38,7 +38,9 @@ def dialecticaWitness {ι : Type} (X : ι → Type) {F : ι → Ty ι} {Γ : Ctx
   | .bot        => Unit
   | .eq0 _ _    => Unit
   | .and A B    => dialecticaWitness X A × dialecticaWitness X B
-  | .or  A B    => Bool × dialecticaWitness X A × dialecticaWitness X B
+  -- the tag is a natural rather than a `Bool` so that the witness *type* is an
+  -- object-level type (`Ty` has no booleans): `0` selects the left disjunct.
+  | .or  A B    => Nat × dialecticaWitness X A × dialecticaWitness X B
   | .imp A B    => (dialecticaWitness X A → dialecticaWitness X B) ×
                    (dialecticaWitness X A → dialecticaCounter X B → dialecticaCounter X A)
   | .ex  ρ A    => Ty.interpret X ρ × dialecticaWitness X A
@@ -81,7 +83,7 @@ def dialecticaDefaultWitness {ι : Type} {X : ι → Type} {F : ι → Ty ι}
   | .bot      => ()
   | .eq0 _ _  => ()
   | .and A B  => (dialecticaDefaultWitness si A, dialecticaDefaultWitness si B)
-  | .or  A B  => (true, dialecticaDefaultWitness si A, dialecticaDefaultWitness si B)
+  | .or  A B  => (0, dialecticaDefaultWitness si A, dialecticaDefaultWitness si B)
   | .imp A B  => (fun _ => dialecticaDefaultWitness si B,
                   fun _ _ => dialecticaDefaultCounter si A)
   | .ex  ρ A  => (Ty.interpret_default si ρ, dialecticaDefaultWitness si A)
@@ -116,8 +118,8 @@ def dialecticaMatrix {ι : Type} {X : ι → Type} {F : ι → Ty ι}
   | _, .and A B,  env, xw, yc =>
       dialecticaMatrix si A env xw.1 yc.1 ∧ dialecticaMatrix si B env xw.2 yc.2
   | _, .or  A B,  env, xw, yc =>
-      (xw.1 = true  → dialecticaMatrix si A env xw.2.1 yc.1) ∧
-      (xw.1 = false → dialecticaMatrix si B env xw.2.2 yc.2)
+      (xw.1 = 0 → dialecticaMatrix si A env xw.2.1 yc.1) ∧
+      (xw.1 ≠ 0 → dialecticaMatrix si B env xw.2.2 yc.2)
   | _, .imp A B,  env, xw, yc =>
       dialecticaMatrix si A env yc.1 (xw.2 yc.1 yc.2) →
       dialecticaMatrix si B env (xw.1 yc.1) yc.2
@@ -153,13 +155,13 @@ instance dialecticaMatrix_decidable {ι : Type} {X : ι → Type} {F : ι → Ty
   | .or A B, env, w, y => by
       haveI := dialecticaMatrix_decidable si A env w.2.1 y.1
       haveI := dialecticaMatrix_decidable si B env w.2.2 y.2
-      haveI : Decidable (w.1 = true  → dialecticaMatrix si A env w.2.1 y.1) :=
-        if ht : w.1 = true then
+      haveI : Decidable (w.1 = 0 → dialecticaMatrix si A env w.2.1 y.1) :=
+        if ht : w.1 = 0 then
           if hd : dialecticaMatrix si A env w.2.1 y.1 then isTrue  (fun _ => hd)
           else isFalse (fun h => hd (h ht))
         else isTrue (fun h => absurd h ht)
-      haveI : Decidable (w.1 = false → dialecticaMatrix si B env w.2.2 y.2) :=
-        if hf : w.1 = false then
+      haveI : Decidable (w.1 ≠ 0 → dialecticaMatrix si B env w.2.2 y.2) :=
+        if hf : w.1 ≠ 0 then
           if hd : dialecticaMatrix si B env w.2.2 y.2 then isTrue  (fun _ => hd)
           else isFalse (fun h => hd (h hf))
         else isTrue (fun h => absurd h hf)
@@ -461,8 +463,8 @@ theorem dialecticaMatrix_renameF {ι : Type} {X : ι → Type} {F : ι → Ty ι
     have hcB := (dialectica_types_renameF (X := X) A2 r).2
     have hWpair : (dialecticaWitness X (A1.renameF r) × dialecticaWitness X (A2.renameF r)) =
                   (dialecticaWitness X A1 × dialecticaWitness X A2) := by rw [hwA, hwB]
-    have hWbig : (Bool × dialecticaWitness X (A1.renameF r) × dialecticaWitness X (A2.renameF r)) =
-                 (Bool × dialecticaWitness X A1 × dialecticaWitness X A2) := by rw [hwA, hwB]
+    have hWbig : (Nat × dialecticaWitness X (A1.renameF r) × dialecticaWitness X (A2.renameF r)) =
+                 (Nat × dialecticaWitness X A1 × dialecticaWitness X A2) := by rw [hwA, hwB]
     have hCbig : (dialecticaCounter X (A1.renameF r) × dialecticaCounter X (A2.renameF r)) =
                  (dialecticaCounter X A1 × dialecticaCounter X A2) := by rw [hcA, hcB]
     -- Relate projections of cast to cast of projections
@@ -564,8 +566,8 @@ theorem dialecticaMatrix_substF {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     have hcB := (dialectica_types_substF (X := X) A2 s).2
     have hWpair : (dialecticaWitness X (A1.substF s) × dialecticaWitness X (A2.substF s)) =
                   (dialecticaWitness X A1 × dialecticaWitness X A2) := by rw [hwA, hwB]
-    have hWbig : (Bool × dialecticaWitness X (A1.substF s) × dialecticaWitness X (A2.substF s)) =
-                 (Bool × dialecticaWitness X A1 × dialecticaWitness X A2) := by rw [hwA, hwB]
+    have hWbig : (Nat × dialecticaWitness X (A1.substF s) × dialecticaWitness X (A2.substF s)) =
+                 (Nat × dialecticaWitness X A1 × dialecticaWitness X A2) := by rw [hwA, hwB]
     have hCbig : (dialecticaCounter X (A1.substF s) × dialecticaCounter X (A2.substF s)) =
                  (dialecticaCounter X A1 × dialecticaCounter X A2) := by rw [hcA, hcB]
     have hw1 : (cast hWbig.symm w).1 = w.1 := cast_prod_fst hWbig.symm rfl hWpair.symm w
