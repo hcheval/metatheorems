@@ -206,7 +206,7 @@ private def Ty.interpret_default' {ι : Type} {X : ι → Type} {F : ι → Ty �
 -- support recursor Ty.rec" error; use term-mode `match` instead.
 
 /-- A canonical counter for `eqAtType EqX ρ s t`. -/
-private def eqAtType_default_ctr {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ) :
+def eqAtType_default_ctr {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ) :
     ℂ X (eqAtType EqX ρ s t) :=
   match ρ, s, t with
   | .nat,      _, _  => ()
@@ -219,7 +219,7 @@ private def eqAtType_default_ctr {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
      eqAtType_default_ctr τ (s.weaken.app (.var .vz)) (t.weaken.app (.var .vz)))
 
 /-- A canonical witness for `eqAtType EqX ρ s t`. -/
-private def eqAtType_default_wit {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ) :
+def eqAtType_default_wit {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ) :
     𝕎 X (eqAtType EqX ρ s t) :=
   match ρ, s, t with
   | .nat,      _, _  => ()
@@ -234,7 +234,7 @@ private def eqAtType_default_wit {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
     At `nat` the witness is `Unit`; at `base i` this follows from `EqX` being purely
     universal (encoded in `eqxi.witnessSubsingleton`); at function types the witness
     is a function into a subsingleton, which is again a subsingleton. -/
-private lemma dialecticaWitness_eqAtType_ss (eqxi : EqXInterp X F si EqX) (ρ : Ty ι) :
+lemma dialecticaWitness_eqAtType_ss (eqxi : EqXInterp X F si EqX) (ρ : Ty ι) :
     ∀ {Γ : Ctx ι} (s t : Term F Γ ρ),
     Subsingleton (𝕎 X (eqAtType EqX ρ s t)) := by
   induction ρ with
@@ -254,7 +254,7 @@ private lemma dialecticaWitness_eqAtType_ss (eqxi : EqXInterp X F si EqX) (ρ : 
       (ih_τ (Term.app s.weaken (.var .vz)) (Term.app t.weaken (.var .vz))).elim (f z) (g z))⟩
 
 /-- Extract semantic equality from a full realizer for `eqAtType EqX ρ s t`. -/
-private def eqAtType_to_semEq {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
+def eqAtType_to_semEq {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
     (env : Ctx.interpret X Γ) (h : dialecticaRealizerCtx si (eqAtType EqX ρ s t) env) :
     Term.interpret si s env = Term.interpret si t env :=
   match ρ, s, t, env, h with
@@ -284,7 +284,7 @@ private def eqAtType_to_semEq {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
 /-- Build a full realizer for `eqAtType EqX ρ s t` from a semantic equality.
     The `base i` case uses `eqxi.realize`, which encodes the semantic correctness
     of the base-type equality predicate `EqX i`. -/
-private def eqAtType_from_semEq {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
+def eqAtType_from_semEq {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
     (env : Ctx.interpret X Γ) (h : Term.interpret si s env = Term.interpret si t env) :
     dialecticaRealizerCtx si (eqAtType EqX ρ s t) env :=
   match ρ, s, t, env, h with

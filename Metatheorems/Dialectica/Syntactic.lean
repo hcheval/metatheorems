@@ -6,6 +6,7 @@ Authors: Horatiu
 import Metatheorems.Dialectica.Defs
 import Metatheorems.Majorizability
 import Metatheorems.Arithmetic
+import Metatheorems.Dialectica.Lemmas
 
 namespace Metatheorems
 
@@ -777,6 +778,45 @@ def sBetaEq {ρ τ : Ty ι} {body : Term F (ρ :: Γ) τ} {u : Term F Γ ρ} :
   sEqAtType eqxi τ _ _ (fun _ => by simp [Term.interpret, Term.interpret_subst0])
 
 end EqRules
+
+
+/-- QF-ER. The witness may be *any* inhabitant of `wTy (eqAtType σ …)`, since that type is
+a subsingleton for `eqAtType`; the content is in the counter, which feeds the induction
+hypothesis a canonical counter. -/
+def sQfer {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) →
+      Formula F Γ} {si : SpaceInterp X F} (eqxi : EqXInterp X F si EqX)
+    {A₀ : Formula F Γ} {ρ σ : Ty ι} {s t : Term F Γ ρ} {r : Term F (ρ :: Γ) σ}
+    (hqf : A₀.isQF = true) (hvf : A₀.isVFree = true)
+    (ih : SRealizer si (A₀ →ᶠ eqAtType EqX ρ s t)) :
+    SRealizer si (A₀ →ᶠ eqAtType EqX σ (r.subst0 s) (r.subst0 t)) :=
+  SRealizer.imp
+    (.lam (Term.weaken (defaultWTerm (eqAtType EqX σ (r.subst0 s) (r.subst0 t)))))
+    (.lam (.lam (.app (.app (Term.weaken (Term.weaken (.snd ih.val))) (.var (.vs .vz)))
+      (Term.weaken (Term.weaken (defaultCTerm (eqAtType EqX ρ s t)))))))
+    (fun env w y hA₀ => by
+      have ssC : Subsingleton (ℂ X A₀) := (dialecticaWitness_subsingleton A₀ hqf hvf).2
+      have ssW : Subsingleton (𝕎 X (eqAtType EqX σ (r.subst0 s) (r.subst0 t))) :=
+        dialecticaWitness_eqAtType_ss si eqxi σ (r.subst0 s) (r.subst0 t)
+      simp only [Term.interpret, Term.interpret_weaken, Ctx.lookup] at hA₀ ⊢
+      -- the induction hypothesis, as a semantic realizer of the equation
+      have hfull : dialecticaRealizerCtx si (eqAtType EqX ρ s t) env :=
+        ⟨(Term.interpret si ih.val env).1 w, fun yρ => by
+          refine ih.property env (w, yρ) ?_
+          have hcc : (Term.interpret si ih.val env).2 w yρ
+              = (Term.interpret si ih.val env).2 w
+                  (Term.interpret si (defaultCTerm (eqAtType EqX ρ s t)) env) :=
+            ssC.elim _ _
+          rw [hcc]; exact hA₀⟩
+      have hsem : Term.interpret si s env = Term.interpret si t env :=
+        eqAtType_to_semEq si eqxi ρ s t env hfull
+      have hsem_r : Term.interpret si (r.subst0 s) env = Term.interpret si (r.subst0 t) env := by
+        rw [Term.interpret_subst0, Term.interpret_subst0, hsem]
+      have hrσ := eqAtType_from_semEq si eqxi σ (r.subst0 s) (r.subst0 t) env hsem_r
+      have hwW : hrσ.val
+          = Term.interpret si (defaultWTerm (eqAtType EqX σ (r.subst0 s) (r.subst0 t))) env :=
+        ssW.elim _ _
+      rw [← hwW]
+      exact hrσ.property y)
 
 
 end Rules
