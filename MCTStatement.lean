@@ -179,21 +179,9 @@ def mct_close
 /-! ### The step that consumes the induction hypothesis
 
 The IH gives `H →ᶠ ex nat C`. To use the witness while keeping `H` available, the hypothesis
-has to be pushed under the existential first. That lemma is not in `PureFOLLemmas`. -/
+has to be pushed under the existential first. That lemma now lives in `PureFOLLemmas`. -/
 
-def ex_and_left {Γ : Ctx ι} {ρ : Ty ι} {A : Formula F (ρ :: Γ)} {B : Formula F Γ} :
-    Derivable F EqX al Premises
-      (Formula.ex ρ A ∧ᶠ B →ᶠ Formula.ex ρ (A ∧ᶠ Formula.weakenBy ρ B)) :=
-  -- Under the binder, re-introduce the existential at the bound variable itself.
-  have key : Derivable F EqX al Premises
-      ((A ∧ᶠ Formula.weakenBy ρ B) →ᶠ
-        Formula.weakenBy ρ (Formula.ex ρ (A ∧ᶠ Formula.weakenBy ρ B))) := by
-    have h := Derivable.exist_ax (F := F) (EqX := EqX) (allowed := al) (Premises := Premises)
-      (Term.var .vz)
-      (Formula.renameF (Term.Renaming.ext Term.Renaming.shift) (A ∧ᶠ Formula.weakenBy ρ B))
-    simp only [Formula.subst0] at h
-    rwa [Formula.substF_renameF_id _ _ (fun {_} v => by cases v <;> rfl)] at h
-  .importation (.exist_rule (.exportation key))
+-- `ex_and_left` now lives in `PureFOLLemmas`; the local copy was removed.
 
 /-! ### Probe P2c: the induction formula, at the real depth
 

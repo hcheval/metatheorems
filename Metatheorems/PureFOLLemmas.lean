@@ -16,6 +16,7 @@ variable {ι : Type} {F : ι → Ty ι}
     {a : Allowed} {Premises : PremiseSet F}
 
 -- Re-export helpers that are private in Arithmetic.lean
+-- (public: the proof-mode packaging kit builds on them)
 private def self_imp_h {Γ : Ctx ι} {A : Formula F Γ} :
     Derivable F EqX a Premises (A →ᶠ A) :=
   .syllogism .and_contract .and_weak
@@ -34,7 +35,7 @@ private theorem weaken_subst0_id {Γ : Ctx ι} {ρ : Ty ι} (A : Formula F (ρ :
     A
 
 -- Helper: instantiate a weakened ∀ at var vz, getting back the body
-private def forall_ax_vz {Γ : Ctx ι} {ρ : Ty ι} {A : Formula F (ρ :: Γ)} :
+def forall_ax_vz {Γ : Ctx ι} {ρ : Ty ι} {A : Formula F (ρ :: Γ)} :
     Derivable F EqX a Premises ((Formula.all ρ A).weakenBy ρ →ᶠ A) := by
   have h := @Derivable.forall_ax ι F EqX a Premises (ρ :: Γ) ρ
     (A.renameF (Renaming.ext Renaming.shift)) (.var .vz)
@@ -146,5 +147,21 @@ def exist_map {Γ : Ctx ι} {ρ : Ty ι} {P Q : Formula F (ρ :: Γ)}
     (h : Derivable F EqX a Premises (P →ᶠ Q)) :
     Derivable F EqX a Premises (Formula.ex ρ P →ᶠ Formula.ex ρ Q) :=
   .exist_rule (.syllogism h exist_ax_vz)
+
+/-- Push a side hypothesis under an existential. Needed wherever a hypothesis must stay
+available while the witness of an `∃` is consumed. -/
+def ex_and_left {Γ : Ctx ι} {ρ : Ty ι} {A : Formula F (ρ :: Γ)} {B : Formula F Γ} :
+    Derivable F EqX a Premises
+      (Formula.ex ρ A ∧ᶠ B →ᶠ Formula.ex ρ (A ∧ᶠ Formula.weakenBy ρ B)) :=
+  have key : Derivable F EqX a Premises
+      ((A ∧ᶠ Formula.weakenBy ρ B) →ᶠ
+        Formula.weakenBy ρ (Formula.ex ρ (A ∧ᶠ Formula.weakenBy ρ B))) := by
+    have h := Derivable.exist_ax (F := F) (EqX := EqX) (allowed := a) (Premises := Premises)
+      (Term.var .vz)
+      (Formula.renameF (Term.Renaming.ext Term.Renaming.shift) (A ∧ᶠ Formula.weakenBy ρ B))
+    simp only [Formula.subst0] at h
+    rwa [Formula.substF_renameF_id _ _ (fun {_} v => by cases v <;> rfl)] at h
+  .importation (.exist_rule (.exportation key))
+
 
 end Metatheorems

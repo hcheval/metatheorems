@@ -4195,13 +4195,7 @@ private def eq_Q_from_components {a b : Term F Γ Ty.nat}
     (.mp (add_eq_zero_iff adm _ _) (.syllogism .and_perm .and_weak))
   .mp (.mp h_sum (.mp unfold and_intro)) .trans0
 
-/-- Distributivity of ∧ over ∨: `H ∧ (A ∨ B) → (H ∧ A) ∨ (H ∧ B)`. -/
-private def and_or_dist : Derivable F EqX al Premises (Γ := Γ)
-    (H ∧ᶠ (A ∨ᶠ B) →ᶠ (H ∧ᶠ A) ∨ᶠ (H ∧ᶠ B)) :=
-  .syllogism .and_perm
-    (.importation (or_elim_rule
-      (.exportation (.syllogism .and_perm .or_weak))
-      (.exportation (.syllogism .and_perm or_inr))))
+-- Distributivity of ∧ over ∨ (`and_or_dist`) now lives in `PropositionalLemmas`.
 
 /-- From `sg_bar(x) =₀ S0`, derive `x =₀ 0`. -/
 private def sg_bar_eq_S0_implies_zero (x : Term F Γ Ty.nat) :

@@ -380,6 +380,14 @@ def dnn_lem : Derivable F EqX a Premises (¬ᶠ¬ᶠ(A ∨ᶠ ¬ᶠA)) :=
     .syllogism neg_A (@or_inr ι F EqX a Premises Γ A (¬ᶠA))
   Derivable.syllogism (pair_h I_comb or_inr_A) eval_K
 
+/-- Distribute a conjunct over a disjunction. -/
+def and_or_dist : Derivable F EqX a Premises (Γ := Γ)
+    (A ∧ᶠ (B ∨ᶠ C) →ᶠ (A ∧ᶠ B) ∨ᶠ (A ∧ᶠ C)) :=
+  .syllogism .and_perm
+    (.importation (or_elim_rule
+      (.exportation (.syllogism .and_perm .or_weak))
+      (.exportation (.syllogism .and_perm or_inr))))
+
 end PropositionalLemmas
 
 end Metatheorems
