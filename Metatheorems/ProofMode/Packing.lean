@@ -157,6 +157,24 @@ def seq_exchange {Δ : HCtx F Γ} {A B C : Formula F Γ} :
     Seq F EqX a Premises (A :: B :: Δ) C → Seq F EqX a Premises (B :: A :: Δ) C :=
   seq_mono flip_comb
 
+/-- Drop a hypothesis from *anywhere* in the context.
+
+`seq_weaken` only reaches the most recent hypothesis. The general case is a recursion on the
+part of the context above the one being dropped: `Seq (C :: Δ) B` is `Seq Δ (C →ᶠ B)`, so
+peeling `Δ₁` moves those hypotheses into the goal formula and leaves the target position at
+the top, where `seq_weaken` applies. -/
+def seq_clear : (Δ₁ : HCtx F Γ) → {A : Formula F Γ} → {Δ₂ : HCtx F Γ} → {B : Formula F Γ} →
+    Seq F EqX a Premises (Δ₁ ++ Δ₂) B → Seq F EqX a Premises (Δ₁ ++ A :: Δ₂) B
+  | [],      _, _, _, h => seq_weaken h
+  | C :: Δ₁, A, Δ₂, B, h => seq_clear (A := A) Δ₁ (Δ₂ := Δ₂) (B := C →ᶠ B) h
+
+/-- Exchange two adjacent hypotheses *anywhere* in the context. Same recursion. -/
+def seq_swap : (Δ₁ : HCtx F Γ) → {A B : Formula F Γ} → {Δ₂ : HCtx F Γ} → {C : Formula F Γ} →
+    Seq F EqX a Premises (Δ₁ ++ A :: B :: Δ₂) C →
+    Seq F EqX a Premises (Δ₁ ++ B :: A :: Δ₂) C
+  | [],      _, _, _, _, h => seq_exchange h
+  | D :: Δ₁, A, B, Δ₂, C, h => seq_swap (A := A) (B := B) Δ₁ (Δ₂ := Δ₂) (C := D →ᶠ C) h
+
 /-- Cut. -/
 def seq_cut {Δ : HCtx F Γ} {A B : Formula F Γ}
     (hA : Seq F EqX a Premises Δ A) (hB : Seq F EqX a Premises (A :: Δ) B) :

@@ -21,9 +21,10 @@ Status: ✅ have · ❌ missing · — not applicable.
 |---|---|---|
 | `mlIntro "H"` | `pintro h …` | ✅ |
 | `mlRename "H1" into "H2"` | `prename h into k` | ✅ |
-| `mlRevert "H"`, `mlRevertLast` | | ❌ `seq_revert` exists as a lemma; no tactic. |
-| `mlClear "H"` | | ❌ needs removal at an arbitrary index. |
-| `mlSwap "H" with "H0"` | | ❌ `seq_exchange` covers the top two only. |
+| `mlRevertLast` | `prevert` | ✅ definitionally the identity |
+| `mlClear "H"` | `pclear h` | ✅ at any position |
+| `mlSwap "H" with "H0"` | `pswap h with k` | ✅ adjacent positions |
+| `mlRevert "H"` | | ❌ for a hypothesis that is not the most recent; `pswap` it up first. |
 
 ## Propositional
 
@@ -42,8 +43,8 @@ Status: ✅ have · ❌ missing · — not applicable.
 | `mlConj "H1" "H2" as "HC"` | `pconj h k with m` | ✅ |
 | `mlAssert ("H" : phi)` | `phave h : A` | ✅ |
 | `mlClassic phi as "H1" "H2"` | `pclassic A with h k` | ✅ guarded by `allowed.lem` |
-| `mlDestructImp` | | ❌ |
-| `mlTransitivity` | `ptrans` | 🔶 for `=₀` only; not for `→ᶠ` or `↔ᶠ` |
+| `mlDestructImp` | `pdestruct_imp h with k` | ✅ |
+| `mlTransitivity` | `ptrans` for `=₀` | 🔶 for `→ᶠ`, chain `papply`; no `↔ᶠ` support |
 
 ## Meta level — using kernel theorems
 
@@ -52,7 +53,7 @@ Status: ✅ have · ❌ missing · — not applicable.
 | `mlExactMeta` | `pthm e` | ✅ |
 | `mlApplyMeta term` | `papplym e` | ✅ |
 | `mlAdd` | `pfrom h := e` | ✅ |
-| `mlApplyMeta term in "H"` | | ❌ |
+| `mlApplyMeta term in "H"` | `papplym e in h with k` | ✅ |
 | `mlRewrite term at n` | | ❌ `prw`, next up. No occurrence selection planned yet. |
 | `mlDeduct "H"` | — | No deduction theorem at all here. Theirs is restricted to totality patterns; ours does not exist, which is the whole reason the packaging kit does. |
 
@@ -65,7 +66,7 @@ Status: ✅ have · ❌ missing · — not applicable.
 | `mlSpecialize "H" with x` | `pspecialize h with k` | ✅ at the bound variable |
 | | `pinst h t with k` | ✅ at a term |
 | `mlExists x` | `pexists t`, `pbound t` | ✅ `pbound` additionally applies the surface-recursor ban |
-| `mlRevertAll x` | | ❌ |
+| `mlRevertAll x` | — | Their element variables are free in a *named* context that a tactic can generalise over. Ours are de Bruijn: `Γ` is fixed by the statement and `pforall` is the only way into `ρ :: Γ`, so there is no free variable to move back. |
 | `mlIntroAllManual`, `mlDestructExManual` | — | The "Manual" variants exist because the automatic freshness side conditions can fail. Intrinsically-typed de Bruijn has no freshness conditions: the eigenvariable condition is discharged by the indices. |
 
 ## Equational

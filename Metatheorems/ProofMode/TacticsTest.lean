@@ -390,6 +390,50 @@ example {Prem : PremiseSet F} :
   pclassic A with hpos hneg
   pexact h
 
+/-- `mlApplyMeta … in "H"`. -/
+example : SeqD [] F EqX a Premises [] (A →ᶠ B →ᶠ (A ∧ᶠ B)) := by
+  pintro ha hb
+  -- `and_intro` applied to `ha` alone leaves its second conjunct open, so it is given here;
+  -- the same ambiguity Lean's own `apply … at` has.
+  papplym (and_intro (B := B)) in ha with hstep
+  papply hstep
+  pexact hb
+
+/-- `mlDestructImp`: prove the antecedent, keep the conclusion. -/
+example : SeqD [] F EqX a Premises [] ((A →ᶠ B) →ᶠ A →ᶠ B) := by
+  pintro himp ha
+  pdestruct_imp himp with hb
+  · pexact ha
+  · pexact hb
+
+/-- `mlTransitivity` for `→ᶠ`. The kit lemma it needs is itself proved as a script — the
+mode is now strong enough to build its own furniture. -/
+example : SeqD [] F EqX a Premises [] ((A →ᶠ B) →ᶠ (B →ᶠ C) →ᶠ (A →ᶠ C)) := by
+  pintro hab hbc ha
+  papply hbc
+  papply hab
+  pexact ha
+
+/-- `mlClear`: drop a hypothesis from the *middle* of the context, not just the top. -/
+example : SeqD [] F EqX a Premises [] (A →ᶠ B →ᶠ B) := by
+  pintro ha hb
+  pclear ha
+  pexact hb
+
+/-- `mlSwap`: exchange two adjacent hypotheses; the names move with them. -/
+example : SeqD [] F EqX a Premises [] (A →ᶠ B →ᶠ (A ∧ᶠ B)) := by
+  pintro ha hb
+  pswap hb with ha
+  psplit
+  · pexact ha
+  · pexact hb
+
+/-- `mlRevertLast`. -/
+example : SeqD [] F EqX a Premises [] (A →ᶠ A) := by
+  pintro h
+  prevert
+  pthm I_comb
+
 /-- `mlSymmetry in "H"`. -/
 example {s t : Term F Γ Ty.nat} :
     SeqD [] F EqX a Premises [] (Formula.eq0 s t →ᶠ Formula.eq0 t s) := by

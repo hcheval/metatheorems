@@ -123,9 +123,23 @@ def pm_classic (n m : String) (hlem : a.lem = true) (A : Formula F Γ)
     SeqD ns F EqX a Premises Δ C :=
   seq_orE (seq_of_thm (.lem hlem)) h₁ h₂
 
+/-- Use an implicational hypothesis, proving its antecedent, and keep the conclusion. -/
+def pm_impcut (n : String) {Δ : HCtx F Γ} {A B C : Formula F Γ}
+    (h : SeqD ns F EqX a Premises Δ (A →ᶠ B))
+    (hA : SeqD ns F EqX a Premises Δ A)
+    (k : SeqD (n :: ns) F EqX a Premises (B :: Δ) C) :
+    SeqD ns F EqX a Premises Δ C :=
+  seq_cut (seq_mp h hA) k
+
 /-- Rename a hypothesis. Names are display data, so this is the identity. -/
 def pm_rename {ns' : List String} {Δ : HCtx F Γ} {B : Formula F Γ}
     (h : SeqD ns' F EqX a Premises Δ B) : SeqD ns F EqX a Premises Δ B := h
+
+/-- Revert the most recent hypothesis into the goal. Definitionally the identity — the
+packing is arranged so that it is (see `Packing.lean`). -/
+def pm_revert {n : String} {Δ : HCtx F Γ} {A B : Formula F Γ}
+    (h : SeqD ns F EqX a Premises Δ (A →ᶠ B)) :
+    SeqD (n :: ns) F EqX a Premises (A :: Δ) B := h
 
 /-- **Enter the proof mode** from an ordinary kernel goal.
 
@@ -561,6 +575,16 @@ elab "papplym " eStx:term : tactic => do
     for _ in [0:k] do t ← `(pm_mp $t ?_)
     evalTactic (← `(tactic| refine $t))
 
+/-- `papplym e in h with k` applies a kernel theorem to a hypothesis. -/
+macro "papplym " e:term " in " h:ident " with " k:ident : tactic =>
+  `(tactic| refine pm_cut $(Lean.quote k.getId.toString)
+      (pm_mp (pm_have $e) (by pexact $h)) ?_)
+
+/-- `pdestruct_imp h with k` uses an implicational hypothesis: prove its antecedent in the
+first goal, continue with its conclusion named `k` in the second. -/
+macro "pdestruct_imp " h:ident " with " k:ident : tactic =>
+  `(tactic| refine pm_impcut $(Lean.quote k.getId.toString) (by pexact $h) ?_ ?_)
+
 /-- `pconj h k with m` conjoins two hypotheses. -/
 macro "pconj " h:ident ppSpace k:ident " with " m:ident : tactic =>
   `(tactic| refine pm_conj $(Lean.quote m.getId.toString) (by pexact $h) (by pexact $k) ?_)
@@ -579,6 +603,70 @@ elab "pclassic " A:term " with " h:ident ppSpace k:ident : tactic => do
     (refine pm_classic $(Lean.quote h.getId.toString) $(Lean.quote k.getId.toString)
         ?hlem $A ?pos ?neg
      case hlem => pside)))
+
+/-- The pieces a context-surgery tactic needs: the goal's arguments, the hypothesis names,
+the hypothesis formulas, the position of `n`, and the `Formula F Γ` type to build lists at. -/
+private def hypSplit (who : String) (n : String) :
+    TacticM (Array Expr × List String × List Expr × Nat × Expr) := do
+  let args ← seqDGoalArgs who
+  let some namesE := listLit? args[1]! |
+    throwError "{who}: the hypothesis names are not a literal list"
+  let names := namesE.filterMap strLit?
+  let some i := names.findIdx? (· == n) |
+    throwError "{who}: no hypothesis named `{n}` (have: {names})"
+  let some hyps ← whnfListLit? args[7]! |
+    throwError "{who}: the hypothesis context is not a literal list"
+  let fTy := mkAppN (.const ``Formula []) #[args[0]!, args[2]!, args[6]!]
+  return (args, names, hyps, i, fTy)
+
+/-- Replace the goal by `newTy`, justified by `proof newGoal`. -/
+private def replaceGoalWith (newTy : Expr) (proof : Expr → Expr) : TacticM Unit := do
+  let goal ← getMainGoal
+  let m ← Lean.Meta.mkFreshExprSyntheticOpaqueMVar newTy
+  goal.assign (proof m)
+  replaceMainGoal [m.mvarId!]
+
+/-- Rebuild a `SeqD` goal with new names and a new hypothesis context. -/
+private def mkSeqD (args : Array Expr) (namesE ΔE : Expr) : Expr :=
+  mkAppN (.const ``SeqD []) #[args[0]!, namesE, args[2]!, args[3]!, args[4]!,
+    args[5]!, args[6]!, ΔE, args[8]!]
+
+private def mkStrListLit (xs : List String) : MetaM Expr :=
+  Lean.Meta.mkListLit (.const ``String []) (xs.map (Expr.lit <| .strVal ·))
+
+/-- `pclear h` drops a hypothesis, wherever it sits in the context. -/
+elab "pclear " h:ident : tactic => do
+  let (args, names, hyps, i, fTy) ← hypSplit "pclear" h.getId.toString
+  let Δ₁ ← Lean.Meta.mkListLit fTy (hyps.take i)
+  let Δ₂ ← Lean.Meta.mkListLit fTy (hyps.drop (i + 1))
+  let namesE ← mkStrListLit (names.take i ++ names.drop (i + 1))
+  let ΔE ← Lean.Meta.mkListLit fTy (hyps.take i ++ hyps.drop (i + 1))
+  replaceGoalWith (mkSeqD args namesE ΔE) fun m =>
+    mkAppN (.const ``seq_clear []) #[args[0]!, args[2]!, args[3]!, args[4]!, args[5]!,
+      args[6]!, Δ₁, hyps[i]!, Δ₂, args[8]!, m]
+
+/-- `pswap h with k` exchanges two *adjacent* hypotheses. Non-adjacent swaps compose from
+these; the kit rule is the adjacent one. -/
+elab "pswap " h:ident " with " k:ident : tactic => do
+  let (args, names, hyps, i, fTy) ← hypSplit "pswap" h.getId.toString
+  let n2 := k.getId.toString
+  let some j := names.findIdx? (· == n2) |
+    throwError "pswap: no hypothesis named `{n2}` (have: {names})"
+  unless j == i + 1 do
+    throwError "pswap: `{h.getId}` and `{k.getId}` are at positions {i} and {j}; \
+      only adjacent hypotheses can be exchanged directly."
+  let Δ₁ ← Lean.Meta.mkListLit fTy (hyps.take i)
+  let Δ₂ ← Lean.Meta.mkListLit fTy (hyps.drop (i + 2))
+  let namesE ← mkStrListLit
+    (names.take i ++ [names[j]!, names[i]!] ++ names.drop (i + 2))
+  let ΔE ← Lean.Meta.mkListLit fTy
+    (hyps.take i ++ [hyps[j]!, hyps[i]!] ++ hyps.drop (i + 2))
+  replaceGoalWith (mkSeqD args namesE ΔE) fun m =>
+    mkAppN (.const ``seq_swap []) #[args[0]!, args[2]!, args[3]!, args[4]!, args[5]!,
+      args[6]!, Δ₁, hyps[j]!, hyps[i]!, Δ₂, args[8]!, m]
+
+/-- `prevert` moves the most recent hypothesis back into the goal. -/
+macro "prevert" : tactic => `(tactic| refine pm_revert ?_)
 
 /-- `prename h into k` renames a hypothesis. Names are display data, so nothing is proved. -/
 elab "prename " h:ident " into " k:ident : tactic => do
