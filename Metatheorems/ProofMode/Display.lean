@@ -1,0 +1,130 @@
+/-
+Copyright (c) 2026. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Horatiu
+-/
+import Lean
+import Metatheorems.ProofMode.Packing
+
+/-!
+# Rendering a proof-mode goal
+
+`Seq F EqX a Premises Δ B` is legible only if you can read `Δ` as a *list of named
+hypotheses* rather than as a `List (Formula F Γ)` printed inline. This file adds the display
+layer: a name-carrying wrapper `SeqD` and a delaborator that renders it as a box.
+
+## Where names live
+
+`Seq` has no names — the packaging kit sees positions, and that is the right invariant for
+it (`HVar` is a de Bruijn index). Names are display data, so they are carried by a separate
+*reducible* wrapper:
+
+    SeqD names F EqX a Premises Δ B  :=  Seq F EqX a Premises Δ B
+
+Being `@[reducible]`, every kit lemma applies through it by unification: the tactic layer
+never has to translate between the two. Its job is only to keep `names` in step with `Δ`
+when it changes one, and `names` never affects the proof term.
+
+## Rendering
+
+    ⊢ ⟪[nat]⟫
+        k : A
+        h : B
+        ────────────────────
+        A ∧ᶠ B
+
+where `[nat]` is the *term-variable* context `Γ`.
+
+Hypotheses are listed most-recent-*last*, which is the reverse of `Δ`'s own order (`Δ`'s
+head is the most recent, see `Packing.lean`). That reversal is the whole reason the display
+layer exists: it is the one place where the de Bruijn convention should not leak.
+
+An unnamed position — `names` shorter than `Δ`, or not a literal list — prints as `_`, so
+the renderer never fails on a goal a tactic has not yet labelled.
+-/
+
+namespace Metatheorems
+namespace ProofMode
+
+open Lean
+
+variable {ι : Type} {F : ι → Ty ι}
+    {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
+    {a : Allowed} {Premises : PremiseSet F} {Γ : Ctx ι}
+
+/-- `Seq` together with display names for the hypothesis positions.
+
+Reducible, hence interchangeable with `Seq` for every purpose except printing. -/
+@[reducible] def SeqD (_names : List String) (F : ι → Ty ι)
+    (EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ)
+    (a : Allowed) (Premises : PremiseSet F) {Γ : Ctx ι}
+    (Δ : HCtx F Γ) (B : Formula F Γ) : Type :=
+  Seq F EqX a Premises Δ B
+
+/-- Forget the names. Definitionally the identity. -/
+def SeqD.toSeq {names : List String} {Δ : HCtx F Γ} {B : Formula F Γ} :
+    SeqD names F EqX a Premises Δ B → Seq F EqX a Premises Δ B := id
+
+/-- Attach names. Definitionally the identity. -/
+def SeqD.ofSeq {names : List String} {Δ : HCtx F Γ} {B : Formula F Γ} :
+    Seq F EqX a Premises Δ B → SeqD names F EqX a Premises Δ B := id
+
+-- ============================================================================
+-- Syntax
+-- ============================================================================
+
+/-- A rendered proof-mode goal. Display only — this never elaborates.
+
+The hypothesis lines are a grouped repetition *inside* this rule rather than a syntax
+category of their own: a category would be run through the term parenthesizer, which cannot
+know that juxtaposed `h : A` lines are unambiguous and so brackets them. -/
+syntax (name := pmGoal)
+  "⟪" term "⟫" ppIndent((ppLine ident " : " term)* ppLine "────────────────────"
+    ppLine term) : term
+
+-- ============================================================================
+-- Delaborator
+-- ============================================================================
+
+section Delab
+open Lean.PrettyPrinter.Delaborator
+
+/-- Split an expression that is a literal `List` spine into its elements. -/
+private partial def listLit? (e : Expr) : Option (List Expr) :=
+  match e.getAppFnArgs with
+  | (``List.nil, _) => some []
+  | (``List.cons, #[_, x, xs]) => (listLit? xs).map (x :: ·)
+  | _ => none
+
+/-- The `String` behind a string-literal expression. -/
+private def strLit? (e : Expr) : Option String :=
+  match e with
+  | .lit (.strVal s) => some s
+  | _ => none
+
+/-- Render `SeqD names F EqX a Premises Δ B` as a proof-mode box.
+
+Fails (falling back to the default application delaborator) only when `Δ` is not a literal
+list — there is nothing sensible to draw in that case. -/
+@[app_delab Metatheorems.ProofMode.SeqD]
+def delabSeqD : Delab := do
+  let e ← SubExpr.getExpr
+  let args := e.getAppArgs
+  -- ι, names, F, EqX, a, Premises, Γ, Δ, B
+  guard (args.size == 9)
+  let some hyps := listLit? args[7]! | failure
+  let names : List String :=
+    (listLit? args[1]!).map (·.filterMap strLit?) |>.getD []
+  let ctxStx ← Lean.PrettyPrinter.delab args[6]!
+  let goalStx ← Lean.PrettyPrinter.delab args[8]!
+  -- `Δ`'s head is the most recent hypothesis; display oldest-first.
+  let hyps := hyps.reverse
+  let names := (names ++ List.replicate hyps.length "_").take hyps.length |>.reverse
+  let ns : Array Ident := (names.map (mkIdent <| Name.mkSimple ·)).toArray
+  let hs ← hyps.toArray.mapM fun h => Lean.PrettyPrinter.delab h
+  `(⟪$ctxStx⟫ $[$ns:ident : $hs]* ──────────────────── $goalStx)
+
+end Delab
+
+end ProofMode
+end Metatheorems
