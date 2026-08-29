@@ -178,6 +178,14 @@ theorem weaken_subst0 (t : Term F Γ τ) (s : Term F Γ ρ) :
   rw [rename_subst]
   exact subst_id t
 
+/-- `weaken_subst0` with `subst0` unfolded.
+
+Normalizing a goal left behind by `induction` pushes `Formula.subst0` down to bare
+`Term.subst`, at which point `weaken_subst0` no longer matches. This form does. -/
+theorem subst_subst0_map_weaken (t : Term F Γ τ) (s : Term F Γ ρ) :
+    Term.subst (Term.subst0_map s) (Term.weaken t) = t :=
+  weaken_subst0 t s
+
 end Term
 
 -- Re-export Renaming at Metatheorems level for backwards compatibility

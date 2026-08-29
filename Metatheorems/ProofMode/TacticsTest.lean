@@ -24,10 +24,19 @@ variable {ι : Type} {F : ι → Ty ι}
 open Formula
 
 /-- `R_nat 0 (λx n. x) 0` — extensionally `0`, but computed by recursion. The witness the
-surface-recursor ban exists to refuse. -/
-def iterating_zero : Term F Γ Ty.nat :=
-  Term.app (Term.app (Term.app (Term.prec Ty.nat) Term.zero)
-    (Term.lam (Term.lam (Term.var (.vs .vz))))) Term.zero
+surface-recursor ban exists to refuse.
+
+A `macro`, not a `def`, so that it elaborates to the term the user would have typed. A `def`
+would be a *constant* and the check would not look inside it — see `wrapped_iteration`
+below, which records that limitation. -/
+macro "iterating_zero" : term =>
+  `(Term.app (Term.app (Term.app (Term.prec Ty.nat) Term.zero)
+      (Term.lam (Term.lam (Term.var (.vs .vz))))) Term.zero)
+
+/-- The same term behind a name. The surface check does not unfold constants — it must not,
+since `Term.add` is also built from `Term.prec` — so this gets through. Recorded, not fixed:
+the principled version is a whitelist of surface constants. -/
+def wrapped_iteration : Term F Γ Ty.nat := iterating_zero
 
 /-! ## Propositional -/
 
@@ -243,7 +252,7 @@ example : SeqD [] F EqX a Premises (Γ := Γ) []
 -- An iterating witness — `R_nat 0 (λx n. x) 0`, which is `0` but computed by recursion —
 -- is rejected, with the reason.
 /--
-error: pbound: the term uses the primitive recursor.
+error: pbound: the term applies the primitive recursor directly.
 Iteration is what extraction produces, so a hand-written iterating term makes the
 extraction vacuous (HANDOFF D-2, surface-recursor ban). If this really is auxiliary, say so
 explicitly with `pexists!`.
@@ -257,7 +266,7 @@ example : SeqD [] F EqX a Premises (Γ := Γ) []
 -- `pexists` carries the same ban — the surface language loses the recursor, not just the
 -- headline position.
 /--
-error: pexists: the term uses the primitive recursor.
+error: pexists: the term applies the primitive recursor directly.
 Iteration is what extraction produces, so a hand-written iterating term makes the
 extraction vacuous (HANDOFF D-2, surface-recursor ban). If this really is auxiliary, say so
 explicitly with `pexists!`.
@@ -277,7 +286,7 @@ example : SeqD [] F EqX a Premises (Γ := Γ) []
 -- **R4 attempt C**: the smuggle that reaches the extracted term through an
 -- *instantiation*, never touching an `∃`. Refused.
 /--
-error: pinst: the term uses the primitive recursor.
+error: pinst: the term applies the primitive recursor directly.
 Iteration is what extraction produces, so a hand-written iterating term makes the
 extraction vacuous (HANDOFF D-2, surface-recursor ban). If this really is auxiliary, say so
 explicitly with `pexists!`.
@@ -292,7 +301,7 @@ example {P : Formula F (Ty.nat :: Γ)} :
 -- A route D-2's list does not name: the *formula* of a cut is user-written too, and its
 -- terms reach the extracted content the same way an instantiation's do.
 /--
-error: phave: the formula contains a term built with the primitive recursor.
+error: phave: the formula applies the primitive recursor directly.
 Iteration is what extraction produces, so writing it by hand makes the extraction
 vacuous (HANDOFF D-2, surface-recursor ban).
 -/
@@ -300,6 +309,15 @@ vacuous (HANDOFF D-2, surface-recursor ban).
 example : SeqD [] F EqX a Premises (Γ := Γ) [] (A →ᶠ A) := by
   phave k : Formula.eq0 iterating_zero iterating_zero
   pthm I_comb
+
+/-- **The recorded limitation.** The same iteration behind a `def` is accepted, because the
+check must not unfold constants — `Term.add` is built from `Term.prec` too, and `x + y` is
+not a smuggled bound. A whitelist of surface constants is the fix; a blacklist of one cannot
+distinguish these. -/
+example : SeqD [] F EqX a Premises (Γ := Γ) []
+    (Formula.ex Ty.nat (Formula.eq0 (Term.var .vz) (Term.var .vz))) := by
+  pbound wrapped_iteration
+  pthm .refl0
 
 /-! ## Error reporting
 

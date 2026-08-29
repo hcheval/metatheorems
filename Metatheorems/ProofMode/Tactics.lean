@@ -127,12 +127,12 @@ def pm_exI {ρ : Ty ι} {Δ : HCtx F Γ} {A : Formula F (ρ :: Γ)} (t : Term F 
     SeqD ns F EqX a Premises Δ (Formula.ex ρ A) :=
   seq_exI t h
 
-/-- Supply a witness at a *headline* `∃`, subject to the surface-recursor ban. -/
+/-- Supply a witness at a *headline* `∃`. The recursor ban is enforced by the `pbound`
+tactic, not by this lemma — see `ProofMode/Linter.lean`. -/
 def pm_bound {ρ : Ty ι} {Δ : HCtx F Γ} {A : Formula F (ρ :: Γ)} (t : Term F Γ ρ)
-    (hrf : t.usesPrec = false)
     (h : SeqD ns F EqX a Premises Δ (A.subst0 t)) :
     SeqD ns F EqX a Premises Δ (Formula.ex ρ A) :=
-  seq_bound t hrf h
+  seq_bound t h
 
 /-- Consume an `∃`, naming the body. -/
 def pm_exE (n : String) {ρ : Ty ι} {Δ : HCtx F Γ} {A : Formula F (ρ :: Γ)} {B : Formula F Γ}
@@ -159,6 +159,32 @@ def pm_cut (n : String) {Δ : HCtx F Γ} {A C : Formula F Γ}
     (k : SeqD (n :: ns) F EqX a Premises (A :: Δ) C) :
     SeqD ns F EqX a Premises Δ C :=
   seq_cut hA k
+
+-- ============================================================================
+-- Equational reasoning
+-- ============================================================================
+
+/-- Reflexivity of `=₀`. -/
+def pm_refl {Δ : HCtx F Γ} {t : Term F Γ Ty.nat} :
+    SeqD ns F EqX a Premises Δ (Formula.eq0 t t) :=
+  seq_of_thm .refl0
+
+/-- Symmetry of `=₀`. -/
+def pm_sym {Δ : HCtx F Γ} {s t : Term F Γ Ty.nat}
+    (h : SeqD ns F EqX a Premises Δ (Formula.eq0 t s)) :
+    SeqD ns F EqX a Premises Δ (Formula.eq0 s t) :=
+  seq_mono .sym0 h
+
+/-- Transitivity of `=₀`, as a *step*: name the midpoint and get the two halves as goals.
+
+The kernel gives transitivity in `∧`-form; this is the curried form a script wants, and it
+is the closest thing to a `calc` step the object logic has — there is no rewriting, because
+there is no extensionality. -/
+def pm_trans {Δ : HCtx F Γ} {s u : Term F Γ Ty.nat} (t : Term F Γ Ty.nat)
+    (h₁ : SeqD ns F EqX a Premises Δ (Formula.eq0 s t))
+    (h₂ : SeqD ns F EqX a Premises Δ (Formula.eq0 t u)) :
+    SeqD ns F EqX a Premises Δ (Formula.eq0 s u) :=
+  seq_mp (seq_of_thm .trans0) (seq_andI h₁ h₂)
 
 -- ============================================================================
 -- Moves specific to this logic
@@ -283,6 +309,16 @@ private def hypFormula (who : String) (n : String) : TacticM Expr := do
   let some A := hyps[i]? | throwError "{who}: `{n}` names position {i}, which is not there"
   return A
 
+/-- Does this expression *apply the recursor itself*, as opposed to using a constant of the
+language that happens to be defined by recursion?
+
+The traversal deliberately does not unfold constants: `Term.add` is built from `Term.prec`,
+as every primitive-recursive constant must be, and `x + y` is not a smuggled bound. Only an
+occurrence the user typed is refused. See `ProofMode/Linter.lean` for why this is the right
+reading of "surface", and for the limit of it. -/
+private def mentionsPrec (e : Expr) : Bool :=
+  (e.find? (·.isConstOf ``Term.prec)).isSome
+
 /-- Elaborate a term the *user wrote* at a surface position, and enforce the recursor ban.
 
 `HANDOFF` D-2 puts the ban on the surface language as a whole — "instantiation witnesses,
@@ -295,8 +331,8 @@ to live here rather than at `∃`-introduction. -/
 private def elabSurfaceTerm (who : String) (ι F Γ ρ : Expr) (tStx : TSyntax `term) :
     TacticM Expr := do
   let t ← elabTerm tStx (some (mkAppN (.const ``Term []) #[ι, F, Γ, ρ]))
-  if (← evalBoolCheck (mkAppN (.const ``Term.usesPrec []) #[ι, F, Γ, ρ, t])) == some true then
-    throwError "{who}: the term uses the primitive recursor.\n\
+  if mentionsPrec (← instantiateMVars t) then
+    throwError "{who}: the term applies the primitive recursor directly.\n\
       Iteration is what extraction produces, so a hand-written iterating term makes the\n\
       extraction vacuous (HANDOFF D-2, surface-recursor ban). If this really is auxiliary, \
       say so\nexplicitly with `pexists!`."
@@ -332,6 +368,22 @@ macro "pand_right" : tactic => `(tactic| apply pm_andE₂)
 
 /-- `pexfalso` replaces the goal by `⊥ᶠ`. -/
 macro "pexfalso" : tactic => `(tactic| refine pm_exfalso ?_)
+
+/-- `prefl` / `psym` / `ptrans t` — equational reasoning on `=₀`. `ptrans` names the
+midpoint and leaves the two halves as goals; the midpoint is a surface term, so the
+recursor ban applies to it. -/
+macro "prefl" : tactic => `(tactic| exact pm_refl)
+macro "psym" : tactic => `(tactic| refine pm_sym ?_)
+
+elab "ptrans " tStx:term : tactic => do
+  let args ← seqDGoalArgs "ptrans"
+  let target ← whnfD args[8]!
+  let targs := target.getAppArgs
+  unless target.isAppOf ``Formula.eq0 && targs.size == 5 do
+    throwError "ptrans: the goal is not an equation."
+  let natTy := mkApp (.const ``Ty.nat []) targs[0]!
+  let _ ← elabSurfaceTerm "ptrans" targs[0]! targs[1]! targs[2]! natTy tStx
+  evalTactic (← `(tactic| refine pm_trans $tStx ?_ ?_))
 
 /-- `pnorm` clears the de Bruijn bookkeeping a goal accumulates when a weakening meets a
 substitution — most often after supplying a just-obtained witness back to an `∃`. -/
@@ -388,7 +440,7 @@ Like `pby_contra`, the check runs *before* anything is applied to the goal. -/
 elab "pbound " tStx:term : tactic => do
   let g ← exGoalArgs "pbound"
   let _ ← elabSurfaceTerm "pbound" g[0]! g[1]! g[2]! g[3]! tStx
-  evalTactic (← `(tactic| refine pm_bound $tStx (by rfl) ?_))
+  evalTactic (← `(tactic| refine pm_bound $tStx ?_))
 
 /-- `pobtain h with x` consumes the `∃` proved by hypothesis `h`, naming the body `x`. -/
 macro "pobtain " h:ident " with " x:ident : tactic =>
@@ -438,9 +490,8 @@ route to the extracted content that `pinst` has. -/
 elab "phave " h:ident " : " AStx:term : tactic => do
   let args ← seqDGoalArgs "phave"
   let A ← elabTerm AStx (some (mkAppN (.const ``Formula []) #[args[0]!, args[2]!, args[6]!]))
-  if (← evalBoolCheck (mkAppN (.const ``Formula.usesPrec [])
-      #[args[0]!, args[2]!, args[6]!, A])) == some true then
-    throwError "phave: the formula contains a term built with the primitive recursor.\n\
+  if mentionsPrec (← instantiateMVars A) then
+    throwError "phave: the formula applies the primitive recursor directly.\n\
       Iteration is what extraction produces, so writing it by hand makes the extraction\n\
       vacuous (HANDOFF D-2, surface-recursor ban)."
   evalTactic (← `(tactic| refine pm_cut (A := $AStx) $(Lean.quote h.getId.toString) ?_ ?_))

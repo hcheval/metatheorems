@@ -799,13 +799,17 @@ end ArithCorr
 
 -- ── Isolated nf lemmas for Term.add under subst0 (avoiding deep defeq) ───
 
-/-- Weakened terms are invariant under substVar0. -/
-private theorem weaken_substVar0 {ρ : Ty ι} (t : Term F Γ τ) (u : Term F (ρ :: Γ) ρ) :
+/-- Weakened terms are invariant under substVar0.
+
+Public: this is one of the rewrites a proof script needs to see through the goals that
+`induction` leaves behind — see `ProofMode/Arith.lean`. -/
+theorem weaken_substVar0 {ρ : Ty ι} (t : Term F Γ τ) (u : Term F (ρ :: Γ) ρ) :
     t.weaken.subst (Term.substVar0_map u) = t.weaken := by
   simp only [Term.weaken]
   rw [Term.rename_subst, Term.rename_eq_subst]; rfl
 
-private theorem add_closed_subst {Γ Δ : Ctx ι} (σ : Term.Subst F Γ Δ) :
+/-- `Term.add` is closed, so substitution leaves it alone. Public for the same reason. -/
+theorem add_closed_subst {Γ Δ : Ctx ι} (σ : Term.Subst F Γ Δ) :
     Term.subst σ (Term.add : Term F Γ _) = Term.add := add_closed_subst' σ
 
 private theorem add_qfer_l_nf {Γ : Ctx ι} (x y s : Term F Γ Ty.nat) :
