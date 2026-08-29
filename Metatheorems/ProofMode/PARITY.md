@@ -54,7 +54,7 @@ Status: ✅ have · ❌ missing · — not applicable.
 | `mlApplyMeta term` | `papplym e` | ✅ |
 | `mlAdd` | `pfrom h := e` | ✅ |
 | `mlApplyMeta term in "H"` | `papplym e in h with k` | ✅ |
-| `mlRewrite term at n` | | ❌ `prw`, next up. No occurrence selection planned yet. |
+| `mlRewrite term at n` | `prw e` | ✅ both sides, like `rw`; no occurrence selection (`at n`) |
 | `mlDeduct "H"` | — | No deduction theorem at all here. Theirs is restricted to totality patterns; ours does not exist, which is the whole reason the packaging kit does. |
 
 ## First order
@@ -76,7 +76,7 @@ Status: ✅ have · ❌ missing · — not applicable.
 | `mlReflexivity` | `prefl` | ✅ |
 | `mlSymmetry` | `psym` | ✅ |
 | `mlSymmetry in "H"` | `psym in h with k` | ✅ |
-| `mlRewriteBy "H" at n` | | ❌ `prw` by a hypothesis. Note they need the definedness theory and unrestricted reasoning for this; our analogue needs QF-ER, whose premise must be quantifier-free and ∨-free. Same shape of restriction. |
+| `mlRewriteBy "H" at n` | `prwby h` | ✅ available when the hypothesis context *is* the premise, i.e. holds that one equation. They need the definedness theory and unrestricted reasoning for this; we need QF-ER, whose premise must be quantifier-free and ∨-free. Same shape of restriction, reached from opposite directions. |
 
 ## Everything else
 

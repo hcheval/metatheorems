@@ -178,6 +178,13 @@ theorem weaken_subst0 (t : Term F Γ τ) (s : Term F Γ ρ) :
   rw [rename_subst]
   exact subst_id t
 
+/-- `subst0_map` at the two variable shapes. Stated so that `simp` can step through them:
+unfolding the definition alone leaves a `match`. -/
+@[simp] theorem subst0_map_vz (s : Term F Γ ρ) : subst0_map s (τ := ρ) .vz = s := rfl
+
+@[simp] theorem subst0_map_vs (s : Term F Γ ρ) {τ : Ty ι} (w : Var Γ τ) :
+    subst0_map s (.vs w) = .var w := rfl
+
 /-- `weaken_subst0` with `subst0` unfolded.
 
 Normalizing a goal left behind by `induction` pushes `Formula.subst0` down to bare

@@ -5,6 +5,7 @@ Authors: Horatiu
 -/
 import Metatheorems.Arithmetic
 import Metatheorems.ProofMode.Tactics
+import Metatheorems.ProofMode.Rewrite
 
 /-!
 # Arithmetic in the proof mode
@@ -104,32 +105,30 @@ variable (adm : AdmissibleEqX EqX)
 /-- **Commutativity of addition**, as a script. Compare `Metatheorems.add_comm`, which proves
 the same thing with raw constructors.
 
-The shape is the textbook one: induct on the second argument; the base case is
-`x + 0 = x = 0 + x`; the step chains `x + Sy = S(x + y) = S(y + x) = Sy + x`, using the
-induction hypothesis in the middle through successor-congruence. -/
+The shape is the textbook one, and with `prw` the script is the textbook script: induct on
+the second argument, rewrite by the defining equations, use the induction hypothesis.
+
+Compare `Nat.add_comm` in mathlib — `induction`, then `rw [Nat.add_succ, ih, Nat.succ_add]`.
+The remaining differences are `anorm`, which pays for the substitutions `induction` leaves in
+the goal, and the split between `prw` (closed equation) and `prwby` (hypothesis), which is
+forced by QF-ER carrying a premise. -/
 example (x : Term F Γ Ty.nat) :
     SeqD [] F EqX al Premises (Γ := Γ) []
       (Formula.all Ty.nat (Formula.eq0 (x +ᵗ x₀) (x₀ +ᵗ x))) := by
   pinduction
   · -- x + 0 = 0 + x
     anorm
-    ptrans x
-    · pthm (add_zero_r adm x)
-    · psym
-      pthm (add_zero_l adm x)
+    prw (add_zero_r adm x)
+    prw (add_zero_l adm x)
+    prefl
   · pforall
     pintro ih
     anorm
-    -- x + Sy = S(x + y)
-    ptrans (S (x +ᵗ x₀))
-    · pthm (add_succ adm _ _)
-    -- S(x + y) = S(y + x) = Sy + x
-    · ptrans (S (x₀ +ᵗ x))
-      · pfrom sc := succ_congr_imp (Γ := Ty.nat :: Γ) (s := x +ᵗ x₀) (t := x₀ +ᵗ x)
-        papply sc
-        pexact ih
-      · psym
-        pthm (add_succ_l adm _ _)
+    -- x + Sy = S(x + y) = S(y + x) = Sy + x
+    prw (add_succ adm _ _)
+    prw (add_succ_l adm _ _)
+    prwby ih
+    prefl
 
 end AddComm
 

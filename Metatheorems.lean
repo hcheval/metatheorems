@@ -12,3 +12,4 @@ import Metatheorems.ProofMode.Display
 import Metatheorems.ProofMode.Tactics
 import Metatheorems.ProofMode.Examples
 import Metatheorems.ProofMode.Arith
+import Metatheorems.ProofMode.Rewrite

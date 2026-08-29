@@ -349,7 +349,7 @@ private def evalBoolCheck (e : Expr) : TacticM (Option Bool) := do
   | _ => return none
 
 /-- The `SeqD` goal, split into its arguments: `ι, names, F, EqX, a, Premises, Γ, Δ, B`. -/
-private def seqDGoalArgs (who : String) : TacticM (Array Expr) := do
+def seqDGoalArgs (who : String) : TacticM (Array Expr) := do
   let ty ← instantiateMVars (← (← getMainGoal).getType)
   let args := ty.getAppArgs
   unless ty.isAppOf ``SeqD && args.size == 9 do
