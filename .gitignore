@@ -16,3 +16,5 @@ _mcp_snippet_*.lean
 *.bak
 .claude/memory/
 .claude/worktrees/
+
+/AML-Formalization

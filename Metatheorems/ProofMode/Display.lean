@@ -80,7 +80,7 @@ The hypothesis lines are a grouped repetition *inside* this rule rather than a s
 category of their own: a category would be run through the term parenthesizer, which cannot
 know that juxtaposed `h : A` lines are unambiguous and so brackets them. -/
 syntax (name := pmGoal)
-  "⟪" term ("," ppSpace ident " : " term)* "⟫"
+  "⟪" term ("," ppSpace term " : " term)* "⟫"
     ppIndent((ppLine ident " : " term)* ppLine "────────────────────" ppLine term) : term
 
 -- ============================================================================
@@ -141,7 +141,7 @@ def delabSeqD : Delab := do
   let (tail, tys) := Pretty.ctxSplit args[6]!
   let tailStx ← Lean.PrettyPrinter.delab tail
   -- Outermost-first, under the same naming the term printer uses.
-  let tvs : Array Ident := Pretty.ctxVarIdents 0 0 args[6]!
+  let tvs : Array (TSyntax `term) := Pretty.ctxVarIdents 0 0 args[6]!
   let tts ← tys.toArray.reverse.mapM fun t => (Lean.PrettyPrinter.delab t : MetaM _)
   let goalStx ← Lean.PrettyPrinter.delab args[8]!
   -- `Δ`'s head is the most recent hypothesis; display oldest-first.
@@ -149,7 +149,7 @@ def delabSeqD : Delab := do
   let names := (names ++ List.replicate hyps.length "_").take hyps.length |>.reverse
   let ns : Array Ident := (names.map (mkIdent <| Name.mkSimple ·)).toArray
   let hs ← hyps.toArray.mapM fun h => Lean.PrettyPrinter.delab h
-  `(⟪$tailStx $[, $tvs:ident : $tts]*⟫ $[$ns:ident : $hs]* ──────────────────── $goalStx)
+  `(⟪$tailStx $[, $tvs : $tts]*⟫ $[$ns:ident : $hs]* ──────────────────── $goalStx)
 
 end Delab
 

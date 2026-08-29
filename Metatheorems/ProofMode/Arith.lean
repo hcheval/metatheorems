@@ -36,19 +36,31 @@ for everything else. -/
 namespace Pretty
 open Lean Lean.PrettyPrinter.Delaborator
 
-/-- Display-only infix for the object-level arithmetic operations. -/
+/-- Infix for the object-level arithmetic operations. These *parse* as well as print, so a
+script writes terms the way the goal shows them. -/
 syntax:65 term:65 " +ᵗ " term:66 : term
 syntax:70 term:70 " *ᵗ " term:71 : term
 syntax:65 term:65 " ∸ᵗ " term:66 : term
+syntax:max "S " term:max : term
+
+macro_rules
+  | `($a +ᵗ $b) => `(Metatheorems.Term.app2 Metatheorems.Term.add $a $b)
+  | `($a *ᵗ $b) => `(Metatheorems.Term.app2 Metatheorems.Term.mul $a $b)
+  | `($a ∸ᵗ $b) => `(Metatheorems.Term.app2 Metatheorems.Term.monus $a $b)
+  | `(S $t)     => `(Metatheorems.Term.app Metatheorems.Term.succ $t)
 
 def delabArith : Delab := do
   let e ← SubExpr.getExpr
   guard (isSpine e)
   let (hd, xs) := termSpine e
+  let hd? := hd.getAppFn.constName?
+  if xs.size == 1 && hd? == some ``Term.succ then
+    let a ← (Lean.PrettyPrinter.delab xs[0]! : MetaM _)
+    return ← `(S $a)
   guard (xs.size == 2)
   let a ← (Lean.PrettyPrinter.delab xs[0]! : MetaM _)
   let b ← (Lean.PrettyPrinter.delab xs[1]! : MetaM _)
-  match hd.getAppFn.constName? with
+  match hd? with
   | some ``Term.add   => `($a +ᵗ $b)
   | some ``Term.mul   => `($a *ᵗ $b)
   | some ``Term.monus => `($a ∸ᵗ $b)
@@ -96,10 +108,8 @@ The shape is the textbook one: induct on the second argument; the base case is
 `x + 0 = x = 0 + x`; the step chains `x + Sy = S(x + y) = S(y + x) = Sy + x`, using the
 induction hypothesis in the middle through successor-congruence. -/
 example (x : Term F Γ Ty.nat) :
-    SeqD [] F EqX al Premises []
-      (Formula.all Ty.nat (Formula.eq0
-        (Term.app2 Term.add (x.weaken (σ := Ty.nat)) (.var .vz))
-        (Term.app2 Term.add (.var .vz) (x.weaken (σ := Ty.nat))))) := by
+    SeqD [] F EqX al Premises (Γ := Γ) []
+      (Formula.all Ty.nat (Formula.eq0 (x +ᵗ x₀) (x₀ +ᵗ x))) := by
   pinduction
   · -- x + 0 = 0 + x
     anorm
@@ -111,17 +121,15 @@ example (x : Term F Γ Ty.nat) :
     pintro ih
     anorm
     -- x + Sy = S(x + y)
-    ptrans (.app .succ (Term.app2 Term.add (x.weaken (σ := Ty.nat)) (.var .vz)))
-    · pthm (add_succ adm (x.weaken (σ := Ty.nat)) (.var .vz))
+    ptrans (S (x +ᵗ x₀))
+    · pthm (add_succ adm _ _)
     -- S(x + y) = S(y + x) = Sy + x
-    · ptrans (.app .succ (Term.app2 Term.add (.var .vz) (x.weaken (σ := Ty.nat))))
-      · pfrom sc := succ_congr_imp
-          (s := Term.app2 Term.add (x.weaken (σ := Ty.nat)) (.var .vz))
-          (t := Term.app2 Term.add (.var .vz) (x.weaken (σ := Ty.nat)))
+    · ptrans (S (x₀ +ᵗ x))
+      · pfrom sc := succ_congr_imp (Γ := Ty.nat :: Γ) (s := x +ᵗ x₀) (t := x₀ +ᵗ x)
         papply sc
         pexact ih
       · psym
-        pthm (add_succ_l adm (.var .vz) (x.weaken (σ := Ty.nat)))
+        pthm (add_succ_l adm _ _)
 
 end AddComm
 

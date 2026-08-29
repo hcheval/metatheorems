@@ -55,6 +55,23 @@ separate change; this one costs no API.
 -/
 
 namespace Metatheorems
+
+namespace ProofMode
+
+/-- **Weakening is internal machinery and should not appear in a script.**
+
+A term written in `Γ` is usable wherever a term in `ρ :: Γ` is expected — that is what
+weakening *means* — so it is inserted by coercion rather than by hand. Scoped, so it is in
+force exactly where proof-mode scripts are written.
+
+The printer already drops it in the same cases (see `delabWeakening`), so a term neither
+prints nor reads with a weakening in it. -/
+scoped instance instCoeWeakenTerm {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι} {τ σ : Ty ι} :
+    CoeTail (Term F Γ τ) (Term F (σ :: Γ) τ) :=
+  ⟨Term.weaken⟩
+
+end ProofMode
+
 namespace Pretty
 
 open Lean Lean.PrettyPrinter.Delaborator
@@ -116,16 +133,50 @@ def withBinder (x : DelabM α) : DelabM α := do
   let (_, i) ← getDepths
   withOptions (pp.metatheorems.inner.set · (i + 1)) x
 
-/-- The display name of the variable at de Bruijn index `i` in context `Γ`.
+/-- The display *number* of the variable at de Bruijn index `i` in context `Γ`, or `none`
+when it reaches past the explicit prefix into the abstract tail.
 
 `i < inner` marks a variable bound *inside* the current weakening: fresh, so offset by
 `shift`. Anything else is shared with the ambient context and keeps the ambient name. -/
-def varName (shift inner : Nat) (Γ : Expr) (i : Nat) : String :=
+def varSlot (shift inner : Nat) (Γ : Expr) (i : Nat) : Option Nat :=
   let n := ctxPrefixLen Γ
-  if i < n then
-    "x" ++ subscript ((if i < inner then shift else 0) + n - 1 - i)
-  else
-    "y" ++ subscript (i - n)
+  if i < n then some ((if i < inner then shift else 0) + n - 1 - i) else none
+
+/-! ### Variables are written the way they are shown
+
+`x₀`, `x₁`, … are *tokens*, not identifiers, and they elaborate against the expected type:
+the context is read off it, and the de Bruijn index computed from the display name. So a
+variable can be copied out of a goal into a script unchanged, and no script mentions
+`Term.var`, `Var.vs`, or an index. Binder positions in the display syntaxes take a `term`
+rather than an `ident` for the same reason — an `ident` position would print the token
+escaped, as `«x₀»`.
+
+Six are declared, which is more binder depth than any proof here uses. The correspondence
+holds in the unshifted frame; a variable *inside* a `↑ᶜ` displays under the shifted names and
+cannot be written back directly. -/
+
+syntax:max "x₀" : term
+syntax:max "x₁" : term
+syntax:max "x₂" : term
+syntax:max "x₃" : term
+syntax:max "x₄" : term
+syntax:max "x₅" : term
+
+/-- The syntax for the variable displayed as `xₖ`. -/
+def varStx : Nat → Option (TSyntax `term)
+  | 0 => some (Unhygienic.run `(x₀))
+  | 1 => some (Unhygienic.run `(x₁))
+  | 2 => some (Unhygienic.run `(x₂))
+  | 3 => some (Unhygienic.run `(x₃))
+  | 4 => some (Unhygienic.run `(x₄))
+  | 5 => some (Unhygienic.run `(x₅))
+  | _ => none
+
+/-- The display name of the variable at de Bruijn index `i` in context `Γ`. -/
+def varName (shift inner : Nat) (Γ : Expr) (i : Nat) : String :=
+  match varSlot shift inner Γ i with
+  | some k => "x" ++ subscript k
+  | none => "y" ++ subscript (i - ctxPrefixLen Γ)
 
 /-- The de Bruijn index of a `Var` expression. -/
 partial def varIndex (e : Expr) : Option Nat :=
@@ -173,11 +224,13 @@ namespace Pretty
 
 open Lean Lean.PrettyPrinter.Delaborator
 
-/-- Object-level binders, `λ`, and quantifiers. Display only. -/
-syntax:lead "∀ᶠ " ident " : " term ", " term : term
-syntax:lead "∃ᶠ " ident " : " term ", " term : term
-syntax:lead "λᶠ " ident " : " term ", " term : term
-syntax:max "S" : term
+/-- Object-level binders, `λ`, and quantifiers. Display only.
+
+The bound name is a `term`, not an `ident`, because it is one of the `x₀ …` *tokens* — an
+`ident` position would print it escaped as `«x₀»`. -/
+syntax:lead "∀ᶠ " term " : " term ", " term : term
+syntax:lead "∃ᶠ " term " : " term ", " term : term
+syntax:lead "λᶠ " term " : " term ", " term : term
 syntax:max "R[" term "]" : term
 syntax:max "X[" term "]" : term
 syntax:max "↑ᶜ" term:max : term
@@ -202,12 +255,19 @@ def objCtx? (ty : Expr) : Option Expr :=
   | (``Term, #[_, _, Γ, _]) => some Γ
   | _ => none
 
+/-- The syntax for the variable at de Bruijn index `i`: the token that reads back as the
+same variable when there is one, an identifier otherwise. Binder positions use this too, so
+a bound variable is never printed as an escaped `«x₀»`. -/
+def varTermStx (shift inner : Nat) (Γ : Expr) (i : Nat) : TSyntax `term :=
+  match varSlot shift inner Γ i >>= varStx with
+  | some stx => stx
+  | none => mkIdent (Name.mkSimple (varName shift inner Γ i))
+
 /-- The names of the explicit prefix of a context, outermost-first — under the same
 free/bound split `varName` makes: entry `k` is de Bruijn index `n - 1 - k`. -/
-def ctxVarIdents (shift inner : Nat) (Γ : Expr) : Array Ident :=
+def ctxVarIdents (shift inner : Nat) (Γ : Expr) : Array (TSyntax `term) :=
   let n := ctxPrefixLen Γ
-  (List.range n).toArray.map fun k =>
-    mkIdent (Name.mkSimple (varName shift inner Γ (n - 1 - k)))
+  (List.range n).toArray.map fun k => varTermStx shift inner Γ (n - 1 - k)
 
 /-- **An open formula prints applied to the variables it may mention.**
 
@@ -266,13 +326,41 @@ def delabWeakening (inner : Expr) : Delab := do
   let i ← withShift (Lean.PrettyPrinter.delab inner : DelabM _)
   `(↑ᶜ$i)
 
-/-- Variables print by name. -/
+open Lean.Elab.Term in
+/-- Elaborate the variable displayed as `xₖ`: its de Bruijn index is fixed by the context of
+the expected type. -/
+def elabObjVar (k : Nat) (expectedType? : Option Expr) : TermElabM Expr := do
+  let some ty := expectedType? |
+    throwError "x{k}: the expected type is not known here, so the context is not either.\n\
+      Give the term an explicit type."
+  let ty ← instantiateMVars (← Lean.Meta.whnf ty)
+  let some Γ := objCtx? ty |
+    throwError "x{k}: expected an object-level term or formula, not{indentExpr ty}"
+  let n := ctxPrefixLen Γ
+  if k ≥ n then
+    throwError "x{k}: the context has only {n} named variable(s) — \
+      `x₀`{if n > 1 then s!" … x{n-1}" else ""}."
+  let mut v ← `(Metatheorems.Var.vz)
+  for _ in [0:n - 1 - k] do v ← `(Metatheorems.Var.vs $v)
+  elabTerm (← `(Metatheorems.Term.var $v)) expectedType?
+
+elab_rules : term <= expectedType? | `(x₀) => elabObjVar 0 expectedType?
+elab_rules : term <= expectedType? | `(x₁) => elabObjVar 1 expectedType?
+elab_rules : term <= expectedType? | `(x₂) => elabObjVar 2 expectedType?
+elab_rules : term <= expectedType? | `(x₃) => elabObjVar 3 expectedType?
+elab_rules : term <= expectedType? | `(x₄) => elabObjVar 4 expectedType?
+elab_rules : term <= expectedType? | `(x₅) => elabObjVar 5 expectedType?
+
+/-- Variables print by name — emitting the very token that reads back as the same variable,
+when there is one. -/
 @[app_delab Metatheorems.Term.var]
 def delabTermVar : Delab := do
   let args := (← SubExpr.getExpr).getAppArgs
   guard (args.size == 5)
   let some i := varIndex args[4]! | failure
   let (s, inner) ← getDepths
+  if let some k := varSlot s inner args[2]! i then
+    if let some stx := varStx k then return stx
   return mkIdent (Name.mkSimple (varName s inner args[2]! i))
 
 /-- Flatten an application spine, so `((f a) b) c` and `app2 f a b` both print as `f a b`.
@@ -323,9 +411,6 @@ def delabSpine : Delab := do
 @[app_delab Metatheorems.Term.zero]
 def delabTermZero : Delab := do `(0)
 
-@[app_delab Metatheorems.Term.succ]
-def delabTermSucc : Delab := do `(S)
-
 @[app_delab Metatheorems.Term.prec]
 def delabTermPrec : Delab := do
   let args := (← SubExpr.getExpr).getAppArgs
@@ -342,9 +427,10 @@ def delabTermWeaken : Delab := do
 
 /-- The name a binder over `Γ` introduces, and its body printed one binder deeper. -/
 private def delabBinder (Γ ρ body : Expr) :
-    DelabM (Ident × TSyntax `term × TSyntax `term) := do
+    DelabM (TSyntax `term × TSyntax `term × TSyntax `term) := do
   let (s, _) ← getDepths
-  let x := mkIdent (Name.mkSimple (binderName s Γ))
+  let k := s + ctxPrefixLen Γ
+  let x := (varStx k).getD (mkIdent (Name.mkSimple (binderName s Γ)))
   let ρS ← (Lean.PrettyPrinter.delab ρ : DelabM _)
   let bS ← withBinder (Lean.PrettyPrinter.delab body : DelabM _)
   return (x, ρS, bS)
