@@ -319,6 +319,64 @@ example : SeqD [] F EqX a Premises (Γ := Γ) []
   pbound wrapped_iteration
   pthm .refl0
 
+/-! ## Named variables
+
+An open formula prints applied to the variables it may mention, so a binder reads as a
+binder. These two pin the cases where the naming is easy to get wrong. -/
+
+section Naming
+variable {ρ σ : Ty ι} {P Q : Formula F (ρ :: Γ)}
+
+-- A *structured* weakened hypothesis. Its own binder is fresh, so it must not be named `x₀`
+-- like the ambient variable; `↑ᶜ` marks where the renumbering applies.
+/--
+trace: ι : Type
+F : ι → Ty ι
+EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ X[i] → Term F Γ X[i] → Formula F Γ
+a : Allowed
+Premises : PremiseSet F
+Γ : Ctx ι
+A B : Formula F Γ
+ρ σ : Ty ι
+P Q : Formula F (ρ :: Γ)
+⊢ ⟪Γ, x₀ : ρ⟫
+      h : ↑ᶜ(∀ᶠ x₁ : ρ, P x₁ ∧ᶠ Q x₁)
+      ────────────────────
+      P x₀
+-/
+#guard_msgs in
+example : SeqD ["h"] F EqX a Premises (Γ := ρ :: Γ)
+    [Formula.weakenBy ρ (Formula.all ρ (P ∧ᶠ Q))] P := by
+  trace_state
+  pspecialize h with hpq
+  pdestruct hpq with hp _hq
+  pexact hp
+
+-- An *atom* under a weakening. Its free variable is shared with the ambient context, so it
+-- keeps the ambient name and the weakening prints invisibly.
+/--
+trace: ι : Type
+F : ι → Ty ι
+EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ X[i] → Term F Γ X[i] → Formula F Γ
+a : Allowed
+Premises : PremiseSet F
+Γ : Ctx ι
+A B : Formula F Γ
+ρ σ : Ty ι
+P Q : Formula F (ρ :: Γ)
+⊢ ⟪Γ, x₀ : ρ, x₁ : σ⟫
+      p : P x₀
+      ────────────────────
+      P x₀
+-/
+#guard_msgs in
+example : SeqD ["p"] F EqX a Premises (Γ := σ :: ρ :: Γ)
+    [Formula.weakenBy σ P] (Formula.weakenBy σ P) := by
+  trace_state
+  pexact p
+
+end Naming
+
 /-! ## Error reporting
 
 `pexact` is the only tactic that can fail on a *name*, and it says what names are in scope.

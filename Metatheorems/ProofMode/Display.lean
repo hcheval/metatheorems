@@ -90,6 +90,14 @@ syntax (name := pmGoal)
 section Delab
 open Lean.PrettyPrinter.Delaborator
 
+/-- Weakening a formula, under the rule in `Pretty.delabWeakening`. (It lives here rather
+than in `Pretty.lean` because `Formula.weakenBy` is declared in `Derivable.lean`.) -/
+@[app_delab Metatheorems.Formula.weakenBy]
+def delabFormulaWeakenBy : Delab := do
+  let args := (← SubExpr.getExpr).getAppArgs
+  guard (args.size == 5)
+  Pretty.delabWeakening args[4]!
+
 /-- Split an expression that is a literal `List` spine into its elements. -/
 partial def listLit? (e : Expr) : Option (List Expr) :=
   match e.getAppFnArgs with
@@ -132,8 +140,8 @@ def delabSeqD : Delab := do
   -- scheme the term printer uses, and its (usually abstract) tail as itself.
   let (tail, tys) := Pretty.ctxSplit args[6]!
   let tailStx ← Lean.PrettyPrinter.delab tail
-  let tvs : Array Ident := (List.range tys.length).reverse.toArray.map fun k =>
-    mkIdent (Name.mkSimple (Pretty.tvarName k))
+  -- Outermost-first, under the same naming the term printer uses.
+  let tvs : Array Ident := Pretty.ctxVarIdents 0 0 args[6]!
   let tts ← tys.toArray.reverse.mapM fun t => (Lean.PrettyPrinter.delab t : MetaM _)
   let goalStx ← Lean.PrettyPrinter.delab args[8]!
   -- `Δ`'s head is the most recent hypothesis; display oldest-first.

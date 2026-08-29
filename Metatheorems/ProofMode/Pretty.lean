@@ -35,6 +35,20 @@ under one more binder it still prints as `x₂` while the new one becomes `x₃`
 reaching into an abstract tail `Γ` print as `y₀, y₁, …`, indexed from the top of the tail,
 which is stable for the same reason.
 
+## Open formulas print applied
+
+A Lean variable `P : Formula F (ρ :: Γ)` is an object-level formula with a free object
+variable — a predicate. Printing it as bare `P` hides that, and makes `∀ᶠ x₀ : ρ, P` look as
+though the binder were vacuous. It prints as `P x₀`, and `P.subst0 t` prints as `P t`, so a
+substitution reads as the application it is.
+
+## Weakening
+
+Weakening an *atom* is invisible: an atom binds nothing, so all its variables are shared with
+the ambient context and already carry the ambient names. Weakening a structured formula is
+marked `↑ᶜ`, because its own binders are fresh and must be kept clear of the ambient names —
+see the two counters below.
+
 These are *generated* names. Names the user chose — `pforall n` — would be better, and would
 mean threading a second name list through `SeqD` beside the hypothesis names. That is a
 separate change; this one costs no API.
@@ -58,10 +72,60 @@ private def subscript (n : Nat) : String :=
   else
     subscript (n / 10) ++ subscript (n % 10)
 
-/-- The display name of the variable at de Bruijn index `i` in context `Γ`. -/
-def varName (Γ : Expr) (i : Nat) : String :=
+/-! ### Printing under a weakening
+
+A *weakened* formula was written in a smaller context than the one it is being read in, and
+that splits its variables in two:
+
+* its **free** variables are shared with the ambient context — weakening embeds them — so
+  they must print with the *same* names they have outside;
+* its **bound** variables are fresh, and must not collide with ambient ones.
+
+Distance-from-the-tail alone cannot tell these apart: a binder inside the weakened formula
+and an ambient variable introduced *by* the weakening both sit at the same distance from the
+shared tail. So two counters are carried: how many weakenings have been crossed (`shift`,
+which offsets fresh names out of the way) and how many binders have been crossed since the
+last one (`inner`, which says which indices are the fresh ones).
+
+With no weakening in sight both are zero and the whole thing collapses to the plain scheme.
+-/
+
+register_option pp.metatheorems.shift : Nat := {
+  defValue := 0
+  descr := "internal: weakenings crossed while printing object-level syntax"
+}
+
+register_option pp.metatheorems.inner : Nat := {
+  defValue := 0
+  descr := "internal: binders crossed since the last weakening"
+}
+
+/-- The current (shift, inner) pair. -/
+def getDepths : DelabM (Nat × Nat) := do
+  let o ← getOptions
+  return (pp.metatheorems.shift.get o, pp.metatheorems.inner.get o)
+
+/-- Print `x` one weakening deeper: fresh names move up, and no binder has been crossed
+inside this weakening yet. -/
+def withShift (x : DelabM α) : DelabM α := do
+  let (s, _) ← getDepths
+  withOptions (fun o => (pp.metatheorems.inner.set (pp.metatheorems.shift.set o (s + 1)) 0)) x
+
+/-- Print `x` under one more object-level binder. -/
+def withBinder (x : DelabM α) : DelabM α := do
+  let (_, i) ← getDepths
+  withOptions (pp.metatheorems.inner.set · (i + 1)) x
+
+/-- The display name of the variable at de Bruijn index `i` in context `Γ`.
+
+`i < inner` marks a variable bound *inside* the current weakening: fresh, so offset by
+`shift`. Anything else is shared with the ambient context and keeps the ambient name. -/
+def varName (shift inner : Nat) (Γ : Expr) (i : Nat) : String :=
   let n := ctxPrefixLen Γ
-  if i < n then "x" ++ subscript (n - 1 - i) else "y" ++ subscript (i - n)
+  if i < n then
+    "x" ++ subscript ((if i < inner then shift else 0) + n - 1 - i)
+  else
+    "y" ++ subscript (i - n)
 
 /-- The de Bruijn index of a `Var` expression. -/
 partial def varIndex (e : Expr) : Option Nat :=
@@ -72,7 +136,8 @@ partial def varIndex (e : Expr) : Option Nat :=
 
 /-- The name a binder over `Γ` should introduce: the variable it binds is index 0 in
 `ρ :: Γ`, so its name is fixed by `Γ`'s length. -/
-def binderName (Γ : Expr) : String := "x" ++ subscript (ctxPrefixLen Γ)
+def binderName (shift : Nat) (Γ : Expr) : String :=
+  "x" ++ subscript (shift + ctxPrefixLen Γ)
 
 /-- The name of the term variable standing at distance `k` from the end of the explicit
 prefix — the same scheme `varName` uses, addressed from the other side. -/
@@ -115,6 +180,7 @@ syntax:lead "λᶠ " ident " : " term ", " term : term
 syntax:max "S" : term
 syntax:max "R[" term "]" : term
 syntax:max "X[" term "]" : term
+syntax:max "↑ᶜ" term:max : term
 
 /-- Types: `nat` and `X i`; the arrow already has notation. -/
 @[app_delab Metatheorems.Ty.nat]
@@ -129,13 +195,85 @@ def delabTyBase : Delab := do
   let i ← Lean.PrettyPrinter.delab args[1]!
   `(X[$i])
 
+/-- The context of an expression that is an object-level formula or term, if it is one. -/
+def objCtx? (ty : Expr) : Option Expr :=
+  match ty.getAppFnArgs with
+  | (``Formula, #[_, _, Γ]) => some Γ
+  | (``Term, #[_, _, Γ, _]) => some Γ
+  | _ => none
+
+/-- The names of the explicit prefix of a context, outermost-first — under the same
+free/bound split `varName` makes: entry `k` is de Bruijn index `n - 1 - k`. -/
+def ctxVarIdents (shift inner : Nat) (Γ : Expr) : Array Ident :=
+  let n := ctxPrefixLen Γ
+  (List.range n).toArray.map fun k =>
+    mkIdent (Name.mkSimple (varName shift inner Γ (n - 1 - k)))
+
+/-- **An open formula prints applied to the variables it may mention.**
+
+A Lean variable `P : Formula F (ρ :: Γ)` is an object-level formula with a free object
+variable — a *predicate*. Printing it as bare `P` hides that, and makes `∀ᶠ x₀ : ρ, P` look
+as though the binder were vacuous. It prints as `P x₀` instead.
+
+This is the one place where the printer looks at an expression's *type* rather than at the
+expression: an atom carries no structure to read the dependency off, only its context does.
+An atom over a context with no explicit prefix — `x : Term F Γ nat` — is closed as far as
+the displayed binders go, and prints bare. -/
+@[delab fvar]
+def delabOpenAtom : Delab := do
+  let e ← SubExpr.getExpr
+  let some Γ := objCtx? (← instantiateMVars (← Lean.Meta.inferType e)) | failure
+  let (s, i) ← getDepths
+  let xs := ctxVarIdents s i Γ
+  guard (xs.size > 0)
+  let base := mkIdent (← e.fvarId!.getUserName)
+  `($base $xs*)
+
+/-- Substituting into an open atom is application: `P.subst0 t` prints as `P t`. -/
+@[app_delab Metatheorems.Formula.subst0]
+def delabFormulaSubst0 : Delab := do
+  let args := (← SubExpr.getExpr).getAppArgs
+  guard (args.size == 5)
+  guard args[3]!.isFVar
+  let p := mkIdent (← args[3]!.fvarId!.getUserName)
+  let t ← Lean.PrettyPrinter.delab args[4]!
+  `($p $t)
+
+/-- Likewise in place: `P.substVar0 t` prints as `P t`. This is what makes the induction step
+readable — `P x₀ →ᶠ P (S x₀)`. -/
+@[app_delab Metatheorems.Formula.substVar0]
+def delabFormulaSubstVar0 : Delab := do
+  let args := (← SubExpr.getExpr).getAppArgs
+  guard (args.size == 5)
+  guard args[3]!.isFVar
+  let p := mkIdent (← args[3]!.fvarId!.getUserName)
+  let t ← Lean.PrettyPrinter.delab args[4]!
+  `($p $t)
+
+/-- Weakening an atom is invisible; weakening anything else is marked `↑ᶜ`, and everything
+inside it is named one level deeper.
+
+An atom over a prefix-free context genuinely does not mention the displayed binders, so
+dropping the weakening loses nothing. Structured formulas are different: their variables were
+written in the *smaller* context, so naming them at the ambient depth would collide them with
+the ambient variables. `withShift` moves them out of the way, and `↑ᶜ` says why. -/
+def delabWeakening (inner : Expr) : Delab := do
+  -- An atom binds nothing, so every variable it mentions is shared with the ambient context
+  -- and already prints with the ambient name. Nothing to mark, and nothing to move.
+  if inner.isFVar then
+    if (objCtx? (← instantiateMVars (← Lean.Meta.inferType inner))).isSome then
+      return ← Lean.PrettyPrinter.delab inner
+  let i ← withShift (Lean.PrettyPrinter.delab inner : DelabM _)
+  `(↑ᶜ$i)
+
 /-- Variables print by name. -/
 @[app_delab Metatheorems.Term.var]
 def delabTermVar : Delab := do
   let args := (← SubExpr.getExpr).getAppArgs
   guard (args.size == 5)
   let some i := varIndex args[4]! | failure
-  return mkIdent (Name.mkSimple (varName args[2]! i))
+  let (s, inner) ← getDepths
+  return mkIdent (Name.mkSimple (varName s inner args[2]! i))
 
 /-- Flatten an application spine, so `((f a) b) c` and `app2 f a b` both print as `f a b`.
 
@@ -195,38 +333,41 @@ def delabTermPrec : Delab := do
   let ρ ← Lean.PrettyPrinter.delab args[3]!
   `(R[$ρ])
 
-/-- Weakening is invisible: it is the same term, read in a larger context. -/
+/-- Weakening, under the rule in `delabWeakening`. -/
 @[app_delab Metatheorems.Term.weaken]
 def delabTermWeaken : Delab := do
   let args := (← SubExpr.getExpr).getAppArgs
   guard (args.size == 6)
-  Lean.PrettyPrinter.delab args[5]!
+  delabWeakening args[5]!
+
+/-- The name a binder over `Γ` introduces, and its body printed one binder deeper. -/
+private def delabBinder (Γ ρ body : Expr) :
+    DelabM (Ident × TSyntax `term × TSyntax `term) := do
+  let (s, _) ← getDepths
+  let x := mkIdent (Name.mkSimple (binderName s Γ))
+  let ρS ← (Lean.PrettyPrinter.delab ρ : DelabM _)
+  let bS ← withBinder (Lean.PrettyPrinter.delab body : DelabM _)
+  return (x, ρS, bS)
 
 @[app_delab Metatheorems.Term.lam]
 def delabTermLam : Delab := do
   let args := (← SubExpr.getExpr).getAppArgs
   guard (args.size == 6)
-  let x := mkIdent (Name.mkSimple (binderName args[3]!))
-  let ρ ← Lean.PrettyPrinter.delab args[2]!
-  let b ← Lean.PrettyPrinter.delab args[5]!
+  let (x, ρ, b) ← delabBinder args[3]! args[2]! args[5]!
   `(λᶠ $x : $ρ, $b)
 
 @[app_delab Metatheorems.Formula.all]
 def delabFormulaAll : Delab := do
   let args := (← SubExpr.getExpr).getAppArgs
   guard (args.size == 5)
-  let x := mkIdent (Name.mkSimple (binderName args[2]!))
-  let ρ ← Lean.PrettyPrinter.delab args[3]!
-  let b ← Lean.PrettyPrinter.delab args[4]!
+  let (x, ρ, b) ← delabBinder args[2]! args[3]! args[4]!
   `(∀ᶠ $x : $ρ, $b)
 
 @[app_delab Metatheorems.Formula.ex]
 def delabFormulaEx : Delab := do
   let args := (← SubExpr.getExpr).getAppArgs
   guard (args.size == 5)
-  let x := mkIdent (Name.mkSimple (binderName args[2]!))
-  let ρ ← Lean.PrettyPrinter.delab args[3]!
-  let b ← Lean.PrettyPrinter.delab args[4]!
+  let (x, ρ, b) ← delabBinder args[2]! args[3]! args[4]!
   `(∃ᶠ $x : $ρ, $b)
 
 end Pretty
