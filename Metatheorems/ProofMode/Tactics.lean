@@ -5,6 +5,7 @@ Authors: Horatiu
 -/
 import Metatheorems.ProofMode.Display
 import Metatheorems.ProofMode.Induction
+import Metatheorems.ProofMode.Linter
 
 /-!
 # The tactic layer
@@ -126,6 +127,13 @@ def pm_exI {ρ : Ty ι} {Δ : HCtx F Γ} {A : Formula F (ρ :: Γ)} (t : Term F 
     SeqD ns F EqX a Premises Δ (Formula.ex ρ A) :=
   seq_exI t h
 
+/-- Supply a witness at a *headline* `∃`, subject to the surface-recursor ban. -/
+def pm_bound {ρ : Ty ι} {Δ : HCtx F Γ} {A : Formula F (ρ :: Γ)} (t : Term F Γ ρ)
+    (hrf : t.usesPrec = false)
+    (h : SeqD ns F EqX a Premises Δ (A.subst0 t)) :
+    SeqD ns F EqX a Premises Δ (Formula.ex ρ A) :=
+  seq_bound t hrf h
+
 /-- Consume an `∃`, naming the body. -/
 def pm_exE (n : String) {ρ : Ty ι} {Δ : HCtx F Γ} {A : Formula F (ρ :: Γ)} {B : Formula F Γ}
     (hex : SeqD ns F EqX a Premises Δ (Formula.ex ρ A))
@@ -219,6 +227,28 @@ elab "pexact " h:ident : tactic => do
   for _ in [0:i] do v ← `(HVar.hs $v)
   evalTactic (← `(tactic| exact seq_id $v))
 
+/-- `pfail "…"` fails with exactly this message. Unlike `fail` it does not append the goal
+state, which matters here: the interesting failures are about the *shape* of the goal, and
+the shape is what the message already says. -/
+elab "pfail " s:str : tactic => throwError s.getString
+
+/-- Reduce a `Bool`-valued side condition. `some b` if it settles, `none` if it is stuck on
+an abstract formula — in which case the tactic should try to *prove* the side condition
+rather than refuse. -/
+private def evalBoolCheck (e : Expr) : TacticM (Option Bool) := do
+  match (← whnfD e) with
+  | .const ``Bool.true  _ => return some true
+  | .const ``Bool.false _ => return some false
+  | _ => return none
+
+/-- The `SeqD` goal, split into its arguments: `ι, names, F, EqX, a, Premises, Γ, Δ, B`. -/
+private def seqDGoalArgs (who : String) : TacticM (Array Expr) := do
+  let ty ← instantiateMVars (← (← getMainGoal).getType)
+  let args := ty.getAppArgs
+  unless ty.isAppOf ``SeqD && args.size == 9 do
+    throwError "{who}: the goal is not a proof-mode sequent{indentExpr ty}"
+  return args
+
 /-- `pintro h k …` introduces implications, naming the hypotheses. -/
 syntax (name := pintro) "pintro" (ppSpace colGt ident)+ : tactic
 
@@ -256,8 +286,33 @@ macro "pforall" : tactic => `(tactic| refine pm_allI ?_)
 /-- `pspecialize` instantiates a weakened `∀`-goal at the bound variable. -/
 macro "pspecialize" : tactic => `(tactic| refine pm_allE_here ?_)
 
-/-- `pexists t` supplies a witness. -/
+/-- `pexists t` supplies a witness. Unchecked — use `pbound` at a headline `∃`. -/
 macro "pexists " t:term : tactic => `(tactic| refine pm_exI $t ?_)
+
+/-- `pbound t` supplies a witness at a *headline* `∃`, and checks the surface-recursor ban.
+
+This is `bound` v0: a certificate **checker**, not a prover. The user writes the bound; the
+tactic checks that it is a bound the extraction could have produced rather than one smuggled
+in by hand.
+
+Like `pby_contra`, the check runs *before* anything is applied to the goal. -/
+elab "pbound " tStx:term : tactic => do
+  let args ← seqDGoalArgs "pbound"
+  -- `Formula.ex` : {ι} {F} {Γ} (ρ) (A)
+  let target ← whnfD args[8]!
+  let targs := target.getAppArgs
+  unless target.isAppOf ``Formula.ex && targs.size == 5 do
+    throwError "pbound: the goal is not an ∃, so there is no witness to supply."
+  let witTy := mkAppN (.const ``Term []) #[targs[0]!, targs[1]!, targs[2]!, targs[3]!]
+  let t ← elabTerm tStx (some witTy)
+  let chk := mkAppN (.const ``Term.usesPrec [])
+    #[targs[0]!, targs[1]!, targs[2]!, targs[3]!, t]
+  if (← evalBoolCheck chk) == some true then
+    throwError "pbound: the witness uses the primitive recursor.\n\
+      Iteration is what extraction produces, so a hand-written iterating witness makes the\n\
+      extraction vacuous (HANDOFF D-2, surface-recursor ban). Use `pexists` only if this ∃ \
+      is\nnot a headline position."
+  evalTactic (← `(tactic| refine pm_bound $tStx (by rfl) ?_))
 
 /-- `pobtain h with x` consumes the `∃` proved by hypothesis `h`, naming the body `x`. -/
 macro "pobtain " h:ident " with " x:ident : tactic =>
@@ -291,16 +346,40 @@ macro "pside" : tactic => `(tactic| first | rfl | assumption | decide)
 macro "pinduction" : tactic => `(tactic| refine pm_induction ?_ ?_)
 
 /-- `pby_contra h` proves an `∃` over a QF ∨-free matrix by contradiction, via Markov. The
-goal becomes `⊥ᶠ` with `h` the negated `∃`. -/
-macro "pby_contra " h:ident : tactic =>
-  -- The side conditions mention the matrix, which is only determined once the *conclusion*
-  -- has been unified with the goal. So they are left as named holes and discharged after
-  -- `refine`, not passed as `(by …)` arguments.
-  `(tactic| (refine pm_markov ?hm ?hqf ?hvf ?main
-             case hm => pside
-             case hqf => pside
-             case hvf => pside
-             pintro $h))
+goal becomes `⊥ᶠ` with `h` the negated `∃`.
+
+**The shape check comes first, and the tactic is atomic.** `HANDOFF` D-4 makes `by_contra`
+*be* the Markov rule, and D-1 makes "is this proof translated?" the question a refusal
+should provoke. Both require that a wrong-shaped goal be refused before anything is applied
+to it — a tactic that half-applies and then complains leaves the user reading errors about a
+goal they did not write. -/
+elab "pby_contra " h:ident : tactic => do
+  let args ← seqDGoalArgs "pby_contra"
+  -- `Formula.ex` : {ι} {F} {Γ} (ρ) (A)
+  let target ← whnfD args[8]!
+  let targs := target.getAppArgs
+  unless target.isAppOf ``Formula.ex && targs.size == 5 do
+    throwError "pby_contra: the goal is not an ∃ — not a Markov shape.\n\
+      Is this proof translated? (HANDOFF D-1: the classical content of a hand-translated \
+      proof is\nexactly `¬¬∃n(qf) → ∃n(qf)`.)"
+  let A₀ := targs[4]!
+  -- `Formula F Γ'` : the three arguments needed to say `isQF A₀` / `isVFree A₀`
+  let fargs := (← instantiateMVars (← inferType A₀)).getAppArgs
+  let check (fn : Name) : TacticM (Option Bool) :=
+    evalBoolCheck (mkAppN (.const fn []) #[fargs[0]!, fargs[1]!, fargs[2]!, A₀])
+  if (← evalBoolCheck (mkAppN (.const ``Allowed.markov []) #[args[4]!])) == some false then
+    throwError "pby_contra: Markov is not available here — `allowed.markov` is not `true`."
+  if (← check ``Formula.isQF) == some false then
+    throwError "pby_contra: the matrix is not quantifier-free — not a Markov shape.\n\
+      Is this proof translated?"
+  if (← check ``Formula.isVFree) == some false then
+    throwError "pby_contra: the matrix contains ∨ — not a Markov shape.\n\
+      Is this proof translated?"
+  evalTactic (← `(tactic| (refine pm_markov ?hm ?hqf ?hvf ?main
+                           case hm => pside
+                           case hqf => pside
+                           case hvf => pside
+                           pintro $h)))
 
 /-- `pinst h t as k` instantiates the `∀`-hypothesis `h` at `t`, naming the result `k`. -/
 macro "pinst " h:ident ppSpace t:term " as " k:ident : tactic =>

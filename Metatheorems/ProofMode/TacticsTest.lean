@@ -162,7 +162,97 @@ example : SeqD ["h"] F EqX Allowed.extended Prem (Γ := Γ)
   pqfac h as k
   pexact k
 
+/-! ### The Markov shape check
+
+`HANDOFF` D-4 asks that `by_contra` be the Markov rule *named as such*, and that it refuse
+anything else with a message pointing at the translation discipline. Each way of getting it
+wrong has its own message. Each goal below is separately provable, so the only message is
+the refusal — the tactic declines to *start*, it does not leave a broken state. -/
+
+-- Not an `∃` at all.
+/--
+error: pby_contra: the goal is not an ∃ — not a Markov shape.
+Is this proof translated? (HANDOFF D-1: the classical content of a hand-translated proof is
+exactly `¬¬∃n(qf) → ∃n(qf)`.)
+-/
+#guard_msgs in
+example : SeqD [] F EqX Allowed.extended Prem (Γ := Γ) [] (A →ᶠ A) := by
+  pby_contra h
+  pthm I_comb
+
+-- An `∃`, but the matrix has a quantifier in it.
+/--
+error: pby_contra: the matrix is not quantifier-free — not a Markov shape.
+Is this proof translated?
+-/
+#guard_msgs in
+example : SeqD [] F EqX Allowed.extended Prem (Γ := Γ) []
+    (Formula.ex Ty.nat (Formula.all Ty.nat
+      (Formula.eq0 (Term.var (.vs .vz)) (Term.var (.vs .vz))))) := by
+  pby_contra h
+  pexists Term.zero
+  pforall
+  pthm .refl0
+
+-- Quantifier-free, but with a `∨`: outside what our Dialectica interprets.
+/--
+error: pby_contra: the matrix contains ∨ — not a Markov shape.
+Is this proof translated?
+-/
+#guard_msgs in
+example : SeqD [] F EqX Allowed.extended Prem (Γ := Γ) []
+    (Formula.ex Ty.nat (Formula.eq0 (Term.var .vz) Term.zero ∨ᶠ
+      Formula.eq0 (Term.var .vz) Term.zero)) := by
+  pby_contra h
+  pexists Term.zero
+  pleft
+  pthm .refl0
+
+-- The right shape, but Markov is not in the system.
+/-- error: pby_contra: Markov is not available here — `allowed.markov` is not `true`. -/
+#guard_msgs in
+example : SeqD [] F EqX Allowed.base Prem (Γ := Γ) []
+    (Formula.ex Ty.nat (Formula.eq0 (Term.var .vz) Term.zero)) := by
+  pby_contra h
+  pexists Term.zero
+  pthm .refl0
+
 end Extended
+
+/-! ## `bound` v0 — the certificate checker
+
+`pbound` is the headline `∃`-introduction. It takes the witness from the user and checks the
+surface-recursor ban: iteration is what extraction is supposed to *produce*, so a
+hand-written iterating witness would make the extraction vacuous. -/
+
+/-- An honest witness passes. -/
+example : SeqD [] F EqX a Premises (Γ := Γ) []
+    (Formula.ex Ty.nat (Formula.eq0 (Term.var .vz) Term.zero)) := by
+  pbound Term.zero
+  pthm .refl0
+
+-- An iterating witness — `R_nat 0 (λx n. x) 0`, which is `0` but computed by recursion —
+-- is rejected, with the reason.
+/--
+error: pbound: the witness uses the primitive recursor.
+Iteration is what extraction produces, so a hand-written iterating witness makes the
+extraction vacuous (HANDOFF D-2, surface-recursor ban). Use `pexists` only if this ∃ is
+not a headline position.
+-/
+#guard_msgs in
+example : SeqD [] F EqX a Premises (Γ := Γ) []
+    (Formula.ex Ty.nat (Formula.eq0 (Term.var .vz) (Term.var .vz))) := by
+  pbound (Term.app (Term.app (Term.app (Term.prec Ty.nat) Term.zero)
+      (Term.lam (Term.lam (Term.var (.vs .vz))))) Term.zero)
+  pthm .refl0
+
+/-- The ban is on the *surface* term only: `pexists` still accepts the same witness,
+because not every `∃` in a proof is a headline position. -/
+example : SeqD [] F EqX a Premises (Γ := Γ) []
+    (Formula.ex Ty.nat (Formula.eq0 (Term.var .vz) (Term.var .vz))) := by
+  pexists (Term.app (Term.app (Term.app (Term.prec Ty.nat) Term.zero)
+      (Term.lam (Term.lam (Term.var (.vs .vz))))) Term.zero)
+  pthm .refl0
 
 /-! ## Error reporting
 
