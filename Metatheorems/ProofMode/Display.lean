@@ -90,14 +90,14 @@ section Delab
 open Lean.PrettyPrinter.Delaborator
 
 /-- Split an expression that is a literal `List` spine into its elements. -/
-private partial def listLit? (e : Expr) : Option (List Expr) :=
+partial def listLit? (e : Expr) : Option (List Expr) :=
   match e.getAppFnArgs with
   | (``List.nil, _) => some []
   | (``List.cons, #[_, x, xs]) => (listLit? xs).map (x :: ·)
   | _ => none
 
 /-- The `String` behind a string-literal expression. -/
-private def strLit? (e : Expr) : Option String :=
+def strLit? (e : Expr) : Option String :=
   match e with
   | .lit (.strVal s) => some s
   | _ => none
