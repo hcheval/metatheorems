@@ -128,7 +128,7 @@ example : SeqD [] F EqX a Premises [] ((A →ᶠ B) →ᶠ A →ᶠ B) := by
 
 example {ρ : Ty ι} {P : Formula F (ρ :: Γ)} (t : Term F Γ ρ) :
     SeqD ["h"] F EqX a Premises [Formula.all ρ P] (P.subst0 t) := by
-  pinst h t as k
+  pinst h t with k
   pexact k
 
 /-! ## Induction
@@ -174,7 +174,7 @@ example : SeqD ["h"] F EqX Allowed.extended Prem (Γ := Γ)
     [Formula.all Ty.nat (Formula.ex Ty.nat (Formula.eq0 (Term.var .vz) (Term.var .vz)))]
     (Formula.ex (Ty.nat →ₜ Ty.nat) (Formula.all Ty.nat
       (Formula.substF Formula.acSubst (Formula.eq0 (Term.var .vz) (Term.var .vz))))) := by
-  pqfac h as k
+  pqfac h with k
   pexact k
 
 /-! ### The Markov shape check
@@ -294,8 +294,8 @@ explicitly with `pexists!`.
 #guard_msgs in
 example {P : Formula F (Ty.nat :: Γ)} :
     SeqD ["h"] F EqX a Premises [Formula.all Ty.nat P] (P.subst0 Term.zero) := by
-  pinst h iterating_zero as k
-  pinst h Term.zero as k'
+  pinst h iterating_zero with k
+  pinst h Term.zero with k'
   pexact k'
 
 -- A route D-2's list does not name: the *formula* of a cut is user-written too, and its

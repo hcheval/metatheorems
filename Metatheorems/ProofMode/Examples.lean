@@ -85,13 +85,13 @@ section Quantifiers
 variable {ρ : Ty ι} {P Q : Formula F (ρ :: Γ)}
 
 /-- `∀` distributes over `→`. This is the one that made the missing move obvious: after
-`pforall` the hypotheses are weakened, so `himp` is *used* by `pspecialize … as …`. -/
+`pforall` the hypotheses are weakened, so `himp` is *used* by `pspecialize … with …`. -/
 example : SeqD [] F EqX a Premises []
     (Formula.all ρ (P →ᶠ Q) →ᶠ Formula.all ρ P →ᶠ Formula.all ρ Q) := by
   pintro himp hp
   pforall
-  pspecialize himp as hpq
-  pspecialize hp as hp'
+  pspecialize himp with hpq
+  pspecialize hp with hp'
   papply hpq
   pexact hp'
 
@@ -101,11 +101,11 @@ example : SeqD [] F EqX a Premises []
   pintro h
   psplit
   · pforall
-    pspecialize h as hpq
+    pspecialize h with hpq
     pdestruct hpq with hp _hq
     pexact hp
   · pforall
-    pspecialize h as hpq
+    pspecialize h with hpq
     pdestruct hpq with _hp hq
     pexact hq
 
@@ -125,7 +125,7 @@ but `∀x P → P[t]` is, for any term you can write. -/
 example (t : Term F Γ ρ) : SeqD [] F EqX a Premises []
     (Formula.all ρ P →ᶠ P.subst0 t) := by
   pintro h
-  pinst h t as k
+  pinst h t with k
   pexact k
 
 end Quantifiers

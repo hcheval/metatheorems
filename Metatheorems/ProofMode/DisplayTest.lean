@@ -29,7 +29,7 @@ open Formula
 /--
 trace: ι : Type
 F : ι → Ty ι
-EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ
+EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ X[i] → Term F Γ X[i] → Formula F Γ
 a : Allowed
 Premises : PremiseSet F
 Γ : Ctx ι
@@ -49,7 +49,7 @@ example : SeqD ["h", "k"] F EqX a Premises [B, A] (A ∧ᶠ B) := by
 /--
 trace: ι : Type
 F : ι → Ty ι
-EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ
+EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ X[i] → Term F Γ X[i] → Formula F Γ
 a : Allowed
 Premises : PremiseSet F
 Γ : Ctx ι
@@ -68,7 +68,7 @@ example : SeqD [] F EqX a Premises [] (A →ᶠ A) := by
 /--
 trace: ι : Type
 F : ι → Ty ι
-EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ
+EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ X[i] → Term F Γ X[i] → Formula F Γ
 a : Allowed
 Premises : PremiseSet F
 Γ : Ctx ι

@@ -285,17 +285,6 @@ private def seqDGoalArgs (who : String) : TacticM (Array Expr) := do
     throwError "{who}: the goal is not a proof-mode sequent{indentExpr ty}"
   return args
 
-/-- Split a `List` spine, reducing as it goes. Needed because `∀`-introduction leaves the
-hypothesis context as `Δ.map (weakenBy ρ)` rather than as a literal `cons` chain. -/
-private partial def whnfListLit? (e : Expr) : TacticM (Option (List Expr)) := do
-  match (← whnfD e).getAppFnArgs with
-  | (``List.nil, _) => return some []
-  | (``List.cons, #[_, x, xs]) =>
-      match ← whnfListLit? xs with
-      | some r => return some (x :: r)
-      | none => return none
-  | _ => return none
-
 /-- The formula at position `n` of the hypothesis context of the current goal. -/
 private def hypFormula (who : String) (n : String) : TacticM Expr := do
   let args ← seqDGoalArgs who
@@ -400,11 +389,11 @@ is used after `pforall`.
 
 The `colGt` matters: without it the bare form would swallow the next line's tactic name as
 its `h`. -/
-syntax "pspecialize" (ppSpace colGt ident " as " ppSpace colGt ident)? : tactic
+syntax "pspecialize" (ppSpace colGt ident " with " ppSpace colGt ident)? : tactic
 
 macro_rules
   | `(tactic| pspecialize) => `(tactic| refine pm_allE_here ?_)
-  | `(tactic| pspecialize $h:ident as $k:ident) =>
+  | `(tactic| pspecialize $h:ident with $k:ident) =>
       `(tactic| refine pm_allE_here_cut $(Lean.quote k.getId.toString) (by pexact $h) ?_)
 
 /-- The `Formula.ex` the goal is, split into `ι, F, Γ, ρ, A`. -/
@@ -550,7 +539,7 @@ The instantiation term is a surface term, so the recursor ban applies. This is t
 R4's attempt C used: a `∀`-premise instantiated at a hand-written iterating term contributes
 that term to the Dialectica challenge side, and thence to the extracted bound, without ever
 introducing an `∃` for a headline-scoped linter to notice. -/
-elab "pinst " h:ident ppSpace tStx:term " as " k:ident : tactic => do
+elab "pinst " h:ident ppSpace tStx:term " with " k:ident : tactic => do
   let A ← whnfD (← hypFormula "pinst" h.getId.toString)
   let aargs := A.getAppArgs
   unless A.isAppOf ``Formula.all && aargs.size == 5 do
@@ -561,7 +550,7 @@ elab "pinst " h:ident ppSpace tStx:term " as " k:ident : tactic => do
 
 /-- `pqfac h as k` applies QF-AC to the `∀∃`-hypothesis `h`, naming the choice function
 statement `k`. -/
-macro "pqfac " h:ident " as " k:ident : tactic =>
+macro "pqfac " h:ident " with " k:ident : tactic =>
   -- Unlike Markov, the matrix here is fixed by the *hypothesis*, not by the goal, so that
   -- argument has to be elaborated inline; only the side conditions can be deferred.
   `(tactic| (refine pm_qfac $(Lean.quote k.getId.toString) ?hq ?hqf ?hvf (by pexact $h) ?main

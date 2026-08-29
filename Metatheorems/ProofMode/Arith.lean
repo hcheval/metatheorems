@@ -26,6 +26,39 @@ extensional, so equals may be substituted for equals only through QF-ER, at quan
 -/
 
 namespace Metatheorems
+
+/-! ## Printing arithmetic
+
+A second delaborator for `Term.app`, registered after the generic one in `Pretty.lean` and
+tried first. It recognises the binary arithmetic constants and falls through to juxtaposition
+for everything else. -/
+
+namespace Pretty
+open Lean Lean.PrettyPrinter.Delaborator
+
+/-- Display-only infix for the object-level arithmetic operations. -/
+syntax:65 term:65 " +ᵗ " term:66 : term
+syntax:70 term:70 " *ᵗ " term:71 : term
+syntax:65 term:65 " ∸ᵗ " term:66 : term
+
+def delabArith : Delab := do
+  let e ← SubExpr.getExpr
+  guard (isSpine e)
+  let (hd, xs) := termSpine e
+  guard (xs.size == 2)
+  let a ← (Lean.PrettyPrinter.delab xs[0]! : MetaM _)
+  let b ← (Lean.PrettyPrinter.delab xs[1]! : MetaM _)
+  match hd.getAppFn.constName? with
+  | some ``Term.add   => `($a +ᵗ $b)
+  | some ``Term.mul   => `($a *ᵗ $b)
+  | some ``Term.monus => `($a ∸ᵗ $b)
+  | _ => failure
+
+@[app_delab Metatheorems.Term.app]  def delabArithApp : Delab := delabArith
+@[app_delab Metatheorems.Term.app2] def delabArithApp2 : Delab := delabArith
+
+end Pretty
+
 namespace ProofMode
 
 open Formula

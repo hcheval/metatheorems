@@ -5,6 +5,7 @@ Authors: Horatiu
 -/
 import Lean
 import Metatheorems.ProofMode.Packing
+import Metatheorems.ProofMode.Pretty
 
 /-!
 # Rendering a proof-mode goal
@@ -79,8 +80,8 @@ The hypothesis lines are a grouped repetition *inside* this rule rather than a s
 category of their own: a category would be run through the term parenthesizer, which cannot
 know that juxtaposed `h : A` lines are unambiguous and so brackets them. -/
 syntax (name := pmGoal)
-  "⟪" term "⟫" ppIndent((ppLine ident " : " term)* ppLine "────────────────────"
-    ppLine term) : term
+  "⟪" term ("," ppSpace ident " : " term)* "⟫"
+    ppIndent((ppLine ident " : " term)* ppLine "────────────────────" ppLine term) : term
 
 -- ============================================================================
 -- Delaborator
@@ -95,6 +96,16 @@ partial def listLit? (e : Expr) : Option (List Expr) :=
   | (``List.nil, _) => some []
   | (``List.cons, #[_, x, xs]) => (listLit? xs).map (x :: ·)
   | _ => none
+
+/-- Split a `List` spine, reducing as it goes. -/
+partial def whnfListLit? (e : Expr) : MetaM (Option (List Expr)) := do
+  match (← Lean.Meta.whnf e).getAppFnArgs with
+  | (``List.nil, _) => return some []
+  | (``List.cons, #[_, x, xs]) =>
+      match ← whnfListLit? xs with
+      | some r => return some (x :: r)
+      | none => return none
+  | _ => return none
 
 /-- The `String` behind a string-literal expression. -/
 def strLit? (e : Expr) : Option String :=
@@ -112,17 +123,25 @@ def delabSeqD : Delab := do
   let args := e.getAppArgs
   -- ι, names, F, EqX, a, Premises, Γ, Δ, B
   guard (args.size == 9)
-  let some hyps := listLit? args[7]! | failure
+  -- `∀`-introduction leaves `Δ` as `Δ.map (weakenBy ρ)`, so the spine has to be reduced
+  -- rather than matched syntactically.
+  let some hyps ← whnfListLit? args[7]! | failure
   let names : List String :=
     (listLit? args[1]!).map (·.filterMap strLit?) |>.getD []
-  let ctxStx ← Lean.PrettyPrinter.delab args[6]!
+  -- The term context: its explicit prefix is shown as named binders, under the same naming
+  -- scheme the term printer uses, and its (usually abstract) tail as itself.
+  let (tail, tys) := Pretty.ctxSplit args[6]!
+  let tailStx ← Lean.PrettyPrinter.delab tail
+  let tvs : Array Ident := (List.range tys.length).reverse.toArray.map fun k =>
+    mkIdent (Name.mkSimple (Pretty.tvarName k))
+  let tts ← tys.toArray.reverse.mapM fun t => (Lean.PrettyPrinter.delab t : MetaM _)
   let goalStx ← Lean.PrettyPrinter.delab args[8]!
   -- `Δ`'s head is the most recent hypothesis; display oldest-first.
   let hyps := hyps.reverse
   let names := (names ++ List.replicate hyps.length "_").take hyps.length |>.reverse
   let ns : Array Ident := (names.map (mkIdent <| Name.mkSimple ·)).toArray
   let hs ← hyps.toArray.mapM fun h => Lean.PrettyPrinter.delab h
-  `(⟪$ctxStx⟫ $[$ns:ident : $hs]* ──────────────────── $goalStx)
+  `(⟪$tailStx $[, $tvs:ident : $tts]*⟫ $[$ns:ident : $hs]* ──────────────────── $goalStx)
 
 end Delab
 
