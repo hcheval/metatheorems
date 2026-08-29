@@ -23,6 +23,12 @@ variable {ι : Type} {F : ι → Ty ι}
 
 open Formula
 
+/-- `R_nat 0 (λx n. x) 0` — extensionally `0`, but computed by recursion. The witness the
+surface-recursor ban exists to refuse. -/
+def iterating_zero : Term F Γ Ty.nat :=
+  Term.app (Term.app (Term.app (Term.prec Ty.nat) Term.zero)
+    (Term.lam (Term.lam (Term.var (.vs .vz))))) Term.zero
+
 /-! ## Propositional -/
 
 example : SeqD [] F EqX a Premises [] (A →ᶠ B →ᶠ (A ∧ᶠ B)) := by
@@ -223,7 +229,10 @@ end Extended
 
 `pbound` is the headline `∃`-introduction. It takes the witness from the user and checks the
 surface-recursor ban: iteration is what extraction is supposed to *produce*, so a
-hand-written iterating witness would make the extraction vacuous. -/
+hand-written iterating witness would make the extraction vacuous.
+
+Per HANDOFF D-2 the ban is on the *surface language*, so `pexists` and `pinst` carry it too;
+`pexists!` is the named escape hatch. -/
 
 /-- An honest witness passes. -/
 example : SeqD [] F EqX a Premises (Γ := Γ) []
@@ -234,25 +243,63 @@ example : SeqD [] F EqX a Premises (Γ := Γ) []
 -- An iterating witness — `R_nat 0 (λx n. x) 0`, which is `0` but computed by recursion —
 -- is rejected, with the reason.
 /--
-error: pbound: the witness uses the primitive recursor.
-Iteration is what extraction produces, so a hand-written iterating witness makes the
-extraction vacuous (HANDOFF D-2, surface-recursor ban). Use `pexists` only if this ∃ is
-not a headline position.
+error: pbound: the term uses the primitive recursor.
+Iteration is what extraction produces, so a hand-written iterating term makes the
+extraction vacuous (HANDOFF D-2, surface-recursor ban). If this really is auxiliary, say so
+explicitly with `pexists!`.
 -/
 #guard_msgs in
 example : SeqD [] F EqX a Premises (Γ := Γ) []
     (Formula.ex Ty.nat (Formula.eq0 (Term.var .vz) (Term.var .vz))) := by
-  pbound (Term.app (Term.app (Term.app (Term.prec Ty.nat) Term.zero)
-      (Term.lam (Term.lam (Term.var (.vs .vz))))) Term.zero)
+  pbound iterating_zero
   pthm .refl0
 
-/-- The ban is on the *surface* term only: `pexists` still accepts the same witness,
-because not every `∃` in a proof is a headline position. -/
+-- `pexists` carries the same ban — the surface language loses the recursor, not just the
+-- headline position.
+/--
+error: pexists: the term uses the primitive recursor.
+Iteration is what extraction produces, so a hand-written iterating term makes the
+extraction vacuous (HANDOFF D-2, surface-recursor ban). If this really is auxiliary, say so
+explicitly with `pexists!`.
+-/
+#guard_msgs in
 example : SeqD [] F EqX a Premises (Γ := Γ) []
     (Formula.ex Ty.nat (Formula.eq0 (Term.var .vz) (Term.var .vz))) := by
-  pexists (Term.app (Term.app (Term.app (Term.prec Ty.nat) Term.zero)
-      (Term.lam (Term.lam (Term.var (.vs .vz))))) Term.zero)
+  pexists iterating_zero
   pthm .refl0
+
+/-- `pexists!` is the escape hatch: a bypass has to be written down. -/
+example : SeqD [] F EqX a Premises (Γ := Γ) []
+    (Formula.ex Ty.nat (Formula.eq0 (Term.var .vz) (Term.var .vz))) := by
+  pexists! iterating_zero
+  pthm .refl0
+
+-- **R4 attempt C**: the smuggle that reaches the extracted term through an
+-- *instantiation*, never touching an `∃`. Refused.
+/--
+error: pinst: the term uses the primitive recursor.
+Iteration is what extraction produces, so a hand-written iterating term makes the
+extraction vacuous (HANDOFF D-2, surface-recursor ban). If this really is auxiliary, say so
+explicitly with `pexists!`.
+-/
+#guard_msgs in
+example {P : Formula F (Ty.nat :: Γ)} :
+    SeqD ["h"] F EqX a Premises [Formula.all Ty.nat P] (P.subst0 Term.zero) := by
+  pinst h iterating_zero as k
+  pinst h Term.zero as k'
+  pexact k'
+
+-- A route D-2's list does not name: the *formula* of a cut is user-written too, and its
+-- terms reach the extracted content the same way an instantiation's do.
+/--
+error: phave: the formula contains a term built with the primitive recursor.
+Iteration is what extraction produces, so writing it by hand makes the extraction
+vacuous (HANDOFF D-2, surface-recursor ban).
+-/
+#guard_msgs in
+example : SeqD [] F EqX a Premises (Γ := Γ) [] (A →ᶠ A) := by
+  phave k : Formula.eq0 iterating_zero iterating_zero
+  pthm I_comb
 
 /-! ## Error reporting
 

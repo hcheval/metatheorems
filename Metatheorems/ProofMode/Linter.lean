@@ -36,6 +36,27 @@ def usesPrec : {Γ : Ctx ι} → {ρ : Ty ι} → Term F Γ ρ → Bool
 
 end Term
 
+namespace Formula
+
+variable {ι : Type} {F : ι → Ty ι}
+
+/-- Does this formula mention the primitive recursor, anywhere in its terms?
+
+A user-written *formula* is a surface position too: a cut on `A` contributes `A`'s witness
+and counter types to the Dialectica interpretation, so a hand-written iterating term inside
+`A` reaches the extracted content by the same route `R4`'s attempt C used for
+instantiations. `HANDOFF` D-2's list of surface positions does not name this one. -/
+def usesPrec : {Γ : Ctx ι} → Formula F Γ → Bool
+  | _, .bot     => false
+  | _, .eq0 s t => s.usesPrec || t.usesPrec
+  | _, .and A B => usesPrec A || usesPrec B
+  | _, .or  A B => usesPrec A || usesPrec B
+  | _, .imp A B => usesPrec A || usesPrec B
+  | _, .all _ A => usesPrec A
+  | _, .ex  _ A => usesPrec A
+
+end Formula
+
 namespace ProofMode
 
 variable {ι : Type} {F : ι → Ty ι}

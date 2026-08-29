@@ -25,13 +25,18 @@ The named scope cut, if one is later needed, is the §8 abort state (hand-execut
 interpretation + machine-checked certificate), which is **already half-built** — see
 Fallbacks below.
 
-**Confidence: still low on schedule.** The two probes run were the *design*-risk probes
-(R1, R4) and both are answerable on paper. The *schedule*-risk probes (R2 PMTerm, R3
-elaboration boundary, R6 extractor) are unrun, and M1-by-deadline is entirely their
-question. Expect the verdict to move on R2.
+**Confidence on schedule: improved, not resolved.** R3/R5/R6 have now been run by *building*
+the proof mode rather than estimating it (probe entry below): B1 is complete with zero
+`sorry`, D-2's recursor ban is implemented and refuses both of R4's surviving smuggles, and
+D-4's `by_contra_markov` check exists with the specified message. What remains unrun is
+**B2** — the acceptance oracle "DSL-MCT script ≡ hand-built p₂" — which has nothing to
+compare against until a derivation exists on the A track. **R2 remains the binding
+evidence**, and M1-by-deadline is still its question.
 
 **Verdict history.** YELLOW (initial, after R1-partial: cut was "classical route dead").
 That cut is **withdrawn** — R1's completion shows the route is live once D-1 is fixed.
+Held at YELLOW after R3/R5/R6: they retire the B-track schedule risk, but the verdict turns
+on the A track, which they say nothing about.
 
 ---
 
@@ -278,6 +283,76 @@ needs an iterated term, the ban needs a carve-out and the whole argument weakens
   motive, that inject terms into the extracted output the way `bound` does? Not enumerated
   — the `bound` route was found by asking "what else reaches the extracted term", and that
   question has more answers than I checked.
+
+---
+
+### R3 / R5 / R6 · The proof mode, built rather than estimated
+
+- **Timebox** — · **Actual** one session · **Artifact** `Metatheorems/ProofMode/`, 5 modules
+  + 3 test modules, zero `sorry`, full `lake build` green.
+- **Result: PASS.** Every move `HANDOFF` §3 B1 names is implemented and property-tested, and
+  `bound` v0 is the certificate checker it was specified to be. R6's "six moves" cost about
+  450 lines of derived layer plus 200 of tactic; the schedule risk these probes were meant
+  to measure is not there.
+
+**R3 — the elaboration boundary.** `Derivable` is Hilbert-style, so `Γ` is the *term*
+context and there is no assumption mechanism to target. The mode therefore targets a derived
+sequent layer: a hypothesis context reified as a list of formulas, packaged into nested
+implications (`Packing.lean`). Names live in a *reducible* wrapper `SeqD` (`Display.lean`),
+so the proof layer pays nothing for them and the two never need translating between.
+
+The boundary turned out to sit in an unexpected place. Almost nothing needs to inspect the
+goal: each move is a **lemma stated on `SeqD`** plus a three-line `macro` that `refine`s it,
+so the name/context bookkeeping is checked by the *elaborator*, not by tactic code
+manipulating `Expr`s. Only the moves that must read a name or enforce a side condition are
+written as `elab` — `pexact`, `pby_contra`, `pbound`, `pexists`, `pinst`, `phave`.
+
+**R6 — the moves.** intro/exact/apply/cut, ∧/∨/⊥, ∀/∃, `pinduction`, `pby_contra` (Markov),
+`pqfac`, `pinst`, `pbound`. Two things the move table did not anticipate:
+
+1. After `∀`-introduction the whole hypothesis context arrives *weakened*, so a
+   `∀`-hypothesis is **used** through `forall_ax_vz`, not looked up. A separate move.
+2. `induction` is a kernel *rule* with no side formula, so with hypotheses present the
+   context must be carried through it — the formula actually inducted on is `Δ↑ →ᶠ A`,
+   peeled one hypothesis at a time (`Induction.lean`). That needed two formula-level
+   substitution lemmas (`subst0_weakenBy`, `substVar0_weakenBy`) which in turn needed
+   `renameF_substF` / `renameF_eq_substF`, none of which existed. This is the whole de
+   Bruijn cost of the general rule, and it is paid once.
+
+**D-4's `by_contra_markov` is mechanical now.** The shape check runs *before* anything is
+applied, and each way of being wrong has its own message: not an `∃`; matrix not QF; matrix
+contains `∨`; Markov not in `allowed`. All four are pinned by `#guard_msgs`. Atomicity was
+not a nicety — the first version half-applied and then complained, which left the user
+reading errors about a goal they had not written.
+
+**R5 / D-2 — the surface-recursor ban is implemented, and it is stronger than R4 left it.**
+`Term.usesPrec` plus the `pbound` / `pexists` / `pinst` / `phave` checks. Three findings:
+
+- **The ban subsumes attempt B as well as attempt C.** R4 proposed provenance ∪ syntactic
+  identity tagging to close B (re-derive the headline `∃` inside a reductio). But B still has
+  to *write* Ψ, and Ψ needs iteration. With the ban on the surface language, B is refused
+  without any headline tagging at all. Tagging is therefore not needed for the Ψ case — which
+  is the case the demo rests on. It would still be needed for a bound expressible without a
+  recursor; R4 already flags Groetsch as the place to check that.
+- **Attempt C's actual route is now refused**, and there is a test that exhibits it: `pinst`
+  at a hand-written iterating term, never touching an `∃`.
+- **A surface position D-2 does not name: the formula of a cut.** `phave h : A` is
+  user-written, and `A`'s witness and counter types enter the interpretation exactly the way
+  an instantiation's term does. `Formula.usesPrec` now covers it. Found by re-asking R4's own
+  closing question — "what else reaches the extracted term" — against the implemented move
+  set rather than against the spec.
+
+`ind` is *not* a surface position here after all: `pinduction` reads its motive off the goal,
+so there is no user-written motive to smuggle through. `split` does not exist yet.
+
+- **Schedule delta.** Negative. B1 is done; B2 is the remaining B-track work.
+- **Kill criterion.** Not fired.
+- **Open questions.** (i) **B2 is unrun** — there is no MCT derivation in either hand-built
+  or scripted form yet, so the acceptance oracle "script ≡ p₂" has nothing to compare. That
+  is now the binding evidence for the B track, exactly as R2 is for the A track. (ii) The
+  ban rests on Ψ needing iteration. Any corpus item whose bound is recursor-free defeats it
+  and brings the tagging work back. (iii) `pexists!` is the named bypass; nothing yet
+  *reports* that a derivation used it, which a certificate ought to do.
 
 ---
 

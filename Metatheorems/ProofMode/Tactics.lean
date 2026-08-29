@@ -241,6 +241,25 @@ private def evalBoolCheck (e : Expr) : TacticM (Option Bool) := do
   | .const ``Bool.false _ => return some false
   | _ => return none
 
+/-- Elaborate a term the *user wrote* at a surface position, and enforce the recursor ban.
+
+`HANDOFF` D-2 puts the ban on the surface language as a whole — "instantiation witnesses,
+`bound` instantiations, `split` precisions, `ind` motives" — not only on headline `∃`
+witnesses. That is deliberately stronger than a headline-only check and is what makes the
+non-triviality claim a statement about *expressiveness*: the input language cannot write the
+bound, so no enumeration of smuggling routes is needed. R4's attempt C reached the extracted
+term through an *instantiation*, never touching an `∃`, which is exactly why the check has
+to live here rather than at `∃`-introduction. -/
+private def elabSurfaceTerm (who : String) (ι F Γ ρ : Expr) (tStx : TSyntax `term) :
+    TacticM Expr := do
+  let t ← elabTerm tStx (some (mkAppN (.const ``Term []) #[ι, F, Γ, ρ]))
+  if (← evalBoolCheck (mkAppN (.const ``Term.usesPrec []) #[ι, F, Γ, ρ, t])) == some true then
+    throwError "{who}: the term uses the primitive recursor.\n\
+      Iteration is what extraction produces, so a hand-written iterating term makes the\n\
+      extraction vacuous (HANDOFF D-2, surface-recursor ban). If this really is auxiliary, \
+      say so\nexplicitly with `pexists!`."
+  return t
+
 /-- The `SeqD` goal, split into its arguments: `ι, names, F, EqX, a, Premises, Γ, Δ, B`. -/
 private def seqDGoalArgs (who : String) : TacticM (Array Expr) := do
   let ty ← instantiateMVars (← (← getMainGoal).getType)
@@ -286,32 +305,39 @@ macro "pforall" : tactic => `(tactic| refine pm_allI ?_)
 /-- `pspecialize` instantiates a weakened `∀`-goal at the bound variable. -/
 macro "pspecialize" : tactic => `(tactic| refine pm_allE_here ?_)
 
-/-- `pexists t` supplies a witness. Unchecked — use `pbound` at a headline `∃`. -/
-macro "pexists " t:term : tactic => `(tactic| refine pm_exI $t ?_)
-
-/-- `pbound t` supplies a witness at a *headline* `∃`, and checks the surface-recursor ban.
-
-This is `bound` v0: a certificate **checker**, not a prover. The user writes the bound; the
-tactic checks that it is a bound the extraction could have produced rather than one smuggled
-in by hand.
-
-Like `pby_contra`, the check runs *before* anything is applied to the goal. -/
-elab "pbound " tStx:term : tactic => do
-  let args ← seqDGoalArgs "pbound"
-  -- `Formula.ex` : {ι} {F} {Γ} (ρ) (A)
+/-- The `Formula.ex` the goal is, split into `ι, F, Γ, ρ, A`. -/
+private def exGoalArgs (who : String) : TacticM (Array Expr) := do
+  let args ← seqDGoalArgs who
   let target ← whnfD args[8]!
   let targs := target.getAppArgs
   unless target.isAppOf ``Formula.ex && targs.size == 5 do
-    throwError "pbound: the goal is not an ∃, so there is no witness to supply."
-  let witTy := mkAppN (.const ``Term []) #[targs[0]!, targs[1]!, targs[2]!, targs[3]!]
-  let t ← elabTerm tStx (some witTy)
-  let chk := mkAppN (.const ``Term.usesPrec [])
-    #[targs[0]!, targs[1]!, targs[2]!, targs[3]!, t]
-  if (← evalBoolCheck chk) == some true then
-    throwError "pbound: the witness uses the primitive recursor.\n\
-      Iteration is what extraction produces, so a hand-written iterating witness makes the\n\
-      extraction vacuous (HANDOFF D-2, surface-recursor ban). Use `pexists` only if this ∃ \
-      is\nnot a headline position."
+    throwError "{who}: the goal is not an ∃, so there is no witness to supply."
+  return targs
+
+/-- `pexists t` supplies a witness for an `∃` goal, subject to the surface-recursor ban. -/
+elab "pexists " tStx:term : tactic => do
+  let g ← exGoalArgs "pexists"
+  let _ ← elabSurfaceTerm "pexists" g[0]! g[1]! g[2]! g[3]! tStx
+  evalTactic (← `(tactic| refine pm_exI $tStx ?_))
+
+/-- `pexists! t` supplies a witness **without** the recursor ban.
+
+The escape hatch exists so that a bypass is visible in the source and greppable, rather than
+being the silent default. Using it at a headline `∃` invalidates the extraction claim. -/
+macro "pexists! " t:term : tactic => `(tactic| refine pm_exI $t ?_)
+
+/-- `pbound t` supplies a witness at a *headline* `∃`.
+
+This is `bound` v0: a certificate **checker**, not a prover. The user writes the bound; the
+tactic checks that it is a bound the extraction could have produced rather than one smuggled
+in by hand. It differs from `pexists` only in recording, at the call site, that this is the
+headline position — the check itself is the same, because D-2 puts the ban on the surface
+language rather than on headline positions specifically.
+
+Like `pby_contra`, the check runs *before* anything is applied to the goal. -/
+elab "pbound " tStx:term : tactic => do
+  let g ← exGoalArgs "pbound"
+  let _ ← elabSurfaceTerm "pbound" g[0]! g[1]! g[2]! g[3]! tStx
   evalTactic (← `(tactic| refine pm_bound $tStx (by rfl) ?_))
 
 /-- `pobtain h with x` consumes the `∃` proved by hypothesis `h`, naming the body `x`. -/
@@ -329,9 +355,20 @@ macro "pthm " e:term : tactic => `(tactic| exact pm_have $e)
 /-- `papply h` uses the implicational hypothesis `h`, leaving its antecedent as the goal. -/
 macro "papply " h:ident : tactic => `(tactic| refine pm_mp (by pexact $h) ?_)
 
-/-- `phave h : A` proves `A` in a side goal and keeps it as the hypothesis `h`. -/
-macro "phave " h:ident " : " A:term : tactic =>
-  `(tactic| refine pm_cut (A := $A) $(Lean.quote h.getId.toString) ?_ ?_)
+/-- `phave h : A` proves `A` in a side goal and keeps it as the hypothesis `h`.
+
+The formula is user-written, so the recursor ban applies to the terms inside it: a cut on
+`A` contributes `A`'s witness and counter types to the interpretation, which is the same
+route to the extracted content that `pinst` has. -/
+elab "phave " h:ident " : " AStx:term : tactic => do
+  let args ← seqDGoalArgs "phave"
+  let A ← elabTerm AStx (some (mkAppN (.const ``Formula []) #[args[0]!, args[2]!, args[6]!]))
+  if (← evalBoolCheck (mkAppN (.const ``Formula.usesPrec [])
+      #[args[0]!, args[2]!, args[6]!, A])) == some true then
+    throwError "phave: the formula contains a term built with the primitive recursor.\n\
+      Iteration is what extraction produces, so writing it by hand makes the extraction\n\
+      vacuous (HANDOFF D-2, surface-recursor ban)."
+  evalTactic (← `(tactic| refine pm_cut (A := $AStx) $(Lean.quote h.getId.toString) ?_ ?_))
 
 /-- `pfrom h := e` adds a kernel theorem to the context under the name `h`. -/
 macro "pfrom " h:ident " := " e:term : tactic =>
@@ -381,9 +418,33 @@ elab "pby_contra " h:ident : tactic => do
                            case hvf => pside
                            pintro $h)))
 
-/-- `pinst h t as k` instantiates the `∀`-hypothesis `h` at `t`, naming the result `k`. -/
-macro "pinst " h:ident ppSpace t:term " as " k:ident : tactic =>
-  `(tactic| refine pm_inst $(Lean.quote k.getId.toString) $t (by pexact $h) ?_)
+/-- The formula at position `n` of the hypothesis context of the current goal. -/
+private def hypFormula (who : String) (n : String) : TacticM Expr := do
+  let args ← seqDGoalArgs who
+  let some namesE := listLit? args[1]! |
+    throwError "{who}: the hypothesis names are not a literal list"
+  let names := namesE.filterMap strLit?
+  let some i := names.findIdx? (· == n) |
+    throwError "{who}: no hypothesis named `{n}` (have: {names})"
+  let some hyps := listLit? args[7]! |
+    throwError "{who}: the hypothesis context is not a literal list"
+  let some A := hyps[i]? | throwError "{who}: `{n}` names position {i}, which is not there"
+  return A
+
+/-- `pinst h t as k` instantiates the `∀`-hypothesis `h` at `t`, naming the result `k`.
+
+The instantiation term is a surface term, so the recursor ban applies. This is the route
+R4's attempt C used: a `∀`-premise instantiated at a hand-written iterating term contributes
+that term to the Dialectica challenge side, and thence to the extracted bound, without ever
+introducing an `∃` for a headline-scoped linter to notice. -/
+elab "pinst " h:ident ppSpace tStx:term " as " k:ident : tactic => do
+  let A ← whnfD (← hypFormula "pinst" h.getId.toString)
+  let aargs := A.getAppArgs
+  unless A.isAppOf ``Formula.all && aargs.size == 5 do
+    throwError "pinst: `{h.getId}` is not a ∀, so there is nothing to instantiate."
+  let _ ← elabSurfaceTerm "pinst" aargs[0]! aargs[1]! aargs[2]! aargs[3]! tStx
+  evalTactic (← `(tactic| refine pm_inst $(Lean.quote k.getId.toString) $tStx
+    (by pexact $h) ?_))
 
 /-- `pqfac h as k` applies QF-AC to the `∀∃`-hypothesis `h`, naming the choice function
 statement `k`. -/
