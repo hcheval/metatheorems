@@ -319,6 +319,86 @@ example : SeqD [] F EqX a Premises (Γ := Γ) []
   pbound wrapped_iteration
   pthm .refl0
 
+/-! ## Parity with an established proof mode
+
+The tactic set is being brought up to what the matching-logic proof mode
+(`AML-Formalization/matching-logic/src/ProofMode`) offers, restricted to the moves that make
+sense here. One test per move. -/
+
+section Parity
+
+/-- `mlIntro`+`mlAssumption`: close by *whichever* hypothesis fits, without naming it. -/
+example : SeqD [] F EqX a Premises [] (A →ᶠ B →ᶠ A) := by
+  pintro ha hb
+  passumption
+
+/-- `toMLGoal`: a theorem stated as an ordinary kernel derivation, proved as a script. This
+is what makes the mode usable — every other test states its goal as a `SeqD` already. -/
+example : Derivable F EqX a Premises (Γ := Γ) (A →ᶠ B →ᶠ (A ∧ᶠ B)) := by
+  pmode
+  pintro ha hb
+  psplit
+  · pexact ha
+  · pexact hb
+
+/-- `mlApply "H" in "H0"`: forward application into a hypothesis. -/
+example : SeqD [] F EqX a Premises [] ((A →ᶠ B) →ᶠ A →ᶠ B) := by
+  pintro himp ha
+  papply himp in ha with hb
+  pexact hb
+
+/-- `mlApplyMeta`: apply a *kernel theorem* to the goal, leaving its antecedents. -/
+example : SeqD [] F EqX a Premises [] (A →ᶠ B →ᶠ (A ∧ᶠ B)) := by
+  pintro ha hb
+  papplym and_intro
+  · pexact ha
+  · pexact hb
+
+/-- `mlConj`: conjoin two hypotheses. -/
+example : SeqD [] F EqX a Premises [] (A →ᶠ B →ᶠ (A ∧ᶠ B)) := by
+  pintro ha hb
+  pconj ha hb with hab
+  pexact hab
+
+/-- `mlDestructBot`. -/
+example : SeqD [] F EqX a Premises [] (⊥ᶠ →ᶠ A) := by
+  pintro hbot
+  pcontradiction hbot
+
+/-- `mlRename`. -/
+example : SeqD [] F EqX a Premises [] (A →ᶠ A) := by
+  pintro h
+  prename h into k
+  pexact k
+
+/-- `mlClassic`: case split on `A ∨ᶠ ¬ᶠA`, available only where LEM is. -/
+example {Prem : PremiseSet F} :
+    SeqD [] F EqX Allowed.classical Prem (Γ := Γ) [] (A →ᶠ A) := by
+  pintro h
+  pclassic A with hpos hneg
+  · pexact h
+  · pexact h
+
+-- …and refused where it is not.
+/--
+error: pclassic: excluded middle is not available here — `allowed.lem` is not `true`.
+-/
+#guard_msgs in
+example {Prem : PremiseSet F} :
+    SeqD [] F EqX Allowed.base Prem (Γ := Γ) [] (A →ᶠ A) := by
+  pintro h
+  pclassic A with hpos hneg
+  pexact h
+
+/-- `mlSymmetry in "H"`. -/
+example {s t : Term F Γ Ty.nat} :
+    SeqD [] F EqX a Premises [] (Formula.eq0 s t →ᶠ Formula.eq0 t s) := by
+  pintro h
+  psym in h with h'
+  pexact h'
+
+end Parity
+
 /-! ## Named variables
 
 An open formula prints applied to the variables it may mention, so a binder reads as a

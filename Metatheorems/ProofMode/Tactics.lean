@@ -108,6 +108,32 @@ def pm_exfalso {Δ : HCtx F Γ} {A : Formula F Γ}
     (h : SeqD ns F EqX a Premises Δ ⊥ᶠ) : SeqD ns F EqX a Premises Δ A :=
   seq_exfalso h
 
+/-- Conjoin two hypotheses into one. -/
+def pm_conj (n : String) {Δ : HCtx F Γ} {A B C : Formula F Γ}
+    (hA : SeqD ns F EqX a Premises Δ A) (hB : SeqD ns F EqX a Premises Δ B)
+    (k : SeqD (n :: ns) F EqX a Premises ((A ∧ᶠ B) :: Δ) C) :
+    SeqD ns F EqX a Premises Δ C :=
+  seq_cut (seq_andI hA hB) k
+
+/-- Case split on `A ∨ᶠ ¬ᶠA`. Needs LEM, so it is not available in the base system. -/
+def pm_classic (n m : String) (hlem : a.lem = true) (A : Formula F Γ)
+    {Δ : HCtx F Γ} {C : Formula F Γ}
+    (h₁ : SeqD (n :: ns) F EqX a Premises (A :: Δ) C)
+    (h₂ : SeqD (m :: ns) F EqX a Premises ((¬ᶠA) :: Δ) C) :
+    SeqD ns F EqX a Premises Δ C :=
+  seq_orE (seq_of_thm (.lem hlem)) h₁ h₂
+
+/-- Rename a hypothesis. Names are display data, so this is the identity. -/
+def pm_rename {ns' : List String} {Δ : HCtx F Γ} {B : Formula F Γ}
+    (h : SeqD ns' F EqX a Premises Δ B) : SeqD ns F EqX a Premises Δ B := h
+
+/-- **Enter the proof mode** from an ordinary kernel goal.
+
+`Seq` with an empty hypothesis context *is* `Derivable`, so this is the identity — but a
+script has to say so, or the goal stays a kernel derivation and none of the tactics apply. -/
+def pm_enter {Γ : Ctx ι} {A : Formula F Γ}
+    (h : SeqD [] F EqX a Premises [] A) : Derivable F EqX a Premises A := h
+
 /-- Introduce a `∀`. The whole hypothesis context weakens; the *names* do not change, which
 is why the name list can be reused verbatim. -/
 def pm_allI {ρ : Ty ι} {Δ : HCtx F Γ} {A : Formula F (ρ :: Γ)}
@@ -186,6 +212,13 @@ def pm_trans {Δ : HCtx F Γ} {s u : Term F Γ Ty.nat} (t : Term F Γ Ty.nat)
     SeqD ns F EqX a Premises Δ (Formula.eq0 s u) :=
   seq_mp (seq_of_thm .trans0) (seq_andI h₁ h₂)
 
+/-- Flip an equational hypothesis, keeping the flipped form under a new name. -/
+def pm_sym_at (n : String) {Δ : HCtx F Γ} {s t : Term F Γ Ty.nat} {C : Formula F Γ}
+    (h : SeqD ns F EqX a Premises Δ (Formula.eq0 s t))
+    (k : SeqD (n :: ns) F EqX a Premises (Formula.eq0 t s :: Δ) C) :
+    SeqD ns F EqX a Premises Δ C :=
+  seq_cut (pm_sym h) k
+
 -- ============================================================================
 -- Moves specific to this logic
 -- ============================================================================
@@ -263,10 +296,34 @@ elab "pexact " h:ident : tactic => do
   for _ in [0:i] do v ← `(HVar.hs $v)
   evalTactic (← `(tactic| exact seq_id $v))
 
+/-- `pmode` enters the proof mode from a kernel goal, so a theorem can be *stated* as an
+ordinary `Derivable` and *proved* as a script. -/
+macro "pmode" : tactic => `(tactic| refine pm_enter ?_)
+
+/-- `passumption` closes the goal with whichever hypothesis matches, without naming it. -/
+elab "passumption" : tactic => do
+  let ty ← instantiateMVars (← (← getMainGoal).getType)
+  let args := ty.getAppArgs
+  unless ty.isAppOf ``SeqD && args.size == 9 do
+    throwError "passumption: the goal is not a proof-mode sequent{indentExpr ty}"
+  let names := ((listLit? args[1]!).getD []).filterMap strLit?
+  for n in names do
+    let stx := mkIdent (Name.mkSimple n)
+    try
+      evalTactic (← `(tactic| pexact $stx))
+      return
+    catch _ => pure ()
+  throwError "passumption: no hypothesis matches the goal (have: {names})"
+
 /-- `pfail "…"` fails with exactly this message. Unlike `fail` it does not append the goal
 state, which matters here: the interesting failures are about the *shape* of the goal, and
 the shape is what the message already says. -/
 elab "pfail " s:str : tactic => throwError s.getString
+
+/-- Side conditions of the object-logic rules — `allowed` flags and `isQF`/`isVFree`
+checks — are settled by computation when everything is concrete, and otherwise looked for
+in the Lean context. -/
+macro "pside" : tactic => `(tactic| first | rfl | assumption | decide)
 
 /-- Reduce a `Bool`-valued side condition. `some b` if it settles, `none` if it is stuck on
 an abstract formula — in which case the tactic should try to *prove* the side condition
@@ -471,6 +528,73 @@ elab "papply " h:ident : tactic => do
     for _ in [0:k] do e ← `(pm_mp $e ?_)
     evalTactic (← `(tactic| refine $e))
 
+/-- `papply h in k with m` applies the implicational hypothesis `h` to the hypothesis `k`,
+adding the conclusion under the name `m`. Forward reasoning, the counterpart of `papply`. -/
+macro "papply " h:ident " in " k:ident " with " m:ident : tactic =>
+  `(tactic| refine pm_cut $(Lean.quote m.getId.toString)
+      (pm_mp (by pexact $h) (by pexact $k)) ?_)
+
+/-- `papplym e` applies a *kernel theorem* to the goal, leaving its antecedents as goals —
+the escape hatch's `apply`, next to `pthm`'s `exact`. -/
+elab "papplym " eStx:term : tactic => do
+  let args ← seqDGoalArgs "papplym"
+  let goalF := args[8]!
+  let e ← elabTerm eStx none
+  let ety ← instantiateMVars (← inferType e)
+  let etyArgs := ety.getAppArgs
+  unless ety.isAppOf ``Derivable && etyArgs.size == 7 do
+    throwError "papplym: not a kernel derivation{indentExpr ety}"
+  let k? ← withoutModifyingState do
+    let mut cur ← whnfD etyArgs[6]!
+    for i in [0:16] do
+      if (← isDefEq cur goalF) then return some i
+      let cargs := cur.getAppArgs
+      unless cur.isAppOf ``Formula.imp && cargs.size == 5 do return none
+      cur ← whnfD cargs[4]!
+    return none
+  let some k := k? | throwError "papplym: this theorem does not conclude the goal.\n\
+      It proves{indentExpr etyArgs[6]!}\nand the goal is{indentExpr goalF}"
+  if k == 0 then
+    evalTactic (← `(tactic| pthm $eStx))
+  else
+    let mut t ← `(pm_have $eStx)
+    for _ in [0:k] do t ← `(pm_mp $t ?_)
+    evalTactic (← `(tactic| refine $t))
+
+/-- `pconj h k with m` conjoins two hypotheses. -/
+macro "pconj " h:ident ppSpace k:ident " with " m:ident : tactic =>
+  `(tactic| refine pm_conj $(Lean.quote m.getId.toString) (by pexact $h) (by pexact $k) ?_)
+
+/-- `pcontradiction h` finishes the proof from a hypothesis `h : ⊥ᶠ`. -/
+macro "pcontradiction " h:ident : tactic => `(tactic| (pexfalso; pexact $h))
+
+/-- `pclassic A with h k` splits on `A ∨ᶠ ¬ᶠA`. Refused — before anything is applied to the
+goal — unless LEM is available. -/
+elab "pclassic " A:term " with " h:ident ppSpace k:ident : tactic => do
+  let args ← seqDGoalArgs "pclassic"
+  if (← evalBoolCheck (mkAppN (.const ``Allowed.lem []) #[args[4]!])) == some false then
+    throwError "pclassic: excluded middle is not available here — \
+      `allowed.lem` is not `true`."
+  evalTactic (← `(tactic|
+    (refine pm_classic $(Lean.quote h.getId.toString) $(Lean.quote k.getId.toString)
+        ?hlem $A ?pos ?neg
+     case hlem => pside)))
+
+/-- `prename h into k` renames a hypothesis. Names are display data, so nothing is proved. -/
+elab "prename " h:ident " into " k:ident : tactic => do
+  let args ← seqDGoalArgs "prename"
+  let names := ((listLit? args[1]!).getD []).filterMap strLit?
+  let n := h.getId.toString
+  let some i := names.findIdx? (· == n) |
+    throwError "prename: no hypothesis named `{n}` (have: {names})"
+  let names' := names.set i k.getId.toString
+  let lst ← `([$(names'.toArray.map (Syntax.mkStrLit ·)),*])
+  evalTactic (← `(tactic| refine pm_rename (ns' := $lst) ?_))
+
+/-- `psym in h with k` flips an equational hypothesis. -/
+macro "psym " " in " h:ident " with " k:ident : tactic =>
+  `(tactic| refine pm_sym_at $(Lean.quote k.getId.toString) (by pexact $h) ?_)
+
 /-- `phave h : A` proves `A` in a side goal and keeps it as the hypothesis `h`.
 
 The formula is user-written, so the recursor ban applies to the terms inside it: a cut on
@@ -488,11 +612,6 @@ elab "phave " h:ident " : " AStx:term : tactic => do
 /-- `pfrom h := e` adds a kernel theorem to the context under the name `h`. -/
 macro "pfrom " h:ident " := " e:term : tactic =>
   `(tactic| refine pm_cut $(Lean.quote h.getId.toString) (pm_have $e) ?_)
-
-/-- Side conditions of the object-logic rules — `allowed` flags and `isQF`/`isVFree`
-checks — are settled by computation when everything is concrete, and otherwise looked for
-in the Lean context. -/
-macro "pside" : tactic => `(tactic| first | rfl | assumption | decide)
 
 /-- `pinduction` starts an induction on `ℕ`: base case first, then the step. -/
 macro "pinduction" : tactic => `(tactic| refine pm_induction ?_ ?_)
