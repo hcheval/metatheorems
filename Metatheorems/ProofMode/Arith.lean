@@ -130,6 +130,16 @@ example (x : Term F Γ Ty.nat) :
     prwby ih
     prefl
 
+/-- Occurrence selection. `x + 0` occurs twice here — once inside the left side, once as the
+whole right side — and they are numbered left to right across the goal. -/
+example (x : Term F Γ Ty.nat) :
+    SeqD [] F EqX al Premises (Γ := Γ) []
+      (Formula.eq0 ((x +ᵗ Term.zero) +ᵗ Term.zero) (x +ᵗ Term.zero)) := by
+  prw (add_zero_r adm x) at 2   -- the right side:      (x + 0) + 0 =₀ x
+  prw (add_zero_r adm x)        -- the one that is left: x + 0      =₀ x
+  prw (add_zero_r adm x)        --                       x          =₀ x
+  prefl
+
 end AddComm
 
 end ProofMode

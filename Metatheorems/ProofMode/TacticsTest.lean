@@ -434,6 +434,39 @@ example : SeqD [] F EqX a Premises [] (A →ᶠ A) := by
   prevert
   pthm I_comb
 
+/-- `mlRevert "H"` for a hypothesis that is *not* the most recent: it is walked to the top
+by adjacent exchanges first. -/
+example : SeqD [] F EqX a Premises [] (A →ᶠ B →ᶠ (A ∧ᶠ B)) := by
+  pintro ha hb
+  prevert ha
+  pintro ha'
+  psplit
+  · pexact ha'
+  · pexact hb
+
+/-- `mlTransitivity` for `↔ᶠ`. Proved as a script — `↔ᶠ` is a conjunction of implications,
+and the tactics see through the definition. -/
+example : SeqD [] F EqX a Premises [] ((A ↔ᶠ B) →ᶠ (B ↔ᶠ C) →ᶠ (A ↔ᶠ C)) := by
+  pintro hab hbc
+  pdestruct hab with hab1 hab2
+  pdestruct hbc with hbc1 hbc2
+  psplit
+  · pintro ha
+    papply hbc1
+    papply hab1
+    pexact ha
+  · pintro hc
+    papply hab2
+    papply hbc2
+    pexact hc
+
+/-- `use <reasoning> in H`: discharge the goal in a weaker system. -/
+example {Prem : PremiseSet F} :
+    SeqD [] F EqX Allowed.extended Prem (Γ := Γ) [] (A →ᶠ A) := by
+  pin_system (Allowed.base_le Allowed.extended)
+  pintro h
+  pexact h
+
 /-- `mlSymmetry in "H"`. -/
 example {s t : Term F Γ Ty.nat} :
     SeqD [] F EqX a Premises [] (Formula.eq0 s t →ᶠ Formula.eq0 t s) := by

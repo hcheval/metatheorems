@@ -141,6 +141,12 @@ def pm_revert {n : String} {Δ : HCtx F Γ} {A B : Formula F Γ}
     (h : SeqD ns F EqX a Premises Δ (A →ᶠ B)) :
     SeqD (n :: ns) F EqX a Premises (A :: Δ) B := h
 
+/-- Prove the goal in a *weaker* system. The counterpart of `use <reasoning> in H`: since
+`Allowed` is a flag rather than a constraint system, weakening is a plain cast. -/
+def pm_in_system {a' : Allowed} (h_le : Allowed.le a' a) {Δ : HCtx F Γ} {B : Formula F Γ}
+    (h : SeqD ns F EqX a' Premises Δ B) : SeqD ns F EqX a Premises Δ B :=
+  Derivable.castAllowed h_le h
+
 /-- **Enter the proof mode** from an ordinary kernel goal.
 
 `Seq` with an empty hypothesis context *is* `Derivable`, so this is the identity — but a
@@ -665,8 +671,32 @@ elab "pswap " h:ident " with " k:ident : tactic => do
     mkAppN (.const ``seq_swap []) #[args[0]!, args[2]!, args[3]!, args[4]!, args[5]!,
       args[6]!, Δ₁, hyps[j]!, hyps[i]!, Δ₂, args[8]!, m]
 
-/-- `prevert` moves the most recent hypothesis back into the goal. -/
-macro "prevert" : tactic => `(tactic| refine pm_revert ?_)
+/-- `prevert` moves the most recent hypothesis back into the goal;
+`prevert h` moves a named one, walking it to the top with adjacent exchanges first. -/
+syntax "prevert" (ppSpace colGt ident)? : tactic
+
+macro_rules
+  | `(tactic| prevert) => `(tactic| refine pm_revert ?_)
+
+elab_rules : tactic
+  | `(tactic| prevert $h:ident) => do
+    let n := h.getId.toString
+    -- Each exchange moves `h` one place towards the top; re-read the names each time,
+    -- since the tactic that did the exchange rewrote them.
+    for _ in [0:64] do
+      let args ← seqDGoalArgs "prevert"
+      let names := ((listLit? args[1]!).getD []).filterMap strLit?
+      let some i := names.findIdx? (· == n) |
+        throwError "prevert: no hypothesis named `{n}` (have: {names})"
+      if i == 0 then
+        evalTactic (← `(tactic| refine pm_revert ?_))
+        return
+      let above := mkIdent (Name.mkSimple names[i - 1]!)
+      evalTactic (← `(tactic| pswap $above with $h))
+    throwError "prevert: gave up walking `{n}` to the top of the context"
+
+/-- `pin_system h` proves the goal in the weaker system justified by `h : Allowed.le a' a`. -/
+macro "pin_system " h:term : tactic => `(tactic| refine pm_in_system $h ?_)
 
 /-- `prename h into k` renames a hypothesis. Names are display data, so nothing is proved. -/
 elab "prename " h:ident " into " k:ident : tactic => do

@@ -73,6 +73,11 @@ def le (a₁ a₂ : Allowed) : Prop :=
   (a₁.ac = true → a₂.ac = true) ∧
   (a₁.qfac = true → a₂.qfac = true)
 
+/-- The base system permits nothing, so it is below every system. -/
+theorem base_le (a : Allowed) : Allowed.le Allowed.base a :=
+  ⟨fun h => Bool.noConfusion h, fun h => Bool.noConfusion h, fun h => Bool.noConfusion h,
+   fun h => Bool.noConfusion h, fun h => Bool.noConfusion h⟩
+
 end Allowed
 
 -- ============================================================================
