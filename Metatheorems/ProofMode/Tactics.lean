@@ -180,6 +180,16 @@ def pm_markov {Δ : HCtx F Γ} {ρ : Ty ι} {A₀ : Formula F (ρ :: Γ)}
     SeqD ns F EqX a Premises Δ (Formula.ex ρ A₀) :=
   seq_mono (.markov hm hqf hvf) h
 
+/-- Instantiate a weakened `∀`-hypothesis at the bound variable, keeping the result as a
+named hypothesis. The forward counterpart of `pm_allE_here`, and the move you need after
+`pm_allI` to *use* a `∀`-hypothesis rather than to prove a `∀`-goal. -/
+def pm_allE_here_cut (n : String) {ρ : Ty ι} {Δ : HCtx F (ρ :: Γ)}
+    {A C : Formula F (ρ :: Γ)}
+    (h : SeqD ns F EqX a Premises Δ (Formula.weakenBy ρ (Formula.all ρ A)))
+    (k : SeqD (n :: ns) F EqX a Premises (A :: Δ) C) :
+    SeqD ns F EqX a Premises Δ C :=
+  seq_cut (seq_allE_here h) k
+
 /-- Instantiate a `∀`-hypothesis at a term, keeping the result as a named hypothesis. -/
 def pm_inst (n : String) {ρ : Ty ι} {Δ : HCtx F Γ} {A : Formula F (ρ :: Γ)} {C : Formula F Γ}
     (t : Term F Γ ρ)
@@ -241,6 +251,38 @@ private def evalBoolCheck (e : Expr) : TacticM (Option Bool) := do
   | .const ``Bool.false _ => return some false
   | _ => return none
 
+/-- The `SeqD` goal, split into its arguments: `ι, names, F, EqX, a, Premises, Γ, Δ, B`. -/
+private def seqDGoalArgs (who : String) : TacticM (Array Expr) := do
+  let ty ← instantiateMVars (← (← getMainGoal).getType)
+  let args := ty.getAppArgs
+  unless ty.isAppOf ``SeqD && args.size == 9 do
+    throwError "{who}: the goal is not a proof-mode sequent{indentExpr ty}"
+  return args
+
+/-- Split a `List` spine, reducing as it goes. Needed because `∀`-introduction leaves the
+hypothesis context as `Δ.map (weakenBy ρ)` rather than as a literal `cons` chain. -/
+private partial def whnfListLit? (e : Expr) : TacticM (Option (List Expr)) := do
+  match (← whnfD e).getAppFnArgs with
+  | (``List.nil, _) => return some []
+  | (``List.cons, #[_, x, xs]) =>
+      match ← whnfListLit? xs with
+      | some r => return some (x :: r)
+      | none => return none
+  | _ => return none
+
+/-- The formula at position `n` of the hypothesis context of the current goal. -/
+private def hypFormula (who : String) (n : String) : TacticM Expr := do
+  let args ← seqDGoalArgs who
+  let some namesE := listLit? args[1]! |
+    throwError "{who}: the hypothesis names are not a literal list"
+  let names := namesE.filterMap strLit?
+  let some i := names.findIdx? (· == n) |
+    throwError "{who}: no hypothesis named `{n}` (have: {names})"
+  let some hyps ← whnfListLit? args[7]! |
+    throwError "{who}: the hypothesis context is not a literal list"
+  let some A := hyps[i]? | throwError "{who}: `{n}` names position {i}, which is not there"
+  return A
+
 /-- Elaborate a term the *user wrote* at a surface position, and enforce the recursor ban.
 
 `HANDOFF` D-2 puts the ban on the surface language as a whole — "instantiation witnesses,
@@ -259,14 +301,6 @@ private def elabSurfaceTerm (who : String) (ι F Γ ρ : Expr) (tStx : TSyntax `
       extraction vacuous (HANDOFF D-2, surface-recursor ban). If this really is auxiliary, \
       say so\nexplicitly with `pexists!`."
   return t
-
-/-- The `SeqD` goal, split into its arguments: `ι, names, F, EqX, a, Premises, Γ, Δ, B`. -/
-private def seqDGoalArgs (who : String) : TacticM (Array Expr) := do
-  let ty ← instantiateMVars (← (← getMainGoal).getType)
-  let args := ty.getAppArgs
-  unless ty.isAppOf ``SeqD && args.size == 9 do
-    throwError "{who}: the goal is not a proof-mode sequent{indentExpr ty}"
-  return args
 
 /-- `pintro h k …` introduces implications, naming the hypotheses. -/
 syntax (name := pintro) "pintro" (ppSpace colGt ident)+ : tactic
@@ -299,11 +333,27 @@ macro "pand_right" : tactic => `(tactic| apply pm_andE₂)
 /-- `pexfalso` replaces the goal by `⊥ᶠ`. -/
 macro "pexfalso" : tactic => `(tactic| refine pm_exfalso ?_)
 
+/-- `pnorm` clears the de Bruijn bookkeeping a goal accumulates when a weakening meets a
+substitution — most often after supplying a just-obtained witness back to an `∃`. -/
+macro "pnorm" : tactic =>
+  `(tactic| simp only [Formula.subst0_weakenUnder, Formula.subst0_weakenBy,
+      Formula.substVar0_weakenBy])
+
 /-- `pforall` introduces a `∀`, weakening the hypothesis context. -/
 macro "pforall" : tactic => `(tactic| refine pm_allI ?_)
 
-/-- `pspecialize` instantiates a weakened `∀`-goal at the bound variable. -/
-macro "pspecialize" : tactic => `(tactic| refine pm_allE_here ?_)
+/-- `pspecialize` instantiates a weakened `∀`-*goal* at the bound variable;
+`pspecialize h as k` instantiates a weakened `∀`-*hypothesis*, which is how a `∀`-hypothesis
+is used after `pforall`.
+
+The `colGt` matters: without it the bare form would swallow the next line's tactic name as
+its `h`. -/
+syntax "pspecialize" (ppSpace colGt ident " as " ppSpace colGt ident)? : tactic
+
+macro_rules
+  | `(tactic| pspecialize) => `(tactic| refine pm_allE_here ?_)
+  | `(tactic| pspecialize $h:ident as $k:ident) =>
+      `(tactic| refine pm_allE_here_cut $(Lean.quote k.getId.toString) (by pexact $h) ?_)
 
 /-- The `Formula.ex` the goal is, split into `ι, F, Γ, ρ, A`. -/
 private def exGoalArgs (who : String) : TacticM (Array Expr) := do
@@ -352,8 +402,33 @@ macro "pdestruct " h:ident " with " x:ident ppSpace y:ident : tactic =>
 /-- `pthm e` discharges the goal with a kernel theorem. -/
 macro "pthm " e:term : tactic => `(tactic| exact pm_have $e)
 
-/-- `papply h` uses the implicational hypothesis `h`, leaving its antecedent as the goal. -/
-macro "papply " h:ident : tactic => `(tactic| refine pm_mp (by pexact $h) ?_)
+/-- `papply h` uses the implicational hypothesis `h`, leaving its antecedents as goals.
+
+It peels as many arrows as it takes to reach the goal, so a hypothesis with several premises
+produces several subgoals, in order — the same way Lean's own `apply` does. -/
+elab "papply " h:ident : tactic => do
+  let args ← seqDGoalArgs "papply"
+  let goalF := args[8]!
+  let hyp ← hypFormula "papply" h.getId.toString
+  -- How many antecedents lie between `h` and the goal? Probed without committing to any
+  -- unification the probe happens to make.
+  let k? ← withoutModifyingState do
+    let mut cur ← whnfD hyp
+    for i in [0:16] do
+      if (← isDefEq cur goalF) then return some i
+      let cargs := cur.getAppArgs
+      unless cur.isAppOf ``Formula.imp && cargs.size == 5 do return none
+      cur ← whnfD cargs[4]!
+    return none
+  let some k := k? |
+    throwError "papply: `{h.getId}` does not conclude the goal.\n\
+      It is{indentExpr hyp}\nand the goal is{indentExpr goalF}"
+  if k == 0 then
+    evalTactic (← `(tactic| pexact $h))
+  else
+    let mut e ← `(by pexact $h)
+    for _ in [0:k] do e ← `(pm_mp $e ?_)
+    evalTactic (← `(tactic| refine $e))
 
 /-- `phave h : A` proves `A` in a side goal and keeps it as the hypothesis `h`.
 
@@ -417,19 +492,6 @@ elab "pby_contra " h:ident : tactic => do
                            case hqf => pside
                            case hvf => pside
                            pintro $h)))
-
-/-- The formula at position `n` of the hypothesis context of the current goal. -/
-private def hypFormula (who : String) (n : String) : TacticM Expr := do
-  let args ← seqDGoalArgs who
-  let some namesE := listLit? args[1]! |
-    throwError "{who}: the hypothesis names are not a literal list"
-  let names := namesE.filterMap strLit?
-  let some i := names.findIdx? (· == n) |
-    throwError "{who}: no hypothesis named `{n}` (have: {names})"
-  let some hyps := listLit? args[7]! |
-    throwError "{who}: the hypothesis context is not a literal list"
-  let some A := hyps[i]? | throwError "{who}: `{n}` names position {i}, which is not there"
-  return A
 
 /-- `pinst h t as k` instantiates the `∀`-hypothesis `h` at `t`, naming the result `k`.
 

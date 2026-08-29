@@ -10,3 +10,4 @@ import Metatheorems.RationalNumbers
 import Metatheorems.ProofMode.Packing
 import Metatheorems.ProofMode.Display
 import Metatheorems.ProofMode.Tactics
+import Metatheorems.ProofMode.Examples

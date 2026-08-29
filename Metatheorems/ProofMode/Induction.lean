@@ -44,6 +44,16 @@ theorem substVar0_weakenBy {Γ : Ctx ι} {ρ : Ty ι} (B : Formula F Γ) (t : Te
   rw [Formula.renameF_substF, Formula.renameF_eq_substF]
   rfl
 
+/-- Weakening *under* a binder, then substituting the bound variable back, is the identity.
+
+This is what you need to re-introduce an `∃` at a witness you have just obtained: after
+`seq_exE` the goal is `(∃x A)↑` in the extended context, and supplying `x` itself for the
+witness lands on this. -/
+theorem subst0_weakenUnder {Γ : Ctx ι} {ρ : Ty ι} (A : Formula F (ρ :: Γ)) :
+    Formula.subst0 (Formula.renameF (Term.Renaming.ext (Term.Renaming.shift (σ := ρ))) A)
+      (Term.var .vz) = A :=
+  Formula.substF_renameF_id _ _ (fun v => by cases v <;> rfl) A
+
 end Formula
 
 namespace ProofMode
