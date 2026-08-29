@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Horatiu
 -/
 import Metatheorems.ProofMode.Display
+import Metatheorems.ProofMode.Induction
 
 /-!
 # The tactic layer
@@ -22,6 +23,19 @@ Tactics are prefixed `p`, since they operate on the object logic and must not be
 with Lean's own `intro`, `cases`, … . A tactic never touches the kernel: it emits a `refine`
 against a lemma from this file, which is built from `Packing.lean`, which is built from
 `Derivable`.
+
+## Where side conditions go
+
+The rules of the extended system carry side conditions — an `allowed` flag, an `isQF` or
+`isVFree` check. These cannot be passed as `(by …)` arguments, because at the time such an
+argument is elaborated the matrix is still a metavariable: it is fixed only when `refine`
+unifies the lemma's conclusion with the goal. They are therefore left as *named holes* and
+discharged afterwards by `pside`, which computes when everything is concrete and otherwise
+looks in the Lean context.
+
+The one exception is a rule whose matrix comes from a *hypothesis* rather than from the
+goal — QF-AC. There the hypothesis argument must be elaborated inline, since nothing else
+determines the matrix.
 -/
 
 namespace Metatheorems
@@ -125,6 +139,57 @@ def pm_have {Δ : HCtx F Γ} {A : Formula F Γ}
     (h : Derivable F EqX a Premises A) : SeqD ns F EqX a Premises Δ A :=
   seq_of_thm h
 
+/-- Modus ponens against a hypothesis. -/
+def pm_mp {Δ : HCtx F Γ} {A B : Formula F Γ}
+    (hAB : SeqD ns F EqX a Premises Δ (A →ᶠ B)) (hA : SeqD ns F EqX a Premises Δ A) :
+    SeqD ns F EqX a Premises Δ B :=
+  seq_mp hAB hA
+
+/-- Forward reasoning: prove something, then keep it as a named hypothesis. -/
+def pm_cut (n : String) {Δ : HCtx F Γ} {A C : Formula F Γ}
+    (hA : SeqD ns F EqX a Premises Δ A)
+    (k : SeqD (n :: ns) F EqX a Premises (A :: Δ) C) :
+    SeqD ns F EqX a Premises Δ C :=
+  seq_cut hA k
+
+-- ============================================================================
+-- Moves specific to this logic
+-- ============================================================================
+
+/-- Induction on `ℕ`, with the hypothesis context carried through. See
+`ProofMode/Induction.lean` for why the context is not free here. -/
+def pm_induction {Δ : HCtx F Γ} {A : Formula F (Ty.nat :: Γ)}
+    (base : SeqD ns F EqX a Premises Δ (A.subst0 Term.zero))
+    (step : SeqD ns F EqX a Premises Δ
+      (Formula.all Ty.nat (A →ᶠ Formula.substVar0 A succVar0))) :
+    SeqD ns F EqX a Premises Δ (Formula.all Ty.nat A) :=
+  seq_induction base step
+
+/-- Markov's principle: a `∃` over a QF ∨-free matrix may be proved by contradiction. -/
+def pm_markov {Δ : HCtx F Γ} {ρ : Ty ι} {A₀ : Formula F (ρ :: Γ)}
+    (hm : a.markov = true) (hqf : A₀.isQF = true) (hvf : A₀.isVFree = true)
+    (h : SeqD ns F EqX a Premises Δ (¬ᶠ¬ᶠ(Formula.ex ρ A₀))) :
+    SeqD ns F EqX a Premises Δ (Formula.ex ρ A₀) :=
+  seq_mono (.markov hm hqf hvf) h
+
+/-- Instantiate a `∀`-hypothesis at a term, keeping the result as a named hypothesis. -/
+def pm_inst (n : String) {ρ : Ty ι} {Δ : HCtx F Γ} {A : Formula F (ρ :: Γ)} {C : Formula F Γ}
+    (t : Term F Γ ρ)
+    (h : SeqD ns F EqX a Premises Δ (Formula.all ρ A))
+    (k : SeqD (n :: ns) F EqX a Premises (A.subst0 t :: Δ) C) :
+    SeqD ns F EqX a Premises Δ C :=
+  seq_cut (seq_allE h t) k
+
+/-- QF-AC, forwards: from `∀x ∃y A₀` obtain the choice function. -/
+def pm_qfac (n : String) {ρ τ : Ty ι} {Δ : HCtx F Γ} {A₀ : Formula F (τ :: ρ :: Γ)}
+    {C : Formula F Γ}
+    (hq : a.qfac = true) (hqf : A₀.isQF = true) (hvf : A₀.isVFree = true)
+    (h : SeqD ns F EqX a Premises Δ (Formula.all ρ (Formula.ex τ A₀)))
+    (k : SeqD (n :: ns) F EqX a Premises
+      (Formula.ex (ρ →ₜ τ) (Formula.all ρ (Formula.substF Formula.acSubst A₀)) :: Δ) C) :
+    SeqD ns F EqX a Premises Δ C :=
+  seq_cut (seq_mono (.qfac hq hqf hvf) h) k
+
 -- ============================================================================
 -- Tactics
 -- ============================================================================
@@ -205,6 +270,51 @@ macro "pdestruct " h:ident " with " x:ident ppSpace y:ident : tactic =>
 
 /-- `pthm e` discharges the goal with a kernel theorem. -/
 macro "pthm " e:term : tactic => `(tactic| exact pm_have $e)
+
+/-- `papply h` uses the implicational hypothesis `h`, leaving its antecedent as the goal. -/
+macro "papply " h:ident : tactic => `(tactic| refine pm_mp (by pexact $h) ?_)
+
+/-- `phave h : A` proves `A` in a side goal and keeps it as the hypothesis `h`. -/
+macro "phave " h:ident " : " A:term : tactic =>
+  `(tactic| refine pm_cut (A := $A) $(Lean.quote h.getId.toString) ?_ ?_)
+
+/-- `pfrom h := e` adds a kernel theorem to the context under the name `h`. -/
+macro "pfrom " h:ident " := " e:term : tactic =>
+  `(tactic| refine pm_cut $(Lean.quote h.getId.toString) (pm_have $e) ?_)
+
+/-- Side conditions of the object-logic rules — `allowed` flags and `isQF`/`isVFree`
+checks — are settled by computation when everything is concrete, and otherwise looked for
+in the Lean context. -/
+macro "pside" : tactic => `(tactic| first | rfl | assumption | decide)
+
+/-- `pinduction` starts an induction on `ℕ`: base case first, then the step. -/
+macro "pinduction" : tactic => `(tactic| refine pm_induction ?_ ?_)
+
+/-- `pby_contra h` proves an `∃` over a QF ∨-free matrix by contradiction, via Markov. The
+goal becomes `⊥ᶠ` with `h` the negated `∃`. -/
+macro "pby_contra " h:ident : tactic =>
+  -- The side conditions mention the matrix, which is only determined once the *conclusion*
+  -- has been unified with the goal. So they are left as named holes and discharged after
+  -- `refine`, not passed as `(by …)` arguments.
+  `(tactic| (refine pm_markov ?hm ?hqf ?hvf ?main
+             case hm => pside
+             case hqf => pside
+             case hvf => pside
+             pintro $h))
+
+/-- `pinst h t as k` instantiates the `∀`-hypothesis `h` at `t`, naming the result `k`. -/
+macro "pinst " h:ident ppSpace t:term " as " k:ident : tactic =>
+  `(tactic| refine pm_inst $(Lean.quote k.getId.toString) $t (by pexact $h) ?_)
+
+/-- `pqfac h as k` applies QF-AC to the `∀∃`-hypothesis `h`, naming the choice function
+statement `k`. -/
+macro "pqfac " h:ident " as " k:ident : tactic =>
+  -- Unlike Markov, the matrix here is fixed by the *hypothesis*, not by the goal, so that
+  -- argument has to be elaborated inline; only the side conditions can be deferred.
+  `(tactic| (refine pm_qfac $(Lean.quote k.getId.toString) ?hq ?hqf ?hvf (by pexact $h) ?main
+             case hq => pside
+             case hqf => pside
+             case hvf => pside))
 
 end Tactics
 

@@ -96,6 +96,74 @@ example (t : Term F Γ ρ) (h : SeqD [] F EqX a Premises [] (P.subst0 t)) :
 
 end Quantifiers
 
+/-! ## Forward reasoning -/
+
+example : SeqD [] F EqX a Premises [] (A →ᶠ (A ∧ᶠ A)) := by
+  pintro h
+  phave k : A
+  · pexact h
+  · psplit
+    · pexact k
+    · pexact k
+
+example : SeqD [] F EqX a Premises [] ((A →ᶠ B) →ᶠ A →ᶠ B) := by
+  pintro himp ha
+  papply himp
+  pexact ha
+
+example {ρ : Ty ι} {P : Formula F (ρ :: Γ)} (t : Term F Γ ρ) :
+    SeqD ["h"] F EqX a Premises [Formula.all ρ P] (P.subst0 t) := by
+  pinst h t as k
+  pexact k
+
+/-! ## Induction
+
+The hypothesis context is carried through the induction by `Packing`'s peeling; the script
+does not mention it. Both of these prove `∀n (n =₀ n)`, the second with a hypothesis in
+scope so that the peeling actually runs. -/
+
+example : SeqD [] F EqX a Premises (Γ := Γ) []
+    (Formula.all Ty.nat (Formula.eq0 (Term.var .vz) (Term.var .vz))) := by
+  pinduction
+  · pthm .refl0
+  · pforall
+    pintro hn
+    pthm .refl0
+
+example {C : Formula F Γ} : SeqD ["c"] F EqX a Premises [C]
+    (Formula.all Ty.nat (Formula.eq0 (Term.var .vz) (Term.var .vz))) := by
+  pinduction
+  · pthm .refl0
+  · pforall
+    pintro hn
+    pthm .refl0
+
+/-! ## Principles of the extended system
+
+`pside` discharges the `allowed` flags and the `isQF` / `isVFree` checks by computation. -/
+
+section Extended
+variable {Prem : PremiseSet F}
+
+/-- Markov: the `∃` is proved by contradiction, then the contradiction is produced by
+actually supplying the witness. -/
+example : SeqD [] F EqX Allowed.extended Prem (Γ := Γ) []
+    (Formula.ex Ty.nat (Formula.eq0 (Term.var .vz) Term.zero)) := by
+  pby_contra h
+  papply h
+  pexists Term.zero
+  pthm .refl0
+
+/-- QF-AC, forwards: the choice function appears as a new hypothesis. -/
+example : SeqD ["h"] F EqX Allowed.extended Prem (Γ := Γ)
+    [Formula.all Ty.nat (Formula.ex Ty.nat (Formula.eq0 (Term.var .vz) (Term.var .vz)))]
+    (Formula.ex (Ty.nat →ₜ Ty.nat) (Formula.all Ty.nat
+      (Formula.substF Formula.acSubst (Formula.eq0 (Term.var .vz) (Term.var .vz))))) := by
+  pqfac h as k
+  pexact k
+
+end Extended
+
 /-! ## Error reporting
 
 `pexact` is the only tactic that can fail on a *name*, and it says what names are in scope.

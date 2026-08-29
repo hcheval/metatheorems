@@ -163,6 +163,42 @@ theorem substF_renameF_id {Γ Γ' : Ctx ι}
       rw [h w]
       simp [Term.weaken, Term.rename, Term.Renaming.shift]
 
+/-- Renaming then substituting = substituting with the composed map. The formula-level
+counterpart of `Term.rename_subst`. -/
+theorem renameF_substF {Γ Γ' Γ'' : Ctx ι}
+    (r : Term.Renaming Γ Γ') (s : Term.Subst F Γ' Γ'') (A : Formula F Γ) :
+    (A.renameF r).substF s = A.substF (fun {_τ} v => s (r v)) := by
+  induction A generalizing Γ' Γ'' with
+  | bot => rfl
+  | eq0 a b => simp [renameF, substF, Term.rename_subst]
+  | and _ _ ihA ihB | or _ _ ihA ihB | imp _ _ ihA ihB =>
+    simp [renameF, substF, ihA r s, ihB r s]
+  | ex ρ B ihB | all ρ B ihB =>
+    simp only [renameF, substF]
+    congr 1
+    rw [ihB (Term.Renaming.ext r) (Term.Subst.ext s)]
+    congr 1; funext _τ v; cases v with
+    | vz => rfl
+    | vs w => rfl
+
+/-- Renaming equals substituting with the variable injection. The formula-level counterpart
+of `Term.rename_eq_subst`. -/
+theorem renameF_eq_substF {Γ Γ' : Ctx ι}
+    (r : Term.Renaming Γ Γ') (A : Formula F Γ) :
+    A.renameF r = A.substF (fun {_τ} v => .var (r v)) := by
+  induction A generalizing Γ' with
+  | bot => rfl
+  | eq0 a b => simp [renameF, substF, Term.rename_eq_subst]
+  | and _ _ ihA ihB | or _ _ ihA ihB | imp _ _ ihA ihB =>
+    simp [renameF, substF, ihA r, ihB r]
+  | ex ρ B ihB | all ρ B ihB =>
+    simp only [renameF, substF]
+    congr 1
+    rw [ihB (Term.Renaming.ext r)]
+    congr 1; funext _τ v; cases v with
+    | vz => rfl
+    | vs w => rfl
+
 /-- Weaken a formula: embed from context Γ into (σ :: Γ). -/
 def weaken : Formula F Γ → Formula F (σ :: Γ) :=
   renameF Term.Renaming.shift
