@@ -409,9 +409,10 @@ theorem eq_Q_isQF (a b : Term F Γ Ty.nat) : (eq_Q a b).isQF = true := by rfl
 section ClosedSubst
 variable {Γ Δ : Ctx ι} (σ : Term.Subst F Γ Δ)
 
--- Basic arithmetic closed_subst lemmas (terms from Arithmetic.lean)
-@[simp] theorem add_closed_subst :
-    (Term.add : Term F Γ _).subst σ = Term.add := by rfl
+-- Basic arithmetic closed_subst lemmas (terms from Arithmetic.lean).
+-- `add_closed_subst` lives in `Arithmetic.lean`; it is only marked `@[simp]` here.
+attribute [simp] add_closed_subst
+
 @[simp] theorem mul_closed_subst :
     (Term.mul : Term F Γ _).subst σ = Term.mul := by rfl
 @[simp] theorem monus_closed_subst :
