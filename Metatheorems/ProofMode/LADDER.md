@@ -18,7 +18,7 @@ instead of by hand.
 | 5 | the antitone chain: `∀i, a(m+i) ∸ a m = 0` | induction *with a premise in the context*, and a function parameter `a` rather than a variable | `Arith.lean` ✅ |
 | 6a | `y ∸ x = 0 → ¬(x =₀ y) → S y ∸ x = 0` | strictness from `≤` plus `≠`; a new induction, rung-4 sized | `Arith.lean` ✅ |
 | 6b | the strict-drop step | composition rather than proof: no induction of its own | `Arith.lean` ✅ |
-| 7 | ℕ-MCT, proof p₂ (dichotomy) | the whole thing: `qf_lem` case split, budget descent as induction on `K`, a headline `∃` closed by `pbound` | — |
+| 7 | ℕ-MCT, proof p₂ (dichotomy) | the whole thing: `qf_lem` case split, budget descent as induction on `K`, a headline `∃` | `ProofMode/MCT.lean` ✅ |
 
 ## What each rung is actually testing
 
@@ -137,6 +137,51 @@ goal happens to hold anyway), so it needs its own induction, of about rung 4's s
 
 So rung 6 is two rungs. 6a is a genuinely new arithmetic fact and belongs in
 `Arithmetic.lean`'s vocabulary whether or not it is proved as a script.
+
+## Rung 7 — the demo
+
+`Metatheorems/ProofMode/MCT.lean`. `mct_p2 : Derivable F EqX al Premises (Γ := []) mctStatement`,
+`#print axioms` clean, and `mct_bound_p2` composes it with the extraction — so the hypothesis
+`MCTStatement.lean` left open ("given a derivation of `mctStatement` …") is discharged.
+
+The proof is the budget descent, by induction on `k`:
+
+    A(k)  ≡  (∀u B₀ u)  →  ∀m (a m ≤ k → ∃n (a n = a (n + g n)))
+
+At `k = 0` boundedness pins `a m = 0` and antitonicity pins `a (m + g m) = 0`, so `m` is
+itself flat. At `k+1`, either the window at `m` is flat — take `n := m` — or it is not, and
+then `a (m + g m) < a m ≤ k+1`, so the induction hypothesis applies at `m + g m`. The
+statement follows at `k := K`, `m := 0`.
+
+It is built from rungs 5, 6a and 6b exactly as `HANDOFF.md` §3 A0 predicted: `antitone_chain`
+supplies `a (m + i) ≤ a m`, `strict_drop` turns "flat fails" into "the budget drops". A0 was
+the claim that the shared lemmas make the second derivation cheap; the descent is ~50 lines of
+script.
+
+The proof is done over *three separate parameters* `a`, `g`, `K` and specialised to the fused
+`h` only in `mct_p2`. Fusing is an encoding decision — one majorant covering all three — and
+the mathematics does not need to know about it.
+
+**What rung 7 forced.** Three fixes, all of them context-plumbing:
+
+- **`phave` re-elaborated its formula** as a named argument to `pm_cut`, where `pm_cut`'s own
+  `Γ` was still a metavariable. Now it elaborates once, against the goal's context, and hands
+  the *expression* on. This was the rung-6a limit; it also fixed the `papplym` failure there,
+  which turned out to be downstream of it.
+- **`pfrom` did not pin the context** at all, so a lemma over an outer-context parameter could
+  not be brought in under a binder. It now uses `elabRuleInCtx` like `pthm`, and the parameter
+  weakens by coercion.
+- **`xₖ` now postpones** instead of failing when the context is still unknown. Lean does not
+  always propagate an expected type into an argument before elaborating it — `x₀ ⬝ t` is the
+  case that bit, where `Term.app`'s context is fixed only once the whole application meets its
+  expected type.
+
+Plus one addition to the substitution vocabulary: `pspecialize` leaves a bare *renaming* under
+a binder rather than a substitution, and a renaming under a binder is a `Subst.cons` too. One
+rewrite (`anorm_ren`) brings it into the normal form. It is deliberately *not* part of `anorm`:
+converting a renaming before an enclosing `subst0` has absorbed it produces a
+substitution-after-substitution, which is outside the vocabulary — the one place where the
+`cons` calculus is not confluent under naive rewriting, and worth knowing.
 
 ## The rule for the ladder
 

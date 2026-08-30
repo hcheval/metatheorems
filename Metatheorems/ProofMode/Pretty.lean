@@ -352,7 +352,13 @@ def delabWeakening (inner : Expr) : Delab := do
 
 open Lean.Elab.Term in
 /-- Elaborate the variable displayed as `xₖ`: its de Bruijn index is fixed by the context of
-the expected type. -/
+the expected type.
+
+If that context is still a metavariable the elaboration is **postponed** rather than
+refused. Lean does not always propagate an expected type into an argument before elaborating
+it — `x₀ ⬝ t` is the common case, where `Term.app`'s context is fixed only once the whole
+application is unified with its expected type — so the context a token needs may simply not
+have been determined yet. Postponing lets it be, and the token is retried afterwards. -/
 def elabObjVar (k : Nat) (expectedType? : Option Expr) : TermElabM Expr := do
   let some ty := expectedType? |
     throwError "x{k}: the expected type is not known here, so the context is not either.\n\
@@ -360,10 +366,13 @@ def elabObjVar (k : Nat) (expectedType? : Option Expr) : TermElabM Expr := do
   let ty ← instantiateMVars (← Lean.Meta.whnf ty)
   let some Γ := objCtx? ty |
     throwError "x{k}: expected an object-level term or formula, not{indentExpr ty}"
+  if (← instantiateMVars Γ).getAppFn.isMVar then
+    tryPostpone
+  let Γ ← instantiateMVars Γ
   let n := ctxPrefixLen Γ
   if k ≥ n then
-    throwError "x{k}: the context has only {n} named variable(s) — \
-      `x₀`{if n > 1 then s!" … x{n-1}" else ""}."
+    throwError "x{k}: the context has {n} named variable(s){
+      if n == 0 then "" else s!" — `x₀`{if n > 1 then s!" … x{n-1}" else ""}"}."
   let mut v ← `(Metatheorems.Var.vz)
   for _ in [0:n - 1 - k] do v ← `(Metatheorems.Var.vs $v)
   elabTerm (← `(Metatheorems.Term.var $v)) expectedType?

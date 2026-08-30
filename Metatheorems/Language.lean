@@ -229,6 +229,15 @@ theorem subst0_renameF_ext {Γ Δ : Ctx ι} {σ : Ty ι}
     (A.renameF (Term.Renaming.ext r)).subst0 t = A.substF (Term.Subst.cons t r) :=
   substF_subst0_map_renameF_ext r t A
 
+/-- A renaming under a binder is a `cons` as well. This is the shape `∀`-elimination at the
+bound variable leaves behind, and it joins the same normal form. -/
+theorem renameF_ext_eq_substF_cons {Γ Δ : Ctx ι} {σ : Ty ι}
+    (r : Term.Renaming Γ Δ) (A : Formula F (σ :: Γ)) :
+    A.renameF (Term.Renaming.ext r)
+      = A.substF (Term.Subst.cons (.var .vz)
+          (Term.Renaming.comp Term.Renaming.shift r)) := by
+  rw [renameF_eq_substF]; congr 1; funext _τ v; cases v <;> rfl
+
 /-- `cons` absorbs a further renaming under the binder; iterating collapses a tower of
 weakenings into one `Term.Renaming.comp`. -/
 theorem substF_cons_renameF_ext {Γ Δ Δ' : Ctx ι} {σ : Ty ι}

@@ -105,7 +105,7 @@ that is not a variable. `Term.Subst.cons` names the shape; see the comment block
 recognised while `Formula.subst0` is still folded; after, so the leaves `weaken_subst_ext`
 exposes under binders get the same treatment. -/
 macro "anorm_cons" : tactic =>
-  `(tactic| simp only [Formula.weakenBy, Formula.weaken,
+  `(tactic| simp only [
       Formula.subst0_renameF_ext, Formula.substF_subst0_map_renameF_ext,
       Formula.substF_cons_renameF_ext,
       Term.subst_subst0_map_rename_ext, Term.subst_cons_rename_ext,
@@ -129,6 +129,20 @@ macro "anorm" : tactic =>
                Term.weaken_subst0, Term.subst_subst0_map_weaken, Term.weaken_subst_ext,
                weaken_substVar0, succVar0]
              try anorm_cons))
+
+/-- `anorm`, for a goal carrying a bare *renaming* under a binder rather than a substitution.
+
+That is what `pspecialize` leaves: instantiating a weakened `∀` at the bound variable performs
+no substitution at all, only a weakening under the binder. A renaming under a binder is a
+`Term.Subst.cons` too — it keeps variable 0 and renames the rest — so one rewrite brings it
+into the same normal form and `anorm` finishes.
+
+Kept separate from `anorm` because the two rules compete: turning a renaming into a `cons`
+*before* an enclosing `subst0` has absorbed it produces a substitution-after-substitution,
+which is outside the vocabulary. Use this only when the renaming stands alone. -/
+macro "anorm_ren" : tactic =>
+  `(tactic| (simp only [Formula.renameF_ext_eq_substF_cons, Term.rename_ext_eq_subst_cons]
+             anorm))
 
 namespace ByScript
 

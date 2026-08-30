@@ -560,10 +560,19 @@ macro "pdestruct " h:ident " with " x:ident ppSpace y:ident : tactic =>
   `(tactic| refine pm_andcut $(Lean.quote x.getId.toString) $(Lean.quote y.getId.toString)
       (by pexact $h) ?_)
 
-/-- `pthm e` discharges the goal with a kernel theorem. -/
+/-- `pthm e` discharges the goal with a kernel theorem.
+
+The theorem is elaborated against the goal's *formula*, not a fresh metavariable, so a side
+condition written as `rfl` — `qf_lem`'s quantifier-freeness, say — has something to check
+against. If that fails the elaboration is retried against an open formula and left to `exact`,
+which is how a theorem that only matches the goal up to unfolding still goes through. -/
 elab "pthm " eStx:term : tactic => do
   let args ← seqDGoalArgs "pthm"
-  let e ← elabRuleInCtx eStx args[6]! (← derivableInGoal args)
+  let atGoal := mkAppN (.const ``Derivable [])
+    #[args[0]!, args[2]!, args[3]!, args[4]!, args[5]!, args[6]!, args[8]!]
+  let e ← try
+      Lean.Elab.Term.withoutErrToSorry (elabRuleInCtx eStx args[6]! atGoal)
+    catch _ => elabRuleInCtx eStx args[6]! (← derivableInGoal args)
   let eS ← Lean.Elab.Term.exprToSyntax (← instantiateMVars e)
   evalTactic (← `(tactic| exact pm_have $eS))
 
@@ -768,19 +777,34 @@ macro "psym " " in " h:ident " with " k:ident : tactic =>
 
 The formula is user-written, so the recursor ban applies to the terms inside it: a cut on
 `A` contributes `A`'s witness and counter types to the interpretation, which is the same
-route to the extracted content that `pinst` has. -/
+route to the extracted content that `pinst` has.
+
+The formula is elaborated **once**, against the goal's context, and the resulting expression
+is handed to `pm_cut` — not the surface syntax again. Re-elaborating it as a named argument
+would leave `pm_cut`'s own `Γ` a metavariable at the moment the formula is processed, and an
+`xₖ` token reads its de Bruijn index off exactly that context. -/
 elab "phave " h:ident " : " AStx:term : tactic => do
   let args ← seqDGoalArgs "phave"
-  let A ← elabTerm AStx (some (mkAppN (.const ``Formula []) #[args[0]!, args[2]!, args[6]!]))
-  if mentionsPrec (← instantiateMVars A) then
+  let A ← instantiateMVars
+    (← elabTerm AStx (some (mkAppN (.const ``Formula []) #[args[0]!, args[2]!, args[6]!])))
+  if mentionsPrec A then
     throwError "phave: the formula applies the primitive recursor directly.\n\
       Iteration is what extraction produces, so writing it by hand makes the extraction\n\
       vacuous (HANDOFF D-2, surface-recursor ban)."
-  evalTactic (← `(tactic| refine pm_cut (A := $AStx) $(Lean.quote h.getId.toString) ?_ ?_))
+  let AStx' ← Lean.Elab.Term.exprToSyntax A
+  evalTactic (← `(tactic| refine pm_cut (A := $AStx') $(Lean.quote h.getId.toString) ?_ ?_))
 
-/-- `pfrom h := e` adds a kernel theorem to the context under the name `h`. -/
-macro "pfrom " h:ident " := " e:term : tactic =>
-  `(tactic| refine pm_cut $(Lean.quote h.getId.toString) (pm_have $e) ?_)
+/-- `pfrom h := e` adds a kernel theorem to the context under the name `h`.
+
+The theorem's context is pinned to the goal's, exactly as `pthm` does it: a lemma stated over
+a parameter in the *outer* context is usable under binders, the parameter weakening by
+coercion. -/
+elab "pfrom " h:ident " := " eStx:term : tactic => do
+  let args ← seqDGoalArgs "pfrom"
+  let e ← elabRuleInCtx eStx args[6]! (← derivableInGoal args)
+  let eStx' ← Lean.Elab.Term.exprToSyntax e
+  evalTactic (← `(tactic|
+    refine pm_cut $(Lean.quote h.getId.toString) (pm_have $eStx') ?_))
 
 /-- `pinduction` starts an induction on `ℕ`: base case first, then the step. -/
 macro "pinduction" : tactic => `(tactic| refine pm_induction ?_ ?_)

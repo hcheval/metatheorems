@@ -274,6 +274,16 @@ theorem subst_subst0_map_rename_ext {Γ Δ : Ctx ι} {σ τ : Ty ι}
     (u.rename (Renaming.ext r)).subst (subst0_map t) = u.subst (Subst.cons t r) := by
   rw [rename_subst]; congr 1; funext _τ v; cases v <;> rfl
 
+/-- A renaming under a binder is a `cons` too: it keeps variable 0 and renames the rest.
+
+This is what lets a bare *weakening under a binder* — the shape `∀`-elimination at the bound
+variable leaves behind — join the same normal form, opaque leaves included. -/
+theorem rename_ext_eq_subst_cons {Γ Δ : Ctx ι} {σ τ : Ty ι}
+    (r : Renaming Γ Δ) (u : Term F (σ :: Γ) τ) :
+    u.rename (Renaming.ext r)
+      = u.subst (Subst.cons (.var .vz) (Renaming.comp Renaming.shift r)) := by
+  rw [rename_eq_subst]; congr 1; funext _τ v; cases v <;> rfl
+
 /-- `cons` absorbs a further renaming under the binder. Iterating this collapses any tower of
 weakenings into a single `Subst.cons _ (Renaming.comp …)`. -/
 theorem subst_cons_rename_ext {Γ Δ Δ' : Ctx ι} {σ τ : Ty ι}

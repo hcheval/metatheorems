@@ -13,3 +13,5 @@ import Metatheorems.ProofMode.Tactics
 import Metatheorems.ProofMode.Examples
 import Metatheorems.ProofMode.Arith
 import Metatheorems.ProofMode.Rewrite
+import Metatheorems.MCTStatement
+import Metatheorems.ProofMode.MCT
