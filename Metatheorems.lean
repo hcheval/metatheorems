@@ -15,3 +15,4 @@ import Metatheorems.ProofMode.Arith
 import Metatheorems.ProofMode.Rewrite
 import Metatheorems.MCTStatement
 import Metatheorems.ProofMode.MCT
+import Metatheorems.ProofMode.MCTLazy

@@ -183,6 +183,43 @@ converting a renaming before an enclosing `subst0` has absorbed it produces a
 substitution-after-substitution, which is outside the vocabulary — the one place where the
 `cons` calculus is not confluent under naive rewriting, and worth knowing.
 
+## Past the ladder — A3, the lazy proof
+
+`Metatheorems/ProofMode/MCTLazy.lean`. `mct_p1` derives the *same* `mctStatement` the way one
+proves it on paper: assume no flat window, conclude the value drops strictly at every point,
+iterate to fit `K + 1` drops under `a 0 ≤ K`, contradiction. `#print axioms` clean.
+
+The reductio is applied **only** to the headline `∃n (a n =₀ a (n + g n))`, whose matrix is QF
+and ∨-free — so its classical content is exactly `¬¬∃n(qf) → ∃n(qf)`, and `pby_contra`, which
+refuses any other shape, is what enforces that. Nothing else in the proof is classical;
+`Allowed.extended` has `lem := false` and the derivation lives there. That is D-1's
+hand-translation, and the tactic's refusal message is the discipline made mechanical.
+
+Three more arithmetic facts, all short inductions, and all wanted by *this* proof rather than
+p₂: `succ_monus_self` (`S x ∸ x = 1`, the contradiction it bottoms out in), `monus_add_self_l`
+(`y ≤ x + y`), `add_monus_add` (`≤` survives a common addend).
+
+**The divergence, stated carefully.** p₁'s descent `∀k ∃m (a m + k ≤ a 0)` is an induction
+whose *witness* is built by applying `m ↦ m + g m` once per step — the node where
+`g`-iteration is manufactured. p₂'s induction carries no existential in its conclusion; its
+`∃` is discharged inside each branch. That is a structural difference in the two derivation
+trees, and it is what A5's tracer is meant to display. What is **not** established here is
+that the extracted *terms* differ: that is a computation, and it needs a concrete
+interpretation to run in. Both extractions exist and typecheck; comparing them is A4's
+remaining half.
+
+**What A3 forced.** One fix, and it was a regression I had introduced: `pthm` was pinning the
+goal's formula *before* trying an open elaboration, and on a statement this size that
+unification diverges — a stack overflow, not a timeout. The order is now the other way round,
+so the pinning is a fallback that only runs when the open attempt fails. It still buys what it
+was added for (`qf_lem rfl` in `MCT.lean` has a formula to check against) and no longer costs
+anything on large goals.
+
+Also worth recording: `mct_extract_p1` needs its result type **written out**. Inferring it
+means normalising the Dialectica interpretation of the whole derivation, and p₁'s is large
+enough that the elaborator does not get there. Stating the type is the fix; raising
+`maxHeartbeats` is not.
+
 ## The rule for the ladder
 
 A rung is done when the script compiles with no `sorry` **and** mentions no internal

@@ -141,7 +141,7 @@ Kept separate from `anorm` because the two rules compete: turning a renaming int
 *before* an enclosing `subst0` has absorbed it produces a substitution-after-substitution,
 which is outside the vocabulary. Use this only when the renaming stands alone. -/
 macro "anorm_ren" : tactic =>
-  `(tactic| (simp only [Formula.renameF_ext_eq_substF_cons, Term.rename_ext_eq_subst_cons]
+  `(tactic| (try simp only [Formula.renameF_ext_eq_substF_cons, Term.rename_ext_eq_subst_cons]
              anorm))
 
 namespace ByScript
@@ -506,6 +506,75 @@ def strict_drop (adm : AdmissibleEqX EqX) :
   -- S y ∸ S K = y ∸ K
   prw (monus_succ_l adm x₁ x₀) in hfin with hfin'
   pexact hfin'
+
+/-! ## Three more monus facts
+
+Wanted by the *lazy* MCT proof rather than the dichotomy one: it counts strict drops against
+a budget, so it needs `≤` to survive a common addend, `y ≤ x + y`, and the one arithmetic
+fact that turns "`S K ≤ K`" into a contradiction. All three are short inductions. -/
+
+/-- `S x ∸ x = 1`. The contradiction the lazy proof bottoms out in. -/
+def succ_monus_self (adm : AdmissibleEqX EqX) :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all Ty.nat (S x₀ ∸ᵗ x₀ =₀ S Term.zero)) := by
+  pmode
+  pinduction
+  · anorm
+    pthm (monus_zero adm (S Term.zero))
+  · pforall
+    pintro ih
+    anorm
+    prw (monus_succ_l adm (S x₀) x₀)
+    pexact ih
+
+/-- `y ≤ x + y`. -/
+def monus_add_self_l (adm : AdmissibleEqX EqX) :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all Ty.nat (Formula.all Ty.nat
+        (x₁ ∸ᵗ (x₀ +ᵗ x₁) =₀ Term.zero))) := by
+  pmode
+  pinduction
+  · anorm
+    pforall
+    prw (add_zero_l adm x₀)
+    pthm (monus_self adm x₀)
+  · pforall
+    pintro ih
+    anorm
+    pforall
+    prw (add_succ_l adm x₀ x₁)
+    prw (monus_succ adm x₁ (x₀ +ᵗ x₁))
+    pspecialize ih with ihy
+    anorm_ren
+    prwby ihy
+    pthm pd_zero
+
+/-- `(x + k) ∸ (y + k) = x ∸ y`: a common addend cancels, so `≤` survives it. -/
+def add_monus_add (adm : AdmissibleEqX EqX) :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all Ty.nat (Formula.all Ty.nat (Formula.all Ty.nat
+        ((x₁ +ᵗ x₀) ∸ᵗ (x₂ +ᵗ x₀) =₀ x₁ ∸ᵗ x₂)))) := by
+  pmode
+  pinduction
+  · anorm
+    pforall
+    pforall
+    prw (add_zero_r adm x₀)
+    prw (add_zero_r adm x₁)
+    prefl
+  · pforall
+    pintro ih
+    anorm
+    pforall
+    pforall
+    prw (add_succ adm x₁ x₀)
+    prw (add_succ adm x₂ x₀)
+    prw (monus_succ_l adm (x₁ +ᵗ x₀) (x₂ +ᵗ x₀))
+    pinst ih x₁ with ih1
+    anorm
+    pinst ih1 x₂ with ih2
+    anorm
+    pexact ih2
 
 end ProofMode
 end Metatheorems

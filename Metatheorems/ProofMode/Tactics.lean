@@ -562,17 +562,20 @@ macro "pdestruct " h:ident " with " x:ident ppSpace y:ident : tactic =>
 
 /-- `pthm e` discharges the goal with a kernel theorem.
 
-The theorem is elaborated against the goal's *formula*, not a fresh metavariable, so a side
-condition written as `rfl` — `qf_lem`'s quantifier-freeness, say — has something to check
-against. If that fails the elaboration is retried against an open formula and left to `exact`,
-which is how a theorem that only matches the goal up to unfolding still goes through. -/
+The theorem is elaborated against an *open* formula and left to `exact`, which is how a
+theorem that only matches the goal up to unfolding still goes through. Only if that fails is
+it retried against the goal's own formula — which is what gives a side condition written as
+`rfl`, `qf_lem`'s quantifier-freeness say, something to check against.
+
+The order matters: pinning the formula first would force unification through the goal on
+every call, and on a large statement that is where it diverges. -/
 elab "pthm " eStx:term : tactic => do
   let args ← seqDGoalArgs "pthm"
-  let atGoal := mkAppN (.const ``Derivable [])
-    #[args[0]!, args[2]!, args[3]!, args[4]!, args[5]!, args[6]!, args[8]!]
   let e ← try
-      Lean.Elab.Term.withoutErrToSorry (elabRuleInCtx eStx args[6]! atGoal)
-    catch _ => elabRuleInCtx eStx args[6]! (← derivableInGoal args)
+      Lean.Elab.Term.withoutErrToSorry (elabRuleInCtx eStx args[6]! (← derivableInGoal args))
+    catch _ =>
+      elabRuleInCtx eStx args[6]! (mkAppN (.const ``Derivable [])
+        #[args[0]!, args[2]!, args[3]!, args[4]!, args[5]!, args[6]!, args[8]!])
   let eS ← Lean.Elab.Term.exprToSyntax (← instantiateMVars e)
   evalTactic (← `(tactic| exact pm_have $eS))
 
