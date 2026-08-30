@@ -111,6 +111,19 @@ macro "anorm" : tactic =>
       Term.weaken_subst0, Term.subst_subst0_map_weaken, Term.weaken_subst_ext,
       weaken_substVar0, succVar0])
 
+/-- `anorm`, plus pushing *renamings* down to the variables.
+
+Kept separate because it is not always an improvement: on a term built only from variables and
+constants it finishes the job, but on an opaque parameter it turns a tidy `weakenBy` into a
+stuck `Term.rename`. Use it when instantiating a weakened `∀`-hypothesis at a compound term,
+and only then. -/
+macro "anorm_deep" : tactic =>
+  `(tactic| (anorm
+             simp only [Formula.weakenBy, Formula.weaken, Formula.renameF, Term.rename,
+               Term.Renaming.ext_vz, Term.Renaming.ext_vs, Term.Renaming.shift,
+               Formula.substF, Term.subst, Term.subst0_map_vz, Term.subst0_map_vs,
+               Term.Subst.ext_vz, Term.Subst.ext_vs, Formula.subst0, Term.app2]))
+
 namespace ByScript
 
 /-!
