@@ -239,3 +239,50 @@ far has forced a fix to make that true:
 
 That is the point of going slowly: each rung buys a fix the next one needs, and none of these
 would have surfaced from more abstract tests.
+
+## Rough edges, deliberately left
+
+Recorded rather than fixed. Everything below was hit while writing the proofs above, and none
+of it blocks anything — but each cost a debugging round, so it should cost the next person
+zero.
+
+**`anorm` is hand-placed, and there are two of them.** Every `pinduction`, `pinst` and
+`pexists` leaves substitution bookkeeping that the script has to clear by calling `anorm`
+explicitly, and you have to know when `anorm_ren` is the one you want (see the non-confluence
+above). That is not a bug, it is the tax the mode has not yet paid off: `anorm` generalises
+the hand-written `_nf` lemmas of `Arithmetic.lean` rather than removing the need for them.
+
+It got worse in proportion to proof size — MCT calls it about thirty times. The two ways out
+are for each tactic to normalise its own output, or for `anorm`'s rewrite set to become
+confluent enough to run as a closure. Both are design work, not patches, and the second
+subsumes the `anorm`/`anorm_ren` split.
+
+Two smaller ones. `anorm` errors with "simp made no progress" when there is nothing to
+normalise, so a script cannot call it defensively — which is exactly what you want to do when
+you do not know whether the previous move left a substitution behind. And it does not report
+what it *failed* to normalise, so a stuck goal has to be read by eye.
+
+**`⬝` takes both operands at `max` precedence.** It is declared
+
+```lean
+syntax:max term:max " ⬝ " term:max : term      -- Pretty.lean
+```
+
+so each side must be an *atom* or parenthesized — a Lean-level application on either side does
+not fit, and the whole `⬝`-expression sits at `max` too, so it happily becomes the head of an
+application instead:
+
+```lean
+(x₀ ⬝ (Term.ofNat 2)) ⬝ (Term.ofNat 0)      -- correct: parens at every step
+x₀ ⬝ Term.ofNat 0                            -- parses as (x₀ ⬝ Term.ofNat) 0
+```
+
+The failure mode is a type error some distance from the real problem, because the mis-parse
+still elaborates far enough to produce one. `mct_p2` and `mct_p1` both hit it. Declaring it at
+an ordinary level — `infixl:70` — would let applications sit on either side unparenthesized,
+but it touches every existing use, so it is left alone for now.
+
+**`prw` does not descend every term former.** `scanTerm` walks `Term.app`, `app2` and `app3`.
+Anything else — a `lam` body, and the pair formers if `syntactic-witnesses` ever lands — is
+treated as a leaf, so a rewrite inside one silently finds nothing rather than failing. Not
+unsoundness; a coverage gap that reads as "the rule did not match".
