@@ -178,6 +178,18 @@ theorem weaken_subst0 (t : Term F Γ τ) (s : Term F Γ ρ) :
   rw [rename_subst]
   exact subst_id t
 
+/-- `Subst.ext` at the two variable shapes, and weakening of a variable. Needed to normalise
+a goal under *nested* binders, where the substitution arrives as an iterated `Subst.ext`.
+Stated so that `simp` can step through: unfolding alone leaves a `match`. -/
+@[simp] theorem Subst.ext_vz {σ : Ty ι} (s : Subst F Γ Δ) :
+    Subst.ext s (σ := σ) (τ := σ) .vz = .var .vz := rfl
+
+@[simp] theorem Subst.ext_vs {σ τ : Ty ι} (s : Subst F Γ Δ) (w : Var Γ τ) :
+    Subst.ext s (σ := σ) (.vs w) = (s w).weaken := rfl
+
+@[simp] theorem weaken_var {σ τ : Ty ι} (v : Var Γ τ) :
+    (Term.var v : Term F Γ τ).weaken (σ := σ) = .var (.vs v) := rfl
+
 /-- `subst0_map` at the two variable shapes. Stated so that `simp` can step through them:
 unfolding the definition alone leaves a `match`. -/
 @[simp] theorem subst0_map_vz (s : Term F Γ ρ) : subst0_map s (τ := ρ) .vz = s := rfl

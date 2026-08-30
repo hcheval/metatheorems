@@ -214,6 +214,14 @@ def Term.substVar0_map (t : Term F (ρ :: Γ) ρ) : Term.Subst F (ρ :: Γ) (ρ 
   | _, .vz   => t
   | _, .vs w => .var (.vs w)
 
+/-- `substVar0_map` at the two variable shapes, for the same reason as `Term.subst0_map_vz`:
+`simp` cannot step through the bare definition. -/
+@[simp] theorem Term.substVar0_map_vz {Γ : Ctx ι} {ρ : Ty ι} (t : Term F (ρ :: Γ) ρ) :
+    Term.substVar0_map t (τ := ρ) .vz = t := rfl
+
+@[simp] theorem Term.substVar0_map_vs {Γ : Ctx ι} {ρ τ : Ty ι} (t : Term F (ρ :: Γ) ρ)
+    (w : Var Γ τ) : Term.substVar0_map t (.vs w) = .var (.vs w) := rfl
+
 /-- Substitute a term for variable 0, keeping the same context.
     Maps var 0 to `t` and var (n+1) to var (n+1). Unlike `subst0`, this
     does not shrink the context — it's used e.g. in the induction step

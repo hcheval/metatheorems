@@ -491,7 +491,7 @@ private theorem add_body_nf (x s : Term F Γ Ty.nat) :
       (.var .vz) : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat).subst0 (s.weaken)).subst0 x =
     Term.app3 (.prec Ty.nat) x (Term.lam (Term.lam (.app .succ (.var (.vs .vz))))) s := by
   simp [Term.subst0, Term.subst, Term.subst0_map, Term.app3]
-  exact ⟨rfl, weaken_subst0_h s x⟩
+  exact weaken_subst0_h s x
 
 /-- `Term.pd` is closed. Public: proof scripts need it in the goal-normalising simp set. -/
 theorem pd_closed_subst {Γ Δ : Ctx ι} (σ : Term.Subst F Γ Δ) :
@@ -504,7 +504,7 @@ private theorem monus_body_nf (x s : Term F Γ Ty.nat) :
     Term.app3 (.prec Ty.nat) x
       (Term.lam (Term.lam (.app Term.pd (.var (.vs .vz))))) s := by
   simp [Term.subst0, Term.subst, Term.subst0_map, Term.app3, pd_closed_subst]
-  exact ⟨rfl, weaken_subst0_h s x⟩
+  exact weaken_subst0_h s x
 
 -- Step function reductions: (step.subst0 (n.weaken)).subst0 r = f(r, n)
 private theorem step_succ_nf (r n : Term F Γ Ty.nat) :

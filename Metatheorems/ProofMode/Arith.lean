@@ -85,7 +85,7 @@ variable {ι : Type} {F : ι → Ty ι}
 This is QF-ER at `r := S(·)`: the only form of "substituting equals for equals" the system
 has. -/
 def succ_congr_imp {s t : Term F Γ Ty.nat} :
-    Derivable F EqX al Premises
+    Derivable F EqX al Premises (Γ := Γ)
       (Formula.eq0 s t →ᶠ Formula.eq0 (.app .succ s) (.app .succ t)) :=
   qfer_nat_nf (A₀ := Formula.eq0 s t) (by rfl) (by rfl) I_comb
     (r := .app .succ (.var .vz)) rfl rfl
@@ -95,17 +95,27 @@ def succ_congr_imp {s t : Term F Γ Ty.nat} :
 The counterpart of the `base_nf` / `step_nf` / `inst_nf` lemmas that the hand-built proofs in
 `Arithmetic.lean` write out separately for each theorem. -/
 macro "anorm" : tactic =>
-  `(tactic| simp only [Formula.subst0, Formula.substVar0, Formula.substF, Term.subst,
-      Term.subst0_map, Term.substVar0_map, Term.app2,
+  `(tactic| simp only [Formula.subst0, Formula.substVar0, Formula.substF, Formula.neg,
+      Term.subst,
+      Term.subst0_map_vz, Term.subst0_map_vs,
+      Term.substVar0_map_vz, Term.substVar0_map_vs,
+      Term.Subst.ext_vz, Term.Subst.ext_vs, Term.weaken_var, Term.app2,
       add_closed_subst, mul_closed_subst, monus_closed_subst, abs_diff_closed_subst,
       pd_closed_subst, sg_bar_closed_subst,
       Term.weaken_subst0, Term.subst_subst0_map_weaken, weaken_substVar0, succVar0])
 
-section AddComm
-variable (adm : AdmissibleEqX EqX)
+namespace ByScript
 
-/-- **Commutativity of addition**, as a script. Compare `Metatheorems.add_comm`, which proves
-the same thing with raw constructors.
+/-!
+These are theorems `Arithmetic.lean` already proves with raw constructors, proved again as
+scripts so the two can be read side by side. They live in `ByScript` because they are the
+*same* statements — the point is the proof, not the theorem.
+
+Each is stated as a `Derivable`, not as a `SeqD`: that is how a theorem is written, and it is
+what lets a later proof feed it to `prw` or `pthm`. `pmode` enters the mode.
+-/
+
+/-- **Commutativity of addition.** Compare `Metatheorems.add_comm`.
 
 The shape is the textbook one, and with `prw` the script is the textbook script: induct on
 the second argument, rewrite by the defining equations, use the induction hypothesis.
@@ -114,9 +124,10 @@ Compare `Nat.add_comm` in mathlib — `induction`, then `rw [Nat.add_succ, ih, N
 The remaining differences are `anorm`, which pays for the substitutions `induction` leaves in
 the goal, and the split between `prw` (closed equation) and `prwby` (hypothesis), which is
 forced by QF-ER carrying a premise. -/
-example (x : Term F Γ Ty.nat) :
-    SeqD [] F EqX al Premises (Γ := Γ) []
+def add_comm (adm : AdmissibleEqX EqX) (x : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (Γ := Γ)
       (Formula.all Ty.nat (Formula.eq0 (x +ᵗ x₀) (x₀ +ᵗ x))) := by
+  pmode
   pinduction
   · -- x + 0 = 0 + x
     anorm
@@ -134,19 +145,22 @@ example (x : Term F Γ Ty.nat) :
 
 /-- Occurrence selection. `x + 0` occurs twice here — once inside the left side, once as the
 whole right side — and they are numbered left to right across the goal. -/
-example (x : Term F Γ Ty.nat) :
-    SeqD [] F EqX al Premises (Γ := Γ) []
+def add_zero_twice (adm : AdmissibleEqX EqX) (x : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (Γ := Γ)
       (Formula.eq0 ((x +ᵗ Term.zero) +ᵗ Term.zero) (x +ᵗ Term.zero)) := by
+  pmode
   prw (add_zero_r adm x) at 2   -- the right side:      (x + 0) + 0 =₀ x
   prw (add_zero_r adm x)        -- the one that is left: x + 0      =₀ x
   prw (add_zero_r adm x)        --                       x          =₀ x
   prefl
 
 /-- **Rung 2** — associativity. Three variables and a nested context, so the rewrite rules
-mention both an outer term and the bound variable in the same argument list. -/
-example (x y : Term F Γ Ty.nat) :
-    SeqD [] F EqX al Premises (Γ := Γ) []
+mention both an outer term and the bound variable in the same argument list.
+Compare `Metatheorems.add_assoc`. -/
+def add_assoc (adm : AdmissibleEqX EqX) (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (Γ := Γ)
       (Formula.all Ty.nat (Formula.eq0 ((x +ᵗ y) +ᵗ x₀) (x +ᵗ (y +ᵗ x₀)))) := by
+  pmode
   pinduction
   · anorm
     prw (add_zero_r adm (x +ᵗ y))
@@ -161,11 +175,11 @@ example (x y : Term F Γ Ty.nat) :
     prwby ih
     prefl
 
-/-- **Rung 3** — the first monus fact, `0 ∸ y = 0`. Compare `Metatheorems.monus_zero_l`,
-which is the same statement built by hand. -/
-example :
-    SeqD [] F EqX al Premises (Γ := Γ) []
+/-- **Rung 3** — the first monus fact, `0 ∸ y = 0`. Compare `Metatheorems.monus_zero_l`. -/
+def monus_zero_l (adm : AdmissibleEqX EqX) :
+    Derivable F EqX al Premises (Γ := Γ)
       (Formula.all Ty.nat (Formula.eq0 (Term.zero ∸ᵗ x₀) Term.zero)) := by
+  pmode
   pinduction
   · anorm
     prw (monus_zero adm Term.zero)
@@ -177,7 +191,7 @@ example :
     prwby ih
     pthm pd_zero
 
-end AddComm
+end ByScript
 
 end ProofMode
 end Metatheorems

@@ -310,19 +310,25 @@ def delabFormulaSubstVar0 : Delab := do
   let t ← Lean.PrettyPrinter.delab args[4]!
   `($p $t)
 
-/-- Weakening an atom is invisible; weakening anything else is marked `↑ᶜ`, and everything
-inside it is named one level deeper.
+/-- Does this expression contain an object-level binder — the only thing whose displayed name
+could collide with an ambient one? -/
+def hasObjBinder (e : Expr) : Bool :=
+  (e.find? fun s =>
+    s.isConstOf ``Formula.all || s.isConstOf ``Formula.ex || s.isConstOf ``Term.lam).isSome
+
+/-- Weakening something with no binder in it is invisible; weakening anything else is marked
+`↑ᶜ`, and everything inside it is named one level deeper.
 
 An atom over a prefix-free context genuinely does not mention the displayed binders, so
 dropping the weakening loses nothing. Structured formulas are different: their variables were
 written in the *smaller* context, so naming them at the ambient depth would collide them with
 the ambient variables. `withShift` moves them out of the way, and `↑ᶜ` says why. -/
 def delabWeakening (inner : Expr) : Delab := do
-  -- An atom binds nothing, so every variable it mentions is shared with the ambient context
-  -- and already prints with the ambient name. Nothing to mark, and nothing to move.
-  if inner.isFVar then
-    if (objCtx? (← instantiateMVars (← Lean.Meta.inferType inner))).isSome then
-      return ← Lean.PrettyPrinter.delab inner
+  -- Nothing that binds nothing needs marking: every variable such an expression mentions is
+  -- shared with the ambient context and already prints with the ambient name. That covers
+  -- atoms, closed constants like `0`, and any structure built from them.
+  if !hasObjBinder inner then
+    return ← Lean.PrettyPrinter.delab inner
   let i ← withShift (Lean.PrettyPrinter.delab inner : DelabM _)
   `(↑ᶜ$i)
 

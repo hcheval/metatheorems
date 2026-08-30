@@ -167,30 +167,6 @@ private def prwCore (who : String) (occ : Occ) (s t : Expr)
   evalTactic (← `(tactic|
     refine pm_trans $repL $hL (pm_trans $repR ?_ (pm_sym $hR))))
 
-/-- Elaborate a rewrite rule with its context pinned to the goal's.
-
-Pinning by the *expected type* alone does not work: Lean fixes a rule's `Γ` from its first
-explicit argument, before unifying the result type. So the context is injected as a named
-argument at the head of the application — which is what lets a rule mention `x₀` next to a
-term from the outer context, the latter then weakening by coercion.
-
-Rules that are not applications, or whose context implicit is not called `Γ`, fall back to
-plain elaboration against the expected type. -/
-private partial def unparen (s : Syntax) : Syntax :=
-  if s.getKind == ``Lean.Parser.Term.paren then unparen s[1] else s
-
-private def elabRuleInCtx (eStx : TSyntax `term) (Γ expected : Expr) : TacticM Expr := do
-  let bare := unparen eStx.raw
-  if bare.getKind == ``Lean.Parser.Term.app then
-    let ΓStx ← Lean.Elab.Term.exprToSyntax Γ
-    let named ← `(Lean.Parser.Term.namedArgument| (Γ := $ΓStx))
-    let pinned : TSyntax `term := ⟨Syntax.node2 .none ``Lean.Parser.Term.app bare[0]
-      (Syntax.node .none `null (#[named.raw] ++ bare[1].getArgs))⟩
-    try
-      return ← Lean.Elab.Term.withoutErrToSorry (elabTerm pinned (some expected))
-    catch _ => pure ()
-  Lean.Elab.Term.withoutErrToSorry (elabTerm eStx (some expected))
-
 /-- The two sides of an equation `s =₀ t`, from the formula expression. -/
 private def eqSides (who : String) (what : MessageData) (f : Expr) :
     TacticM (Expr × Expr) := do
@@ -215,15 +191,7 @@ elab "prw " eStx:term occ:(occSel)? : tactic => do
   -- nothing pins the rule's `Γ`, and a variable like `x₀` in its arguments has no context to
   -- resolve against — while a term from the outer context needs the weakening coercion.
   let args ← seqDGoalArgs "prw"
-  let A ← mkFreshExprMVar (mkAppN (.const ``Formula []) #[args[0]!, args[2]!, args[6]!])
-  let expected := mkAppN (.const ``Derivable [])
-    #[args[0]!, args[2]!, args[3]!, args[4]!, args[5]!, args[6]!, A]
-  -- Pinning `Γ` by the *expected type* is not enough: Lean fixes a rule's `Γ` from its first
-  -- explicit argument, before the result type is unified. So the goal's context is supplied
-  -- as a named argument, which is what lets a rule mention `x₀` alongside a term from the
-  -- outer context — the latter then weakens by coercion. Rules that do not take `Γ` by that
-  -- name fall back to plain elaboration.
-  let e ← elabRuleInCtx eStx args[6]! expected
+  let e ← elabRuleInCtx eStx args[6]! (← derivableInGoal args)
   let ety ← instantiateMVars (← inferType e)
   let etyArgs := ety.getAppArgs
   unless ety.isAppOf ``Derivable && etyArgs.size == 7 do
@@ -237,30 +205,31 @@ elab "prw " eStx:term occ:(occSel)? : tactic => do
 
 /-- `prwby h` rewrites the goal with a *hypothesis* `h : s =₀ t`.
 
-QF-ER carries its premise, and that premise must be quantifier-free and ∨-free — so this is
-available exactly when the hypothesis context *is* the premise, that is, when it holds the
-one equation. (The matching-logic proof mode draws the same line, from its own side: its
-`mlRewriteBy` needs the definedness theory and unrestricted reasoning, where `mlRewrite` does
-not.) -/
+QF-ER carries a premise, and that premise must be quantifier-free and ∨-free. The premise is
+not the hypothesis *context* though — it is the equation itself. So the congruence
+
+    (s =₀ t) →ᶠ (L =₀ L[s := t])
+
+is a **closed** derivation, obtained from QF-ER at `I_comb`, and rewriting by a hypothesis is
+that theorem applied to it. The rest of the context can be anything at all, including
+non-quantifier-free hypotheses like an induction hypothesis. The only requirement is that
+`h`'s own formula is quantifier-free and ∨-free, which is exactly what QF-ER asks. -/
 elab "prwby " h:ident occ:(occSel)? : tactic => do
   let args ← seqDGoalArgs "prwby"
   let some hyps ← whnfListLit? args[7]! |
     throwError "prwby: the hypothesis context is not a literal list"
   let names := ((listLit? args[1]!).getD []).filterMap strLit?
   let n := h.getId.toString
-  unless names == [n] do
-    throwError "prwby: rewriting by a hypothesis needs the hypothesis context to be exactly \
-      `{n}`,\nbecause QF-ER carries its premise and that premise is the context. \
-      Here it is {names}.\nClear the others, or use a closed equation with `prw`."
-  let (s, t) ← eqSides "prwby" m!"`{h.getId}`" hyps[0]!
-  -- `s` and `t` have to be given: they are fixed by the *premise*, and the premise proof is
-  -- just "the hypothesis is itself", which says nothing about its shape.
+  let some i := names.findIdx? (· == n) |
+    throwError "prwby: no hypothesis named `{n}` (have: {names})"
+  let (s, t) ← eqSides "prwby" m!"`{h.getId}`" hyps[i]!
+  -- `s` and `t` have to be given: they are fixed by the premise, and the premise proof is
+  -- just "the equation implies itself", which says nothing about its shape.
   let sS ← Lean.Elab.Term.exprToSyntax s
   let tS ← Lean.Elab.Term.exprToSyntax t
-  -- The premise proof is `A₀ →ᶠ A₀`, since the premise *is* the equation being rewritten by.
   prwCore "prwby" (readOcc occ) s t fun r =>
-    `(qfer_nat_nf (by rfl) (by rfl) (s := $sS) (t := $tS) I_comb
-        (r := $r) (by prw_norm) (by prw_norm))
+    `(pm_mp (pm_have (qfer_nat_nf (by rfl) (by rfl) (s := $sS) (t := $tS) I_comb
+        (r := $r) (by prw_norm) (by prw_norm))) (by pexact $h))
 
 end ProofMode
 end Metatheorems

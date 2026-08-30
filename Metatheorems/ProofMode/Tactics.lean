@@ -385,6 +385,37 @@ reading of "surface", and for the limit of it. -/
 private def mentionsPrec (e : Expr) : Bool :=
   (e.find? (·.isConstOf ``Term.prec)).isSome
 
+private partial def unparen (s : Syntax) : Syntax :=
+  if s.getKind == ``Lean.Parser.Term.paren then unparen s[1] else s
+
+/-- Elaborate a kernel theorem with its context pinned to the goal's.
+
+Pinning by the *expected type* alone does not work: Lean fixes a theorem's `Γ` from its first
+explicit argument, before unifying the result type. So the goal's context is injected as a
+named argument at the head of the application — which is what lets a theorem mention `x₀`
+next to a term from the outer context, the latter then weakening by coercion.
+
+Theorems that are not applications, or whose context implicit is not called `Γ`, fall back to
+plain elaboration against the expected type. -/
+def elabRuleInCtx (eStx : TSyntax `term) (Γ expected : Expr) : TacticM Expr := do
+  let bare := unparen eStx.raw
+  if bare.getKind == ``Lean.Parser.Term.app then
+    let ΓStx ← Lean.Elab.Term.exprToSyntax Γ
+    let named ← `(Lean.Parser.Term.namedArgument| (Γ := $ΓStx))
+    let pinned : TSyntax `term := ⟨Syntax.node2 .none ``Lean.Parser.Term.app bare[0]
+      (Syntax.node .none `null (#[named.raw] ++ bare[1].getArgs))⟩
+    try
+      return ← Lean.Elab.Term.withoutErrToSorry (elabTerm pinned (some expected))
+    catch _ => pure ()
+  Lean.Elab.Term.withoutErrToSorry (elabTerm eStx (some expected))
+
+/-- The type `Derivable F EqX a Premises Γ ?A` for the goal's parameters — the expected type
+a kernel theorem is elaborated against. -/
+def derivableInGoal (args : Array Expr) : TacticM Expr := do
+  let A ← mkFreshExprMVar (mkAppN (.const ``Formula []) #[args[0]!, args[2]!, args[6]!])
+  return mkAppN (.const ``Derivable [])
+    #[args[0]!, args[2]!, args[3]!, args[4]!, args[5]!, args[6]!, A]
+
 /-- Elaborate a term the *user wrote* at a surface position, and enforce the recursor ban.
 
 `HANDOFF` D-2 puts the ban on the surface language as a whole — "instantiation witnesses,
@@ -518,7 +549,11 @@ macro "pdestruct " h:ident " with " x:ident ppSpace y:ident : tactic =>
       (by pexact $h) ?_)
 
 /-- `pthm e` discharges the goal with a kernel theorem. -/
-macro "pthm " e:term : tactic => `(tactic| exact pm_have $e)
+elab "pthm " eStx:term : tactic => do
+  let args ← seqDGoalArgs "pthm"
+  let e ← elabRuleInCtx eStx args[6]! (← derivableInGoal args)
+  let eS ← Lean.Elab.Term.exprToSyntax (← instantiateMVars e)
+  evalTactic (← `(tactic| exact pm_have $eS))
 
 /-- `papply h` uses the implicational hypothesis `h`, leaving its antecedents as goals.
 
@@ -559,7 +594,7 @@ the escape hatch's `apply`, next to `pthm`'s `exact`. -/
 elab "papplym " eStx:term : tactic => do
   let args ← seqDGoalArgs "papplym"
   let goalF := args[8]!
-  let e ← elabTerm eStx none
+  let e ← elabRuleInCtx eStx args[6]! (← derivableInGoal args)
   let ety ← instantiateMVars (← inferType e)
   let etyArgs := ety.getAppArgs
   unless ety.isAppOf ``Derivable && etyArgs.size == 7 do
