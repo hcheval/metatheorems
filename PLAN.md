@@ -143,7 +143,7 @@ will be decided *for* you by phase A.
 - The program route (unverified extractor + kernel-checked certificate).
 - Compiling Lean definitions into object `Term`s.
 - Automatic generalisation (§G, §G′), filters (§I), the space ladder (§J).
-- `Mine.lean` — a design point, not a result. Keep it off the slides as a headline.
+- `Reference/Mine.lean` — a design point, not a result. Keep it off the slides as a headline.
 
 ---
 

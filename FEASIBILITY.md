@@ -4,7 +4,27 @@ Append-only probe log. Current verdict at the top. Verdict changes cite the prob
 
 ---
 
-## CURRENT VERDICT: **YELLOW**
+## CURRENT VERDICT: **CLOSED — technical route demonstrated**
+
+*As of 2026-08-30. Superseded by construction: the A track was built, so the question this
+log existed to answer is no longer open. See `## CLOSING ENTRY` at the foot of the probe log
+for what settled it and what it does not cover.*
+
+The YELLOW verdict below is kept verbatim, per the append-only rule. Read it as history.
+
+**Path note.** Entries below link to files that have since moved. The entries are not edited;
+this table is the redirect.
+
+| as written | now |
+|---|---|
+| `ProbeR1.lean` | `Metatheorems/Probes/R1.lean` |
+| `Probe.lean` | `Metatheorems/Probes/P1.lean` |
+| `MCT.lean` | `Reference/MCT.lean` |
+| `MCTStatement.lean` | `Metatheorems/MCTStatement.lean` |
+
+---
+
+## SUPERSEDED VERDICT: **YELLOW**
 
 *As of 2026-08-10, after probes R1 (complete) and R4.*
 
@@ -388,3 +408,61 @@ so there is no user-written motive to smuggle through. `split` does not exist ye
 - **The §8 abort state is the cheapest live fallback.** It needs a hand-executed
   interpretation plus a machine-checked certificate; MCT.lean already supplies the
   certificate half (modulo the `⌈b/ε⌉` vs `⌈b/ε⌉+1` fixture correction found in R1).
+
+---
+
+## CLOSING ENTRY
+
+*2026-08-30. Not a probe: the thing the probes were estimating got built.*
+
+**What settled it.** Both A-track derivations of the ℕ-MCT statement exist, at
+`Allowed.extended`, with `#print axioms` reporting only `propext, Quot.sound`:
+
+- `Metatheorems/ProofMode/MCT.lean` — `mct_p2`, the dichotomy proof (A2).
+- `Metatheorems/ProofMode/MCTLazy.lean` — `mct_p1`, the lazy proof, hand-translated per D-1
+  with the reductio confined to the headline `∃` over a QF ∨-free matrix (A3).
+
+Both are `Derivable` terms — the proof mode is definitionally `Derivable` (`Seq` is an
+`abbrev`, `SeqD` is `@[reducible]`), so there is no wrapper to verify and no soundness
+theorem about the mode to prove. `mct_bound_p2` / `mct_bound_p1` feed them to
+`general_metatheorem`, discharging the hypothesis `MCTStatement.lean` had been carrying.
+
+**Against the standing questions.**
+
+- **R2** was named "the binding evidence" and was never run as a probe. It was answered by
+  construction instead: the A track exists. That is a stronger answer than the probe would
+  have given, and a narrower one — it says the route works, not that any particular schedule
+  holds.
+- **R6 (one-month demo floor).** Not assessable from here and never was mine to certify.
+  What can be said: A0, A1, A2 and A3 are done, and A0's premise held — the shared lemmas
+  made the second derivation cost the proof skeleton plus three short inductions.
+- **B1** complete, zero `sorry`. **B2** (acceptance oracle, DSL-MCT ≡ hand-built p₂) remains
+  unrun; it now has something to compare against, but see the caveat below. **B3** implemented
+  and refusing both of R4's surviving smuggles.
+- **F1/F3 fallbacks** untouched and still available. `MCT.lean` has moved to
+  `Reference/MCT.lean`; the citation above is otherwise unchanged.
+
+**What this does NOT establish.**
+
+- That the two extracted *terms* differ. The derivation *trees* differ structurally — p₁'s
+  descent is an induction whose witness iterates `m ↦ m + g m`, p₂'s induction carries no
+  existential in its conclusion — but comparing the extracted functionals is a computation
+  needing a concrete interpretation to run in. That is A4's remaining half, and until it is
+  run the divergence claim is about proof structure, not about numbers.
+- That B2 can be a term-equality check. Because hypotheses are packed as nested implications,
+  the derivation's shape depends on how the script was written — order of `pintro`/`prevert`,
+  `phave` versus `pfrom`. Two scripts proving the same thing give α-different terms, so the
+  oracle has to be extraction-equivalence, not term equality. B2 as originally worded
+  ("α-equal *or* extraction-equivalent") already allows this; the point is that the first
+  disjunct is not available.
+- Anything about ℝ, ℚ, or abstract spaces. `RealNumbers.lean` and `MetricSpaces.lean` are
+  skeletons and are not in the library build.
+- The `sorry` at `Metatheorem.lean:298` (`general_metatheorem_classical`) is untouched, as
+  D-4 directs. p₁ routes around it by hand-translation, which is the mechanism D-1 specified,
+  and the demonstration above is what shows that route is not merely available but taken.
+
+**Known debt, recorded so it is a choice and not a surprise.** The substitution normal form
+(`Term.Subst.cons`) covers the shapes these proofs produced, not all shapes; `anorm` and
+`anorm_ren` are non-confluent against each other and must be chosen by hand. The trigger for
+a full sigma-calculus layer is a composite that cannot be sequenced away. See
+`Metatheorems/ProofMode/LADDER.md`.

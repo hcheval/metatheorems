@@ -170,7 +170,8 @@ signature. **Do not let an agent wander into it.**
 
 Probe results standing: R1 PASS (W-ty coherent on the corpus; inner types land on
 Ψ exactly; metastability = readback of 𝕎(¬¬∃∀qf), n.c.i. is an output format, not the
-engine). R4 KILLED then CLOSED by D-2. P1/P2 PASS (`Probe.lean`, `MCTStatement.lean`):
+engine). R4 KILLED then CLOSED by D-2. P1/P2 PASS (`Metatheorems/Probes/P1.lean`,
+`Metatheorems/MCTStatement.lean` — both now in the library build):
 `subst0`/`weakenBy` reduce by `rfl` on the real formulas at four binders deep, through the
 real `induction`/`forall_ax`/`exist_ax` constructors. Encoding risk retired; the proof mode
 buys ergonomics, not feasibility.

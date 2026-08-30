@@ -16,3 +16,5 @@ import Metatheorems.ProofMode.Rewrite
 import Metatheorems.MCTStatement
 import Metatheorems.ProofMode.MCT
 import Metatheorems.ProofMode.MCTLazy
+import Metatheorems.Probes.P1
+import Metatheorems.Probes.R1

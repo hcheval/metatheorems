@@ -12,8 +12,12 @@ Method: hand-compute the types, then assert the hand computation against the mac
 Every `example` below that elaborates is one hand computation confirmed.
 
 Ground instance: `ι = Empty` (no abstract space), so `⟦mctTy⟧ = ℕ → ℕ → ℕ`.
-The MCT statement is the one from `MCTStatement.lean`, repeated here so the probe is
-self-contained and disposable.
+
+The MCT statement is repeated here rather than imported from `MCTStatement.lean`. That was
+originally so the probe could be thrown away; it is now the reason to keep it. The probe is
+part of the library build, so if the type assignment ever stops matching the hand computation
+one of these `rfl`s fails — and because the statement is written out independently, a change
+to `MCTStatement.lean` cannot silently carry the probe along with it.
 -/
 
 namespace Metatheorems
