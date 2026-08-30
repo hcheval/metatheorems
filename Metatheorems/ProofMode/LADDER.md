@@ -15,7 +15,7 @@ instead of by hand.
 | 2 | `add_assoc` | three variables; a rule mentioning an outer term *and* the bound variable together | `Arith.lean` ✅ |
 | 3 | `0 ∸ y = 0` | the first monus fact; a non-equational finish (`pthm pd_zero`) | `Arith.lean` ✅ |
 | 4 | monus transitivity: `x ∸ y = 0 → y ∸ z = 0 → x ∸ z = 0` | **case analysis inside an induction**, and **rewriting inside hypotheses** | `Arith.lean` ✅ |
-| 5 | the antitone chain: `∀i, a(m+i) ∸ a m = 0` | induction *with a premise in the context*, and a function parameter `a` rather than a variable | — |
+| 5 | the antitone chain: `∀i, a(m+i) ∸ a m = 0` | induction *with a premise in the context*, and a function parameter `a` rather than a variable | `Arith.lean` ✅ |
 | 6 | the strict-drop step | a negated hypothesis; the first use of `pby_contra` in anger | — |
 | 7 | ℕ-MCT, proof p₂ (dichotomy) | the whole thing: `qf_lem` case split, budget descent as induction on `K`, a headline `∃` closed by `pbound` | — |
 
@@ -57,6 +57,31 @@ hypothesis rewrite needs, applied forwards. The hypothesis is threaded between t
 sides' congruences by transitivity. Worth noting the matching-logic proof mode does not have
 this either — `mlRewrite`/`mlRewriteBy` are goal-directed there, and only
 `mlApplyMeta … in "H"` and `mlSymmetry in "H"` act on hypotheses.
+
+## Rung 5, and the one sharp edge left
+
+Done, and it uses rung 4 — the antitone chain is monus transitivity applied along the
+sequence. It needed object-level *application* to be writable, so `f ⬝ a` now parses as well
+as prints, and the weakening coercion had to chain, since a parameter used under two binders
+needs two weakenings and a single-step instance does not compose on its own.
+
+**The sharp edge.** Instantiating a **weakened** `∀`-hypothesis at a **compound** term leaves
+
+    Term.subst (fun v => subst0_map t (ext shift (ext shift v))) a
+
+which `anorm` cannot finish: collapsing it needs `subst_id` under a `funext`, which is not a
+rewrite. Three ways round it, in order of preference:
+
+1. put the premise *inside* the quantifiers, so it is never weakened — what rung 5 does;
+2. instantiate at the *bound variable*, where `pspecialize` applies and no substitution
+   appears at all;
+3. failing both, a per-shape `_nf` lemma, which is what `Arithmetic.lean` does by hand
+   everywhere and what `anorm` exists to avoid.
+
+This is the same wall the `q_norm` tactic in `RationalNumbers.lean` was built against. It is
+worth a proper fix — a normal form for iterated `ext`/`shift` composites — before rung 7,
+because the MCT statement fuses `a`, `g` and `K` into one parameter `h` and will instantiate
+it at compound terms constantly.
 
 ## The rule for the ladder
 

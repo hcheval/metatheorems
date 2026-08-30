@@ -108,7 +108,8 @@ macro "anorm" : tactic =>
       Term.Subst.ext_vz, Term.Subst.ext_vs, Term.weaken_var, Term.app2,
       add_closed_subst, mul_closed_subst, monus_closed_subst, abs_diff_closed_subst,
       pd_closed_subst, sg_bar_closed_subst,
-      Term.weaken_subst0, Term.subst_subst0_map_weaken, weaken_substVar0, succVar0])
+      Term.weaken_subst0, Term.subst_subst0_map_weaken, Term.weaken_subst_ext,
+      weaken_substVar0, succVar0])
 
 namespace ByScript
 
@@ -281,6 +282,53 @@ def monus_trans (adm : AdmissibleEqX EqX) :
         papply ihB
         · pexact h1''
         · pexact h2'''
+
+/-- **Rung 5 — the antitone chain.** A nonincreasing sequence never comes back up:
+`a (m + i) ≤ a m`, by induction on `i`. The second of `HANDOFF.md` §3 A0's shared lemmas,
+and the first proof with a hypothesis that survives the induction and a *function* parameter
+rather than a variable.
+
+The premise sits **inside** the quantifiers on purpose. Put outside, it would be weakened by
+each `pforall`, and instantiating a weakened `∀`-hypothesis at a compound term leaves a
+substitution `anorm` cannot normalise — see `LADDER.md`. Inside, every use is either at the
+bound variable, where `pspecialize` applies and no substitution appears, or on an unweakened
+hypothesis, where `pinst` does. -/
+def antitone_chain (adm : AdmissibleEqX EqX) (a : Term F Γ (Ty.nat →ₜ Ty.nat)) :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all Ty.nat (Formula.all Ty.nat
+        (Formula.all Ty.nat (Formula.eq0 (a ⬝ (S x₂) ∸ᵗ a ⬝ x₂) Term.zero) →ᶠ
+         Formula.eq0 (a ⬝ (x₁ +ᵗ x₀) ∸ᵗ a ⬝ x₁) Term.zero))) := by
+  pmode
+  pinduction
+  · -- i = 0 : a (m + 0) ∸ a m = a m ∸ a m = 0
+    anorm
+    pforall
+    pintro hmono
+    prw (add_zero_r adm x₀)
+    pthm (monus_self adm (a ⬝ x₀))
+  · pforall
+    pintro ih
+    anorm
+    pforall
+    pintro hmono
+    -- a (m + S i) = a (S (m + i)), then chain through a (m + i)
+    prw (add_succ adm x₁ x₀)
+    pfrom mt := monus_trans adm
+    pinst mt (a ⬝ (S (x₁ +ᵗ x₀))) with mt1
+    anorm
+    pinst mt1 (a ⬝ (x₁ +ᵗ x₀)) with mt2
+    anorm
+    pinst mt2 (a ⬝ x₁) with mt3
+    anorm
+    papply mt3
+    · -- the sequence steps down at u := m + i
+      pinst hmono (x₁ +ᵗ x₀) with hm
+      anorm
+      pexact hm
+    · -- the induction hypothesis, at the bound variable and then at the premise
+      pspecialize ih with ihm
+      papply ihm
+      pexact hmono
 
 end ProofMode
 end Metatheorems

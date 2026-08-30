@@ -124,6 +124,14 @@ def Renaming.ext (r : Renaming Γ Δ) : Renaming (σ :: Γ) (σ :: Δ) :=
 /-- Shift renaming: weakens all variables by one. -/
 def Renaming.shift : Renaming Γ (σ :: Γ) := Var.vs
 
+/-- `Renaming.ext` at the two variable shapes. Stated so that `simp` can step through them:
+unfolding the definition alone leaves a `match`. -/
+@[simp] theorem Renaming.ext_vz {Γ Δ : Ctx ι} {σ : Ty ι} (r : Renaming Γ Δ) :
+    Renaming.ext r (σ := σ) (τ := σ) .vz = .vz := rfl
+
+@[simp] theorem Renaming.ext_vs {Γ Δ : Ctx ι} {σ τ : Ty ι} (r : Renaming Γ Δ) (w : Var Γ τ) :
+    Renaming.ext r (σ := σ) (.vs w) = .vs (r w) := rfl
+
 /-- Apply a renaming to a term. -/
 def rename (r : Renaming Γ Δ) : Term F Γ τ → Term F Δ τ
   | .var v         => .var (r v)

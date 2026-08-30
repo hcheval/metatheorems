@@ -70,6 +70,17 @@ scoped instance instCoeWeakenTerm {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι} {
     CoeTail (Term F Γ τ) (Term F (σ :: Γ) τ) :=
   ⟨Term.weaken⟩
 
+/-- …and again, so a term can cross *several* binders. A sequence quantified over twice needs
+two weakenings, and a single-step instance does not chain on its own. -/
+scoped instance instCoeWeakenTerm₂ {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι} {τ σ σ' : Ty ι} :
+    CoeTail (Term F Γ τ) (Term F (σ' :: σ :: Γ) τ) :=
+  ⟨fun t => t.weaken.weaken⟩
+
+/-- Three, which is as deep as anything here goes. -/
+scoped instance instCoeWeakenTerm₃ {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι} {τ σ σ' σ'' : Ty ι} :
+    CoeTail (Term F Γ τ) (Term F (σ'' :: σ' :: σ :: Γ) τ) :=
+  ⟨fun t => t.weaken.weaken.weaken⟩
+
 end ProofMode
 
 namespace Pretty
@@ -232,6 +243,13 @@ syntax:lead "∀ᶠ " term " : " term ", " term : term
 syntax:lead "∃ᶠ " term " : " term ", " term : term
 syntax:lead "λᶠ " term " : " term ", " term : term
 syntax:max "R[" term "]" : term
+/-- Object-level application. Written `f ⬝ a` rather than by juxtaposition, which would be
+ambiguous with Lean's own application, and *printed* the same way so a term can be copied
+from a goal into a script. -/
+syntax:max term:max " ⬝ " term:max : term
+
+macro_rules
+  | `($f ⬝ $a) => `(Metatheorems.Term.app $f $a)
 syntax:max "X[" term "]" : term
 syntax:max "↑ᶜ" term:max : term
 
@@ -405,9 +423,11 @@ def delabSpine : Delab := do
   let e ← SubExpr.getExpr
   guard (isSpine e)
   let (hd, as) := termSpine e
-  let hdS ← Lean.PrettyPrinter.delab hd
-  let asS ← as.mapM fun x => (Lean.PrettyPrinter.delab x : MetaM _)
-  `($hdS $asS*)
+  let mut out ← (Lean.PrettyPrinter.delab hd : MetaM _)
+  for x in as do
+    let xS ← (Lean.PrettyPrinter.delab x : MetaM _)
+    out ← `($out ⬝ $xS)
+  return out
 
 @[app_delab Metatheorems.Term.app]  def delabTermApp : Delab := delabSpine
 @[app_delab Metatheorems.Term.app2] def delabTermApp2 : Delab := delabSpine
