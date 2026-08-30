@@ -1,3 +1,4 @@
+import Metatheorems.SimpSets
 import Metatheorems.TypeSystem
 import Metatheorems.Term
 import Metatheorems.Subst

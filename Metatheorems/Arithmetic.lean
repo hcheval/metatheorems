@@ -6,6 +6,7 @@ Authors: Horatiu
 import Metatheorems.Derivable
 import Metatheorems.PropositionalLemmas
 import Metatheorems.PureFOLLemmas
+import Metatheorems.SimpSets
 
 
 namespace Metatheorems
@@ -827,6 +828,36 @@ theorem sg_bar_closed_subst {Γ Δ : Ctx ι} (σ : Term.Subst F Γ Δ) :
 /-- `Term.add` is closed, so substitution leaves it alone. Public for the same reason. -/
 theorem add_closed_subst {Γ Δ : Ctx ι} (σ : Term.Subst F Γ Δ) :
     Term.subst σ (Term.add : Term F Γ _) = Term.add := add_closed_subst' σ
+
+-- The arithmetic constants join the `closed_subst` set. The primed variants above are the
+-- same statements — `add_closed_subst` is literally `add_closed_subst' σ` — and exist only
+-- because they are needed earlier in the file, so only the canonical names are tagged.
+attribute [closed_subst] pd_closed_subst mul_closed_subst monus_closed_subst
+  abs_diff_closed_subst sg_bar_closed_subst add_closed_subst
+
+/-- The eta-expanded form of `Term.weaken_subst0`. `simp` leaves the substitution as
+`fun {τ} => …`, which the plain lemma does not match, so the normalising set needs this
+spelling rather than the direct one. -/
+theorem Term.weaken_subst0_eta {Γ : Ctx ι} {τ ρ : Ty ι} (t : Term F Γ τ) (s : Term F Γ ρ) :
+    Term.subst (fun {_τ} => Term.subst0_map s) (Term.weaken t) = t :=
+  Term.weaken_subst0 t s
+
+-- `qnorm` is the substitution-normalising `simp only` that this development writes out by
+-- hand roughly 300 times: push `subst`/`subst0` through the application spine, and leave the
+-- closed constants alone. The explicit lists it replaces had to name every closed constant
+-- appearing in the goal, and omitting one *fails* the call rather than weakening it.
+--
+-- `qnorm [h₁, h₂]` adds lemmas to the front — in practice the local `let` abbreviations a
+-- goal is stated in terms of, which have to be zeta-unfolded in the same pass.
+open Lean.Parser.Tactic in
+syntax "qnorm" (" [" (simpErase <|> simpLemma),* "]")? : tactic
+
+macro_rules
+  | `(tactic| qnorm) => `(tactic| qnorm [])
+  | `(tactic| qnorm [$ts,*]) =>
+      `(tactic| simp only [$ts,*, Term.subst0, Term.subst, Term.subst0_map,
+          Term.subst0_map_vz, Term.subst0_map_vs, Term.app2, Term.app3,
+          Term.weaken_subst0, Term.weaken_subst0_eta, closed_subst])
 
 private theorem add_qfer_l_nf {Γ : Ctx ι} (x y s : Term F Γ Ty.nat) :
     (Term.app2 Term.add (.var .vz) y.weaken : Term F (Ty.nat :: Γ) Ty.nat).subst0 s =

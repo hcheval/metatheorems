@@ -31,13 +31,6 @@ variable {ι : Type} {F : ι → Ty ι}
   {al : Allowed} {Premises : PremiseSet F} {Γ : Ctx ι}
   (adm : AdmissibleEqX EqX)
 
-/-- Local copy of `RationalNumbers`' private `weaken_subst0_eta`: the eta-expanded form of
-the public `Term.weaken_subst0` that `simp` leaves behind. Restated rather than un-privated
-so this probe needs no rebuild of the 7800-line file. -/
-private theorem weaken_subst0_eta {τ ρ : Ty ι} (t : Term F Γ τ) (s : Term F Γ ρ) :
-    Term.subst (fun {_τ} => Term.subst0_map s) (Term.weaken t) = t :=
-  Term.weaken_subst0 t s
-
 /-! ## Chunk 1 — pure congruence plumbing (calibration)
 
 The original `h_num` (RationalNumbers.lean:5024–5031) is 8 lines of `ite_nat_congr_x/y/b`
@@ -117,22 +110,12 @@ def add_Q_comm_pm :
   let den_ba := Term.app Term.pd (Term.app2 Term.mul db da)
   have nf_ab : (body.subst0 (b.weaken)).subst0 a =
       Term.app3 Term.rat_encode sign_ab num_ab den_ab := by
-    simp only [body, a, b, sign_ab, num_ab, den_ab, same_ab, ac_ab, bc_ab,
-      sa, sb, pa, pb, da, db,
-      Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
-      rat_encode_closed_subst, rat_sign_closed_subst, rat_num_closed_subst,
-      rat_den_closed_subst, ite_nat_closed_subst, sg_bar_closed_subst,
-      abs_diff_closed_subst, add_closed_subst, mul_closed_subst,
-      geq_closed_subst, pd_closed_subst, weaken_subst0_eta]
+    qnorm [body, a, b, sign_ab, num_ab, den_ab, same_ab, ac_ab, bc_ab,
+      sa, sb, pa, pb, da, db]
   have nf_ba : (body.subst0 (a.weaken)).subst0 b =
       Term.app3 Term.rat_encode sign_ba num_ba den_ba := by
-    simp only [body, a, b, sign_ba, num_ba, den_ba, same_ba,
-      sa, sb, pa, pb, da, db, ac_ab, bc_ab,
-      Term.subst0, Term.subst, Term.subst0_map, Term.app3, Term.app2,
-      rat_encode_closed_subst, rat_sign_closed_subst, rat_num_closed_subst,
-      rat_den_closed_subst, ite_nat_closed_subst, sg_bar_closed_subst,
-      abs_diff_closed_subst, add_closed_subst, mul_closed_subst,
-      geq_closed_subst, pd_closed_subst, weaken_subst0_eta]
+    qnorm [body, a, b, sign_ba, num_ba, den_ba, same_ba,
+      sa, sb, pa, pb, da, db, ac_ab, bc_ab]
   let unfold_ab := body_eq ▸ lam2_correct_nf adm body a b nf_ab
   let unfold_ba := body_eq ▸ lam2_correct_nf adm body b a nf_ba
   -- ══════════ end of setup ══════════

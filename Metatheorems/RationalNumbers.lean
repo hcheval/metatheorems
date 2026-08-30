@@ -474,6 +474,18 @@ attribute [simp] add_closed_subst mul_closed_subst monus_closed_subst abs_diff_c
 @[simp] theorem one_Q_closed_subst :
     (Term.one_Q : Term F Γ _).subst σ = Term.one_Q := by rfl
 
+-- The rational constants join `closed_subst` (declared in `SimpSets.lean`, seeded with the
+-- arithmetic ones in `Arithmetic.lean`). `qnorm` picks them all up, so a normalising step no
+-- longer has to name every closed constant that happens to appear in the goal.
+attribute [closed_subst] sg_closed_subst isEven_closed_subst isOdd_closed_subst
+  triag_closed_subst exp2_closed_subst ite_nat_closed_subst geq_closed_subst
+  max_closed_subst min_closed_subst pair_closed_subst inv_triag_closed_subst
+  fst_pair_closed_subst snd_pair_closed_subst div2_closed_subst rat_num_closed_subst
+  rat_den_closed_subst rat_sign_closed_subst rat_encode_closed_subst neg_Q_closed_subst
+  add_Q_closed_subst sub_Q_closed_subst mul_Q_closed_subst abs_Q_closed_subst
+  lt_Q_dec_closed_subst le_Q_dec_closed_subst eq_Q_dec_closed_subst
+  encode_nat_Q_closed_subst pow2neg_Q_closed_subst zero_Q_closed_subst one_Q_closed_subst
+
 end ClosedSubst
 
 -- ============================================================================
