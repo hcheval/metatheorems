@@ -46,7 +46,7 @@ open Lean Lean.Elab.Tactic Lean.Meta Formula
 undoing a weakening. -/
 macro "prw_norm" : tactic =>
   `(tactic| simp only [Formula.subst0, Term.subst0, Term.subst, Term.subst0_map_vz,
-      Term.subst0_map_vs, Term.subst_subst0_map_weaken, Term.app2, Term.app3])
+      Term.subst0_map_vs, Term.subst_subst0_map_weaken, Term.app2, Term.app3] <;> try rfl)
 
 section Build
 variable {ι : Type}
@@ -183,6 +183,40 @@ private def readOcc : Option (TSyntax ``occSel) → Occ
   | none => .all
   | some s => .at s.raw[1].toNat
 
+/-- Rewrite `s` to `t` inside an equational *hypothesis*, adding the result under `n`.
+
+The same congruence, applied forwards: the hypothesis is threaded between the two sides'
+congruences by transitivity. -/
+private def prwAtCore (who : String) (occ : Occ) (s t : Expr) (h : Ident) (n : Ident)
+    (mkProof : TSyntax `term → TacticM (TSyntax `term)) : TacticM Unit := do
+  let args ← seqDGoalArgs who
+  let some hyps ← whnfListLit? args[7]! |
+    throwError "{who}: the hypothesis context is not a literal list"
+  let names := ((listLit? args[1]!).getD []).filterMap strLit?
+  let some i := names.findIdx? (· == h.getId.toString) |
+    throwError "{who}: no hypothesis named `{h.getId}` (have: {names})"
+  let (P, Q) ← eqSides who m!"`{h.getId}`" hyps[i]!
+  let (ι, F, Γ) := (args[0]!, args[2]!, args[6]!)
+  let ρ := mkApp (.const ``Ty.nat []) ι
+  let seen ← IO.mkRef 0
+  let sP ← scanTerm occ seen ι F Γ ρ s t P
+  let sQ ← scanTerm occ seen ι F Γ ρ s t Q
+  unless sP.hit || sQ.hit do
+    throwError "{who}: the pattern does not occur in `{h.getId}`.\n\
+      Rewriting{indentExpr s}\nbut `{h.getId}` is{indentExpr hyps[i]!}"
+  let cP ← mkProof (← Lean.Elab.Term.exprToSyntax sP.abs)
+  let cQ ← mkProof (← Lean.Elab.Term.exprToSyntax sQ.abs)
+  -- The rewritten sides are passed explicitly: they are what the congruences *conclude*, so
+  -- leaving them implicit would ask the elaborator to read them back out of the proofs.
+  let repP ← Lean.Elab.Term.exprToSyntax sP.rep
+  let repQ ← Lean.Elab.Term.exprToSyntax sQ.rep
+  let origP ← Lean.Elab.Term.exprToSyntax P
+  let origQ ← Lean.Elab.Term.exprToSyntax Q
+  evalTactic (← `(tactic|
+    refine pm_rw_at $(Lean.quote n.getId.toString)
+      (P := $origP) (P' := $repP) (Q := $origQ) (Q' := $repQ)
+      $cP $cQ (by pexact $h) ?_))
+
 /-- `prw e` rewrites the goal with the closed equation `e : s =₀ t`, on both sides, the way
 `rw` does; `prw e at n` rewrites only the `n`-th occurrence, numbered left to right across
 the goal. Available in any hypothesis context, since a closed equation needs no premise. -/
@@ -228,6 +262,36 @@ elab "prwby " h:ident occ:(occSel)? : tactic => do
   let sS ← Lean.Elab.Term.exprToSyntax s
   let tS ← Lean.Elab.Term.exprToSyntax t
   prwCore "prwby" (readOcc occ) s t fun r =>
+    `(pm_mp (pm_have (qfer_nat_nf (by rfl) (by rfl) (s := $sS) (t := $tS) I_comb
+        (r := $r) (by prw_norm) (by prw_norm))) (by pexact $h))
+
+/-- `prw e in h with k` rewrites *inside* the equational hypothesis `h`, naming the result
+`k`. The goal-directed `prw` proves `L =₀ L[s:=t]` and chains it onto the goal; this proves
+the same congruence and threads the hypothesis between the two sides' copies of it. -/
+elab "prw " eStx:term " in " h:ident " with " n:ident occ:(occSel)? : tactic => do
+  let args ← seqDGoalArgs "prw"
+  let e ← elabRuleInCtx eStx args[6]! (← derivableInGoal args)
+  let ety ← instantiateMVars (← inferType e)
+  let etyArgs := ety.getAppArgs
+  unless ety.isAppOf ``Derivable && etyArgs.size == 7 do
+    throwError "prw: not a kernel derivation{indentExpr ety}"
+  let (s, t) ← eqSides "prw" m!"`{eStx}`" etyArgs[6]!
+  prwAtCore "prw" (readOcc occ) s t h n fun r => do
+    let eS ← Lean.Elab.Term.exprToSyntax (← instantiateMVars e)
+    `(pm_have (qfer_no_premise_nat_nf $eS (r := $r) (by prw_norm) (by prw_norm)))
+
+/-- `prwby h in k with m` rewrites inside the hypothesis `k` using the equation `h`. -/
+elab "prwby " h:ident " in " k:ident " with " n:ident occ:(occSel)? : tactic => do
+  let args ← seqDGoalArgs "prwby"
+  let some hyps ← whnfListLit? args[7]! |
+    throwError "prwby: the hypothesis context is not a literal list"
+  let names := ((listLit? args[1]!).getD []).filterMap strLit?
+  let some i := names.findIdx? (· == h.getId.toString) |
+    throwError "prwby: no hypothesis named `{h.getId}` (have: {names})"
+  let (s, t) ← eqSides "prwby" m!"`{h.getId}`" hyps[i]!
+  let sS ← Lean.Elab.Term.exprToSyntax s
+  let tS ← Lean.Elab.Term.exprToSyntax t
+  prwAtCore "prwby" (readOcc occ) s t k n fun r =>
     `(pm_mp (pm_have (qfer_nat_nf (by rfl) (by rfl) (s := $sS) (t := $tS) I_comb
         (r := $r) (by prw_norm) (by prw_norm))) (by pexact $h))
 

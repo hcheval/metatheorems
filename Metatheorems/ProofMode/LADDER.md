@@ -14,7 +14,7 @@ instead of by hand.
 | 1 | `add_comm` | one induction; rewriting by a closed rule and by the hypothesis | `Arith.lean` ✅ |
 | 2 | `add_assoc` | three variables; a rule mentioning an outer term *and* the bound variable together | `Arith.lean` ✅ |
 | 3 | `0 ∸ y = 0` | the first monus fact; a non-equational finish (`pthm pd_zero`) | `Arith.lean` ✅ |
-| 4 | monus transitivity: `x ∸ y = 0 → y ∸ z = 0 → x ∸ z = 0` | **case analysis inside an induction** — the first proof needing `pcases` and a zero-or-successor split | 🔶 base case and the `y = 0` branch done; blocked, see below |
+| 4 | monus transitivity: `x ∸ y = 0 → y ∸ z = 0 → x ∸ z = 0` | **case analysis inside an induction**, and **rewriting inside hypotheses** | `Arith.lean` ✅ |
 | 5 | the antitone chain: `∀i, a(m+i) ∸ a m = 0` | induction *with a premise in the context*, and a function parameter `a` rather than a variable | — |
 | 6 | the strict-drop step | a negated hypothesis; the first use of `pby_contra` in anger | — |
 | 7 | ℕ-MCT, proof p₂ (dichotomy) | the whole thing: `qf_lem` case split, budget descent as induction on `K`, a headline `∃` closed by `pbound` | — |
@@ -33,10 +33,12 @@ peeling in `Induction.lean` was built for and has only been unit-tested.
 
 Rung 6 introduces negation, and rung 7 is the demo.
 
-## Rung 4, and what it is blocked on
+## Rung 4, and what it forced
 
-The statement, the induction, the case split on `y = 0 ∨ y ≠ 0`, and the branch where `y = 0`
-contradicts `S x ∸ y = 0` all go through. The goal reads as the mathematics:
+This is the first proof that is not "induct and rewrite", and the first that is *not* also in
+`Arithmetic.lean` — it is `HANDOFF.md` §3 A0's first shared lemma, so it is Track A work.
+
+Mid-proof the state reads as the mathematics, which is the whole point:
 
     ⟪Γ, x₀ : nat, x₁ : nat, x₂ : nat⟫
           ih : ↑ᶜ↑ᶜ(∀ᶠ x₃ : nat, ∀ᶠ x₄ : nat, x₀ ∸ᵗ x₃ =₀ 0 →ᶠ x₃ ∸ᵗ x₄ =₀ 0 →ᶠ x₀ ∸ᵗ x₄ =₀ 0)
@@ -46,15 +48,15 @@ contradicts `S x ∸ y = 0` all go through. The goal reads as the mathematics:
           ────────────────────
           S x₀ ∸ᵗ x₂ =₀ 0
 
-The `y ≠ 0` branch needs `y = S(pd y)`, and then to **rewrite that into `h1` and `h2`** so
-`monus_succ_l` can strip the successors and the induction hypothesis can apply.
+The `y ≠ 0` branch needs `y = S(pd y)` **rewritten into `h1` and `h2`**, so `monus_succ_l` can
+strip the successors and the induction hypothesis can apply. `prw`/`prwby` were goal-directed
+only, so this forced `prw e in h with k` and `prwby h in k with m`.
 
-`prw` and `prwby` rewrite the *goal*. There is no `prw … in h`. That is the missing move, and
-it is not a gap in the object logic — the congruence QF-ER provides is exactly what a
-hypothesis rewrite needs, applied forwards instead of backwards. It is the next thing to
-build, and notably the matching-logic proof mode does not have it either (`mlRewrite`/
-`mlRewriteBy` are goal-directed; only `mlApplyMeta … in "H"` and `mlSymmetry in "H"` act on
-hypotheses).
+That is not a gap in the object logic: the congruence QF-ER supplies is exactly what a
+hypothesis rewrite needs, applied forwards. The hypothesis is threaded between the two
+sides' congruences by transitivity. Worth noting the matching-logic proof mode does not have
+this either — `mlRewrite`/`mlRewriteBy` are goal-directed there, and only
+`mlApplyMeta … in "H"` and `mlSymmetry in "H"` act on hypotheses.
 
 ## The rule for the ladder
 
@@ -66,11 +68,12 @@ far has forced a fix to make that true:
   from the outer context in the same argument list;
 - **rung 3** forced the closed-substitution lemmas for `monus` and friends out of
   `RationalNumbers.lean` into `Arithmetic.lean`, where `anorm` can reach them;
-- **rung 4** forced three. `prwby` no longer requires the hypothesis context to be a single
+- **rung 4** forced four. `prwby` no longer requires the hypothesis context to be a single
   quantifier-free formula — the congruence is a *closed* theorem applied to the hypothesis, so
   the rest of the context can be anything, an induction hypothesis included. `anorm` learned
-  to step through `Subst.ext`, which is what a goal under *nested* binders is made of. And
-  `pthm` / `papplym` got the same context pinning `prw` has.
+  to step through `Subst.ext`, which is what a goal under *nested* binders is made of.
+  `pthm` / `papplym` got the same context pinning `prw` has. And rewriting gained its
+  hypothesis-directed form, `prw … in h with k`.
 
 That is the point of going slowly: each rung buys a fix the next one needs, and none of these
 would have surfaced from more abstract tests.

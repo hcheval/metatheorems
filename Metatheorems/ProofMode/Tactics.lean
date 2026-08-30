@@ -232,6 +232,18 @@ def pm_trans {Δ : HCtx F Γ} {s u : Term F Γ Ty.nat} (t : Term F Γ Ty.nat)
     SeqD ns F EqX a Premises Δ (Formula.eq0 s u) :=
   seq_mp (seq_of_thm .trans0) (seq_andI h₁ h₂)
 
+/-- Rewrite inside an equational hypothesis, keeping the result under a new name.
+
+`congP` and `congQ` are the two congruences QF-ER supplies, one per side; the hypothesis is
+threaded between them by transitivity. -/
+def pm_rw_at (n : String) {Δ : HCtx F Γ} {P P' Q Q' : Term F Γ Ty.nat} {C : Formula F Γ}
+    (congP : SeqD ns F EqX a Premises Δ (Formula.eq0 P P'))
+    (congQ : SeqD ns F EqX a Premises Δ (Formula.eq0 Q Q'))
+    (hf : SeqD ns F EqX a Premises Δ (Formula.eq0 P Q))
+    (k : SeqD (n :: ns) F EqX a Premises (Formula.eq0 P' Q' :: Δ) C) :
+    SeqD ns F EqX a Premises Δ C :=
+  seq_cut (pm_trans P (pm_sym congP) (pm_trans Q hf congQ)) k
+
 /-- Flip an equational hypothesis, keeping the flipped form under a new name. -/
 def pm_sym_at (n : String) {Δ : HCtx F Γ} {s t : Term F Γ Ty.nat} {C : Formula F Γ}
     (h : SeqD ns F EqX a Premises Δ (Formula.eq0 s t))
@@ -616,10 +628,14 @@ elab "papplym " eStx:term : tactic => do
     for _ in [0:k] do t ← `(pm_mp $t ?_)
     evalTactic (← `(tactic| refine $t))
 
-/-- `papplym e in h with k` applies a kernel theorem to a hypothesis. -/
-macro "papplym " e:term " in " h:ident " with " k:ident : tactic =>
-  `(tactic| refine pm_cut $(Lean.quote k.getId.toString)
-      (pm_mp (pm_have $e) (by pexact $h)) ?_)
+/-- `papplym e in h with k` applies a kernel theorem to a hypothesis. Like `pthm`, the
+theorem is elaborated in the goal's context, so it can mention `x₀`. -/
+elab "papplym " eStx:term " in " h:ident " with " k:ident : tactic => do
+  let args ← seqDGoalArgs "papplym"
+  let e ← elabRuleInCtx eStx args[6]! (← derivableInGoal args)
+  let eS ← Lean.Elab.Term.exprToSyntax (← instantiateMVars e)
+  evalTactic (← `(tactic| refine pm_cut $(Lean.quote k.getId.toString)
+      (pm_mp (pm_have $eS) (by pexact $h)) ?_))
 
 /-- `pdestruct_imp h with k` uses an implicational hypothesis: prove its antecedent in the
 first goal, continue with its conclusion named `k` in the second. -/

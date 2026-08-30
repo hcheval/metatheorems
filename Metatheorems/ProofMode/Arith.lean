@@ -43,21 +43,27 @@ syntax:65 term:65 " +ᵗ " term:66 : term
 syntax:70 term:70 " *ᵗ " term:71 : term
 syntax:65 term:65 " ∸ᵗ " term:66 : term
 syntax:max "S " term:max : term
+syntax:max "pdᵗ " term:max : term
 
 macro_rules
   | `($a +ᵗ $b) => `(Metatheorems.Term.app2 Metatheorems.Term.add $a $b)
   | `($a *ᵗ $b) => `(Metatheorems.Term.app2 Metatheorems.Term.mul $a $b)
   | `($a ∸ᵗ $b) => `(Metatheorems.Term.app2 Metatheorems.Term.monus $a $b)
   | `(S $t)     => `(Metatheorems.Term.app Metatheorems.Term.succ $t)
+  | `(pdᵗ $t)   => `(Metatheorems.Term.app Metatheorems.Term.pd $t)
 
 def delabArith : Delab := do
   let e ← SubExpr.getExpr
   guard (isSpine e)
   let (hd, xs) := termSpine e
   let hd? := hd.getAppFn.constName?
-  if xs.size == 1 && hd? == some ``Term.succ then
-    let a ← (Lean.PrettyPrinter.delab xs[0]! : MetaM _)
-    return ← `(S $a)
+  if xs.size == 1 then
+    if hd? == some ``Term.succ then
+      let a ← (Lean.PrettyPrinter.delab xs[0]! : MetaM _)
+      return ← `(S $a)
+    if hd? == some ``Term.pd then
+      let a ← (Lean.PrettyPrinter.delab xs[0]! : MetaM _)
+      return ← `(pdᵗ $a)
   guard (xs.size == 2)
   let a ← (Lean.PrettyPrinter.delab xs[0]! : MetaM _)
   let b ← (Lean.PrettyPrinter.delab xs[1]! : MetaM _)
@@ -192,6 +198,89 @@ def monus_zero_l (adm : AdmissibleEqX EqX) :
     pthm pd_zero
 
 end ByScript
+
+/-- **Rung 4 — transitivity of `≤`, written with monus.**
+
+`Arithmetic.lean` does *not* have this one: it is new, and it is the first of the shared
+lemmas `HANDOFF.md` §3 A0 asks for, so proving it here is Track A work rather than a
+re-proof.
+
+It is also the first proof whose shape is not "induct and rewrite". It needs a case split on
+whether each of `y` and `z` is zero — the zero cases contradict `S x ∸ y = 0` — and in the
+successor cases it rewrites *inside* the premises, to expose the successors that
+`monus_succ_l` strips and the induction hypothesis then consumes. -/
+def monus_trans (adm : AdmissibleEqX EqX) :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all Ty.nat (Formula.all Ty.nat (Formula.all Ty.nat
+        ((x₀ ∸ᵗ x₁ =₀ Term.zero) →ᶠ (x₁ ∸ᵗ x₂ =₀ Term.zero) →ᶠ
+         (x₀ ∸ᵗ x₂ =₀ Term.zero))))) := by
+  pmode
+  pinduction
+  · -- x = 0, so x ∸ z = 0 outright
+    anorm
+    pforall
+    pforall
+    pintro h1 h2
+    pthm (monus_zero_l adm x₁)
+  · pforall
+    pintro ih
+    anorm
+    pforall
+    pforall
+    pintro h1 h2
+    -- is y zero?
+    pfrom hdec := eq0_decidable'
+    pinst hdec x₁ with hy
+    anorm
+    pcases hy with hy0 | hyn
+    · -- y = 0 contradicts `S x ∸ y = 0`
+      pexfalso
+      pfrom hsnz := Derivable.succ_ne_zero
+      pinst hsnz x₀ with hsnz'
+      anorm
+      papply hsnz'
+      ptrans (S x₀ ∸ᵗ x₁)
+      · psym
+        ptrans (S x₀ ∸ᵗ Term.zero)
+        · prwby hy0
+          prefl
+        · pthm (monus_zero adm (S x₀))
+      · pexact h1
+    · -- y = S(pd y): strip the successor off the first premise
+      papplym (ne_zero_eq_succ_pd adm x₁) in hyn with hy1
+      prwby hy1 in h1 with h1'
+      prw (monus_succ_l adm x₀ (pdᵗ x₁)) in h1' with h1''
+      prwby hy1 in h2 with h2'
+      -- is z zero?
+      pinst hdec x₂ with hz
+      anorm
+      pcases hz with hz0 | hzn
+      · pexfalso
+        pfrom hsnz := Derivable.succ_ne_zero
+        pinst hsnz (pdᵗ x₁) with hsnz'
+        anorm
+        papply hsnz'
+        ptrans (S (pdᵗ x₁) ∸ᵗ x₂)
+        · psym
+          ptrans (S (pdᵗ x₁) ∸ᵗ Term.zero)
+          · prwby hz0
+            prefl
+          · pthm (monus_zero adm (S (pdᵗ x₁)))
+        · pexact h2'
+      · -- z = S(pd z): now both premises are at the predecessors
+        papplym (ne_zero_eq_succ_pd adm x₂) in hzn with hz1
+        prwby hz1 in h2' with h2''
+        prw (monus_succ_l adm (pdᵗ x₁) (pdᵗ x₂)) in h2'' with h2'''
+        -- feed the induction hypothesis at (pd y, pd z)
+        pinst ih (pdᵗ x₁) with ihA
+        anorm
+        pinst ihA (pdᵗ x₂) with ihB
+        anorm
+        prwby hz1
+        prw (monus_succ_l adm x₀ (pdᵗ x₂))
+        papply ihB
+        · pexact h1''
+        · pexact h2'''
 
 end ProofMode
 end Metatheorems
