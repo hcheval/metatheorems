@@ -199,6 +199,45 @@ theorem renameF_eq_substF {Γ Γ' : Ctx ι}
     | vz => rfl
     | vs w => rfl
 
+-- ============================================================================
+-- Substitute-after-rename, in normal form
+-- ============================================================================
+
+/-!
+The formula-level counterparts of `Term.subst_subst0_map_rename_ext` and
+`Term.subst_cons_rename_ext`. Together they say: instantiating a formula that has been
+weakened any number of times is a single `substF (Term.Subst.cons t r)`, with all the
+weakenings collected into one `Term.Renaming.comp` tower.
+
+`substF` then pushes down through the connectives as usual; under a binder the substitution
+becomes `Term.Subst.ext (Term.Subst.cons t r)`, where the existing `Term.weaken_subst_ext`
+takes over. At the leaves, `Term.subst_cons_weaken` fires even on opaque terms.
+-/
+
+/-- Substituting for variable 0 after a renaming under the binder is a single `cons`. This is
+the shape left behind by instantiating a weakened `∀`-hypothesis. -/
+theorem substF_subst0_map_renameF_ext {Γ Δ : Ctx ι} {σ : Ty ι}
+    (r : Term.Renaming Γ Δ) (t : Term F Δ σ) (A : Formula F (σ :: Γ)) :
+    (A.renameF (Term.Renaming.ext r)).substF (Term.subst0_map t)
+      = A.substF (Term.Subst.cons t r) := by
+  rw [renameF_substF]; congr 1; funext _τ v; cases v <;> rfl
+
+/-- `subst0`-phrased form of `substF_subst0_map_renameF_ext`, for goals where the abbreviation
+is still folded. -/
+theorem subst0_renameF_ext {Γ Δ : Ctx ι} {σ : Ty ι}
+    (r : Term.Renaming Γ Δ) (t : Term F Δ σ) (A : Formula F (σ :: Γ)) :
+    (A.renameF (Term.Renaming.ext r)).subst0 t = A.substF (Term.Subst.cons t r) :=
+  substF_subst0_map_renameF_ext r t A
+
+/-- `cons` absorbs a further renaming under the binder; iterating collapses a tower of
+weakenings into one `Term.Renaming.comp`. -/
+theorem substF_cons_renameF_ext {Γ Δ Δ' : Ctx ι} {σ : Ty ι}
+    (r : Term.Renaming Δ Δ') (r' : Term.Renaming Γ Δ) (t : Term F Δ' σ)
+    (A : Formula F (σ :: Γ)) :
+    (A.renameF (Term.Renaming.ext r')).substF (Term.Subst.cons t r)
+      = A.substF (Term.Subst.cons t (Term.Renaming.comp r r')) := by
+  rw [renameF_substF]; congr 1; funext _τ v; cases v <;> rfl
+
 /-- Weaken a formula: embed from context Γ into (σ :: Γ). -/
 def weaken : Formula F Γ → Formula F (σ :: Γ) :=
   renameF Term.Renaming.shift

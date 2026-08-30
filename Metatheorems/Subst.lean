@@ -205,6 +205,83 @@ theorem subst_subst0_map_weaken (t : Term F Γ τ) (s : Term F Γ ρ) :
     Term.subst (Term.subst0_map s) (Term.weaken t) = t :=
   weaken_subst0 t s
 
+-- ============================================================================
+-- A normal form for substitute-after-rename
+-- ============================================================================
+
+/-!
+Instantiating a *weakened* `∀` at a term composes a renaming with a substitution. Written
+naively — via `rename_subst` — the composite is an anonymous `fun v => s (r v)`, which matches
+none of the named forms above, so no rewrite can fire on it. It can still be pushed
+structurally down to the variables, where it beta-reduces; but at an *opaque* leaf (a term
+parameter, as opposed to a variable or a constant) there is nothing to push into, and
+collapsing it needs `subst_id` under a `funext` — not a rewrite.
+
+Every composite we actually meet has one shape: *put `t` at variable 0, rename the rest by
+`r`*. Naming that shape, `Subst.cons`, is enough. It is closed under the compositions that
+arise (`Renaming.comp` absorbs the renamings), and — the point — it has a leaf rule,
+`subst_cons_weaken`, that fires on an opaque term because the substitution is a named
+constructor rather than a lambda.
+-/
+
+/-- Composition of renamings, as a named combinator rather than a lambda. -/
+def Renaming.comp (r₂ : Renaming Δ Δ') (r₁ : Renaming Γ Δ) : Renaming Γ Δ' :=
+  fun v => r₂ (r₁ v)
+
+@[simp] theorem Renaming.comp_apply {Γ Δ Δ' : Ctx ι} {τ : Ty ι}
+    (r₂ : Renaming Δ Δ') (r₁ : Renaming Γ Δ) (v : Var Γ τ) :
+    Renaming.comp r₂ r₁ v = r₂ (r₁ v) := rfl
+
+/-- `rename` of a composed renaming, in the direction that takes a composite apart. With
+`Renaming.shift` at the leaves this turns an iterated composite into iterated `weaken`. -/
+theorem rename_comp {Γ Δ Δ' : Ctx ι} {τ : Ty ι}
+    (r₂ : Renaming Δ Δ') (r₁ : Renaming Γ Δ) (t : Term F Γ τ) :
+    t.rename (Renaming.comp r₂ r₁) = (t.rename r₁).rename r₂ :=
+  (rename_rename r₁ r₂ t).symm
+
+/-- `Term.weaken` is `rename Renaming.shift`; state it so that `simp` folds a bare `shift`
+rename back into the notation the user sees. -/
+theorem rename_shift {σ : Ty ι} (t : Term F Γ τ) :
+    t.rename (Renaming.shift (σ := σ)) = t.weaken := rfl
+
+/-- Substitute `t` for variable 0 and rename every other variable by `r`.
+
+This is the normal form for a substitution composed with a renaming. -/
+def Subst.cons (t : Term F Δ σ) (r : Renaming Γ Δ) : Subst F (σ :: Γ) Δ :=
+  fun v => match v with
+  | .vz   => t
+  | .vs w => .var (r w)
+
+@[simp] theorem Subst.cons_vz {σ : Ty ι} (t : Term F Δ σ) (r : Renaming Γ Δ) :
+    Subst.cons t r (τ := σ) .vz = t := rfl
+
+@[simp] theorem Subst.cons_vs {σ τ : Ty ι} (t : Term F Δ σ) (r : Renaming Γ Δ) (w : Var Γ τ) :
+    Subst.cons t r (.vs w) = .var (r w) := rfl
+
+/-- **The leaf rule.** Because `Subst.cons` is a named constructor, this fires on an opaque
+term `u` — which is exactly what the anonymous composite could not do. -/
+@[simp] theorem subst_cons_weaken {σ : Ty ι} (t : Term F Δ σ) (r : Renaming Γ Δ)
+    (u : Term F Γ τ) :
+    (u.weaken (σ := σ)).subst (Subst.cons t r) = u.rename r := by
+  simp only [weaken]
+  rw [rename_subst, rename_eq_subst]
+  rfl
+
+/-- Substituting for variable 0 *after* a renaming under the binder is a `cons`. This is the
+shape produced by instantiating a weakened `∀`. -/
+theorem subst_subst0_map_rename_ext {Γ Δ : Ctx ι} {σ τ : Ty ι}
+    (r : Renaming Γ Δ) (t : Term F Δ σ) (u : Term F (σ :: Γ) τ) :
+    (u.rename (Renaming.ext r)).subst (subst0_map t) = u.subst (Subst.cons t r) := by
+  rw [rename_subst]; congr 1; funext _τ v; cases v <;> rfl
+
+/-- `cons` absorbs a further renaming under the binder. Iterating this collapses any tower of
+weakenings into a single `Subst.cons _ (Renaming.comp …)`. -/
+theorem subst_cons_rename_ext {Γ Δ Δ' : Ctx ι} {σ τ : Ty ι}
+    (r : Renaming Δ Δ') (r' : Renaming Γ Δ) (t : Term F Δ' σ) (u : Term F (σ :: Γ) τ) :
+    (u.rename (Renaming.ext r')).subst (Subst.cons t r)
+      = u.subst (Subst.cons t (Renaming.comp r r')) := by
+  rw [rename_subst]; congr 1; funext _τ v; cases v <;> rfl
+
 end Term
 
 -- Re-export Renaming at Metatheorems level for backwards compatibility

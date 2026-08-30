@@ -96,33 +96,39 @@ def succ_congr_imp {s t : Term F Γ Ty.nat} :
   qfer_nat_nf (A₀ := Formula.eq0 s t) (by rfl) (by rfl) I_comb
     (r := .app .succ (.var .vz)) rfl rfl
 
-/-- Normalise the substitutions `pinduction` leaves behind.
+/-- Put a substitute-after-rename composite into `Term.Subst.cons` normal form.
+
+Instantiating a *weakened* `∀`-hypothesis composes a renaming with a substitution. Left as an
+anonymous `fun v => s (r v)` the composite matches no rewrite rule and gets stuck at any leaf
+that is not a variable. `Term.Subst.cons` names the shape; see the comment block in
+`Subst.lean`. Run before *and* after the main normalisation: before, so the composite is
+recognised while `Formula.subst0` is still folded; after, so the leaves `weaken_subst_ext`
+exposes under binders get the same treatment. -/
+macro "anorm_cons" : tactic =>
+  `(tactic| simp only [Formula.weakenBy, Formula.weaken,
+      Formula.subst0_renameF_ext, Formula.substF_subst0_map_renameF_ext,
+      Formula.substF_cons_renameF_ext,
+      Term.subst_subst0_map_rename_ext, Term.subst_cons_rename_ext,
+      Term.subst_cons_weaken, Term.Subst.cons_vz, Term.Subst.cons_vs,
+      Term.rename_comp, Term.rename_shift, Term.Renaming.comp_apply,
+      Term.Renaming.shift])
+
+/-- Normalise the substitutions `pinduction` and `pinst` leave behind.
 
 The counterpart of the `base_nf` / `step_nf` / `inst_nf` lemmas that the hand-built proofs in
 `Arithmetic.lean` write out separately for each theorem. -/
 macro "anorm" : tactic =>
-  `(tactic| simp only [Formula.subst0, Formula.substVar0, Formula.substF, Formula.neg,
-      Term.subst,
-      Term.subst0_map_vz, Term.subst0_map_vs,
-      Term.substVar0_map_vz, Term.substVar0_map_vs,
-      Term.Subst.ext_vz, Term.Subst.ext_vs, Term.weaken_var, Term.app2,
-      add_closed_subst, mul_closed_subst, monus_closed_subst, abs_diff_closed_subst,
-      pd_closed_subst, sg_bar_closed_subst,
-      Term.weaken_subst0, Term.subst_subst0_map_weaken, Term.weaken_subst_ext,
-      weaken_substVar0, succVar0])
-
-/-- `anorm`, plus pushing *renamings* down to the variables.
-
-Kept separate because it is not always an improvement: on a term built only from variables and
-constants it finishes the job, but on an opaque parameter it turns a tidy `weakenBy` into a
-stuck `Term.rename`. Use it when instantiating a weakened `∀`-hypothesis at a compound term,
-and only then. -/
-macro "anorm_deep" : tactic =>
-  `(tactic| (anorm
-             simp only [Formula.weakenBy, Formula.weaken, Formula.renameF, Term.rename,
-               Term.Renaming.ext_vz, Term.Renaming.ext_vs, Term.Renaming.shift,
-               Formula.substF, Term.subst, Term.subst0_map_vz, Term.subst0_map_vs,
-               Term.Subst.ext_vz, Term.Subst.ext_vs, Formula.subst0, Term.app2]))
+  `(tactic| (try anorm_cons
+             simp only [Formula.subst0, Formula.substVar0, Formula.substF, Formula.neg,
+               Term.subst,
+               Term.subst0_map_vz, Term.subst0_map_vs,
+               Term.substVar0_map_vz, Term.substVar0_map_vs,
+               Term.Subst.ext_vz, Term.Subst.ext_vs, Term.weaken_var, Term.app2,
+               add_closed_subst, mul_closed_subst, monus_closed_subst, abs_diff_closed_subst,
+               pd_closed_subst, sg_bar_closed_subst,
+               Term.weaken_subst0, Term.subst_subst0_map_weaken, Term.weaken_subst_ext,
+               weaken_substVar0, succVar0]
+             try anorm_cons))
 
 namespace ByScript
 
@@ -342,6 +348,44 @@ def antitone_chain (adm : AdmissibleEqX EqX) (a : Term F Γ (Ty.nat →ₜ Ty.na
       pspecialize ih with ihm
       papply ihm
       pexact hmono
+
+/-- The same theorem with the monotonicity premise **outside** the quantifiers.
+
+This is the shape `antitone_chain` was written to avoid: `hmono` is weakened once by the
+induction and again by each `pforall`, and it is then instantiated at the compound term
+`m + i` — a substitute-after-rename composite over an *opaque* parameter `a`. Before
+`Term.Subst.cons` this could not be normalised at all. -/
+def antitone_chain_premise_outside (adm : AdmissibleEqX EqX)
+    (a : Term F Γ (Ty.nat →ₜ Ty.nat)) :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all Ty.nat (Formula.eq0 (a ⬝ (S x₀) ∸ᵗ a ⬝ x₀) Term.zero) →ᶠ
+       Formula.all Ty.nat (Formula.all Ty.nat
+         (Formula.eq0 (a ⬝ (x₁ +ᵗ x₀) ∸ᵗ a ⬝ x₁) Term.zero))) := by
+  pmode
+  pintro hmono
+  pinduction
+  · anorm
+    pforall
+    prw (add_zero_r adm x₀)
+    pthm (monus_self adm (a ⬝ x₀))
+  · pforall
+    pintro ih
+    anorm
+    pforall
+    prw (add_succ adm x₁ x₀)
+    pfrom mt := monus_trans adm
+    pinst mt (a ⬝ (S (x₁ +ᵗ x₀))) with mt1
+    anorm
+    pinst mt1 (a ⬝ (x₁ +ᵗ x₀)) with mt2
+    anorm
+    pinst mt2 (a ⬝ x₁) with mt3
+    anorm
+    papply mt3
+    · pinst hmono (x₁ +ᵗ x₀) with hm
+      anorm
+      pexact hm
+    · pspecialize ih with ihm
+      pexact ihm
 
 end ProofMode
 end Metatheorems
