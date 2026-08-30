@@ -439,32 +439,82 @@ attribute [simp] add_closed_subst mul_closed_subst monus_closed_subst abs_diff_c
     (Term.fst_pair : Term F Γ _).subst σ = Term.fst_pair := by rfl
 @[simp] theorem snd_pair_closed_subst :
     (Term.snd_pair : Term F Γ _).subst σ = Term.snd_pair := by rfl
+
+-- Everything above is small enough that `rfl` is cheap; from here the definitions nest, and
+-- `rfl` has to delta-expand the whole tree. `Term.lt_Q_dec` that way costs 28 s — 14 s in the
+-- tactic and 14 s again in the kernel — because its expansion runs to millions of nodes.
+--
+-- So from here the proofs are *compositional*: unfold one level, push `subst` through the
+-- application spine, and stop at the constants already known closed. That needs the set to be
+-- built up as we go, hence the tags interleaved with the proofs rather than one block at the
+-- end. Same statements, same `@[simp]` status, ~200× less work.
+attribute [closed_subst] sg_closed_subst isEven_closed_subst isOdd_closed_subst
+  triag_closed_subst exp2_closed_subst ite_nat_closed_subst geq_closed_subst
+  max_closed_subst min_closed_subst pair_closed_subst inv_triag_closed_subst
+  fst_pair_closed_subst snd_pair_closed_subst
+
 @[simp] theorem div2_closed_subst :
-    (Term.div2 : Term F Γ _).subst σ = Term.div2 := by rfl
+    (Term.div2 : Term F Γ _).subst σ = Term.div2 := by
+  simp only [Term.div2, Term.subst, Term.Subst.ext, Term.app2, Term.app3, closed_subst]
+  all_goals rfl
 @[simp] theorem rat_num_closed_subst :
-    (Term.rat_num : Term F Γ _).subst σ = Term.rat_num := by rfl
+    (Term.rat_num : Term F Γ _).subst σ = Term.rat_num := by
+  simp only [Term.rat_num, Term.subst, Term.Subst.ext, Term.app2, Term.app3, closed_subst]
+  all_goals rfl
 @[simp] theorem rat_den_closed_subst :
-    (Term.rat_den : Term F Γ _).subst σ = Term.rat_den := by rfl
+    (Term.rat_den : Term F Γ _).subst σ = Term.rat_den := by
+  simp only [Term.rat_den, Term.subst, Term.Subst.ext, Term.app2, Term.app3, closed_subst]
+  all_goals rfl
 @[simp] theorem rat_sign_closed_subst :
-    (Term.rat_sign : Term F Γ _).subst σ = Term.rat_sign := by rfl
+    (Term.rat_sign : Term F Γ _).subst σ = Term.rat_sign := by
+  simp only [Term.rat_sign, Term.subst, Term.Subst.ext, Term.app2, Term.app3, closed_subst]
+  all_goals rfl
 @[simp] theorem rat_encode_closed_subst :
-    (Term.rat_encode : Term F Γ _).subst σ = Term.rat_encode := by rfl
+    (Term.rat_encode : Term F Γ _).subst σ = Term.rat_encode := by
+  simp only [Term.rat_encode, Term.subst, Term.Subst.ext, Term.app2, Term.app3, closed_subst]
+  all_goals rfl
+
+attribute [closed_subst] div2_closed_subst rat_num_closed_subst rat_den_closed_subst
+  rat_sign_closed_subst rat_encode_closed_subst
+
 @[simp] theorem neg_Q_closed_subst :
-    (Term.neg_Q : Term F Γ _).subst σ = Term.neg_Q := by rfl
+    (Term.neg_Q : Term F Γ _).subst σ = Term.neg_Q := by
+  simp only [Term.neg_Q, Term.subst, Term.Subst.ext, Term.app2, Term.app3, closed_subst]
+  all_goals rfl
 @[simp] theorem add_Q_closed_subst :
-    (Term.add_Q : Term F Γ _).subst σ = Term.add_Q := by rfl
+    (Term.add_Q : Term F Γ _).subst σ = Term.add_Q := by
+  simp only [Term.add_Q, Term.subst, Term.Subst.ext, Term.app2, Term.app3, closed_subst]
+  all_goals rfl
+
+attribute [closed_subst] neg_Q_closed_subst add_Q_closed_subst
+
 @[simp] theorem sub_Q_closed_subst :
-    (Term.sub_Q : Term F Γ _).subst σ = Term.sub_Q := by rfl
+    (Term.sub_Q : Term F Γ _).subst σ = Term.sub_Q := by
+  simp only [Term.sub_Q, Term.subst, Term.Subst.ext, Term.app2, Term.app3, closed_subst]
+  all_goals rfl
 @[simp] theorem mul_Q_closed_subst :
-    (Term.mul_Q : Term F Γ _).subst σ = Term.mul_Q := by rfl
+    (Term.mul_Q : Term F Γ _).subst σ = Term.mul_Q := by
+  simp only [Term.mul_Q, Term.subst, Term.Subst.ext, Term.app2, Term.app3, closed_subst]
+  all_goals rfl
 @[simp] theorem abs_Q_closed_subst :
-    (Term.abs_Q : Term F Γ _).subst σ = Term.abs_Q := by rfl
+    (Term.abs_Q : Term F Γ _).subst σ = Term.abs_Q := by
+  simp only [Term.abs_Q, Term.subst, Term.Subst.ext, Term.app2, Term.app3, closed_subst]
+  all_goals rfl
+
+attribute [closed_subst] sub_Q_closed_subst mul_Q_closed_subst abs_Q_closed_subst
+
 @[simp] theorem lt_Q_dec_closed_subst :
-    (Term.lt_Q_dec : Term F Γ _).subst σ = Term.lt_Q_dec := by rfl
+    (Term.lt_Q_dec : Term F Γ _).subst σ = Term.lt_Q_dec := by
+  simp only [Term.lt_Q_dec, Term.subst, Term.Subst.ext, Term.app2, Term.app3, closed_subst]
+  all_goals rfl
 @[simp] theorem le_Q_dec_closed_subst :
-    (Term.le_Q_dec : Term F Γ _).subst σ = Term.le_Q_dec := by rfl
+    (Term.le_Q_dec : Term F Γ _).subst σ = Term.le_Q_dec := by
+  simp only [Term.le_Q_dec, Term.subst, Term.Subst.ext, Term.app2, Term.app3, closed_subst]
+  all_goals rfl
 @[simp] theorem eq_Q_dec_closed_subst :
-    (Term.eq_Q_dec : Term F Γ _).subst σ = Term.eq_Q_dec := by rfl
+    (Term.eq_Q_dec : Term F Γ _).subst σ = Term.eq_Q_dec := by
+  simp only [Term.eq_Q_dec, Term.subst, Term.Subst.ext, Term.app2, Term.app3, closed_subst]
+  all_goals rfl
 @[simp] theorem encode_nat_Q_closed_subst :
     (Term.encode_nat_Q : Term F Γ _).subst σ = Term.encode_nat_Q := by rfl
 @[simp] theorem pow2neg_Q_closed_subst :
@@ -474,16 +524,11 @@ attribute [simp] add_closed_subst mul_closed_subst monus_closed_subst abs_diff_c
 @[simp] theorem one_Q_closed_subst :
     (Term.one_Q : Term F Γ _).subst σ = Term.one_Q := by rfl
 
--- The rational constants join `closed_subst` (declared in `SimpSets.lean`, seeded with the
--- arithmetic ones in `Arithmetic.lean`). `qnorm` picks them all up, so a normalising step no
--- longer has to name every closed constant that happens to appear in the goal.
-attribute [closed_subst] sg_closed_subst isEven_closed_subst isOdd_closed_subst
-  triag_closed_subst exp2_closed_subst ite_nat_closed_subst geq_closed_subst
-  max_closed_subst min_closed_subst pair_closed_subst inv_triag_closed_subst
-  fst_pair_closed_subst snd_pair_closed_subst div2_closed_subst rat_num_closed_subst
-  rat_den_closed_subst rat_sign_closed_subst rat_encode_closed_subst neg_Q_closed_subst
-  add_Q_closed_subst sub_Q_closed_subst mul_Q_closed_subst abs_Q_closed_subst
-  lt_Q_dec_closed_subst le_Q_dec_closed_subst eq_Q_dec_closed_subst
+-- The remaining rational constants join `closed_subst` (declared in `SimpSets.lean`, seeded
+-- with the arithmetic ones in `Arithmetic.lean`); the rest were tagged above, as they were
+-- needed. `qnorm` picks them all up, so a normalising step no longer has to name every closed
+-- constant that happens to appear in the goal.
+attribute [closed_subst] lt_Q_dec_closed_subst le_Q_dec_closed_subst eq_Q_dec_closed_subst
   encode_nat_Q_closed_subst pow2neg_Q_closed_subst zero_Q_closed_subst one_Q_closed_subst
 
 end ClosedSubst
