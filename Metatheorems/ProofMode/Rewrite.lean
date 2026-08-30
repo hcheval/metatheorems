@@ -38,6 +38,42 @@ between `mlRewrite` and `mlRewriteBy`, arrived at from a different restriction.
 -/
 
 namespace Metatheorems
+
+section QferGeneral
+open Formula
+
+variable {ι : Type} {F : ι → Ty ι}
+  {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
+  {al : Allowed} {Premises : PremiseSet F}
+
+/-- QF-ER at an arbitrary pair of types, with the two `subst0` round-trips given explicitly.
+
+`qfer_nat_nf` is this at `ρ = σ = nat`. The constructor was always general — `Derivable.qfer`
+is stated for `eqAtType EqX ρ`/`eqAtType EqX σ` — so nothing here is new metatheory; only the
+`_nf` wrappers were specialised. -/
+def qfer_at_nf {Γ : Ctx ι} {A₀ : Formula F Γ} {ρ σ : Ty ι}
+    (hqf : A₀.isQF = true) (hvf : A₀.isVFree = true)
+    {s t : Term F Γ ρ}
+    (h : Derivable F EqX al Premises (A₀ →ᶠ eqAtType EqX ρ s t))
+    {r : Term F (ρ :: Γ) σ} {rs rt : Term F Γ σ}
+    (hs : r.subst0 s = rs) (ht : r.subst0 t = rt) :
+    Derivable F EqX al Premises (A₀ →ᶠ eqAtType EqX σ rs rt) :=
+  Eq.mp (congrArg (Derivable F EqX al Premises ·)
+    (by rw [show r.subst0 s = rs from hs, show r.subst0 t = rt from ht]))
+    (Derivable.qfer hqf hvf h)
+
+/-- QF-ER without a premise, at an arbitrary pair of types. -/
+def qfer_no_premise_at_nf {Γ : Ctx ι} {ρ σ : Ty ι}
+    {s t : Term F Γ ρ} (h : Derivable F EqX al Premises (eqAtType EqX ρ s t))
+    {r : Term F (ρ :: Γ) σ} {rs rt : Term F Γ σ}
+    (hs : r.subst0 s = rs) (ht : r.subst0 t = rt) :
+    Derivable F EqX al Premises (eqAtType EqX σ rs rt) :=
+  Eq.mp (congrArg (Derivable F EqX al Premises ·)
+    (by rw [show r.subst0 s = rs from hs, show r.subst0 t = rt from ht]))
+    (qfer_no_premise h)
+
+end QferGeneral
+
 namespace ProofMode
 
 open Lean Lean.Elab.Tactic Lean.Meta Formula
@@ -138,27 +174,61 @@ where
 
 end Build
 
-/-- The two sides of an equational goal. -/
-private def eqGoalSides (who : String) : TacticM (Array Expr × Array Expr) := do
+/-- An equation, independent of how it was spelled: the type it is at, and its two sides. -/
+structure EqShape where
+  /-- the `Ty ι` the equation is at -/
+  ty : Expr
+  lhs : Expr
+  rhs : Expr
+
+/-- Recognise an equation in any spelling this development uses.
+
+`eqAtType` is a `def` by recursion on the type, so its normal form differs per type — at
+`nat` a `Formula.eq0`, at a base type whatever `EqX` says, at an arrow a `∀`. Only the
+*folded* presentation has the sides in fixed positions, so this matches on that first and
+only falls back to `whnfD` for the definitions that genuinely unfold to an equation
+(`eq_Q`, `eq_R`, `Formula.neg`-style wrappers). -/
+private def eqView? (ι eqx : Expr) (f : Expr) : MetaM (Option EqShape) := do
+  let check (e : Expr) : MetaM (Option EqShape) := do
+    let a := e.getAppArgs
+    if e.isAppOf ``Formula.eq0 && a.size == 5 then
+      return some ⟨mkApp (.const ``Ty.nat []) ι, a[3]!, a[4]!⟩
+    if e.isAppOf ``eqAtType && a.size == 7 then
+      return some ⟨a[4]!, a[5]!, a[6]!⟩
+    -- `EqX i s t` at a base type: the head is the goal's own `EqX` parameter, which is an
+    -- fvar, so there is nothing to unfold and only this comparison can identify it.
+    if a.size == 4 && (← isDefEq e.getAppFn eqx) then
+      return some ⟨mkApp2 (.const ``Ty.base []) ι a[0]!, a[2]!, a[3]!⟩
+    return none
+  if let some v ← check f then return some v
+  check (← whnfD f)
+
+/-- The goal as an equation. -/
+private def eqGoalSides (who : String) : TacticM (Array Expr × EqShape) := do
   let args ← seqDGoalArgs who
-  let target ← whnfD args[8]!
-  let targs := target.getAppArgs
-  unless target.isAppOf ``Formula.eq0 && targs.size == 5 do
+  let some v ← eqView? args[0]! args[3]! args[8]! |
     throwError "{who}: the goal is not an equation{indentExpr args[8]!}"
-  return (args, targs)
+  return (args, v)
 
 /-- Rewrite `s` to `t` throughout an equational goal, given a way to build the QF-ER
 congruence proof from the abstraction. Shared by `prw` and `prwby`. -/
-private def prwCore (who : String) (occ : Occ) (s t : Expr)
+private def prwCore (who : String) (occ : Occ) (ρ s t : Expr)
     (mkProof : TSyntax `term → TacticM (TSyntax `term)) : TacticM Unit := do
-  let (args, targs) ← eqGoalSides who
+  let (args, goal) ← eqGoalSides who
   let (ι, F, Γ) := (args[0]!, args[2]!, args[6]!)
-  let ρ := mkApp (.const ``Ty.nat []) ι
+  -- The *goal's* type must stay `nat`: the gluing below is `pm_trans`/`pm_sym`, and the
+  -- kernel's `.trans0`/`.sym0` are nat-only. At other types transitivity comes from
+  -- `eqAtType_trans`, which needs an `AdmissibleEqX` this tactic is not given.
+  -- The *pattern's* type `ρ` is unrestricted — QF-ER always was.
+  unless goal.ty.isAppOf ``Ty.nat do
+    throwError "{who}: the goal is an equation at{indentExpr goal.ty}\nbut rewriting is \
+      currently glued by `pm_trans`/`pm_sym`, which the kernel provides only at `nat`. \
+      Rewriting a pattern of any type inside a `nat`-valued goal does work."
   -- One counter across both sides, so `at n` numbers occurrences left to right in the goal
   -- as displayed rather than per side.
   let seen ← IO.mkRef 0
-  let L ← scanTerm occ seen ι F Γ ρ s t targs[3]!
-  let R ← scanTerm occ seen ι F Γ ρ s t targs[4]!
+  let L ← scanTerm occ seen ι F Γ ρ s t goal.lhs
+  let R ← scanTerm occ seen ι F Γ ρ s t goal.rhs
   unless L.hit || R.hit do
     match occ, ← seen.get with
     | .at n, found =>
@@ -178,14 +248,13 @@ private def prwCore (who : String) (occ : Occ) (s t : Expr)
   evalTactic (← `(tactic|
     refine pm_trans $repL $hL (pm_trans $repR ?_ (pm_sym $hR))))
 
-/-- The two sides of an equation `s =₀ t`, from the formula expression. -/
-private def eqSides (who : String) (what : MessageData) (f : Expr) :
-    TacticM (Expr × Expr) := do
-  let eq ← whnfD f
-  let eqArgs := eq.getAppArgs
-  unless eq.isAppOf ``Formula.eq0 && eqArgs.size == 5 do
+/-- The type and two sides of an equation, from the formula expression. Same view as the
+goal uses, so a rule may be stated in any of the accepted spellings. -/
+private def eqSides (who : String) (what : MessageData) (ι eqx f : Expr) :
+    TacticM EqShape := do
+  let some v ← eqView? ι eqx f |
     throwError "{who}: {what} is not an equation{indentExpr f}"
-  return (eqArgs[3]!, eqArgs[4]!)
+  return v
 
 /-- The optional occurrence selector shared by `prw` and `prwby`. -/
 syntax occSel := " at " num
@@ -198,7 +267,7 @@ private def readOcc : Option (TSyntax ``occSel) → Occ
 
 The same congruence, applied forwards: the hypothesis is threaded between the two sides'
 congruences by transitivity. -/
-private def prwAtCore (who : String) (occ : Occ) (s t : Expr) (h : Ident) (n : Ident)
+private def prwAtCore (who : String) (occ : Occ) (ρ s t : Expr) (h : Ident) (n : Ident)
     (mkProof : TSyntax `term → TacticM (TSyntax `term)) : TacticM Unit := do
   let args ← seqDGoalArgs who
   let some hyps ← whnfListLit? args[7]! |
@@ -206,9 +275,12 @@ private def prwAtCore (who : String) (occ : Occ) (s t : Expr) (h : Ident) (n : I
   let names := ((listLit? args[1]!).getD []).filterMap strLit?
   let some i := names.findIdx? (· == h.getId.toString) |
     throwError "{who}: no hypothesis named `{h.getId}` (have: {names})"
-  let (P, Q) ← eqSides who m!"`{h.getId}`" hyps[i]!
+  let target ← eqSides who m!"`{h.getId}`" args[0]! args[3]! hyps[i]!
+  let (P, Q) := (target.lhs, target.rhs)
   let (ι, F, Γ) := (args[0]!, args[2]!, args[6]!)
-  let ρ := mkApp (.const ``Ty.nat []) ι
+  unless target.ty.isAppOf ``Ty.nat do
+    throwError "{who}: `{h.getId}` is an equation at{indentExpr target.ty}\nbut the \
+      forward form is glued by `pm_rw_at`, which is stated at `nat`."
   let seen ← IO.mkRef 0
   let sP ← scanTerm occ seen ι F Γ ρ s t P
   let sQ ← scanTerm occ seen ι F Γ ρ s t Q
@@ -241,12 +313,14 @@ elab "prw " eStx:term occ:(occSel)? : tactic => do
   let etyArgs := ety.getAppArgs
   unless ety.isAppOf ``Derivable && etyArgs.size == 7 do
     throwError "prw: not a kernel derivation{indentExpr ety}"
-  let (s, t) ← eqSides "prw" m!"`{eStx}`" etyArgs[6]!
+  let rule ← eqSides "prw" m!"`{eStx}`" etyArgs[0]! etyArgs[2]! etyArgs[6]!
   -- The rule goes back as an `Expr`: matching may have solved metavariables in it, and
   -- re-elaborating the source would lose those solutions.
-  prwCore "prw" (readOcc occ) s t fun r => do
+  prwCore "prw" (readOcc occ) rule.ty rule.lhs rule.rhs fun r => do
     let eS ← Lean.Elab.Term.exprToSyntax (← instantiateMVars e)
-    `(pm_have (qfer_no_premise_nat_nf $eS (r := $r) (by prw_norm) (by prw_norm)))
+    -- `σ := Ty.nat` has to be given. `eqAtType` matches on its type argument, so with `σ` a
+    -- metavariable the conclusion cannot be unified against the goal's `Formula.eq0`.
+    `(pm_have (qfer_no_premise_at_nf (σ := Ty.nat) $eS (r := $r) (by prw_norm) (by prw_norm)))
 
 /-- `prwby h` rewrites the goal with a *hypothesis* `h : s =₀ t`.
 
@@ -267,13 +341,13 @@ elab "prwby " h:ident occ:(occSel)? : tactic => do
   let n := h.getId.toString
   let some i := names.findIdx? (· == n) |
     throwError "prwby: no hypothesis named `{n}` (have: {names})"
-  let (s, t) ← eqSides "prwby" m!"`{h.getId}`" hyps[i]!
+  let rule ← eqSides "prwby" m!"`{h.getId}`" args[0]! args[3]! hyps[i]!
   -- `s` and `t` have to be given: they are fixed by the premise, and the premise proof is
   -- just "the equation implies itself", which says nothing about its shape.
-  let sS ← Lean.Elab.Term.exprToSyntax s
-  let tS ← Lean.Elab.Term.exprToSyntax t
-  prwCore "prwby" (readOcc occ) s t fun r =>
-    `(pm_mp (pm_have (qfer_nat_nf (by rfl) (by rfl) (s := $sS) (t := $tS) I_comb
+  let sS ← Lean.Elab.Term.exprToSyntax rule.lhs
+  let tS ← Lean.Elab.Term.exprToSyntax rule.rhs
+  prwCore "prwby" (readOcc occ) rule.ty rule.lhs rule.rhs fun r =>
+    `(pm_mp (pm_have (qfer_at_nf (σ := Ty.nat) (by rfl) (by rfl) (s := $sS) (t := $tS) I_comb
         (r := $r) (by prw_norm) (by prw_norm))) (by pexact $h))
 
 /-- `prw e in h with k` rewrites *inside* the equational hypothesis `h`, naming the result
@@ -286,10 +360,10 @@ elab "prw " eStx:term " in " h:ident " with " n:ident occ:(occSel)? : tactic => 
   let etyArgs := ety.getAppArgs
   unless ety.isAppOf ``Derivable && etyArgs.size == 7 do
     throwError "prw: not a kernel derivation{indentExpr ety}"
-  let (s, t) ← eqSides "prw" m!"`{eStx}`" etyArgs[6]!
-  prwAtCore "prw" (readOcc occ) s t h n fun r => do
+  let rule ← eqSides "prw" m!"`{eStx}`" etyArgs[0]! etyArgs[2]! etyArgs[6]!
+  prwAtCore "prw" (readOcc occ) rule.ty rule.lhs rule.rhs h n fun r => do
     let eS ← Lean.Elab.Term.exprToSyntax (← instantiateMVars e)
-    `(pm_have (qfer_no_premise_nat_nf $eS (r := $r) (by prw_norm) (by prw_norm)))
+    `(pm_have (qfer_no_premise_at_nf (σ := Ty.nat) $eS (r := $r) (by prw_norm) (by prw_norm)))
 
 /-- `prwby h in k with m` rewrites inside the hypothesis `k` using the equation `h`. -/
 elab "prwby " h:ident " in " k:ident " with " n:ident occ:(occSel)? : tactic => do
@@ -299,11 +373,11 @@ elab "prwby " h:ident " in " k:ident " with " n:ident occ:(occSel)? : tactic => 
   let names := ((listLit? args[1]!).getD []).filterMap strLit?
   let some i := names.findIdx? (· == h.getId.toString) |
     throwError "prwby: no hypothesis named `{h.getId}` (have: {names})"
-  let (s, t) ← eqSides "prwby" m!"`{h.getId}`" hyps[i]!
-  let sS ← Lean.Elab.Term.exprToSyntax s
-  let tS ← Lean.Elab.Term.exprToSyntax t
-  prwAtCore "prwby" (readOcc occ) s t k n fun r =>
-    `(pm_mp (pm_have (qfer_nat_nf (by rfl) (by rfl) (s := $sS) (t := $tS) I_comb
+  let rule ← eqSides "prwby" m!"`{h.getId}`" args[0]! args[3]! hyps[i]!
+  let sS ← Lean.Elab.Term.exprToSyntax rule.lhs
+  let tS ← Lean.Elab.Term.exprToSyntax rule.rhs
+  prwAtCore "prwby" (readOcc occ) rule.ty rule.lhs rule.rhs k n fun r =>
+    `(pm_mp (pm_have (qfer_at_nf (σ := Ty.nat) (by rfl) (by rfl) (s := $sS) (t := $tS) I_comb
         (r := $r) (by prw_norm) (by prw_norm))) (by pexact $h))
 
 end ProofMode
