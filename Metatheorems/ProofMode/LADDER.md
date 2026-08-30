@@ -16,7 +16,8 @@ instead of by hand.
 | 3 | `0 ∸ y = 0` | the first monus fact; a non-equational finish (`pthm pd_zero`) | `Arith.lean` ✅ |
 | 4 | monus transitivity: `x ∸ y = 0 → y ∸ z = 0 → x ∸ z = 0` | **case analysis inside an induction**, and **rewriting inside hypotheses** | `Arith.lean` ✅ |
 | 5 | the antitone chain: `∀i, a(m+i) ∸ a m = 0` | induction *with a premise in the context*, and a function parameter `a` rather than a variable | `Arith.lean` ✅ |
-| 6 | the strict-drop step | a negated hypothesis; the first use of `pby_contra` in anger | — |
+| 6a | `y ∸ x = 0 → ¬(x =₀ y) → S y ∸ x = 0` | strictness from `≤` plus `≠`; a new induction, rung-4 sized | — |
+| 6b | the strict-drop step | a negated hypothesis; the first use of `pby_contra` in anger | — |
 | 7 | ℕ-MCT, proof p₂ (dichotomy) | the whole thing: `qf_lem` case split, budget descent as induction on `K`, a headline `∃` closed by `pbound` | — |
 
 ## What each rung is actually testing
@@ -82,6 +83,20 @@ This is the same wall the `q_norm` tactic in `RationalNumbers.lean` was built ag
 worth a proper fix — a normal form for iterated `ext`/`shift` composites — before rung 7,
 because the MCT statement fuses `a`, `g` and `K` into one parameter `h` and will instantiate
 it at compound terms constantly.
+
+## Rung 6 splits in two
+
+The strict-drop step is "from `x ∸ (K+1) = 0`, `y ∸ x = 0` and `¬(x =₀ y)` conclude
+`y ∸ K = 0`". Given `S y ∸ x = 0` the rest is two moves — `monus_trans` against
+`x ∸ S K = 0`, then `monus_succ_l` — both already available.
+
+But `S y ∸ x = 0`, that is *`y ≤ x` and `y ≠ x` give `y < x`*, is not in `Arithmetic.lean`
+and does not follow from what is there. `monus_disjunct` on `(S y, x)` does not close it: the
+branch `x ∸ S y = 0` is consistent with the premises (it is the case `x = S y`, where the
+goal happens to hold anyway), so it needs its own induction, of about rung 4's size.
+
+So rung 6 is two rungs. 6a is a genuinely new arithmetic fact and belongs in
+`Arithmetic.lean`'s vocabulary whether or not it is proved as a script.
 
 ## The rule for the ladder
 
