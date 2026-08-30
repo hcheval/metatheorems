@@ -90,6 +90,17 @@ partial def scanTerm (occ : Occ) (seen : IO.Ref Nat) (ι F Γ ρ s t : Expr) (e 
                rep := ← instantiateMVars t, hit := true }
     else
       return ← leaf ι F Γ ρ e
+  -- A local abbreviation — `let same_ab := sg_bar (abs_diff sa sb)` in the surrounding term —
+  -- is an fvar, not an application, so the structural descent below would call it a leaf and
+  -- never look inside. Scan its value instead, and keep the unfolding only if the pattern was
+  -- actually in there; otherwise put the abbreviation back, so goals stay readable.
+  if e.isFVar then
+    if let some v := ((← getLCtx).find? e.fvarId!).bind (·.value?) then
+      let before ← seen.get
+      let inner ← scanTerm occ seen ι F Γ ρ s t v
+      if inner.hit then return inner
+      seen.set before
+      return ← leaf ι F Γ ρ e
   -- All three application forms have to be descended through. `Term.app2` and `Term.app3`
   -- are abbreviations, but they survive elaboration, and the arithmetic notation produces
   -- them: treating them as leaves silently makes a whole subterm unreachable.

@@ -549,12 +549,12 @@ variable {Γ : Ctx ι}
 -- ── Helpers ────────────────────────────────────────────────────────────────
 
 /-- Weaken introduction: from ⊢ A, derive ⊢ B → A. -/
-private def weaken_intro {Γ : Ctx ι} {A B : Formula F Γ}
+def weaken_intro {Γ : Ctx ι} {A B : Formula F Γ}
     (h : Derivable F EqX al Premises A) : Derivable F EqX al Premises (B →ᶠ A) :=
   .mp h (.exportation .and_weak)
 
 /-- abs_diff(x, x) =₀ 0 for any x. From backward abs_diff_eq_zero_iff + refl0. -/
-private def abs_diff_self (x : Term F Γ Ty.nat) :
+def abs_diff_self (x : Term F Γ Ty.nat) :
     Derivable F EqX al Premises (Formula.eq0 (Term.app2 Term.abs_diff x x) Term.zero) :=
   .mp .refl0 (.mp (abs_diff_eq_zero_iff adm x x) (.syllogism .and_perm .and_weak))
 
@@ -566,7 +566,7 @@ private theorem sg_body_nf {Γ : Ctx ι} (s : Term F Γ Ty.nat) :
     Term.app3 (.prec Ty.nat) .zero (Term.lam (Term.lam (.app .succ .zero))) s := by rfl
 
 /-- sg(0) = 0. -/
-private def sg_zero :
+def sg_zero :
     Derivable F EqX al Premises (Γ := Γ)
       (Formula.eq0 (Term.app Term.sg Term.zero) Term.zero) :=
   let body : Term F (Ty.nat :: Γ) Ty.nat :=
@@ -614,7 +614,7 @@ private def ite_nat_unfold (b x y : Term F Γ Ty.nat) :
   lam3_correct_nf adm _ b x y (ite_nat_body_nf b x y)
 
 /-- ite_nat(0, x, y) =₀ y. -/
-private def ite_nat_zero (x y : Term F Γ Ty.nat) :
+def ite_nat_zero (x y : Term F Γ Ty.nat) :
     Derivable F EqX al Premises (Formula.eq0 (Term.app3 Term.ite_nat Term.zero x y) y) :=
   let h1 := ite_nat_unfold adm Term.zero x y
   let h2 := mul_zero_l adm x
@@ -629,7 +629,7 @@ private def ite_nat_zero (x y : Term F Γ Ty.nat) :
   .mp (.mp c4 (.mp h1 and_intro)) .trans0
 
 /-- ite_nat(S0, x, y) =₀ x. -/
-private def ite_nat_one (x y : Term F Γ Ty.nat) :
+def ite_nat_one (x y : Term F Γ Ty.nat) :
     Derivable F EqX al Premises (Formula.eq0 (Term.app3 Term.ite_nat (.app .succ .zero) x y) x) :=
   let h1 := ite_nat_unfold adm (.app .succ .zero) x y
   let h2 := mul_one_l adm x
@@ -1377,7 +1377,7 @@ private def isOdd_double (n : Term F Γ Ty.nat) :
     Base: isEven(0) =₀ S0 → left disjunct.
     Step: case left (isEven(k) =₀ S0): sg_bar(S0) =₀ 0, so isEven(Sk) =₀ 0 → right.
           case right (isEven(k) =₀ 0): sg_bar(0) =₀ S0, so isEven(Sk) =₀ S0 → left. -/
-private def isEven_cases (n : Term F Γ Ty.nat) :
+def isEven_cases (n : Term F Γ Ty.nat) :
     Derivable F EqX al Premises
       (Formula.eq0 (.app Term.isEven n) (.app .succ .zero) ∨ᶠ
        Formula.eq0 (.app Term.isEven n) Term.zero) :=
@@ -1453,7 +1453,7 @@ private def isEven_cases (n : Term F Γ Ty.nat) :
 
 /-- For any n: sg_bar(n) =₀ S0 ∨ sg_bar(n) =₀ 0.
     Case n=0: sg_bar(0) = S0. Case n≠0: n = S(pd n), sg_bar(S(pd n)) = 0. -/
-private def sg_bar_cases (n : Term F Γ Ty.nat) :
+def sg_bar_cases (n : Term F Γ Ty.nat) :
     Derivable F EqX al Premises
       (Formula.eq0 (Term.app Term.sg_bar n) (.app .succ .zero) ∨ᶠ
        Formula.eq0 (Term.app Term.sg_bar n) Term.zero) :=
@@ -3106,7 +3106,7 @@ private def snd_pair_pair (x y : Term F Γ Ty.nat) :
     Unfolds: `rat_encode(s,n,d) = pair(2n ∸ isEven(s), d)`,
     so `rat_den(...) = succ(snd_pair(pair(2n ∸ isEven(s), d))) = succ(d)`
     via `snd_pair_pair`. -/
-private def rat_den_rat_encode (s n d : Term F Γ Ty.nat) :
+def rat_den_rat_encode (s n d : Term F Γ Ty.nat) :
     Derivable F EqX al Premises
       (Formula.eq0 (.app Term.rat_den (Term.app3 Term.rat_encode s n d))
         (.app .succ d)) :=
@@ -3594,7 +3594,7 @@ private def div2_double (n : Term F Γ Ty.nat) :
     By `fst_pair_pair` this simplifies to `div2((2n ∸ isEven(s)) + isOdd(2n ∸ isEven(s)))`.
     Case `isEven(s) = 0`: `2n ∸ 0 = 2n`, `isOdd(2n) = 0`, `div2(2n + 0) = div2(2n) = n`.
     Case `isEven(s) = S0`: `2n ∸ S0 = pd(2n)`, use `pd_double_add_isOdd_pd_double`. -/
-private def rat_num_rat_encode (s n d : Term F Γ Ty.nat)
+def rat_num_rat_encode (s n d : Term F Γ Ty.nat)
     (hs : Derivable F EqX al Premises
       (Formula.eq0 (.app Term.isEven s) (.app .succ .zero) ∨ᶠ
        Formula.eq0 (.app Term.isEven s) Term.zero)) :
@@ -4147,7 +4147,7 @@ def eq_Q_sym :
 
 /-- Derive eq_Q(a, b) from proofs that the cross-product and sign·sg parts of eq_Q_dec
     are both zero.  Handles the eq_Q_dec unfolding internally. -/
-private def eq_Q_from_components {a b : Term F Γ Ty.nat}
+def eq_Q_from_components {a b : Term F Γ Ty.nat}
     (h_cross : Derivable F EqX al Premises (Formula.eq0
       (Term.app2 Term.abs_diff
         (Term.app2 Term.mul (Term.app Term.rat_num a) (Term.app Term.rat_den b))
@@ -4188,7 +4188,7 @@ private def eq_Q_from_components {a b : Term F Γ Ty.nat}
 -- Distributivity of ∧ over ∨ (`and_or_dist`) now lives in `PropositionalLemmas`.
 
 /-- From `sg_bar(x) =₀ S0`, derive `x =₀ 0`. -/
-private def sg_bar_eq_S0_implies_zero (x : Term F Γ Ty.nat) :
+def sg_bar_eq_S0_implies_zero (x : Term F Γ Ty.nat) :
     Derivable F EqX al Premises
       (Formula.eq0 (.app Term.sg_bar x) (.app .succ .zero) →ᶠ Formula.eq0 x .zero) :=
   let backward : Derivable F EqX al Premises
@@ -4943,7 +4943,7 @@ def eq_Q_trans_inst (adm : AdmissibleEqX EqX) (x y z : Term F Γ Ty.nat) :
 -- ── Additive group ─────────────────────────────────────────────────────────
 
 /-- geq(x, y) =₀ sg_bar(y ∸ x). -/
-private def geq_unfold (x y : Term F Γ Ty.nat) :
+def geq_unfold (x y : Term F Γ Ty.nat) :
     Derivable F EqX al Premises
       (Formula.eq0 (Term.app2 Term.geq x y) (.app Term.sg_bar (Term.app2 Term.monus y x))) :=
   lam2_correct_nf adm
