@@ -387,5 +387,111 @@ def antitone_chain_premise_outside (adm : AdmissibleEqX EqX)
     · pspecialize ih with ihm
       pexact ihm
 
+/-- **Rung 6a — strictness.** `y ≤ x` and `y ≠ x` give `y < x`, written in monus form:
+`y ∸ x = 0 → ¬(x = y) → S y ∸ x = 0`.
+
+Not in `Arithmetic.lean` and not a consequence of what is: `monus_disjunct` at `(S y, x)`
+leaves the branch `x ∸ S y = 0`, which is consistent with the premises — the case `x = S y`,
+where the goal happens to hold anyway. So it needs its own induction, on `y`.
+
+The shape is rung 4's: split on whether `x` is zero, kill the zero branch with
+`succ_ne_zero`, and in the other branch replace `x` by `S (pd x)` so `monus_succ_l` strips a
+successor off both the premise and the goal. What is new is that the *disequality* has to be
+transported down to the predecessor as well, which is what the `phave` below does. -/
+def monus_succ_of_ne (adm : AdmissibleEqX EqX) :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all Ty.nat (Formula.all Ty.nat
+        ((x₀ ∸ᵗ x₁ =₀ Term.zero) →ᶠ ¬ᶠ(x₁ =₀ x₀) →ᶠ
+         (S x₀ ∸ᵗ x₁ =₀ Term.zero)))) := by
+  pmode
+  pinduction
+  · -- y = 0 : x ≠ 0, so x = S(pd x) and S 0 ∸ S(pd x) = 0 ∸ pd x = 0
+    anorm
+    pforall
+    pintro h1 hne
+    papplym (ne_zero_eq_succ_pd adm x₀) in hne with hx
+    prwby hx
+    prw (monus_succ_l adm Term.zero (pdᵗ x₀))
+    pthm (monus_zero_l adm (pdᵗ x₀))
+  · pforall
+    pintro ih
+    anorm
+    pforall
+    pintro h1 hne
+    -- is x zero?
+    pfrom hdec := eq0_decidable'
+    pinst hdec x₁ with hx
+    anorm
+    pcases hx with hx0 | hxn
+    · -- x = 0 contradicts `S y ∸ x = 0`
+      pexfalso
+      pfrom hsnz := Derivable.succ_ne_zero
+      pinst hsnz x₀ with hsnz'
+      anorm
+      papply hsnz'
+      ptrans (S x₀ ∸ᵗ x₁)
+      · psym
+        ptrans (S x₀ ∸ᵗ Term.zero)
+        · prwby hx0
+          prefl
+        · pthm (monus_zero adm (S x₀))
+      · pexact h1
+    · -- x = S(pd x): strip a successor off the premise, and off the disequality
+      papplym (ne_zero_eq_succ_pd adm x₁) in hxn with hx1
+      prwby hx1 in h1 with h1'
+      prw (monus_succ_l adm x₀ (pdᵗ x₁)) in h1' with h1''
+      -- the induction hypothesis at pd x
+      pinst ih (pdᵗ x₁) with ihA
+      anorm
+      papply ihA in h1'' with ihB
+      prwby hx1
+      prw (monus_succ_l adm (S x₀) (pdᵗ x₁))
+      papply ihB
+      -- what is left: the disequality, transported down to the predecessor
+      pintro hpd
+      papply hne
+      prwby hx1
+      prwby hpd
+      prefl
+
+/-- **Rung 6b — the strict-drop step.** From `x ≤ K+1`, `y ≤ x` and `x ≠ y`, conclude
+`y ≤ K`: the budget descent MCT's dichotomy proof runs on.
+
+With rung 6a in hand this is two moves — strictness turns `y ≤ x` plus `x ≠ y` into
+`S y ≤ x`, transitivity chains that against `x ≤ S K`, and `monus_succ_l` cancels the
+successors. It is the first rung that is *composed* rather than proved: no induction, no
+rewriting of its own beyond the last cancellation. -/
+def strict_drop (adm : AdmissibleEqX EqX) :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all Ty.nat (Formula.all Ty.nat (Formula.all Ty.nat
+        ((x₂ ∸ᵗ S x₀ =₀ Term.zero) →ᶠ (x₁ ∸ᵗ x₂ =₀ Term.zero) →ᶠ ¬ᶠ(x₂ =₀ x₁) →ᶠ
+         (x₁ ∸ᵗ x₀ =₀ Term.zero))))) := by
+  pmode
+  pforall
+  pforall
+  pforall
+  pintro hK hyx hne
+  -- y ≤ x and x ≠ y give S y ≤ x
+  pfrom sne := monus_succ_of_ne adm
+  pinst sne x₁ with sne1
+  anorm
+  pinst sne1 x₂ with sne2
+  anorm
+  papply sne2 in hyx with sne3
+  papply sne3 in hne with hsy
+  -- chain S y ≤ x ≤ S K
+  pfrom mt := monus_trans adm
+  pinst mt (S x₁) with mt1
+  anorm
+  pinst mt1 x₂ with mt2
+  anorm
+  pinst mt2 (S x₀) with mt3
+  anorm
+  papply mt3 in hsy with mt4
+  papply mt4 in hK with hfin
+  -- S y ∸ S K = y ∸ K
+  prw (monus_succ_l adm x₁ x₀) in hfin with hfin'
+  pexact hfin'
+
 end ProofMode
 end Metatheorems

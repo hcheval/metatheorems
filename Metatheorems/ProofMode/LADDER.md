@@ -16,8 +16,8 @@ instead of by hand.
 | 3 | `0 ∸ y = 0` | the first monus fact; a non-equational finish (`pthm pd_zero`) | `Arith.lean` ✅ |
 | 4 | monus transitivity: `x ∸ y = 0 → y ∸ z = 0 → x ∸ z = 0` | **case analysis inside an induction**, and **rewriting inside hypotheses** | `Arith.lean` ✅ |
 | 5 | the antitone chain: `∀i, a(m+i) ∸ a m = 0` | induction *with a premise in the context*, and a function parameter `a` rather than a variable | `Arith.lean` ✅ |
-| 6a | `y ∸ x = 0 → ¬(x =₀ y) → S y ∸ x = 0` | strictness from `≤` plus `≠`; a new induction, rung-4 sized | — |
-| 6b | the strict-drop step | a negated hypothesis; the first use of `pby_contra` in anger | — |
+| 6a | `y ∸ x = 0 → ¬(x =₀ y) → S y ∸ x = 0` | strictness from `≤` plus `≠`; a new induction, rung-4 sized | `Arith.lean` ✅ |
+| 6b | the strict-drop step | composition rather than proof: no induction of its own | `Arith.lean` ✅ |
 | 7 | ℕ-MCT, proof p₂ (dichotomy) | the whole thing: `qf_lem` case split, budget descent as induction on `K`, a headline `∃` closed by `pbound` | — |
 
 ## What each rung is actually testing
@@ -101,7 +101,30 @@ If a shape shows up later that `cons` does not cover, that is the signal a full
 sigma-calculus/autosubst layer is genuinely needed — and this is its first constructor, not
 work thrown away.
 
-## Rung 6 splits in two
+## Rung 6, and what it forced
+
+Both halves are done. 6a (`monus_succ_of_ne`) is rung 4's shape — split on whether `x` is
+zero, kill the zero branch with `succ_ne_zero`, replace `x` by `S (pd x)` so `monus_succ_l`
+strips a successor — with one thing new: the *disequality* has to be transported down to the
+predecessor too. 6b (`strict_drop`) is the first rung that is composed rather than proved:
+6a plus `monus_trans` plus one cancellation, no induction of its own.
+
+**What 6a forced was a limit, not a fix.** Two spellings failed to elaborate:
+
+    phave hne2 : ¬ᶠ(pdᵗ x₁ =₀ x₀)
+    papplym (succ_congr_imp (s := pdᵗ x₁) (t := x₀))
+
+both with `x₀: the context has only 0 named variable(s)`. The `xₖ` tokens read their de
+Bruijn index off the context of the *expected type*, and in both of these the expected type
+is still a metavariable when the argument is elaborated — a user-written formula handed to
+`phave`, and an implicit argument supplied by name ahead of the `(Γ := …)` injection
+`elabRuleInCtx` performs. Neither is hard to work around, and the proof reads better for it
+(the disequality became a goal after `papply` rather than a `phave`, and the successor
+congruence became two `prwby`s), but it is a real edge: **`xₖ` needs the context to be known
+at the point the token is elaborated.** Worth fixing properly before rung 7 if it recurs —
+`phave` already has the goal's `Γ` in hand and could pin it the way `elabRuleInCtx` does.
+
+## Why rung 6 was split in two
 
 The strict-drop step is "from `x ∸ (K+1) = 0`, `y ∸ x = 0` and `¬(x =₀ y)` conclude
 `y ∸ K = 0`". Given `S y ∸ x = 0` the rest is two moves — `monus_trans` against
