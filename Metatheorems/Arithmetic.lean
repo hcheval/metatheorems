@@ -493,7 +493,8 @@ private theorem add_body_nf (x s : Term F Γ Ty.nat) :
   simp [Term.subst0, Term.subst, Term.subst0_map, Term.app3]
   exact ⟨rfl, weaken_subst0_h s x⟩
 
-private theorem pd_closed_subst {Γ Δ : Ctx ι} (σ : Term.Subst F Γ Δ) :
+/-- `Term.pd` is closed. Public: proof scripts need it in the goal-normalising simp set. -/
+theorem pd_closed_subst {Γ Δ : Ctx ι} (σ : Term.Subst F Γ Δ) :
     Term.subst σ (Term.pd : Term F Γ _) = Term.pd := by rfl
 
 private theorem monus_body_nf (x s : Term F Γ Ty.nat) :
@@ -807,6 +808,21 @@ theorem weaken_substVar0 {ρ : Ty ι} (t : Term F Γ τ) (u : Term F (ρ :: Γ) 
     t.weaken.subst (Term.substVar0_map u) = t.weaken := by
   simp only [Term.weaken]
   rw [Term.rename_subst, Term.rename_eq_subst]; rfl
+
+/-- The terms defined above are closed, so substitution leaves them alone. Public because a
+proof script has to see through the substitutions that `induction` leaves in a goal — see
+`ProofMode/Arith.lean`. -/
+theorem mul_closed_subst {Γ Δ : Ctx ι} (σ : Term.Subst F Γ Δ) :
+    (Term.mul : Term F Γ _).subst σ = Term.mul := by rfl
+
+theorem monus_closed_subst {Γ Δ : Ctx ι} (σ : Term.Subst F Γ Δ) :
+    (Term.monus : Term F Γ _).subst σ = Term.monus := by rfl
+
+theorem abs_diff_closed_subst {Γ Δ : Ctx ι} (σ : Term.Subst F Γ Δ) :
+    (Term.abs_diff : Term F Γ _).subst σ = Term.abs_diff := by rfl
+
+theorem sg_bar_closed_subst {Γ Δ : Ctx ι} (σ : Term.Subst F Γ Δ) :
+    (Term.sg_bar : Term F Γ _).subst σ = Term.sg_bar := by rfl
 
 /-- `Term.add` is closed, so substitution leaves it alone. Public for the same reason. -/
 theorem add_closed_subst {Γ Δ : Ctx ι} (σ : Term.Subst F Γ Δ) :

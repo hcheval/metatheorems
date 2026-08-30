@@ -167,6 +167,30 @@ private def prwCore (who : String) (occ : Occ) (s t : Expr)
   evalTactic (← `(tactic|
     refine pm_trans $repL $hL (pm_trans $repR ?_ (pm_sym $hR))))
 
+/-- Elaborate a rewrite rule with its context pinned to the goal's.
+
+Pinning by the *expected type* alone does not work: Lean fixes a rule's `Γ` from its first
+explicit argument, before unifying the result type. So the context is injected as a named
+argument at the head of the application — which is what lets a rule mention `x₀` next to a
+term from the outer context, the latter then weakening by coercion.
+
+Rules that are not applications, or whose context implicit is not called `Γ`, fall back to
+plain elaboration against the expected type. -/
+private partial def unparen (s : Syntax) : Syntax :=
+  if s.getKind == ``Lean.Parser.Term.paren then unparen s[1] else s
+
+private def elabRuleInCtx (eStx : TSyntax `term) (Γ expected : Expr) : TacticM Expr := do
+  let bare := unparen eStx.raw
+  if bare.getKind == ``Lean.Parser.Term.app then
+    let ΓStx ← Lean.Elab.Term.exprToSyntax Γ
+    let named ← `(Lean.Parser.Term.namedArgument| (Γ := $ΓStx))
+    let pinned : TSyntax `term := ⟨Syntax.node2 .none ``Lean.Parser.Term.app bare[0]
+      (Syntax.node .none `null (#[named.raw] ++ bare[1].getArgs))⟩
+    try
+      return ← Lean.Elab.Term.withoutErrToSorry (elabTerm pinned (some expected))
+    catch _ => pure ()
+  Lean.Elab.Term.withoutErrToSorry (elabTerm eStx (some expected))
+
 /-- The two sides of an equation `s =₀ t`, from the formula expression. -/
 private def eqSides (who : String) (what : MessageData) (f : Expr) :
     TacticM (Expr × Expr) := do
@@ -187,7 +211,19 @@ private def readOcc : Option (TSyntax ``occSel) → Occ
 `rw` does; `prw e at n` rewrites only the `n`-th occurrence, numbered left to right across
 the goal. Available in any hypothesis context, since a closed equation needs no premise. -/
 elab "prw " eStx:term occ:(occSel)? : tactic => do
-  let e ← elabTerm eStx none
+  -- The rule is elaborated against the *goal's* context, not in a vacuum. Without that,
+  -- nothing pins the rule's `Γ`, and a variable like `x₀` in its arguments has no context to
+  -- resolve against — while a term from the outer context needs the weakening coercion.
+  let args ← seqDGoalArgs "prw"
+  let A ← mkFreshExprMVar (mkAppN (.const ``Formula []) #[args[0]!, args[2]!, args[6]!])
+  let expected := mkAppN (.const ``Derivable [])
+    #[args[0]!, args[2]!, args[3]!, args[4]!, args[5]!, args[6]!, A]
+  -- Pinning `Γ` by the *expected type* is not enough: Lean fixes a rule's `Γ` from its first
+  -- explicit argument, before the result type is unified. So the goal's context is supplied
+  -- as a named argument, which is what lets a rule mention `x₀` alongside a term from the
+  -- outer context — the latter then weakens by coercion. Rules that do not take `Γ` by that
+  -- name fall back to plain elaboration.
+  let e ← elabRuleInCtx eStx args[6]! expected
   let ety ← instantiateMVars (← inferType e)
   let etyArgs := ety.getAppArgs
   unless ety.isAppOf ``Derivable && etyArgs.size == 7 do

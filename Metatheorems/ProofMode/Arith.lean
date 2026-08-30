@@ -96,7 +96,9 @@ The counterpart of the `base_nf` / `step_nf` / `inst_nf` lemmas that the hand-bu
 `Arithmetic.lean` write out separately for each theorem. -/
 macro "anorm" : tactic =>
   `(tactic| simp only [Formula.subst0, Formula.substVar0, Formula.substF, Term.subst,
-      Term.subst0_map, Term.substVar0_map, Term.app2, add_closed_subst,
+      Term.subst0_map, Term.substVar0_map, Term.app2,
+      add_closed_subst, mul_closed_subst, monus_closed_subst, abs_diff_closed_subst,
+      pd_closed_subst, sg_bar_closed_subst,
       Term.weaken_subst0, Term.subst_subst0_map_weaken, weaken_substVar0, succVar0])
 
 section AddComm
@@ -139,6 +141,41 @@ example (x : Term F Γ Ty.nat) :
   prw (add_zero_r adm x)        -- the one that is left: x + 0      =₀ x
   prw (add_zero_r adm x)        --                       x          =₀ x
   prefl
+
+/-- **Rung 2** — associativity. Three variables and a nested context, so the rewrite rules
+mention both an outer term and the bound variable in the same argument list. -/
+example (x y : Term F Γ Ty.nat) :
+    SeqD [] F EqX al Premises (Γ := Γ) []
+      (Formula.all Ty.nat (Formula.eq0 ((x +ᵗ y) +ᵗ x₀) (x +ᵗ (y +ᵗ x₀)))) := by
+  pinduction
+  · anorm
+    prw (add_zero_r adm (x +ᵗ y))
+    prw (add_zero_r adm y)
+    prefl
+  · pforall
+    pintro ih
+    anorm
+    prw (add_succ adm (x +ᵗ y) x₀)
+    prw (add_succ adm y x₀)
+    prw (add_succ adm x (y +ᵗ x₀))
+    prwby ih
+    prefl
+
+/-- **Rung 3** — the first monus fact, `0 ∸ y = 0`. Compare `Metatheorems.monus_zero_l`,
+which is the same statement built by hand. -/
+example :
+    SeqD [] F EqX al Premises (Γ := Γ) []
+      (Formula.all Ty.nat (Formula.eq0 (Term.zero ∸ᵗ x₀) Term.zero)) := by
+  pinduction
+  · anorm
+    prw (monus_zero adm Term.zero)
+    prefl
+  · pforall
+    pintro ih
+    anorm
+    prw (monus_succ adm Term.zero x₀)
+    prwby ih
+    pthm pd_zero
 
 end AddComm
 
