@@ -459,19 +459,19 @@ attribute [closed_subst] sg_closed_subst isEven_closed_subst isOdd_closed_subst
   all_goals rfl
 @[simp] theorem rat_num_closed_subst :
     (Term.rat_num : Term F Γ _).subst σ = Term.rat_num := by
-  simp only [Term.rat_num, Term.subst, Term.Subst.ext, Term.app2, Term.app3, closed_subst]
+  simp only [Term.rat_num, Term.subst, Term.Subst.ext, Term.app2, closed_subst]
   all_goals rfl
 @[simp] theorem rat_den_closed_subst :
     (Term.rat_den : Term F Γ _).subst σ = Term.rat_den := by
-  simp only [Term.rat_den, Term.subst, Term.Subst.ext, Term.app2, Term.app3, closed_subst]
+  simp only [Term.rat_den, Term.subst, Term.Subst.ext, closed_subst]
   all_goals rfl
 @[simp] theorem rat_sign_closed_subst :
     (Term.rat_sign : Term F Γ _).subst σ = Term.rat_sign := by
-  simp only [Term.rat_sign, Term.subst, Term.Subst.ext, Term.app2, Term.app3, closed_subst]
+  simp only [Term.rat_sign, Term.subst, Term.Subst.ext, closed_subst]
   all_goals rfl
 @[simp] theorem rat_encode_closed_subst :
     (Term.rat_encode : Term F Γ _).subst σ = Term.rat_encode := by
-  simp only [Term.rat_encode, Term.subst, Term.Subst.ext, Term.app2, Term.app3, closed_subst]
+  simp only [Term.rat_encode, Term.subst, Term.Subst.ext, Term.app2, closed_subst]
   all_goals rfl
 
 attribute [closed_subst] div2_closed_subst rat_num_closed_subst rat_den_closed_subst
@@ -490,7 +490,7 @@ attribute [closed_subst] neg_Q_closed_subst add_Q_closed_subst
 
 @[simp] theorem sub_Q_closed_subst :
     (Term.sub_Q : Term F Γ _).subst σ = Term.sub_Q := by
-  simp only [Term.sub_Q, Term.subst, Term.Subst.ext, Term.app2, Term.app3, closed_subst]
+  simp only [Term.sub_Q, Term.subst, Term.Subst.ext, Term.app2, closed_subst]
   all_goals rfl
 @[simp] theorem mul_Q_closed_subst :
     (Term.mul_Q : Term F Γ _).subst σ = Term.mul_Q := by
@@ -498,22 +498,22 @@ attribute [closed_subst] neg_Q_closed_subst add_Q_closed_subst
   all_goals rfl
 @[simp] theorem abs_Q_closed_subst :
     (Term.abs_Q : Term F Γ _).subst σ = Term.abs_Q := by
-  simp only [Term.abs_Q, Term.subst, Term.Subst.ext, Term.app2, Term.app3, closed_subst]
+  simp only [Term.abs_Q, Term.subst, Term.Subst.ext, Term.app3, closed_subst]
   all_goals rfl
 
 attribute [closed_subst] sub_Q_closed_subst mul_Q_closed_subst abs_Q_closed_subst
 
 @[simp] theorem lt_Q_dec_closed_subst :
     (Term.lt_Q_dec : Term F Γ _).subst σ = Term.lt_Q_dec := by
-  simp only [Term.lt_Q_dec, Term.subst, Term.Subst.ext, Term.app2, Term.app3, closed_subst]
+  simp only [Term.lt_Q_dec, Term.subst, Term.Subst.ext, Term.app2, closed_subst]
   all_goals rfl
 @[simp] theorem le_Q_dec_closed_subst :
     (Term.le_Q_dec : Term F Γ _).subst σ = Term.le_Q_dec := by
-  simp only [Term.le_Q_dec, Term.subst, Term.Subst.ext, Term.app2, Term.app3, closed_subst]
+  simp only [Term.le_Q_dec, Term.subst, Term.Subst.ext, Term.app2, closed_subst]
   all_goals rfl
 @[simp] theorem eq_Q_dec_closed_subst :
     (Term.eq_Q_dec : Term F Γ _).subst σ = Term.eq_Q_dec := by
-  simp only [Term.eq_Q_dec, Term.subst, Term.Subst.ext, Term.app2, Term.app3, closed_subst]
+  simp only [Term.eq_Q_dec, Term.subst, Term.Subst.ext, Term.app2, closed_subst]
   all_goals rfl
 @[simp] theorem encode_nat_Q_closed_subst :
     (Term.encode_nat_Q : Term F Γ _).subst σ = Term.encode_nat_Q := by rfl
