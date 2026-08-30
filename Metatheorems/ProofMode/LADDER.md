@@ -59,30 +59,47 @@ sides' congruences by transitivity. Worth noting the matching-logic proof mode d
 this either — `mlRewrite`/`mlRewriteBy` are goal-directed there, and only
 `mlApplyMeta … in "H"` and `mlSymmetry in "H"` act on hypotheses.
 
-## Rung 5, and the one sharp edge left
+## Rung 5, and the sharp edge it exposed — now fixed
 
 Done, and it uses rung 4 — the antitone chain is monus transitivity applied along the
 sequence. It needed object-level *application* to be writable, so `f ⬝ a` now parses as well
 as prints, and the weakening coercion had to chain, since a parameter used under two binders
 needs two weakenings and a single-step instance does not compose on its own.
 
-**The sharp edge.** Instantiating a **weakened** `∀`-hypothesis at a **compound** term leaves
+**The sharp edge.** Instantiating a **weakened** `∀`-hypothesis at a **compound** term left
 
     Term.subst (fun v => subst0_map t (ext shift (ext shift v))) a
 
-which `anorm` cannot finish: collapsing it needs `subst_id` under a `funext`, which is not a
-rewrite. Three ways round it, in order of preference:
+which `anorm` could not finish. The composite is an *anonymous* function, so it matches none
+of the named rewrite rules; it can still be pushed structurally down to the variables, where
+it beta-reduces, but at an **opaque** leaf — a term parameter rather than a variable or a
+constant — there is nothing to push into, and collapsing it needs `subst_id` under a `funext`,
+which is not a rewrite. Rung 5 dodged it by putting the premise *inside* the quantifiers so it
+is never weakened; that does not scale, and MCT fuses `a`, `g` and `K` into one parameter
+instantiated at compound terms constantly.
 
-1. put the premise *inside* the quantifiers, so it is never weakened — what rung 5 does;
-2. instantiate at the *bound variable*, where `pspecialize` applies and no substitution
-   appears at all;
-3. failing both, a per-shape `_nf` lemma, which is what `Arithmetic.lean` does by hand
-   everywhere and what `anorm` exists to avoid.
+**The fix — `Term.Subst.cons`.** Every composite that actually arises has one shape: *put `t`
+at variable 0, rename the rest by `r`*. Name it (`Subst.lean`), and it is closed under the
+compositions that occur, with `Renaming.comp` absorbing the tower of weakenings:
 
-This is the same wall the `q_norm` tactic in `RationalNumbers.lean` was built against. It is
-worth a proper fix — a normal form for iterated `ext`/`shift` composites — before rung 7,
-because the MCT statement fuses `a`, `g` and `K` into one parameter `h` and will instantiate
-it at compound terms constantly.
+    subst_subst0_map_rename_ext :  (u.rename (ext r)).subst (subst0_map t) = u.subst (cons t r)
+    subst_cons_rename_ext       :  (u.rename (ext r')).subst (cons t r)
+                                     = u.subst (cons t (comp r r'))
+    subst_cons_weaken           :  (u.weaken).subst (cons t r) = u.rename r      -- the leaf rule
+
+The last is the point: because `cons` is a *named constructor* rather than a lambda, it fires
+on an opaque `u`. Under binders the substitution becomes `Subst.ext (cons t r)`, where the
+existing `weaken_subst_ext` already applies; the formula-level counterparts are in
+`Language.lean`, and `anorm` runs the whole set as `anorm_cons` before and after its main pass.
+
+This was the same wall the `q_norm` tactic in `RationalNumbers.lean` was built against.
+`antitone_chain_premise_outside` is the regression test: rung 5 restated with the
+premise outside the quantifiers, so `hmono` is weakened twice and then instantiated at
+`m + i` over the opaque parameter `a`. It did not typecheck before; it does now.
+
+If a shape shows up later that `cons` does not cover, that is the signal a full
+sigma-calculus/autosubst layer is genuinely needed — and this is its first constructor, not
+work thrown away.
 
 ## Rung 6 splits in two
 
