@@ -8562,6 +8562,13 @@ private def posN_unfold (x : Term F Γ Ty.nat) :
       (Formula.eq0 (posN x)
         (Term.app2 Term.mul (.app Term.rat_sign x) (.app Term.rat_num x))) := .refl0
 
+private def negN_unfold (x : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (negN x)
+        (Term.app2 Term.mul
+          (Term.app2 Term.monus (.app .succ .zero) (.app Term.rat_sign x))
+          (.app Term.rat_num x))) := .refl0
+
 /-- Two signed values written as pairs `(A, B)` meaning `A − B` agree componentwise as soon as
 their cross sums agree — *because* at most one component of each pair is nonzero. Without that
 side condition `A₁ + B₂ =₀ A₂ + B₁` says nothing about the components separately. -/
@@ -10807,6 +10814,189 @@ def lt_Q_add :
     (lt_Q_of_eq_Q_diff adm a b (Term.app2 Term.add_Q a c) (Term.app2 Term.add_Q b c)
       (eqQsym adm (sub_Q_add_cancel adm a b c)))))
 
+-- `x <_ℚ y` is the same statement as `0 <_ℚ y −_ℚ x`, and that is the form in which order
+-- facts compose: the difference for a chain splits as a *sum* of differences.
+
+/-- `x <_ℚ y` gives a positive difference. -/
+def lt_Q_to_zero_sub (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (lt_Q x y →ᶠ lt_Q Term.zero_Q (Term.app2 Term.sub_Q y x)) :=
+  lt_Q_of_eq_Q_diff adm x y Term.zero_Q (Term.app2 Term.sub_Q y x)
+    (eqQsym adm (sub_Q_zero_Q adm (Term.app2 Term.sub_Q y x)))
+
+/-- …and conversely. -/
+def lt_Q_of_zero_sub (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (lt_Q Term.zero_Q (Term.app2 Term.sub_Q y x) →ᶠ lt_Q x y) :=
+  lt_Q_of_eq_Q_diff adm Term.zero_Q (Term.app2 Term.sub_Q y x) x y
+    (sub_Q_zero_Q adm (Term.app2 Term.sub_Q y x))
+
+/-- Positivity only depends on the `eq_Q` class. -/
+def lt_Q_zero_congr (P P' : Term F Γ Ty.nat)
+    (h : Derivable F EqX al Premises (eq_Q P P')) :
+    Derivable F EqX al Premises (lt_Q Term.zero_Q P →ᶠ lt_Q Term.zero_Q P') :=
+  lt_Q_of_eq_Q_diff adm Term.zero_Q P Term.zero_Q P'
+    (eqQtrans adm (sub_Q_zero_Q adm P)
+      (eqQtrans adm h (eqQsym adm (sub_Q_zero_Q adm P'))))
+
+/-- Positivity in terms of the signed parts: the negative part vanishes and the positive one
+does not. -/
+def lt_Q_zero_parts (p : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (lt_Q Term.zero_Q p →ᶠ
+        Formula.eq0 (negN p) .zero ∧ᶠ ¬ᶠ(Formula.eq0 (posN p) .zero)) := by
+  pmode
+  pintro hlt
+  papplym (lt_Q_zero_fwd adm p) in hlt with hb
+  pdestruct hb with hs hn
+  psplit
+  · prw (negN_unfold p)
+    prwby hs
+    prw (monus_self adm (.app .succ .zero))
+    pthm (mul_zero_l adm (.app Term.rat_num p))
+  · pintro h0
+    papply hn
+    prw (posN_unfold p) in h0 with h1
+    prwby hs in h1 with h2
+    prw (mul_one_l adm (.app Term.rat_num p)) in h2 with h3
+    pexact h3
+
+/-- …and conversely. -/
+def lt_Q_zero_of_parts (p : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (negN p) .zero ∧ᶠ ¬ᶠ(Formula.eq0 (posN p) .zero) →ᶠ
+        lt_Q Term.zero_Q p) := by
+  pmode
+  pintro hyp
+  pdestruct hyp with _hneg hpos
+  papplym (lt_Q_zero_bwd adm p)
+  psplit
+  · pfrom hc := rat_sign_cases adm p
+    pcases hc with h1 | h0
+    · pexact h1
+    · pexfalso
+      papply hpos
+      prw (posN_unfold p)
+      prwby h0
+      pthm (mul_zero_l adm (.app Term.rat_num p))
+  · pintro h0
+    papply hpos
+    prw (posN_unfold p)
+    prwby h0
+    pthm (mul_zero adm (.app Term.rat_sign p))
+
+/-- A sum of two positive rationals is positive. The signed identity collapses to
+`posN(p+q) =₀ negN(p+q) + R` with `R` the two positive cross products; `negN(p+q)` cannot be
+nonzero, because the two parts multiply to zero. -/
+def lt_Q_zero_add (p q : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (lt_Q Term.zero_Q p ∧ᶠ lt_Q Term.zero_Q q →ᶠ
+        lt_Q Term.zero_Q (Term.app2 Term.add_Q p q)) := by
+  pmode
+  pintro hyp
+  pdestruct hyp with hp hq
+  papplym (lt_Q_zero_parts adm p) in hp with hpb
+  papplym (lt_Q_zero_parts adm q) in hq with hqb
+  pdestruct hpb with hpneg hppos
+  pdestruct hqb with hqneg _hqpos
+  papplym (lt_Q_zero_of_parts adm (Term.app2 Term.add_Q p q))
+  phave hkey : Formula.eq0 (posN (Term.app2 Term.add_Q p q))
+      (Term.app2 Term.add (negN (Term.app2 Term.add_Q p q))
+        (Term.app2 Term.add
+          (Term.app2 Term.mul (posN p) (.app Term.rat_den q))
+          (Term.app2 Term.mul (posN q) (.app Term.rat_den p))))
+  · pfrom hs := addQ_signed adm p q
+    prwby hpneg in hs with h1
+    prwby hqneg in h1 with h2
+    prw (mul_zero_l adm (.app Term.rat_den q)) in h2 with h3
+    prw (mul_zero_l adm (.app Term.rat_den p)) in h3 with h4
+    prw (add_zero_l adm Term.zero) in h4 with h5
+    prw (add_zero_r adm (posN (Term.app2 Term.add_Q p q))) in h5 with h6
+    pexact h6
+  phave hR : ¬ᶠ(Formula.eq0 (Term.app2 Term.add
+      (Term.app2 Term.mul (posN p) (.app Term.rat_den q))
+      (Term.app2 Term.mul (posN q) (.app Term.rat_den p))) .zero)
+  · pintro h0
+    papply hppos
+    papplym (Derivable.mp (add_eq_zero_iff adm
+      (Term.app2 Term.mul (posN p) (.app Term.rat_den q))
+      (Term.app2 Term.mul (posN q) (.app Term.rat_den p))) .and_weak) in h0 with hb
+    pdestruct hb with hb1 _hb2
+    papplym (mul_succ_eq_zero_imp adm (posN p) (.app Term.snd_pair q))
+    prw (Derivable.mp (rat_den_unfold_eq q) Derivable.sym0)
+    pexact hb1
+  phave hnegzero : Formula.eq0 (negN (Term.app2 Term.add_Q p q)) .zero
+  · pfrom hd := Derivable.mp eq0_decidable'
+      (.forall_ax (negN (Term.app2 Term.add_Q p q)))
+    pcases hd with hz | hnz
+    · pexact hz
+    · pexfalso
+      phave hposz : Formula.eq0 (posN (Term.app2 Term.add_Q p q)) .zero
+      · pfrom hm := Derivable.mp (posN_mul_negN adm (Term.app2 Term.add_Q p q))
+          (Derivable.mp (mul_eq_zero_iff adm
+            (posN (Term.app2 Term.add_Q p q)) (negN (Term.app2 Term.add_Q p q))) .and_weak)
+        pcases hm with h1 | h2
+        · pexact h1
+        · pexfalso
+          papply hnz
+          pexact h2
+      papply hnz
+      prwby hposz in hkey with hk2
+      psym in hk2 with hk3
+      papplym (Derivable.mp (add_eq_zero_iff adm
+        (negN (Term.app2 Term.add_Q p q))
+        (Term.app2 Term.add
+          (Term.app2 Term.mul (posN p) (.app Term.rat_den q))
+          (Term.app2 Term.mul (posN q) (.app Term.rat_den p)))) .and_weak) in hk3 with hb
+      pdestruct hb with hb1 _hb2
+      pexact hb1
+  psplit
+  · pexact hnegzero
+  · pintro h0
+    papply hR
+    prwby hnegzero in hkey with hk2
+    prw (add_zero_l adm (Term.app2 Term.add
+      (Term.app2 Term.mul (posN p) (.app Term.rat_den q))
+      (Term.app2 Term.mul (posN q) (.app Term.rat_den p)))) in hk2 with hk3
+    psym in hk3 with hk4
+    prwby h0 in hk4 with hk5
+    pexact hk5
+
+/-- `(p +_ℚ q) +_ℚ (r +_ℚ s) =_ℚ (p +_ℚ r) +_ℚ (q +_ℚ s)`. -/
+def addQ_swap4 (p q r s : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (eq_Q (Term.app2 Term.add_Q (Term.app2 Term.add_Q p q) (Term.app2 Term.add_Q r s))
+        (Term.app2 Term.add_Q (Term.app2 Term.add_Q p r) (Term.app2 Term.add_Q q s))) :=
+  eqQtrans adm (add_Q_assoc_inst adm p q (Term.app2 Term.add_Q r s))
+    (eqQtrans adm (addQr adm p (eqQsym adm (add_Q_assoc_inst adm q r s)))
+      (eqQtrans adm (addQr adm p (addQl adm (add_Q_comm_inst adm q r) s))
+        (eqQtrans adm (addQr adm p (add_Q_assoc_inst adm r q s))
+          (eqQsym adm (add_Q_assoc_inst adm p r (Term.app2 Term.add_Q q s))))))
+
+/-- `c −_ℚ a =_ℚ (b −_ℚ a) +_ℚ (c −_ℚ b)`: a difference splits along any midpoint. -/
+def sub_Q_trans_split (a b c : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (eq_Q (Term.app2 Term.sub_Q c a)
+        (Term.app2 Term.add_Q (Term.app2 Term.sub_Q b a) (Term.app2 Term.sub_Q c b))) :=
+  let na : Term F Γ Ty.nat := .app Term.neg_Q a
+  let nb : Term F Γ Ty.nat := .app Term.neg_Q b
+  let rhs : Derivable F EqX al Premises
+      (eq_Q (Term.app2 Term.add_Q (Term.app2 Term.add_Q b na)
+              (Term.app2 Term.add_Q c nb))
+        (Term.app2 Term.add_Q c na)) :=
+    eqQtrans adm (addQr adm (Term.app2 Term.add_Q b na) (add_Q_comm_inst adm c nb))
+      (eqQtrans adm (addQ_swap4 adm b na nb c)
+        (eqQtrans adm (addQl adm (add_Q_neg_inst adm b) (Term.app2 Term.add_Q na c))
+          (eqQtrans adm (add_Q_comm_inst adm Term.zero_Q (Term.app2 Term.add_Q na c))
+            (eqQtrans adm (add_Q_zero_inst adm (Term.app2 Term.add_Q na c))
+              (add_Q_comm_inst adm na c)))))
+  eqQtrans adm (sub_Q_eq_add_neg adm c a)
+    (eqQtrans adm (eqQsym adm rhs)
+      (eqQtrans adm (addQl adm (eqQsym adm (sub_Q_eq_add_neg adm b a))
+          (Term.app2 Term.add_Q c nb))
+        (addQr adm (Term.app2 Term.sub_Q b a)
+          (eqQsym adm (sub_Q_eq_add_neg adm c b)))))
+
 /-- ⊢ ∀a,b,c. lt_Q(a, b) ∧ lt_Q(b, c) → lt_Q(a, c)  (transitivity) -/
 def lt_Q_trans :
     Derivable F EqX al Premises (Γ := Γ)
@@ -10814,7 +11004,28 @@ def lt_Q_trans :
         (lt_Q (.var (.vs (.vs .vz))) (.var (.vs .vz))
           ∧ᶠ lt_Q (.var (.vs .vz)) (.var .vz)
           →ᶠ lt_Q (.var (.vs (.vs .vz))) (.var .vz))))) :=
-  sorry
+  let a : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat := .var (.vs (.vs .vz))
+  let b : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat := .var (.vs .vz)
+  let c : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat := .var .vz
+  let core : Derivable F EqX al Premises (lt_Q a b ∧ᶠ lt_Q b c →ᶠ lt_Q a c) := by
+    pmode
+    pintro hyp
+    pdestruct hyp with hab hbc
+    papplym (lt_Q_to_zero_sub adm a b) in hab with h1
+    papplym (lt_Q_to_zero_sub adm b c) in hbc with h2
+    phave hsum : lt_Q Term.zero_Q (Term.app2 Term.add_Q
+        (Term.app2 Term.sub_Q b a) (Term.app2 Term.sub_Q c b))
+    · papplym (lt_Q_zero_add adm (Term.app2 Term.sub_Q b a) (Term.app2 Term.sub_Q c b))
+      psplit
+      · pexact h1
+      · pexact h2
+    papplym (lt_Q_of_zero_sub adm a c)
+    papplym (lt_Q_zero_congr adm
+      (Term.app2 Term.add_Q (Term.app2 Term.sub_Q b a) (Term.app2 Term.sub_Q c b))
+      (Term.app2 Term.sub_Q c a)
+      (eqQsym adm (sub_Q_trans_split adm a b c))) in hsum with h3
+    pexact h3
+  univ_gen (univ_gen (univ_gen core))
 
 /-- ⊢ ∀a,b. lt_Q(a, b) ∨ eq_Q(a, b) ∨ lt_Q(b, a)  (trichotomy) -/
 def lt_Q_trichotomy :
