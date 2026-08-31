@@ -6595,17 +6595,8 @@ def mul_Q_comm_inst (adm : AdmissibleEqX EqX) (x y : Term F Γ Ty.nat) :
     (.forall_ax y)
   q_norm using h
 
-/-- ⊢ ∀a,b,c. eq_Q(mul_Q(mul_Q(a,b), c), mul_Q(a, mul_Q(b,c))) -/
-def mul_Q_assoc :
-    Derivable F EqX al Premises (Γ := Γ)
-      (Formula.all Ty.nat (Formula.all Ty.nat (Formula.all Ty.nat
-        (eq_Q
-          (Term.app2 Term.mul_Q
-            (Term.app2 Term.mul_Q (.var (.vs (.vs .vz))) (.var (.vs .vz)))
-            (.var .vz))
-          (Term.app2 Term.mul_Q (.var (.vs (.vs .vz)))
-            (Term.app2 Term.mul_Q (.var (.vs .vz)) (.var .vz))))))) :=
-  sorry
+-- `mul_Q_assoc` needs the signed-numerator machinery, so it is proved further down, in the
+-- "Signed parts of a product" block.
 
 /-- ⊢ ∀a. eq_Q(mul_Q(a, one_Q), a) -/
 def mul_Q_one :
@@ -11436,6 +11427,95 @@ def negN_mul_Q (x y : Term F Γ Ty.nat) :
         (sg_bar_cases adm (Term.app2 Term.abs_diff
           (.app Term.rat_sign x) (.app Term.rat_sign y))))
       (diffSign_mul_split adm x y))
+
+/-- `(a ·_ℚ b) ·_ℚ c =_ℚ a ·_ℚ (b ·_ℚ c)`, at explicit terms.
+
+Both associations have *equal* numerators and denominators up to `mul_assoc`, so this is a
+semiring rearrangement of four monomials in the six parts — no sign reasoning at all, that
+having been spent in `sameSign_mul_split`. -/
+def mul_Q_assoc_inst (a b c : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (eq_Q (Term.app2 Term.mul_Q (Term.app2 Term.mul_Q a b) c)
+        (Term.app2 Term.mul_Q a (Term.app2 Term.mul_Q b c))) :=
+  let pa := posN a
+  let na := negN a
+  let pb := posN b
+  let nb := negN b
+  let pc := posN c
+  let nc := negN c
+  let da : Term F Γ Ty.nat := .app Term.rat_den a
+  let db : Term F Γ Ty.nat := .app Term.rat_den b
+  let dc : Term F Γ Ty.nat := .app Term.rat_den c
+  let hp : Derivable F EqX al Premises
+      (Formula.eq0 (posN (Term.app2 Term.mul_Q (Term.app2 Term.mul_Q a b) c))
+        (posN (Term.app2 Term.mul_Q a (Term.app2 Term.mul_Q b c)))) := by
+    pmode
+    prw (posN_mul_Q adm (Term.app2 Term.mul_Q a b) c)
+    prw (posN_mul_Q adm a (Term.app2 Term.mul_Q b c))
+    prw (posN_mul_Q adm a b)
+    prw (negN_mul_Q adm a b)
+    prw (posN_mul_Q adm b c)
+    prw (negN_mul_Q adm b c)
+    prw (add_mul adm (Term.app2 Term.mul pa pb) (Term.app2 Term.mul na nb) pc)
+    prw (add_mul adm (Term.app2 Term.mul pa nb) (Term.app2 Term.mul na pb) nc)
+    prw (mul_add adm pa (Term.app2 Term.mul pb pc) (Term.app2 Term.mul nb nc))
+    prw (mul_add adm na (Term.app2 Term.mul pb nc) (Term.app2 Term.mul nb pc))
+    prw (mul_assoc adm pa pb pc)
+    prw (mul_assoc adm na nb pc)
+    prw (mul_assoc adm pa nb nc)
+    prw (mul_assoc adm na pb nc)
+    prw (add_swap4 adm (Term.app2 Term.mul pa (Term.app2 Term.mul pb pc))
+      (Term.app2 Term.mul na (Term.app2 Term.mul nb pc))
+      (Term.app2 Term.mul pa (Term.app2 Term.mul nb nc))
+      (Term.app2 Term.mul na (Term.app2 Term.mul pb nc)))
+    prw (add_comm adm (Term.app2 Term.mul na (Term.app2 Term.mul nb pc))
+      (Term.app2 Term.mul na (Term.app2 Term.mul pb nc)))
+    prefl
+  let hn : Derivable F EqX al Premises
+      (Formula.eq0 (negN (Term.app2 Term.mul_Q (Term.app2 Term.mul_Q a b) c))
+        (negN (Term.app2 Term.mul_Q a (Term.app2 Term.mul_Q b c)))) := by
+    pmode
+    prw (negN_mul_Q adm (Term.app2 Term.mul_Q a b) c)
+    prw (negN_mul_Q adm a (Term.app2 Term.mul_Q b c))
+    prw (posN_mul_Q adm a b)
+    prw (negN_mul_Q adm a b)
+    prw (posN_mul_Q adm b c)
+    prw (negN_mul_Q adm b c)
+    prw (add_mul adm (Term.app2 Term.mul pa pb) (Term.app2 Term.mul na nb) nc)
+    prw (add_mul adm (Term.app2 Term.mul pa nb) (Term.app2 Term.mul na pb) pc)
+    prw (mul_add adm pa (Term.app2 Term.mul pb nc) (Term.app2 Term.mul nb pc))
+    prw (mul_add adm na (Term.app2 Term.mul pb pc) (Term.app2 Term.mul nb nc))
+    prw (mul_assoc adm pa pb nc)
+    prw (mul_assoc adm na nb nc)
+    prw (mul_assoc adm pa nb pc)
+    prw (mul_assoc adm na pb pc)
+    prw (add_swap4 adm (Term.app2 Term.mul pa (Term.app2 Term.mul pb nc))
+      (Term.app2 Term.mul na (Term.app2 Term.mul nb nc))
+      (Term.app2 Term.mul pa (Term.app2 Term.mul nb pc))
+      (Term.app2 Term.mul na (Term.app2 Term.mul pb pc)))
+    prw (add_comm adm (Term.app2 Term.mul na (Term.app2 Term.mul nb nc))
+      (Term.app2 Term.mul na (Term.app2 Term.mul pb pc)))
+    prefl
+  let hd := qtrans
+    (qtrans (rat_den_mul_Q adm (Term.app2 Term.mul_Q a b) c)
+      (mul_congr_l (rat_den_mul_Q adm a b) dc))
+    (qtrans (mul_assoc adm da db dc)
+      (.mp (qtrans (rat_den_mul_Q adm a (Term.app2 Term.mul_Q b c))
+        (mul_congr_r da (rat_den_mul_Q adm b c))) .sym0))
+  eq_Q_of_pos_neg adm _ _ hp hn hd
+
+/-- ⊢ ∀a,b,c. eq_Q(mul_Q(mul_Q(a,b), c), mul_Q(a, mul_Q(b,c))) -/
+def mul_Q_assoc :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all Ty.nat (Formula.all Ty.nat (Formula.all Ty.nat
+        (eq_Q
+          (Term.app2 Term.mul_Q
+            (Term.app2 Term.mul_Q (.var (.vs (.vs .vz))) (.var (.vs .vz)))
+            (.var .vz))
+          (Term.app2 Term.mul_Q (.var (.vs (.vs .vz)))
+            (Term.app2 Term.mul_Q (.var (.vs .vz)) (.var .vz))))))) :=
+  univ_gen (univ_gen (univ_gen (mul_Q_assoc_inst adm
+    (.var (.vs (.vs .vz))) (.var (.vs .vz)) (.var .vz))))
 
 end RationalOrderedField
 
