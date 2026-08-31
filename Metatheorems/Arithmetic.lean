@@ -2858,6 +2858,23 @@ def monus_add_cancel (x y : Term F Γ Ty.nat) :
   .syllogism (pair_h (weaken_intro_h h1)
     (.syllogism (pair_h h2 (weaken_intro_h (add_zero_l adm x))) .trans0)) .trans0
 
+/-- `x + k =₀ y + k →ᶠ x =₀ y`. Cancellation, from `monus_cancel` rather than a new
+induction: subtract `k` from both sides. -/
+def add_cancel_r (x y k : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add x k) (Term.app2 Term.add y k) →ᶠ
+       Formula.eq0 x y) :=
+  let sub_k : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add x k) (Term.app2 Term.add y k) →ᶠ
+       Formula.eq0 (Term.app2 Term.monus (Term.app2 Term.add x k) k)
+         (Term.app2 Term.monus (Term.app2 Term.add y k) k)) :=
+    qfer_nat_nf (by rfl) (by rfl) I_comb
+      (r := Term.app2 Term.monus (.var .vz) k.weaken)
+      (monus_subst0_lw_nf k (Term.app2 Term.add x k))
+      (monus_subst0_lw_nf k (Term.app2 Term.add y k))
+  .syllogism (pair_h (weaken_intro_h (.mp (monus_cancel adm x k) .sym0))
+    (.syllogism (pair_h sub_k (weaken_intro_h (monus_cancel adm y k))) .trans0)) .trans0
+
 end ArithProps
 
 -- ============================================================================

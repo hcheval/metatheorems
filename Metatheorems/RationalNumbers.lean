@@ -4271,21 +4271,8 @@ def sg_bar_eq_S0_implies_zero (x : Term F Γ Ty.nat) :
     .syllogism and_or_dist
       (or_elim_rule and_proj2 (.syllogism h_contra .exfalso)))
 
-/-- x+z =₀ y+z → x =₀ y (right additive cancellation). -/
-private def add_cancel_r {Γ : Ctx ι} (x y z : Term F Γ Ty.nat) :
-    Derivable F EqX al Premises
-      (Formula.eq0 (Term.app2 Term.add x z) (Term.app2 Term.add y z) →ᶠ
-       Formula.eq0 x y) :=
-  let m1 := monus_cancel adm x z
-  let m2 := monus_cancel adm y z
-  let cond_mon := qfer_nat_nf (by rfl) (by rfl) I_comb
-    (r := Term.app2 Term.monus (.var .vz) z.weaken)
-    (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map, monus_closed_subst]
-        exact congrArg _ (Term.weaken_subst0 z (Term.app2 Term.add x z)))
-    (by simp only [Term.subst0, Term.app2, Term.subst, Term.subst0_map, monus_closed_subst]
-        exact congrArg _ (Term.weaken_subst0 z (Term.app2 Term.add y z)))
-  .syllogism (pair_h (.syllogism (pair_h (weaken_intro_h (.mp m1 .sym0)) cond_mon) .trans0)
-    (weaken_intro_h m2)) .trans0
+-- `add_cancel_r` (right additive cancellation) is a ℕ fact and now lives in `Arithmetic.lean`,
+-- next to the `monus_cancel` it is proved from.
 
 -- Helpers for doubly-weakened terms under substitution
 private theorem dw_subst0 {Γ : Ctx ι} {F : ι → Ty ι} (t : Term F Γ Ty.nat) (s : Term F Γ Ty.nat) :
@@ -8441,6 +8428,113 @@ def addQ_sign_diff (x y : Term F Γ Ty.nat)
         (Term.app3 Term.ite_nat (Term.app2 Term.geq (addQ_cross x y) (addQ_cross y x))
           (.app Term.rat_sign x) (.app Term.rat_sign y))) :=
   ite_nat_of_zero (adm := adm) _ _ h
+
+-- ── Signed numerators ──────────────────────────────────────────────────────
+--
+-- The encoding stores a magnitude and a sign bit, which makes addition a three-way case
+-- analysis and associativity a nightmare of nested comparisons. Splitting the numerator into
+-- a *positive part* and a *negative part* removes the cases: a rational's value is
+-- `(posN − negN) / den`, addition adds the parts componentwise, and componentwise addition of
+-- pairs of naturals is associative for free.
+--
+-- Nothing below ever subtracts. `u` and `v` have the same value exactly when
+-- `posN u · den v + negN v · den u =₀ posN v · den u + negN u · den v`, and that is an
+-- identity in `+` and `·` alone.
+
+/-- The positive part of `x`'s numerator: `rat_num x` when the sign bit is `1`, else `0`. -/
+def posN (x : Term F Γ Ty.nat) : Term F Γ Ty.nat :=
+  Term.app2 Term.mul (.app Term.rat_sign x) (.app Term.rat_num x)
+
+/-- The negative part of `x`'s numerator: `rat_num x` when the sign bit is `0`, else `0`. -/
+def negN (x : Term F Γ Ty.nat) : Term F Γ Ty.nat :=
+  Term.app2 Term.mul
+    (Term.app2 Term.monus (.app .succ .zero) (.app Term.rat_sign x))
+    (.app Term.rat_num x)
+
+/-- `rat_sign x` is `1` or `0` — it is an `isEven`. -/
+def rat_sign_cases (x : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_sign x) (.app .succ .zero)
+        ∨ᶠ Formula.eq0 (.app Term.rat_sign x) .zero) :=
+  let unf : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_sign x) (.app Term.isEven (.app Term.fst_pair x))) :=
+    lam_correct_nf (.app Term.isEven (.app Term.fst_pair (.var .vz)) : Term F (Ty.nat :: Γ) _)
+      x (by qnorm [Term.subst0])
+  let move : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.isEven (.app Term.fst_pair x)) (.app .succ .zero) →ᶠ
+       Formula.eq0 (.app Term.rat_sign x) (.app .succ .zero)) :=
+    .syllogism (pair_h (weaken_intro_h unf) I_comb) .trans0
+  let move0 : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.isEven (.app Term.fst_pair x)) .zero →ᶠ
+       Formula.eq0 (.app Term.rat_sign x) .zero) :=
+    .syllogism (pair_h (weaken_intro_h unf) I_comb) .trans0
+  .mp (isEven_cases adm (.app Term.fst_pair x))
+    (or_elim_rule (.syllogism move .or_weak) (.syllogism move0 or_inr))
+
+/-- `s + (1 ∸ s) =₀ 1` for a bit `s`. -/
+private def bit_add_compl (s : Term F Γ Ty.nat)
+    (hs : Derivable F EqX al Premises
+      (Formula.eq0 s (.app .succ .zero) ∨ᶠ Formula.eq0 s .zero)) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add s (Term.app2 Term.monus (.app .succ .zero) s))
+        (.app .succ .zero)) :=
+  let S0 : Term F Γ Ty.nat := .app .succ .zero
+  let case1 : Derivable F EqX al Premises
+      (Formula.eq0 s S0 →ᶠ Formula.eq0 (Term.app2 Term.add s (Term.app2 Term.monus S0 s)) S0) :=
+    -- s = 1: 1 + (1 ∸ 1) = 1 + 0 = 1
+    let toS0 := qfer_nat_nf (by rfl) (by rfl) I_comb
+      (r := Term.app2 Term.add (.var .vz) (Term.app2 Term.monus S0.weaken (.var .vz)))
+      (by qnorm [S0]) (by qnorm [S0])
+    htrans toS0 (hconst (qtrans (add_congr_r S0 (monus_self adm S0)) (add_zero_r adm S0)))
+  let case0 : Derivable F EqX al Premises
+      (Formula.eq0 s .zero →ᶠ Formula.eq0 (Term.app2 Term.add s (Term.app2 Term.monus S0 s)) S0) :=
+    -- s = 0: 0 + (1 ∸ 0) = 0 + 1 = 1
+    let toZero := qfer_nat_nf (by rfl) (by rfl) I_comb
+      (r := Term.app2 Term.add (.var .vz) (Term.app2 Term.monus S0.weaken (.var .vz)))
+      (by qnorm [S0]) (by qnorm [S0])
+    htrans toZero (hconst (qtrans (add_congr_r .zero (monus_zero adm S0)) (add_zero_l adm S0)))
+  .mp hs (or_elim_rule case1 case0)
+
+/-- `posN x + negN x =₀ rat_num x`: the two parts recover the magnitude. -/
+def posN_add_negN (x : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add (posN x) (negN x)) (.app Term.rat_num x)) :=
+  let s : Term F Γ Ty.nat := .app Term.rat_sign x
+  let n : Term F Γ Ty.nat := .app Term.rat_num x
+  let S0 : Term F Γ Ty.nat := .app .succ .zero
+  -- s·n + (1∸s)·n = (s + (1∸s))·n = 1·n = n
+  qtrans (.mp (add_mul adm s (Term.app2 Term.monus S0 s) n) .sym0)
+    (qtrans (mul_congr_l (bit_add_compl adm s (rat_sign_cases adm x)) n) (mul_one_l adm n))
+
+/-- `posN x · negN x =₀ 0`: at most one part is nonzero. -/
+def posN_mul_negN (x : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul (posN x) (negN x)) .zero) :=
+  let s : Term F Γ Ty.nat := .app Term.rat_sign x
+  let n : Term F Γ Ty.nat := .app Term.rat_num x
+  let S0 : Term F Γ Ty.nat := .app .succ .zero
+  -- one of the two factors has a vanishing bit
+  let case1 : Derivable F EqX al Premises
+      (Formula.eq0 s S0 →ᶠ Formula.eq0 (Term.app2 Term.mul (posN x) (negN x)) .zero) :=
+    -- s = 1: the negative part is `(1∸1)·n = 0`
+    let hbit : Derivable F EqX al Premises
+        (Formula.eq0 s S0 →ᶠ
+         Formula.eq0 (Term.app2 Term.monus S0 s) (Term.app2 Term.monus S0 S0)) :=
+      qfer_nat_nf (by rfl) (by rfl) I_comb
+        (r := Term.app2 Term.monus S0.weaken (.var .vz)) (by qnorm [S0]) (by qnorm [S0])
+    let hneg := htrans hbit (hconst (monus_self adm S0))
+    let hnegN : Derivable F EqX al Premises
+        (Formula.eq0 s S0 →ᶠ Formula.eq0 (negN x) .zero) :=
+      htrans (.syllogism hneg (mul_congr_l_imp n)) (hconst (mul_zero_l adm n))
+    htrans (.syllogism hnegN (mul_congr_r_imp (posN x))) (hconst (mul_zero adm (posN x)))
+  let case0 : Derivable F EqX al Premises
+      (Formula.eq0 s .zero →ᶠ Formula.eq0 (Term.app2 Term.mul (posN x) (negN x)) .zero) :=
+    -- s = 0: the positive part is `0·n = 0`
+    let hposN : Derivable F EqX al Premises
+        (Formula.eq0 s .zero →ᶠ Formula.eq0 (posN x) .zero) :=
+      htrans (mul_congr_l_imp n) (hconst (mul_zero_l adm n))
+    htrans (.syllogism hposN (mul_congr_l_imp (negN x))) (hconst (mul_zero_l adm (negN x)))
+  .mp (rat_sign_cases adm x) (or_elim_rule case1 case0)
 
 -- ── `add_Q` under `eq_Q` in the second argument ────────────────────────────
 --
