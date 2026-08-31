@@ -5648,17 +5648,8 @@ def add_Q_comm_inst (adm : AdmissibleEqX EqX) (x y : Term F Γ Ty.nat) :
     (.forall_ax y)
   q_norm using h
 
-/-- ⊢ ∀a,b,c. eq_Q(add_Q(add_Q(a,b), c), add_Q(a, add_Q(b,c))) -/
-def add_Q_assoc :
-    Derivable F EqX al Premises (Γ := Γ)
-      (Formula.all Ty.nat (Formula.all Ty.nat (Formula.all Ty.nat
-        (eq_Q
-          (Term.app2 Term.add_Q
-            (Term.app2 Term.add_Q (.var (.vs (.vs .vz))) (.var (.vs .vz)))
-            (.var .vz))
-          (Term.app2 Term.add_Q (.var (.vs (.vs .vz)))
-            (Term.app2 Term.add_Q (.var (.vs .vz)) (.var .vz))))))) :=
-  sorry
+-- `add_Q_assoc` needs the signed-numerator machinery, so it is proved further down, in the
+-- "Associativity" block after `addQ_signed`.
 
 /-- ⊢ ∀a. eq_Q(add_Q(a, zero_Q), a) -/
 def add_Q_zero :
@@ -9230,6 +9221,265 @@ def addQ_signed (x y : Term F Γ Ty.nat) :
       prw (add_zero_l adm (Term.app2 Term.add (addQ_cross x y) (addQ_cross y x)))
       prw (add_zero_r adm (Term.app2 Term.add (addQ_cross x y) (addQ_cross y x)))
       prefl
+
+-- ── Associativity ─────────────────────────────────────────────────────────
+--
+-- Both associations of `a +_ℚ b +_ℚ c` satisfy the *same* signed-value identity against the
+-- canonical three-term sums below. That identity determines the positive and negative parts
+-- (by `signed_pair_eq`), the denominators agree by `mul_assoc`, and `eq_Q_of_pos_neg` closes
+-- it. No sign case analysis appears here at all — it was all spent inside `addQ_signed`.
+
+/-- `posN a·(db·dc) + (posN b·(da·dc) + posN c·(da·db))`, the total positive part over the
+common denominator. -/
+private def sPos (a b c : Term F Γ Ty.nat) : Term F Γ Ty.nat :=
+  Term.app2 Term.add
+    (Term.app2 Term.mul (posN a)
+      (Term.app2 Term.mul (.app Term.rat_den b) (.app Term.rat_den c)))
+    (Term.app2 Term.add
+      (Term.app2 Term.mul (posN b)
+        (Term.app2 Term.mul (.app Term.rat_den a) (.app Term.rat_den c)))
+      (Term.app2 Term.mul (posN c)
+        (Term.app2 Term.mul (.app Term.rat_den a) (.app Term.rat_den b))))
+
+/-- The negative counterpart of `sPos`. -/
+private def sNeg (a b c : Term F Γ Ty.nat) : Term F Γ Ty.nat :=
+  Term.app2 Term.add
+    (Term.app2 Term.mul (negN a)
+      (Term.app2 Term.mul (.app Term.rat_den b) (.app Term.rat_den c)))
+    (Term.app2 Term.add
+      (Term.app2 Term.mul (negN b)
+        (Term.app2 Term.mul (.app Term.rat_den a) (.app Term.rat_den c)))
+      (Term.app2 Term.mul (negN c)
+        (Term.app2 Term.mul (.app Term.rat_den a) (.app Term.rat_den b))))
+
+/-- Eliminate the intermediate sum's own parts from a doubly-applied `addQ_signed`.
+
+`h1` is the outer application and `h2` the inner one scaled by the third denominator; `u` and
+`v` are the intermediate sum's negative and positive parts, which occur once on each side and
+cancel. -/
+private def signed_compose (pL nL u v A B X Y : Term F Γ Ty.nat)
+    (h1 : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add pL (Term.app2 Term.add u A))
+        (Term.app2 Term.add nL (Term.app2 Term.add v B))))
+    (h2 : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add v X) (Term.app2 Term.add u Y))) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add pL (Term.app2 Term.add A X))
+        (Term.app2 Term.add nL (Term.app2 Term.add B Y))) := by
+  pmode
+  papplym (add_cancel_r adm
+    (Term.app2 Term.add pL (Term.app2 Term.add A X))
+    (Term.app2 Term.add nL (Term.app2 Term.add B Y)) u)
+  prw (Derivable.mp (add_shuffle_l adm pL u A X) Derivable.sym0)
+  prw (Derivable.mp (add_shuffle_r' adm nL B u Y) Derivable.sym0)
+  prw (Derivable.mp h2 Derivable.sym0)
+  prw (Derivable.mp (add_shuffle_r adm nL v B X) Derivable.sym0)
+  pthm (add_congr_l h1 X)
+
+/-- `addQ_signed` for the inner sum, scaled by the third denominator and distributed. -/
+private def addQ_signed_scaled (x y k : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0
+        (Term.app2 Term.add (Term.app2 Term.mul (posN (Term.app2 Term.add_Q x y)) k)
+          (Term.app2 Term.mul (Term.app2 Term.add
+            (Term.app2 Term.mul (negN x) (.app Term.rat_den y))
+            (Term.app2 Term.mul (negN y) (.app Term.rat_den x))) k))
+        (Term.app2 Term.add (Term.app2 Term.mul (negN (Term.app2 Term.add_Q x y)) k)
+          (Term.app2 Term.mul (Term.app2 Term.add
+            (Term.app2 Term.mul (posN x) (.app Term.rat_den y))
+            (Term.app2 Term.mul (posN y) (.app Term.rat_den x))) k))) :=
+  let ZN := Term.app2 Term.add
+    (Term.app2 Term.mul (negN x) (.app Term.rat_den y))
+    (Term.app2 Term.mul (negN y) (.app Term.rat_den x))
+  let ZP := Term.app2 Term.add
+    (Term.app2 Term.mul (posN x) (.app Term.rat_den y))
+    (Term.app2 Term.mul (posN y) (.app Term.rat_den x))
+  qtrans (.mp (add_mul adm (posN (Term.app2 Term.add_Q x y)) ZN k) .sym0)
+    (qtrans (mul_congr_l (addQ_signed adm x y) k)
+      (add_mul adm (negN (Term.app2 Term.add_Q x y)) ZP k))
+
+/-- The left association satisfies the canonical signed identity. -/
+private def signed3_left (a b c : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0
+        (Term.app2 Term.add (posN (Term.app2 Term.add_Q (Term.app2 Term.add_Q a b) c))
+          (sNeg a b c))
+        (Term.app2 Term.add (negN (Term.app2 Term.add_Q (Term.app2 Term.add_Q a b) c))
+          (sPos a b c))) :=
+  let da : Term F Γ Ty.nat := .app Term.rat_den a
+  let db : Term F Γ Ty.nat := .app Term.rat_den b
+  let dc : Term F Γ Ty.nat := .app Term.rat_den c
+  let M := Term.app2 Term.add_Q a b
+  let raw := signed_compose adm _ _ _ _ _ _ _ _
+    (addQ_signed adm M c) (addQ_signed_scaled adm a b dc)
+  -- `negN c · rat_den M + (negN a·db + negN b·da)·dc  =₀  sNeg a b c`
+  let normN : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add
+        (Term.app2 Term.mul (negN c) (.app Term.rat_den M))
+        (Term.app2 Term.mul (Term.app2 Term.add
+          (Term.app2 Term.mul (negN a) db) (Term.app2 Term.mul (negN b) da)) dc))
+        (sNeg a b c)) :=
+    qtrans (add_congr_l (mul_congr_r (negN c) (rat_den_add_Q adm a b))
+        (Term.app2 Term.mul (Term.app2 Term.add
+          (Term.app2 Term.mul (negN a) db) (Term.app2 Term.mul (negN b) da)) dc))
+      (qtrans (add_congr_r (Term.app2 Term.mul (negN c) (Term.app2 Term.mul da db))
+          (qtrans (add_mul adm (Term.app2 Term.mul (negN a) db)
+              (Term.app2 Term.mul (negN b) da) dc)
+            (qtrans (add_congr_l (mul_assoc adm (negN a) db dc)
+                (Term.app2 Term.mul (Term.app2 Term.mul (negN b) da) dc))
+              (add_congr_r (Term.app2 Term.mul (negN a) (Term.app2 Term.mul db dc))
+                (mul_assoc adm (negN b) da dc)))))
+        (add_rot3 adm (Term.app2 Term.mul (negN a) (Term.app2 Term.mul db dc))
+          (Term.app2 Term.mul (negN b) (Term.app2 Term.mul da dc))
+          (Term.app2 Term.mul (negN c) (Term.app2 Term.mul da db))))
+  let normP : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add
+        (Term.app2 Term.mul (posN c) (.app Term.rat_den M))
+        (Term.app2 Term.mul (Term.app2 Term.add
+          (Term.app2 Term.mul (posN a) db) (Term.app2 Term.mul (posN b) da)) dc))
+        (sPos a b c)) :=
+    qtrans (add_congr_l (mul_congr_r (posN c) (rat_den_add_Q adm a b))
+        (Term.app2 Term.mul (Term.app2 Term.add
+          (Term.app2 Term.mul (posN a) db) (Term.app2 Term.mul (posN b) da)) dc))
+      (qtrans (add_congr_r (Term.app2 Term.mul (posN c) (Term.app2 Term.mul da db))
+          (qtrans (add_mul adm (Term.app2 Term.mul (posN a) db)
+              (Term.app2 Term.mul (posN b) da) dc)
+            (qtrans (add_congr_l (mul_assoc adm (posN a) db dc)
+                (Term.app2 Term.mul (Term.app2 Term.mul (posN b) da) dc))
+              (add_congr_r (Term.app2 Term.mul (posN a) (Term.app2 Term.mul db dc))
+                (mul_assoc adm (posN b) da dc)))))
+        (add_rot3 adm (Term.app2 Term.mul (posN a) (Term.app2 Term.mul db dc))
+          (Term.app2 Term.mul (posN b) (Term.app2 Term.mul da dc))
+          (Term.app2 Term.mul (posN c) (Term.app2 Term.mul da db))))
+  qtrans (add_congr_r (posN (Term.app2 Term.add_Q M c)) (.mp normN .sym0))
+    (qtrans raw (add_congr_r (negN (Term.app2 Term.add_Q M c)) normP))
+
+/-- The right association satisfies the same identity. -/
+private def signed3_right (a b c : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0
+        (Term.app2 Term.add (posN (Term.app2 Term.add_Q a (Term.app2 Term.add_Q b c)))
+          (sNeg a b c))
+        (Term.app2 Term.add (negN (Term.app2 Term.add_Q a (Term.app2 Term.add_Q b c)))
+          (sPos a b c))) :=
+  let da : Term F Γ Ty.nat := .app Term.rat_den a
+  let db : Term F Γ Ty.nat := .app Term.rat_den b
+  let dc : Term F Γ Ty.nat := .app Term.rat_den c
+  let M := Term.app2 Term.add_Q b c
+  let R := Term.app2 Term.add_Q a M
+  let dM : Term F Γ Ty.nat := .app Term.rat_den M
+  -- the outer application, with its inner sum commuted into `u + A` order
+  let h1 : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add (posN R) (Term.app2 Term.add
+          (Term.app2 Term.mul (negN M) da) (Term.app2 Term.mul (negN a) dM)))
+        (Term.app2 Term.add (negN R) (Term.app2 Term.add
+          (Term.app2 Term.mul (posN M) da) (Term.app2 Term.mul (posN a) dM)))) :=
+    qtrans (.mp (add_congr_r (posN R) (add_comm adm
+        (Term.app2 Term.mul (negN a) dM) (Term.app2 Term.mul (negN M) da))) .sym0)
+      (qtrans (addQ_signed adm a M)
+        (add_congr_r (negN R) (add_comm adm
+          (Term.app2 Term.mul (posN a) dM) (Term.app2 Term.mul (posN M) da))))
+  let raw := signed_compose adm _ _ _ _ _ _ _ _ h1 (addQ_signed_scaled adm b c da)
+  let normN : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add
+        (Term.app2 Term.mul (negN a) dM)
+        (Term.app2 Term.mul (Term.app2 Term.add
+          (Term.app2 Term.mul (negN b) dc) (Term.app2 Term.mul (negN c) db)) da))
+        (sNeg a b c)) :=
+    qtrans (add_congr_l (mul_congr_r (negN a) (rat_den_add_Q adm b c))
+        (Term.app2 Term.mul (Term.app2 Term.add
+          (Term.app2 Term.mul (negN b) dc) (Term.app2 Term.mul (negN c) db)) da))
+      (add_congr_r (Term.app2 Term.mul (negN a) (Term.app2 Term.mul db dc))
+        (qtrans (add_mul adm (Term.app2 Term.mul (negN b) dc)
+            (Term.app2 Term.mul (negN c) db) da)
+          (qtrans (add_congr_l (qtrans (mul_assoc adm (negN b) dc da)
+                (mul_congr_r (negN b) (mul_comm adm dc da)))
+              (Term.app2 Term.mul (Term.app2 Term.mul (negN c) db) da))
+            (add_congr_r (Term.app2 Term.mul (negN b) (Term.app2 Term.mul da dc))
+              (qtrans (mul_assoc adm (negN c) db da)
+                (mul_congr_r (negN c) (mul_comm adm db da)))))))
+  let normP : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add
+        (Term.app2 Term.mul (posN a) dM)
+        (Term.app2 Term.mul (Term.app2 Term.add
+          (Term.app2 Term.mul (posN b) dc) (Term.app2 Term.mul (posN c) db)) da))
+        (sPos a b c)) :=
+    qtrans (add_congr_l (mul_congr_r (posN a) (rat_den_add_Q adm b c))
+        (Term.app2 Term.mul (Term.app2 Term.add
+          (Term.app2 Term.mul (posN b) dc) (Term.app2 Term.mul (posN c) db)) da))
+      (add_congr_r (Term.app2 Term.mul (posN a) (Term.app2 Term.mul db dc))
+        (qtrans (add_mul adm (Term.app2 Term.mul (posN b) dc)
+            (Term.app2 Term.mul (posN c) db) da)
+          (qtrans (add_congr_l (qtrans (mul_assoc adm (posN b) dc da)
+                (mul_congr_r (posN b) (mul_comm adm dc da)))
+              (Term.app2 Term.mul (Term.app2 Term.mul (posN c) db) da))
+            (add_congr_r (Term.app2 Term.mul (posN b) (Term.app2 Term.mul da dc))
+              (qtrans (mul_assoc adm (posN c) db da)
+                (mul_congr_r (posN c) (mul_comm adm db da)))))))
+  qtrans (add_congr_r (posN R) (.mp normN .sym0))
+    (qtrans raw (add_congr_r (negN R) normP))
+
+/-- Both associations have the same positive part and the same negative part. -/
+private def assoc_parts (a b c : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (posN (Term.app2 Term.add_Q (Term.app2 Term.add_Q a b) c))
+          (posN (Term.app2 Term.add_Q a (Term.app2 Term.add_Q b c)))
+        ∧ᶠ Formula.eq0 (negN (Term.app2 Term.add_Q (Term.app2 Term.add_Q a b) c))
+          (negN (Term.app2 Term.add_Q a (Term.app2 Term.add_Q b c)))) :=
+  let L := Term.app2 Term.add_Q (Term.app2 Term.add_Q a b) c
+  let R := Term.app2 Term.add_Q a (Term.app2 Term.add_Q b c)
+  let key : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add (posN L) (negN R))
+        (Term.app2 Term.add (posN R) (negN L))) := by
+    pmode
+    papplym (add_cancel_r adm
+      (Term.app2 Term.add (posN L) (negN R)) (Term.app2 Term.add (posN R) (negN L))
+      (Term.app2 Term.add (sNeg a b c) (sPos a b c)))
+    prw (add_swap4 adm (posN L) (negN R) (sNeg a b c) (sPos a b c))
+    prw (add_swap4 adm (posN R) (negN L) (sNeg a b c) (sPos a b c))
+    prw (signed3_left adm a b c)
+    prw (signed3_right adm a b c)
+    pthm (add_comm adm (Term.app2 Term.add (negN L) (sPos a b c))
+      (Term.app2 Term.add (negN R) (sPos a b c)))
+  Derivable.mp key (signed_pair_eq adm (posN L) (negN L) (posN R) (negN R)
+    (posN_mul_negN adm L) (posN_mul_negN adm R))
+
+/-- Both associations have the same denominator: `(da·db)·dc` against `da·(db·dc)`. -/
+private def assoc_den (a b c : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_den (Term.app2 Term.add_Q (Term.app2 Term.add_Q a b) c))
+        (.app Term.rat_den (Term.app2 Term.add_Q a (Term.app2 Term.add_Q b c)))) :=
+  let da : Term F Γ Ty.nat := .app Term.rat_den a
+  let db : Term F Γ Ty.nat := .app Term.rat_den b
+  let dc : Term F Γ Ty.nat := .app Term.rat_den c
+  qtrans
+    (qtrans (rat_den_add_Q adm (Term.app2 Term.add_Q a b) c)
+      (mul_congr_l (rat_den_add_Q adm a b) dc))
+    (qtrans (mul_assoc adm da db dc)
+      (.mp (qtrans (rat_den_add_Q adm a (Term.app2 Term.add_Q b c))
+        (mul_congr_r da (rat_den_add_Q adm b c))) .sym0))
+
+/-- `(a +_ℚ b) +_ℚ c =_ℚ a +_ℚ (b +_ℚ c)`, at explicit terms. -/
+def add_Q_assoc_inst (a b c : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (eq_Q (Term.app2 Term.add_Q (Term.app2 Term.add_Q a b) c)
+        (Term.app2 Term.add_Q a (Term.app2 Term.add_Q b c))) :=
+  let parts := assoc_parts adm a b c
+  eq_Q_of_pos_neg adm _ _
+    (Derivable.mp parts .and_weak) (Derivable.mp parts and_proj2) (assoc_den adm a b c)
+
+/-- ⊢ ∀a,b,c. eq_Q(add_Q(add_Q(a,b), c), add_Q(a, add_Q(b,c))) -/
+def add_Q_assoc :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all Ty.nat (Formula.all Ty.nat (Formula.all Ty.nat
+        (eq_Q
+          (Term.app2 Term.add_Q
+            (Term.app2 Term.add_Q (.var (.vs (.vs .vz))) (.var (.vs .vz)))
+            (.var .vz))
+          (Term.app2 Term.add_Q (.var (.vs (.vs .vz)))
+            (Term.app2 Term.add_Q (.var (.vs .vz)) (.var .vz))))))) :=
+  univ_gen (univ_gen (univ_gen (add_Q_assoc_inst adm
+    (.var (.vs (.vs .vz))) (.var (.vs .vz)) (.var .vz))))
 
 -- ── `add_Q` under `eq_Q` in the second argument ────────────────────────────
 --
