@@ -4670,8 +4670,11 @@ private def monus_congr_snd_imp {s t : Term F Γ Ty.nat} (u : Term F Γ Ty.nat) 
 private def isEven_congr_imp {s t : Term F Γ Ty.nat} :
     Derivable F EqX al Premises
       (Formula.eq0 s t →ᶠ
-       Formula.eq0 (.app Term.isEven s) (.app Term.isEven t)) :=
-  qfer_nat_nf (by rfl) (by rfl) I_comb (r := .app Term.isEven (.var .vz)) rfl rfl
+       Formula.eq0 (.app Term.isEven s) (.app Term.isEven t)) := by
+  pmode
+  pintro h
+  prwby h
+  prefl
 
 /-- `s =₀ t →ᶠ sḡ s =₀ sḡ t`. -/
 private def sg_bar_congr_imp {s t : Term F Γ Ty.nat} :
