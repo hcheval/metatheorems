@@ -177,7 +177,7 @@ variable {Γ Δ : Ctx ι} (σ : Term.Subst F Γ Δ)
     pow2neg_Q_closed_subst, ite_nat_closed_subst, sg_bar_closed_subst]
 @[simp] theorem zero_R_closed_subst :
     (Term.zero_R : Term F Γ _).subst σ = Term.zero_R := by rfl
-@[simp] private theorem one_R_closed_subst :
+@[simp] theorem one_R_closed_subst :
     (Term.one_R : Term F Γ _).subst σ = Term.one_R := by rfl
 @[simp] private theorem embed_nat_R_closed_subst :
     (Term.embed_nat_R : Term F Γ _).subst σ = Term.embed_nat_R := by rfl
@@ -741,6 +741,16 @@ def cauchyState_id_at (f : Term F Γ (realTy ι))
     Derivable F EqX al Premises (idAt f s) :=
   idF_subst0 f s ▸ Derivable.mp (cauchyState_id_of_cauchy adm f hC) (.forall_ax s)
 
+/-- Weakening *is* a substitution (`Term.rename_eq_subst`), so the `closed_subst` set
+discharges weakening of a closed constant too. -/
+private theorem zero_R_weaken {Δ : Ctx ι} {ρ : Ty ι} :
+    (Term.zero_R : Term F Δ (realTy ι)).weaken (σ := ρ) = Term.zero_R := by
+  rw [Term.weaken, Term.rename_eq_subst]; exact zero_R_closed_subst _
+
+private theorem one_R_weaken {Δ : Ctx ι} {ρ : Ty ι} :
+    (Term.one_R : Term F Δ (realTy ι)).weaken (σ := ρ) = Term.one_R := by
+  rw [Term.weaken, Term.rename_eq_subst]; exact one_R_closed_subst _
+
 /-- `f̂(n) =₀ f(n)` for a sequence that already passes the check everywhere. -/
 def cauchyfy_id (f : Term F Γ (realTy ι))
     (hC : Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
@@ -750,6 +760,67 @@ def cauchyfy_id (f : Term F Γ (realTy ι))
       (Formula.eq0 (Term.app2 Term.cauchyfy f s) (.app f s)) :=
   qtrans (cauchyfy_unfold adm f s)
     (Derivable.mp (cauchyState_id_at adm f hC s) and_proj2)
+
+-- ── The two constant sequences ────────────────────────────────────────────
+
+/-- `0_ℝ` is the constant sequence `0_ℚ`. -/
+def zero_R_apply (x : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.zero_R x) Term.zero_Q) :=
+  lam_correct_nf (Term.zero_Q : Term F (Ty.nat :: Γ) Ty.nat) x
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, closed_subst])
+
+/-- `1_ℝ` is the constant sequence `1_ℚ`. -/
+def one_R_apply (x : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.one_R x) Term.one_Q) :=
+  lam_correct_nf (Term.one_Q : Term F (Ty.nat :: Γ) Ty.nat) x
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, closed_subst])
+
+-- The check formula is spelled out rather than written with `Term.cauchy_check_at`: `prw`
+-- descends through `Term.app`/`app2`/`app3` nodes only, so a named wrapper would hide the
+-- applications of `0_ℝ` from the rewrite. It is definitionally the same formula.
+private def zero_R_check :
+    Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
+      (Formula.eq0
+        (Term.app2 Term.lt_Q_dec
+          (.app Term.abs_Q (Term.app2 Term.sub_Q
+            (.app (Term.zero_R : Term F (Ty.nat :: Γ) _) (.var .vz))
+            (.app (Term.zero_R : Term F (Ty.nat :: Γ) _) (.app .succ (.var .vz)))))
+          (.app Term.pow2neg_Q (.app .succ (.var .vz))))
+        .zero) := by
+  pmode
+  prw (zero_R_apply (.var .vz))
+  prw (zero_R_apply (.app .succ (.var .vz)))
+  pthm (lt_Q_abs_sub_self adm Term.zero_Q (.app .succ (.var .vz)))
+
+private def one_R_check :
+    Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
+      (Formula.eq0
+        (Term.app2 Term.lt_Q_dec
+          (.app Term.abs_Q (Term.app2 Term.sub_Q
+            (.app (Term.one_R : Term F (Ty.nat :: Γ) _) (.var .vz))
+            (.app (Term.one_R : Term F (Ty.nat :: Γ) _) (.app .succ (.var .vz)))))
+          (.app Term.pow2neg_Q (.app .succ (.var .vz))))
+        .zero) := by
+  pmode
+  prw (one_R_apply (.var .vz))
+  prw (one_R_apply (.app .succ (.var .vz)))
+  pthm (lt_Q_abs_sub_self adm Term.one_Q (.app .succ (.var .vz)))
+
+/-- `0̂_ℝ(n) =₀ 0_ℚ`: the constant sequences are fixed by `cauchyfy`. -/
+def cauchyfy_zero_R (s : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.cauchyfy Term.zero_R s) Term.zero_Q) :=
+  qtrans (cauchyfy_id adm Term.zero_R (zero_R_weaken ▸ zero_R_check adm) s)
+    (zero_R_apply s)
+
+/-- `1̂_ℝ(n) =₀ 1_ℚ`. -/
+def cauchyfy_one_R (s : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.cauchyfy Term.one_R s) Term.one_Q) :=
+  qtrans (cauchyfy_id adm Term.one_R (one_R_weaken ▸ one_R_check adm) s)
+    (one_R_apply s)
 
 end Cauchyfy
 
