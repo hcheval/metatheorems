@@ -11517,6 +11517,169 @@ def mul_Q_assoc :
   univ_gen (univ_gen (univ_gen (mul_Q_assoc_inst adm
     (.var (.vs (.vs .vz))) (.var (.vs .vz)) (.var .vz))))
 
+-- ── `eq_Q` from cross-multiplied signed values ─────────────────────────────
+--
+-- `eq_Q_of_pos_neg` needs the two denominators to be *equal*. Distributivity does not have
+-- that: `a·(b+c)` has denominator `da·(db·dc)` while `(a·b) + (a·c)` has `(da·db)·(da·dc)`.
+-- This is the general bridge — the two signed values compared across the denominators.
+
+/-- The sign half, from the two cross-multiplied part equalities. -/
+private def eq_Q_signpart_of_cross (u v : Term F Γ Ty.nat)
+    (hA : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul (posN u) (.app Term.rat_den v))
+        (Term.app2 Term.mul (posN v) (.app Term.rat_den u))))
+    (hB : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul (negN u) (.app Term.rat_den v))
+        (Term.app2 Term.mul (negN v) (.app Term.rat_den u))))
+    (hnum : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul (.app Term.rat_num u) (.app Term.rat_den v))
+        (Term.app2 Term.mul (.app Term.rat_num v) (.app Term.rat_den u)))) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul
+        (Term.app2 Term.abs_diff (.app Term.rat_sign u) (.app Term.rat_sign v))
+        (.app Term.sg (Term.app2 Term.add
+          (.app Term.rat_num u) (.app Term.rat_num v)))) .zero) := by
+  pmode
+  pfrom hcases := sg_bar_cases adm
+    (Term.app2 Term.add (.app Term.rat_num u) (.app Term.rat_num v))
+  pcases hcases with hz | hnz
+  · phave hsum : Formula.eq0
+        (Term.app2 Term.add (.app Term.rat_num u) (.app Term.rat_num v)) .zero
+    · papplym (sg_bar_eq_S0_implies_zero adm
+        (Term.app2 Term.add (.app Term.rat_num u) (.app Term.rat_num v)))
+      pexact hz
+    prwby hsum
+    prw sg_zero
+    pthm (mul_zero adm _)
+  · phave hne : ¬ᶠ(Formula.eq0
+        (Term.app2 Term.add (.app Term.rat_num u) (.app Term.rat_num v)) .zero)
+    · papplym (Derivable.mp (sg_bar_eq_zero_iff adm
+        (Term.app2 Term.add (.app Term.rat_num u) (.app Term.rat_num v))) .and_weak)
+      pexact hnz
+    phave hnu : ¬ᶠ(Formula.eq0 (.app Term.rat_num u) .zero)
+    · pintro h0
+      papply hne
+      phave hnv0 : Formula.eq0 (.app Term.rat_num v) .zero
+      · papplym (mul_succ_eq_zero_imp adm (.app Term.rat_num v) (.app Term.snd_pair u))
+        prw (Derivable.mp (rat_den_unfold_eq u) Derivable.sym0)
+        prw (Derivable.mp hnum Derivable.sym0)
+        prwby h0
+        pthm (mul_zero_l adm (.app Term.rat_den v))
+      prwby h0
+      prwby hnv0
+      pthm (add_zero_l adm Term.zero)
+    phave hnv : ¬ᶠ(Formula.eq0 (.app Term.rat_num v) .zero)
+    · pintro h0
+      papply hne
+      phave hnu0 : Formula.eq0 (.app Term.rat_num u) .zero
+      · papplym (mul_succ_eq_zero_imp adm (.app Term.rat_num u) (.app Term.snd_pair v))
+        prw (Derivable.mp (rat_den_unfold_eq v) Derivable.sym0)
+        prw hnum
+        prwby h0
+        pthm (mul_zero_l adm (.app Term.rat_den u))
+      prwby hnu0
+      prwby h0
+      pthm (add_zero_l adm Term.zero)
+    phave hsuv : Formula.eq0 (.app Term.rat_sign u) (.app Term.rat_sign v)
+    · pfrom hsu := rat_sign_cases adm u
+      pcases hsu with hu1 | hu0
+      · phave hnegu : Formula.eq0 (negN u) .zero
+        · prw (negN_unfold u)
+          prwby hu1
+          prw (monus_self adm (.app .succ .zero))
+          pthm (mul_zero_l adm (.app Term.rat_num u))
+        phave hnegv : Formula.eq0 (negN v) .zero
+        · papplym (mul_succ_eq_zero_imp adm (negN v) (.app Term.snd_pair u))
+          prw (Derivable.mp (rat_den_unfold_eq u) Derivable.sym0)
+          prw (Derivable.mp hB Derivable.sym0)
+          prwby hnegu
+          pthm (mul_zero_l adm (.app Term.rat_den v))
+        pfrom hsv := rat_sign_cases adm v
+        pcases hsv with hv1 | hv0
+        · prwby hu1
+          prwby hv1
+          prefl
+        · pexfalso
+          papply hnv
+          prw (negN_unfold v) in hnegv with hq1
+          prwby hv0 in hq1 with hq2
+          prw (monus_zero adm (.app .succ .zero)) in hq2 with hq3
+          prw (mul_one_l adm (.app Term.rat_num v)) in hq3 with hq4
+          pexact hq4
+      · phave hposu : Formula.eq0 (posN u) .zero
+        · prw (posN_unfold u)
+          prwby hu0
+          pthm (mul_zero_l adm (.app Term.rat_num u))
+        phave hposv : Formula.eq0 (posN v) .zero
+        · papplym (mul_succ_eq_zero_imp adm (posN v) (.app Term.snd_pair u))
+          prw (Derivable.mp (rat_den_unfold_eq u) Derivable.sym0)
+          prw (Derivable.mp hA Derivable.sym0)
+          prwby hposu
+          pthm (mul_zero_l adm (.app Term.rat_den v))
+        pfrom hsv := rat_sign_cases adm v
+        pcases hsv with hv1 | hv0
+        · pexfalso
+          papply hnv
+          prw (posN_unfold v) in hposv with hq1
+          prwby hv1 in hq1 with hq2
+          prw (mul_one_l adm (.app Term.rat_num v)) in hq2 with hq3
+          pexact hq3
+        · prwby hu0
+          prwby hv0
+          prefl
+    phave habs : Formula.eq0 (Term.app2 Term.abs_diff
+        (.app Term.rat_sign u) (.app Term.rat_sign v)) .zero
+    · papplym (Derivable.mp (abs_diff_eq_zero_iff adm
+        (.app Term.rat_sign u) (.app Term.rat_sign v))
+        (.syllogism .and_perm .and_weak))
+      pexact hsuv
+    prwby habs
+    pthm (mul_zero_l adm _)
+
+/-- `eq_Q` from cross-multiplied signed values, with no requirement that the denominators
+agree. Subsumes `eq_Q_of_pos_neg`. -/
+def eq_Q_of_signed_cross (u v : Term F Γ Ty.nat)
+    (h : Derivable F EqX al Premises
+      (Formula.eq0
+        (Term.app2 Term.add
+          (Term.app2 Term.mul (posN u) (.app Term.rat_den v))
+          (Term.app2 Term.mul (negN v) (.app Term.rat_den u)))
+        (Term.app2 Term.add
+          (Term.app2 Term.mul (posN v) (.app Term.rat_den u))
+          (Term.app2 Term.mul (negN u) (.app Term.rat_den v))))) :
+    Derivable F EqX al Premises (eq_Q u v) :=
+  let du : Term F Γ Ty.nat := .app Term.rat_den u
+  let dv : Term F Γ Ty.nat := .app Term.rat_den v
+  let A₁ := Term.app2 Term.mul (posN u) dv
+  let B₁ := Term.app2 Term.mul (negN u) dv
+  let A₂ := Term.app2 Term.mul (posN v) du
+  let B₂ := Term.app2 Term.mul (negN v) du
+  let h1 : Derivable F EqX al Premises (Formula.eq0 (Term.app2 Term.mul A₁ B₁) .zero) :=
+    qtrans (.mp (mul_assoc adm A₁ (negN u) dv) .sym0)
+      (qtrans (mul_congr_l (mul_swap_right adm (posN u) dv (negN u)) dv)
+        (qtrans (mul_congr_l (mul_congr_l (posN_mul_negN adm u) dv) dv)
+          (qtrans (mul_congr_l (mul_zero_l adm dv) dv) (mul_zero_l adm dv))))
+  let h2 : Derivable F EqX al Premises (Formula.eq0 (Term.app2 Term.mul A₂ B₂) .zero) :=
+    qtrans (.mp (mul_assoc adm A₂ (negN v) du) .sym0)
+      (qtrans (mul_congr_l (mul_swap_right adm (posN v) du (negN v)) du)
+        (qtrans (mul_congr_l (mul_congr_l (posN_mul_negN adm v) du) du)
+          (qtrans (mul_congr_l (mul_zero_l adm du) du) (mul_zero_l adm du))))
+  let parts := Derivable.mp h (signed_pair_eq adm A₁ B₁ A₂ B₂ h1 h2)
+  let hA := Derivable.mp parts .and_weak
+  let hB := Derivable.mp parts and_proj2
+  let hnum : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul (.app Term.rat_num u) dv)
+        (Term.app2 Term.mul (.app Term.rat_num v) du)) :=
+    qtrans (mul_congr_l (.mp (posN_add_negN adm u) .sym0) dv)
+      (qtrans (add_mul adm (posN u) (negN u) dv)
+        (qtrans (qtrans (add_congr_l hA B₁) (add_congr_r A₂ hB))
+          (qtrans (.mp (add_mul adm (posN v) (negN v) du) .sym0)
+            (mul_congr_l (posN_add_negN adm v) du))))
+  eq_Q_from_components adm
+    (Derivable.mp hnum
+      (Derivable.mp (abs_diff_eq_zero_iff adm _ _) (.syllogism .and_perm .and_weak)))
+    (eq_Q_signpart_of_cross adm u v hA hB hnum)
+
 end RationalOrderedField
 
 end Metatheorems

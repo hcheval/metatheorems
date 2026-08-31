@@ -2932,6 +2932,14 @@ def add_shuffle_r' (n b u y : Term F Γ Ty.nat) :
           (qtrans (add_congr_r n (add_comm adm u (Term.app2 Term.add b y)))
             (.mp (add_assoc adm n (Term.app2 Term.add b y) u) .sym0)))))
 
+/-- `(x + y) + z =₀ (x + z) + y` — the additive mirror of `mul_swap_right`. -/
+def add_swap_right (x y z : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (Formula.eq0
+      (Term.app2 Term.add (Term.app2 Term.add x y) z)
+      (Term.app2 Term.add (Term.app2 Term.add x z) y)) :=
+  qtrans (qtrans (add_assoc adm x y z) (add_congr_r x (add_comm adm y z)))
+    (.mp (add_assoc adm x z y) .sym0)
+
 /-- `r + (p + q) =₀ p + (q + r)` — rotate a three-term sum. -/
 def add_rot3 (p q r : Term F Γ Ty.nat) :
     Derivable F EqX al Premises (Formula.eq0
