@@ -2623,6 +2623,22 @@ def abs_diff_mul_distrib (u v k : Term F Γ Ty.nat) :
   let e4 := .mp (abs_diff_unfold adm uk vk) .sym0
   qtrans (qtrans (qtrans e1 e2) e3) e4
 
+/-- `(x·y)·z =₀ (x·z)·y`. The rearrangement that turns a cross product scaled by one
+denominator into the same product scaled by the other. -/
+def mul_swap_right (x y z : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (Formula.eq0
+      (Term.app2 Term.mul (Term.app2 Term.mul x y) z)
+      (Term.app2 Term.mul (Term.app2 Term.mul x z) y)) :=
+  qtrans (qtrans (mul_assoc adm x y z) (mul_congr_r x (mul_comm adm y z)))
+    (.mp (mul_assoc adm x z y) .sym0)
+
+/-- `m·(x·y) =₀ (m·y)·x`. -/
+def mul_assoc_comm (m x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (Formula.eq0
+      (Term.app2 Term.mul m (Term.app2 Term.mul x y))
+      (Term.app2 Term.mul (Term.app2 Term.mul m y) x)) :=
+  qtrans (mul_congr_r m (mul_comm adm x y)) (.mp (mul_assoc adm m y x) .sym0)
+
 end ArithProps
 
 -- ============================================================================
