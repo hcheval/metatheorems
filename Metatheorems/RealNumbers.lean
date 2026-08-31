@@ -239,14 +239,11 @@ def cauchyStep (f : Term F Γ (realTy ι)) :
 def cauchyState (f : Term F Γ (realTy ι)) (n : Term F Γ Ty.nat) : Term F Γ Ty.nat :=
   Term.app3 (.prec Ty.nat) (cauchyBase f) (cauchyStep f) n
 
-/-- The value component of the state — this is `cauchyfy f n`. -/
-def cVal (f : Term F Γ (realTy ι)) (n : Term F Γ Ty.nat) : Term F Γ Ty.nat :=
-  .app Term.fst_pair (cauchyState f n)
-
-/-- The violation-flag component of the state: `0` while the Cauchy check has held at every
-index so far, `1` from the first failure onwards. -/
-def cFlag (f : Term F Γ (realTy ι)) (n : Term F Γ Ty.nat) : Term F Γ Ty.nat :=
-  .app Term.snd_pair (cauchyState f n)
+-- The state's two components are `fst_pair (cauchyState f n)` — the value, which is
+-- `cauchyfy f n` — and `snd_pair (cauchyState f n)` — the violation flag, `0` while the
+-- Cauchy check has held at every index so far and `1` from the first failure onwards.
+-- They are deliberately *not* given names: `prw` finds its pattern by descending through
+-- `Term.app`/`app2`/`app3` nodes, and a named wrapper would hide `cauchyState` from it.
 
 end Term
 
@@ -486,16 +483,18 @@ def cauchyStep_unfold (f : Term F Γ (realTy ι)) (st k : Term F Γ Ty.nat) :
 def cauchyState_succ_unfold (f : Term F Γ (realTy ι)) (n : Term F Γ Ty.nat) :
     Derivable F EqX al Premises
       (Formula.eq0 (Term.cauchyState f (.app .succ n))
-        (Term.app3 Term.ite_nat (Term.cFlag f n) (Term.cauchyState f n)
+        (Term.app3 Term.ite_nat (.app Term.snd_pair (Term.cauchyState f n))
+          (Term.cauchyState f n)
           (Term.app3 Term.ite_nat (.app Term.sg_bar (Term.cauchy_check_at f n))
             (Term.app2 Term.pair (.app f (.app .succ n)) .zero)
-            (Term.app2 Term.pair (Term.cVal f n) (.app .succ .zero))))) :=
+            (Term.app2 Term.pair (.app Term.fst_pair (Term.cauchyState f n))
+              (.app .succ .zero))))) :=
   qtrans (cauchyState_succ f n) (cauchyStep_unfold adm f (Term.cauchyState f n) n)
 
 /-- Once the flag is set the state freezes. -/
 def cauchyState_frozen (f : Term F Γ (realTy ι)) (n : Term F Γ Ty.nat) :
     Derivable F EqX al Premises
-      (Formula.eq0 (Term.cFlag f n) (.app .succ .zero) →ᶠ
+      (Formula.eq0 (.app Term.snd_pair (Term.cauchyState f n)) (.app .succ .zero) →ᶠ
        Formula.eq0 (Term.cauchyState f (.app .succ n)) (Term.cauchyState f n)) := by
   pmode
   pintro h
@@ -506,7 +505,7 @@ def cauchyState_frozen (f : Term F Γ (realTy ι)) (n : Term F Γ Ty.nat) :
 /-- Flag clear and the Cauchy check passing at `n`: the next value is `f (n+1)`. -/
 def cauchyState_advance (f : Term F Γ (realTy ι)) (n : Term F Γ Ty.nat) :
     Derivable F EqX al Premises
-      (Formula.eq0 (Term.cFlag f n) .zero
+      (Formula.eq0 (.app Term.snd_pair (Term.cauchyState f n)) .zero
         ∧ᶠ Formula.eq0 (.app Term.sg_bar (Term.cauchy_check_at f n)) (.app .succ .zero) →ᶠ
        Formula.eq0 (Term.cauchyState f (.app .succ n))
          (Term.app2 Term.pair (.app f (.app .succ n)) .zero)) := by
@@ -521,10 +520,11 @@ def cauchyState_advance (f : Term F Γ (realTy ι)) (n : Term F Γ Ty.nat) :
 /-- Flag clear and the Cauchy check failing at `n`: the value freezes and the flag is set. -/
 def cauchyState_trip (f : Term F Γ (realTy ι)) (n : Term F Γ Ty.nat) :
     Derivable F EqX al Premises
-      (Formula.eq0 (Term.cFlag f n) .zero
+      (Formula.eq0 (.app Term.snd_pair (Term.cauchyState f n)) .zero
         ∧ᶠ Formula.eq0 (.app Term.sg_bar (Term.cauchy_check_at f n)) .zero →ᶠ
        Formula.eq0 (Term.cauchyState f (.app .succ n))
-         (Term.app2 Term.pair (Term.cVal f n) (.app .succ .zero))) := by
+         (Term.app2 Term.pair (.app Term.fst_pair (Term.cauchyState f n))
+           (.app .succ .zero))) := by
   pmode
   pintro hyp
   pdestruct hyp with h0 h1
@@ -535,13 +535,15 @@ def cauchyState_trip (f : Term F Γ (realTy ι)) (n : Term F Γ Ty.nat) :
 
 /-- The flag starts clear. -/
 def cFlag_zero (f : Term F Γ (realTy ι)) :
-    Derivable F EqX al Premises (Formula.eq0 (Term.cFlag f Term.zero) .zero) :=
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.snd_pair (Term.cauchyState f Term.zero)) .zero) :=
   qtrans (snd_pair_congr (cauchyState_zero f))
     (snd_pair_pair adm (.app f .zero) Term.zero)
 
 /-- The value starts at `f 0`. -/
 def cVal_zero (f : Term F Γ (realTy ι)) :
-    Derivable F EqX al Premises (Formula.eq0 (Term.cVal f Term.zero) (.app f .zero)) :=
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.fst_pair (Term.cauchyState f Term.zero)) (.app f .zero)) :=
   qtrans (fst_pair_congr (cauchyState_zero f))
     (fst_pair_pair adm (.app f .zero) Term.zero)
 
@@ -550,6 +552,85 @@ def cauchyfy_zero (f : Term F Γ (realTy ι)) :
     Derivable F EqX al Premises
       (Formula.eq0 (Term.app2 Term.cauchyfy f Term.zero) (.app f .zero)) :=
   qtrans (cauchyfy_unfold adm f Term.zero) (cVal_zero adm f)
+
+-- ── The invariant ──────────────────────────────────────────────────────────
+--
+-- Everything above is one step of the recursion. This is the induction: at every index the
+-- state is in one of exactly two shapes. Without it nothing pins the flag down to `{0,1}`,
+-- and `ite_nat` on anything else computes garbage.
+
+/-- The invariant formula, in context `[n, …Γ]`. -/
+private def invF (f : Term F Γ (realTy ι)) : Formula F (Ty.nat :: Γ) :=
+  (Formula.eq0 (.app Term.snd_pair (Term.cauchyState f.weaken (.var .vz))) .zero
+      ∧ᶠ Formula.eq0 (.app Term.fst_pair (Term.cauchyState f.weaken (.var .vz)))
+          (.app f.weaken (.var .vz)))
+    ∨ᶠ Formula.eq0 (.app Term.snd_pair (Term.cauchyState f.weaken (.var .vz)))
+        (.app .succ .zero)
+
+/-- The invariant at an explicit index. -/
+private abbrev invAt (f : Term F Γ (realTy ι)) (s : Term F Γ Ty.nat) : Formula F Γ :=
+  (Formula.eq0 (.app Term.snd_pair (Term.cauchyState f s)) .zero
+      ∧ᶠ Formula.eq0 (.app Term.fst_pair (Term.cauchyState f s)) (.app f s))
+    ∨ᶠ Formula.eq0 (.app Term.snd_pair (Term.cauchyState f s)) (.app .succ .zero)
+
+private theorem invF_subst0 (f : Term F Γ (realTy ι)) (s : Term F Γ Ty.nat) :
+    (invF f).subst0 s = invAt f s := by
+  simp only [invF, invAt, Term.cauchyState, Term.cauchyBase, Term.cauchyStep,
+    Term.cauchy_check_at, Formula.subst0, Formula.substF, Term.subst,
+    Term.subst0_map, Term.Subst.ext, Term.app2, Term.app3,
+    Term.weaken_subst_ext, Term.weaken_var, subst_subst0_map_weaken, closed_subst]
+
+private theorem invF_substVar0 (f : Term F Γ (realTy ι)) :
+    Formula.substVar0 (invF f) (.app .succ (.var .vz)) =
+      invAt f.weaken (.app .succ (.var .vz)) := by
+  simp only [invF, invAt, Term.cauchyState, Term.cauchyBase, Term.cauchyStep,
+    Term.cauchy_check_at, Formula.substVar0, Formula.substF, Term.subst,
+    Term.substVar0_map, Term.Subst.ext, Term.app2, Term.app3,
+    Term.weaken_subst_ext, Term.weaken_var, weaken_substVar0, closed_subst]
+
+/-- **The `cauchyfy` invariant.** At every index the state is in one of exactly two shapes:
+either the flag is clear and the value is `f n` verbatim, or the flag is set. Nothing else
+about `cauchyfy` can be proved without this — in particular nothing pins the flag down to
+`{0, 1}`, and `ite_nat` applied to anything else computes garbage. -/
+def cauchy_inv (f : Term F Γ (realTy ι)) :
+    Derivable F EqX al Premises (Formula.all Ty.nat (invF f)) :=
+  let base : Derivable F EqX al Premises ((invF f).subst0 Term.zero) :=
+    invF_subst0 f Term.zero ▸
+      Derivable.mp (Derivable.mp (cVal_zero adm f)
+        (Derivable.mp (cFlag_zero adm f) and_intro)) .or_weak
+  let fw : Term F (Ty.nat :: Γ) (realTy ι) := f.weaken
+  let nv : Term F (Ty.nat :: Γ) Ty.nat := .var .vz
+  let step : Derivable F EqX al Premises
+      (invF f →ᶠ Formula.substVar0 (invF f) (.app .succ (.var .vz))) :=
+    invF_substVar0 f ▸ (by
+      pmode
+      pintro ih
+      pcases ih with hL | hR
+      · pdestruct hL with h0 _hv
+        pfrom hsg := sg_bar_cases adm (Term.cauchy_check_at fw nv)
+        pcases hsg with hs1 | hs0
+        · -- the Cauchy check passes at `n`: the value advances to `f (n+1)`
+          pconj h0 hs1 with hboth
+          papplym (cauchyState_advance adm fw nv) in hboth with hst
+          pleft
+          psplit
+          · prwby hst
+            pthm (snd_pair_pair adm (.app fw (.app .succ nv)) Term.zero)
+          · prwby hst
+            pthm (fst_pair_pair adm (.app fw (.app .succ nv)) Term.zero)
+        · -- the check fails: the flag trips
+          pconj h0 hs0 with hboth
+          papplym (cauchyState_trip adm fw nv) in hboth with hst
+          pright
+          prwby hst
+          pthm (snd_pair_pair adm (.app Term.fst_pair (Term.cauchyState fw nv))
+            (.app .succ .zero))
+      · -- already tripped: the state freezes, so the flag stays set
+        papplym (cauchyState_frozen adm fw nv) in hR with hst
+        pright
+        prwby hst
+        pexact hR)
+  .induction base (univ_gen step)
 
 end Cauchyfy
 
