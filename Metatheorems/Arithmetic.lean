@@ -2375,13 +2375,15 @@ def qtrans {a b c : Term F Γ Ty.nat}
     Derivable F EqX al Premises (Formula.eq0 a c) :=
   .mp (.mp h₂ (.mp h₁ and_intro)) .trans0
 
-private def monus_congr_fst {s t : Term F Γ Ty.nat}
+/-- Congruence for `monus` in its first argument. -/
+def monus_congr_fst {s t : Term F Γ Ty.nat}
     (h : Derivable F EqX al Premises (Formula.eq0 s t)) (u : Term F Γ Ty.nat) :
     Derivable F EqX al Premises
       (Formula.eq0 (Term.app2 Term.monus s u) (Term.app2 Term.monus t u)) :=
   qfer_no_premise_nat_nf h (monus_subst0_lw_nf u s) (monus_subst0_lw_nf u t)
 
-private def monus_congr_snd (u : Term F Γ Ty.nat) {s t : Term F Γ Ty.nat}
+/-- Congruence for `monus` in its second argument. -/
+def monus_congr_snd (u : Term F Γ Ty.nat) {s t : Term F Γ Ty.nat}
     (h : Derivable F EqX al Premises (Formula.eq0 s t)) :
     Derivable F EqX al Premises
       (Formula.eq0 (Term.app2 Term.monus u s) (Term.app2 Term.monus u t)) :=
