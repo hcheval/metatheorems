@@ -7548,6 +7548,79 @@ private def succ_pd_den_mul (a c : Term F Γ Ty.nat) :
   let h1 := succ_congr (pd_congr h_prod)
   .mp (.mp (.mp h_prod .sym0) (.mp (.mp (.mp h_core (.mp h1 and_intro)) .trans0) and_intro)) .trans0
 
+-- ── `mul_Q` component lemmas ───────────────────────────────────────────────
+--
+-- The `body`/`body_eq`/`nf`/`lam2_correct_nf` unfolding is rebuilt inline sixteen times in
+-- this file, once per proof that needs it. These name it once for `mul_Q`, which is what
+-- makes a proof about `mul_Q x y` reason about its numerator, denominator and sign directly.
+
+/-- The body `mul_Q` compiles to, in the two-variable context. -/
+private def mul_Q_body {Γ : Ctx ι} : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat :=
+  Term.app3 Term.rat_encode
+    (Term.app Term.sg_bar (Term.app2 Term.abs_diff
+      (Term.app Term.rat_sign (.var (.vs .vz)))
+      (Term.app Term.rat_sign (.var .vz))))
+    (Term.app2 Term.mul
+      (Term.app Term.rat_num (.var (.vs .vz)))
+      (Term.app Term.rat_num (.var .vz)))
+    (Term.app Term.pd (Term.app2 Term.mul
+      (Term.app Term.rat_den (.var (.vs .vz)))
+      (Term.app Term.rat_den (.var .vz))))
+
+/-- `mul_Q x y` in encoded form: sign, numerator and denominator spelled out. -/
+def mul_Q_unfold (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul_Q x y)
+        (Term.app3 Term.rat_encode
+          (Term.app Term.sg_bar (Term.app2 Term.abs_diff
+            (.app Term.rat_sign x) (.app Term.rat_sign y)))
+          (Term.app2 Term.mul (.app Term.rat_num x) (.app Term.rat_num y))
+          (.app Term.pd (Term.app2 Term.mul
+            (.app Term.rat_den x) (.app Term.rat_den y))))) :=
+  have body_eq : (Term.mul_Q : Term F Γ _) = Term.lam (Term.lam mul_Q_body) := by rfl
+  have nf : ((mul_Q_body : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat).subst0 (y.weaken)).subst0 x =
+      Term.app3 Term.rat_encode
+        (Term.app Term.sg_bar (Term.app2 Term.abs_diff
+          (.app Term.rat_sign x) (.app Term.rat_sign y)))
+        (Term.app2 Term.mul (.app Term.rat_num x) (.app Term.rat_num y))
+        (.app Term.pd (Term.app2 Term.mul
+          (.app Term.rat_den x) (.app Term.rat_den y))) := by
+    qnorm [mul_Q_body]
+  body_eq ▸ lam2_correct_nf adm mul_Q_body x y nf
+
+/-- The numerator of a product is the product of the numerators. -/
+def rat_num_mul_Q (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_num (Term.app2 Term.mul_Q x y))
+        (Term.app2 Term.mul (.app Term.rat_num x) (.app Term.rat_num y))) := by
+  pmode
+  prw (mul_Q_unfold adm x y)
+  pthm (rat_num_rat_encode adm _ _ _ (isEven_cases adm _))
+
+/-- The denominator of a product is the product of the denominators. The `pd`/`succ` pair
+cancels because a denominator is always a successor. -/
+def rat_den_mul_Q (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_den (Term.app2 Term.mul_Q x y))
+        (Term.app2 Term.mul (.app Term.rat_den x) (.app Term.rat_den y))) := by
+  pmode
+  prw (mul_Q_unfold adm x y)
+  prw (rat_den_rat_encode adm _ _ _)
+  pthm (succ_pd_den_mul adm x y)
+
+/-- The sign of a product, reduced to the parity form the sign lemmas work with. -/
+def rat_sign_mul_Q (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_sign (Term.app2 Term.mul_Q x y))
+        (.app Term.isEven (Term.app2 Term.monus
+          (Term.app2 Term.mul (Term.ofNat 2)
+            (Term.app2 Term.mul (.app Term.rat_num x) (.app Term.rat_num y)))
+          (.app Term.isEven (Term.app Term.sg_bar (Term.app2 Term.abs_diff
+            (.app Term.rat_sign x) (.app Term.rat_sign y))))))) := by
+  pmode
+  prw (mul_Q_unfold adm x y)
+  pthm (rat_sign_rat_encode_unfold adm _ _ _)
+
 /-- `2·n =₀ n + n`. Written out twice inline inside `rat_sign_rat_encode_pos/neg`; pulled out
 here because the sign half of `mul_Q_right_congr` needs it too. -/
 private def two_mul_eq_add (n : Term F Γ Ty.nat) :
@@ -7663,30 +7736,11 @@ private def mul_Q_right_congr :
       (Formula.eq0 (Term.app2 Term.mul_Q a d) (Term.app3 Term.rat_encode sign_ad num_ad den_ad)) :=
     body_eq ▸ lam2_correct_nf adm body a d nf_ad
   -- Component equalities for mac
-  let h_num_ac : Derivable F EqX al Premises (Formula.eq0 (.app Term.rat_num mac) num_ac) :=
-    .mp (.mp (rat_num_rat_encode adm sign_ac num_ac den_ac (isEven_cases adm sign_ac))
-      (.mp (rat_num_congr unfold_ac) and_intro)) .trans0
-  let h_den_ac : Derivable F EqX al Premises
-      (Formula.eq0 (.app Term.rat_den mac) (.app .succ den_ac)) :=
-    .mp (.mp (rat_den_rat_encode adm sign_ac num_ac den_ac)
-      (.mp (rat_den_congr unfold_ac) and_intro)) .trans0
-  -- S(pd(da*dc)) = da*dc
-  let h_spd_ac := succ_pd_den_mul adm a c
-  -- rat_den(mac) = da*dc
-  let h_den_ac_eq : Derivable F EqX al Premises
-      (Formula.eq0 (.app Term.rat_den mac) (Term.app2 Term.mul da dc)) :=
-    .mp (.mp h_spd_ac (.mp h_den_ac and_intro)) .trans0
-  -- Component equalities for mad (symmetric)
-  let h_num_ad : Derivable F EqX al Premises (Formula.eq0 (.app Term.rat_num mad) num_ad) :=
-    .mp (.mp (rat_num_rat_encode adm sign_ad num_ad den_ad (isEven_cases adm sign_ad))
-      (.mp (rat_num_congr unfold_ad) and_intro)) .trans0
-  let h_den_ad : Derivable F EqX al Premises
-      (Formula.eq0 (.app Term.rat_den mad) (.app .succ den_ad)) :=
-    .mp (.mp (rat_den_rat_encode adm sign_ad num_ad den_ad)
-      (.mp (rat_den_congr unfold_ad) and_intro)) .trans0
-  let h_den_ad_eq : Derivable F EqX al Premises
-      (Formula.eq0 (.app Term.rat_den mad) (Term.app2 Term.mul da dd)) :=
-    .mp (.mp (succ_pd_den_mul adm a d) (.mp h_den_ad and_intro)) .trans0
+  -- Component equalities, straight from the named lemmas.
+  let h_num_ac := rat_num_mul_Q adm a c
+  let h_den_ac_eq := rat_den_mul_Q adm a c
+  let h_num_ad := rat_num_mul_Q adm a d
+  let h_den_ad_eq := rat_den_mul_Q adm a d
   -- ═══ Extract from hypothesis eq_Q(c,d) ═══
   -- Unfold eq_Q_dec(c,d) to |nc*dd - nd*dc| + |sc-sd|*sg(nc+nd)
   let eqd_body : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat :=
