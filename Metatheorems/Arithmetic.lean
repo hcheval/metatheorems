@@ -2478,6 +2478,62 @@ def pd_mul (m k : Term F Γ Ty.nat) :
       Term.app2, mul_closed_subst', monus_closed_subst', pd_closed_subst, kw_subst0]
   inst_nf ▸ .mp (Derivable.induction base (univ_gen step_body)) (.forall_ax m)
 
+/-- `(x ∸ y) · k =₀ x·k ∸ y·k`. By induction on `y`: the successor step turns the left side
+into `(x∸y)·k ∸ k` by `monus_succ` and `pd_mul`, and the right side into `(x·k ∸ y·k) ∸ k` by
+`mul_succ_l` and `monus_monus`; the induction hypothesis matches the two. -/
+def monus_mul_distrib (x y k : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (Formula.eq0
+      (Term.app2 Term.mul (Term.app2 Term.monus x y) k)
+      (Term.app2 Term.monus (Term.app2 Term.mul x k) (Term.app2 Term.mul y k))) :=
+  let xw := x.weaken (σ := Ty.nat)
+  let kw := k.weaken (σ := Ty.nat)
+  have xw_subst0 : ∀ s : Term F Γ Ty.nat,
+      Term.subst (fun {τ} ↦ Term.subst0_map s) x.weaken = x := Term.weaken_subst0 x
+  have kw_subst0 : ∀ s : Term F Γ Ty.nat,
+      Term.subst (fun {τ} ↦ Term.subst0_map s) k.weaken = k := Term.weaken_subst0 k
+  let A : Formula F (Ty.nat :: Γ) :=
+    Formula.eq0 (Term.app2 Term.mul (Term.app2 Term.monus xw (.var .vz)) kw)
+      (Term.app2 Term.monus (Term.app2 Term.mul xw kw) (Term.app2 Term.mul (.var .vz) kw))
+  have base_nf : A.subst0 Term.zero =
+      Formula.eq0 (Term.app2 Term.mul (Term.app2 Term.monus x Term.zero) k)
+        (Term.app2 Term.monus (Term.app2 Term.mul x k) (Term.app2 Term.mul Term.zero k)) := by
+    simp only [A, xw, kw, Formula.subst0, Formula.substF, Term.subst, Term.subst0_map,
+      Term.app2, mul_closed_subst', monus_closed_subst', xw_subst0, kw_subst0]
+  have base := base_nf ▸ (
+    -- both sides are `x·k`
+    let lhs := mul_congr_l (monus_zero adm x) k
+    let rhs := qtrans (monus_congr_snd (Term.app2 Term.mul x k) (mul_zero_l adm k))
+      (monus_zero adm (Term.app2 Term.mul x k))
+    qtrans lhs (.mp rhs .sym0))
+  have step_nf : Formula.substVar0 A (.app .succ (.var .vz)) =
+      Formula.eq0 (Term.app2 Term.mul (Term.app2 Term.monus xw (.app .succ (.var .vz))) kw)
+        (Term.app2 Term.monus (Term.app2 Term.mul xw kw)
+          (Term.app2 Term.mul (.app .succ (.var .vz)) kw)) := by
+    simp only [A, xw, kw, Formula.substVar0, Formula.substF, Term.subst, Term.substVar0_map,
+      Term.app2, mul_closed_subst', monus_closed_subst', weaken_substVar0]
+  have step_body := step_nf ▸ (
+    let yv : Term F (Ty.nat :: Γ) Ty.nat := .var .vz
+    let xy := Term.app2 Term.monus xw yv
+    let xk := Term.app2 Term.mul xw kw
+    let yk := Term.app2 Term.mul yv kw
+    -- (x ∸ Sy)·k = pd(x∸y)·k = (x∸y)·k ∸ k
+    let u1 := qtrans (mul_congr_l (monus_succ adm xw yv) kw) (pd_mul adm xy kw)
+    -- IH → (x∸y)·k ∸ k = (x·k ∸ y·k) ∸ k
+    let u2 := qfer_nat_nf (by rfl) (by rfl) I_comb
+      (monus_subst0_lw_nf kw (Term.app2 Term.mul xy kw))
+      (monus_subst0_lw_nf kw (Term.app2 Term.monus xk yk))
+    -- x·k ∸ (Sy)·k = x·k ∸ (y·k + k) = (x·k ∸ y·k) ∸ k, reversed
+    let u3 := .mp (qtrans (monus_congr_snd xk (mul_succ_l adm yv kw))
+      (monus_monus adm xk yk kw)) .sym0
+    let c1 := .syllogism (pair_h (weaken_intro_h u1) u2) .trans0
+    .syllogism (pair_h c1 (weaken_intro_h u3)) .trans0)
+  have inst_nf : A.subst0 y =
+      Formula.eq0 (Term.app2 Term.mul (Term.app2 Term.monus x y) k)
+        (Term.app2 Term.monus (Term.app2 Term.mul x k) (Term.app2 Term.mul y k)) := by
+    simp only [A, xw, kw, Formula.subst0, Formula.substF, Term.subst, Term.subst0_map,
+      Term.app2, mul_closed_subst', monus_closed_subst', xw_subst0, kw_subst0]
+  inst_nf ▸ .mp (Derivable.induction base (univ_gen step_body)) (.forall_ax y)
+
 end ArithProps
 
 -- ============================================================================
