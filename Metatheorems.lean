@@ -8,6 +8,7 @@ import Metatheorems.Semantics
 import Metatheorems.Dialectica
 import Metatheorems.NDTranslation
 import Metatheorems.RationalNumbers
+import Metatheorems.RealNumbers
 import Metatheorems.ProofMode.Packing
 import Metatheorems.ProofMode.Display
 import Metatheorems.ProofMode.Tactics

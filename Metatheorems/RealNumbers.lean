@@ -183,9 +183,6 @@ variable {Γ Δ : Ctx ι} (σ : Term.Subst F Γ Δ)
     (Term.embed_nat_R : Term F Γ _).subst σ = Term.embed_nat_R := by rfl
 @[simp] private theorem neg_R_closed_subst :
     (Term.neg_R : Term F Γ _).subst σ = Term.neg_R := by rfl
-private theorem add_closed_subst :
-    (Term.add : Term F Γ _).subst σ = Term.add := by rfl
-
 @[simp] private theorem add_R_closed_subst :
     (Term.add_R : Term F Γ _).subst σ = Term.add_R := by
   simp only [Term.add_R, Term.subst, Term.Subst.ext, Term.app2,
