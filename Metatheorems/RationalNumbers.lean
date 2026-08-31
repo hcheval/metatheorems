@@ -8964,6 +8964,104 @@ def negN_add_Q (x y : Term F Γ Ty.nat) :
       (mul_congr_r _ (rat_num_add_Q adm x y)))
     (signBit_compl_mul adm (addQ_sign x y) (addQ_num x y) (addQ_sign_cases adm x y))
 
+-- ── Signed parts of a negation ─────────────────────────────────────────────
+--
+-- `neg_Q` swaps the two parts. Together with the fact that it leaves the denominator alone,
+-- this is what turns `sub_Q` into something the signed identity can be applied to.
+
+/-- The complement of a bit is a bit. -/
+private def monus_one_cases (s : Term F Γ Ty.nat)
+    (hs : Derivable F EqX al Premises
+      (Formula.eq0 s (.app .succ .zero) ∨ᶠ Formula.eq0 s .zero)) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.monus (.app .succ .zero) s) (.app .succ .zero)
+        ∨ᶠ Formula.eq0 (Term.app2 Term.monus (.app .succ .zero) s) .zero) := by
+  pmode
+  pfrom hs' := hs
+  pcases hs' with h1 | h0
+  · pright
+    prwby h1
+    pthm (monus_self adm (.app .succ .zero))
+  · pleft
+    prwby h0
+    pthm (monus_zero adm (.app .succ .zero))
+
+/-- `1 ∸ (1 ∸ s) =₀ s` for a bit `s`. -/
+private def monus_one_involutive (s : Term F Γ Ty.nat)
+    (hs : Derivable F EqX al Premises
+      (Formula.eq0 s (.app .succ .zero) ∨ᶠ Formula.eq0 s .zero)) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.monus (.app .succ .zero)
+        (Term.app2 Term.monus (.app .succ .zero) s)) s) := by
+  pmode
+  pfrom hs' := hs
+  pcases hs' with h1 | h0
+  · prwby h1
+    prw (monus_self adm (.app .succ .zero))
+    pthm (monus_zero adm (.app .succ .zero))
+  · prwby h0
+    prw (monus_zero adm (.app .succ .zero))
+    pthm (monus_self adm (.app .succ .zero))
+
+/-- `neg_Q z` in encoded form. -/
+private def neg_Q_unfold (z : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.neg_Q z)
+        (Term.app3 Term.rat_encode
+          (Term.app2 Term.monus (.app .succ .zero) (.app Term.rat_sign z))
+          (.app Term.rat_num z) (.app Term.snd_pair z))) :=
+  lam_correct_nf
+    (Term.app3 Term.rat_encode
+      (Term.app2 Term.monus (.app .succ .zero) (.app Term.rat_sign (.var .vz)))
+      (.app Term.rat_num (.var .vz)) (.app Term.snd_pair (.var .vz))
+      : Term F (Ty.nat :: Γ) _) z (by qnorm [Term.subst0])
+
+/-- Negation leaves the denominator alone. -/
+def rat_den_neg_Q (z : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_den (.app Term.neg_Q z)) (.app Term.rat_den z)) :=
+  qtrans (qtrans (rat_den_congr (neg_Q_unfold z))
+      (rat_den_rat_encode adm _ _ (.app Term.snd_pair z)))
+    (.mp (rat_den_unfold_eq z) .sym0)
+
+/-- Negation turns the negative part into the positive one. -/
+def posN_neg_Q (z : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (posN (.app Term.neg_Q z)) (negN z)) :=
+  let S := Term.app2 Term.monus (.app .succ .zero) (.app Term.rat_sign z)
+  let N : Term F Γ Ty.nat := .app Term.rat_num z
+  let D : Term F Γ Ty.nat := .app Term.snd_pair z
+  let E := Term.app3 Term.rat_encode S N D
+  let hS := monus_one_cases adm (.app Term.rat_sign z) (rat_sign_cases adm z)
+  qtrans (qtrans (mul_congr_l (rat_sign_congr (neg_Q_unfold z))
+      (.app Term.rat_num (.app Term.neg_Q z)))
+      (mul_congr_r (.app Term.rat_sign E) (rat_num_congr (neg_Q_unfold z))))
+    (qtrans (qtrans (mul_congr_l (rat_sign_rat_encode_unfold adm S N D)
+        (.app Term.rat_num E))
+        (mul_congr_r _ (rat_num_rat_encode adm S N D (isEven_cases adm S))))
+      (signBit_mul adm S N hS))
+
+/-- …and the positive part into the negative one. -/
+def negN_neg_Q (z : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (negN (.app Term.neg_Q z)) (posN z)) :=
+  let S := Term.app2 Term.monus (.app .succ .zero) (.app Term.rat_sign z)
+  let N : Term F Γ Ty.nat := .app Term.rat_num z
+  let D : Term F Γ Ty.nat := .app Term.snd_pair z
+  let E := Term.app3 Term.rat_encode S N D
+  let hS := monus_one_cases adm (.app Term.rat_sign z) (rat_sign_cases adm z)
+  qtrans (qtrans (mul_congr_l
+      (monus_congr_snd (.app .succ .zero) (rat_sign_congr (neg_Q_unfold z)))
+      (.app Term.rat_num (.app Term.neg_Q z)))
+      (mul_congr_r _ (rat_num_congr (neg_Q_unfold z))))
+    (qtrans (qtrans (mul_congr_l
+        (monus_congr_snd (.app .succ .zero) (rat_sign_rat_encode_unfold adm S N D))
+        (.app Term.rat_num E))
+        (mul_congr_r _ (rat_num_rat_encode adm S N D (isEven_cases adm S))))
+      (qtrans (signBit_compl_mul adm S N hS)
+        (mul_congr_l (monus_one_involutive adm (.app Term.rat_sign z)
+          (rat_sign_cases adm z)) N)))
+
 -- `addQ_same`/`addQ_cross` are `def`s, so a rewrite cannot see inside them. These expose the
 -- definitions as derivable equations — `refl0` at the stated type, which is a single delta of
 -- a small definition, not a `subst` reduction.
