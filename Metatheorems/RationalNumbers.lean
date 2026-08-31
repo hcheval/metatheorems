@@ -7874,15 +7874,6 @@ private def two_mul_eq_add (n : Term F Γ Ty.nat) :
   let h_m1 := qtrans (mul_comm adm (.app .succ .zero) n) (mul_one_r adm n)
   qtrans h_ms (add_congr_l h_m1 n)
 
-/-- `(a + b)·x =₀ a·x + b·x`. `Arithmetic.lean` has `mul_add` on the other side only. -/
-private def add_mul (a b x : Term F Γ Ty.nat) :
-    Derivable F EqX al Premises
-      (Formula.eq0 (Term.app2 Term.mul (Term.app2 Term.add a b) x)
-        (Term.app2 Term.add (Term.app2 Term.mul a x) (Term.app2 Term.mul b x))) :=
-  let h3 := qtrans (add_congr_l (mul_comm adm x a) (Term.app2 Term.mul x b))
-    (add_congr_r (Term.app2 Term.mul a x) (mul_comm adm x b))
-  qtrans (qtrans (mul_comm adm (Term.app2 Term.add a b) x) (mul_add adm x a b)) h3
-
 -- ── Positivity ─────────────────────────────────────────────────────────────
 --
 -- `0_ℚ <_ℚ p` is the shape every real-number side condition bottoms out in — `eq_R` is a

@@ -2587,6 +2587,42 @@ def sg_bar_monus_mul_succ (u v j : Term F Γ Ty.nat) :
     (r := .app Term.sg_bar (.var .vz)) rfl rfl
   qtrans h (sg_bar_mul_succ adm (Term.app2 Term.monus v u) j)
 
+/-- `|x − y| =₀ (x ∸ y) + (y ∸ x)` — the definition of `abs_diff`, as a derivation. It was
+built inline inside `abs_diff_eq_zero_iff`; named here because the distributivity below needs
+it. -/
+def abs_diff_unfold (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (Formula.eq0 (Term.app2 Term.abs_diff x y)
+      (Term.app2 Term.add (Term.app2 Term.monus x y) (Term.app2 Term.monus y x))) :=
+  lam2_correct_nf adm
+    (Term.app2 Term.add
+      (Term.app2 Term.monus (.var (.vs .vz)) (.var .vz))
+      (Term.app2 Term.monus (.var .vz) (.var (.vs .vz)))) x y (abs_diff_body_nf x y)
+
+/-- `(a + b)·x =₀ a·x + b·x`. `mul_add` is the same identity on the other side. -/
+def add_mul (a b x : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (Formula.eq0
+      (Term.app2 Term.mul (Term.app2 Term.add a b) x)
+      (Term.app2 Term.add (Term.app2 Term.mul a x) (Term.app2 Term.mul b x))) :=
+  let h3 := qtrans (add_congr_l (mul_comm adm x a) (Term.app2 Term.mul x b))
+    (add_congr_r (Term.app2 Term.mul a x) (mul_comm adm x b))
+  qtrans (qtrans (mul_comm adm (Term.app2 Term.add a b) x) (mul_add adm x a b)) h3
+
+/-- `|u − v| · k =₀ |u·k − v·k|`. Truncated subtraction distributes over multiplication on
+each of the two halves of `abs_diff`, and `add_mul` splits the sum. -/
+def abs_diff_mul_distrib (u v k : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (Formula.eq0
+      (Term.app2 Term.mul (Term.app2 Term.abs_diff u v) k)
+      (Term.app2 Term.abs_diff (Term.app2 Term.mul u k) (Term.app2 Term.mul v k))) :=
+  let uk := Term.app2 Term.mul u k
+  let vk := Term.app2 Term.mul v k
+  let e1 := mul_congr_l (abs_diff_unfold adm u v) k
+  let e2 := add_mul adm (Term.app2 Term.monus u v) (Term.app2 Term.monus v u) k
+  let e3 := qtrans
+    (add_congr_l (monus_mul_distrib adm u v k) (Term.app2 Term.mul (Term.app2 Term.monus v u) k))
+    (add_congr_r (Term.app2 Term.monus uk vk) (monus_mul_distrib adm v u k))
+  let e4 := .mp (abs_diff_unfold adm uk vk) .sym0
+  qtrans (qtrans (qtrans e1 e2) e3) e4
+
 end ArithProps
 
 -- ============================================================================
