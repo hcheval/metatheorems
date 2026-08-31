@@ -11232,6 +11232,211 @@ def lt_Q_mul_pos :
       pexact h1
   univ_gen (univ_gen core)
 
+-- ── Signed parts of a product ──────────────────────────────────────────────
+--
+-- Multiplication of signed pairs is the ordinary rule: `(p − n)(p' − n')` has positive part
+-- `p·p' + n·n'` and negative part `p·n' + n·p'`. Both are *polynomials* in the parts — no
+-- branch anywhere — which is what makes `mul_Q_assoc` a semiring rearrangement below.
+
+/-- The same-sign bit times the numerator product, split into parts. -/
+private def sameSign_mul_split (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0
+        (Term.app2 Term.mul
+          (.app Term.sg_bar (Term.app2 Term.abs_diff
+            (.app Term.rat_sign x) (.app Term.rat_sign y)))
+          (Term.app2 Term.mul (.app Term.rat_num x) (.app Term.rat_num y)))
+        (Term.app2 Term.add
+          (Term.app2 Term.mul (posN x) (posN y))
+          (Term.app2 Term.mul (negN x) (negN y)))) := by
+  pmode
+  prw (posN_unfold x)
+  prw (posN_unfold y)
+  prw (negN_unfold x)
+  prw (negN_unfold y)
+  pfrom hx := rat_sign_cases adm x
+  pcases hx with hx1 | hx0
+  · pfrom hy := rat_sign_cases adm y
+    pcases hy with hy1 | hy0
+    · prwby hx1
+      prwby hy1
+      prw (abs_diff_self adm (.app .succ .zero))
+      prw sg_bar_zero
+      prw (monus_self adm (.app .succ .zero))
+      prw (mul_one_l adm (.app Term.rat_num x))
+      prw (mul_one_l adm (.app Term.rat_num y))
+      prw (mul_zero_l adm (.app Term.rat_num x))
+      prw (mul_zero_l adm (.app Term.rat_num y))
+      prw (mul_zero_l adm Term.zero)
+      prw (add_zero_r adm (Term.app2 Term.mul
+        (.app Term.rat_num x) (.app Term.rat_num y)))
+      pthm (mul_one_l adm (Term.app2 Term.mul
+        (.app Term.rat_num x) (.app Term.rat_num y)))
+    · prwby hx1
+      prwby hy0
+      prw (abs_diff_zero_r adm (.app .succ .zero))
+      prw (sg_bar_succ adm Term.zero)
+      prw (monus_self adm (.app .succ .zero))
+      prw (monus_zero adm (.app .succ .zero))
+      prw (mul_one_l adm (.app Term.rat_num x))
+      prw (mul_one_l adm (.app Term.rat_num y))
+      prw (mul_zero_l adm (.app Term.rat_num x))
+      prw (mul_zero_l adm (.app Term.rat_num y))
+      prw (mul_zero adm (.app Term.rat_num x))
+      prw (add_zero_l adm Term.zero)
+      pthm (mul_zero_l adm (Term.app2 Term.mul
+        (.app Term.rat_num x) (.app Term.rat_num y)))
+  · pfrom hy := rat_sign_cases adm y
+    pcases hy with hy1 | hy0
+    · prwby hx0
+      prwby hy1
+      prw (abs_diff_comm adm Term.zero (.app .succ .zero))
+      prw (abs_diff_zero_r adm (.app .succ .zero))
+      prw (sg_bar_succ adm Term.zero)
+      prw (monus_zero adm (.app .succ .zero))
+      prw (monus_self adm (.app .succ .zero))
+      prw (mul_one_l adm (.app Term.rat_num x))
+      prw (mul_one_l adm (.app Term.rat_num y))
+      prw (mul_zero_l adm (.app Term.rat_num x))
+      prw (mul_zero_l adm (.app Term.rat_num y))
+      prw (mul_zero adm (.app Term.rat_num x))
+      prw (add_zero_l adm Term.zero)
+      pthm (mul_zero_l adm (Term.app2 Term.mul
+        (.app Term.rat_num x) (.app Term.rat_num y)))
+    · prwby hx0
+      prwby hy0
+      prw (abs_diff_self adm Term.zero)
+      prw sg_bar_zero
+      prw (monus_zero adm (.app .succ .zero))
+      prw (mul_zero_l adm (.app Term.rat_num x))
+      prw (mul_zero_l adm (.app Term.rat_num y))
+      prw (mul_one_l adm (.app Term.rat_num x))
+      prw (mul_one_l adm (.app Term.rat_num y))
+      prw (mul_zero_l adm Term.zero)
+      prw (add_zero_l adm (Term.app2 Term.mul
+        (.app Term.rat_num x) (.app Term.rat_num y)))
+      pthm (mul_one_l adm (Term.app2 Term.mul
+        (.app Term.rat_num x) (.app Term.rat_num y)))
+
+/-- The positive part of a product. -/
+def posN_mul_Q (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (posN (Term.app2 Term.mul_Q x y))
+        (Term.app2 Term.add
+          (Term.app2 Term.mul (posN x) (posN y))
+          (Term.app2 Term.mul (negN x) (negN y)))) :=
+  let M := Term.app2 Term.mul_Q x y
+  let S := (.app Term.sg_bar (Term.app2 Term.abs_diff
+    (.app Term.rat_sign x) (.app Term.rat_sign y)) : Term F Γ Ty.nat)
+  let N := Term.app2 Term.mul (.app Term.rat_num x) (.app Term.rat_num y)
+  qtrans (qtrans (mul_congr_l (rat_sign_mul_Q adm x y) (.app Term.rat_num M))
+      (mul_congr_r _ (rat_num_mul_Q adm x y)))
+    (qtrans (signBit_mul adm S N
+        (sg_bar_cases adm (Term.app2 Term.abs_diff
+          (.app Term.rat_sign x) (.app Term.rat_sign y))))
+      (sameSign_mul_split adm x y))
+
+/-- The complementary bit times the numerator product, split into parts. -/
+private def diffSign_mul_split (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0
+        (Term.app2 Term.mul
+          (Term.app2 Term.monus (.app .succ .zero)
+            (.app Term.sg_bar (Term.app2 Term.abs_diff
+              (.app Term.rat_sign x) (.app Term.rat_sign y))))
+          (Term.app2 Term.mul (.app Term.rat_num x) (.app Term.rat_num y)))
+        (Term.app2 Term.add
+          (Term.app2 Term.mul (posN x) (negN y))
+          (Term.app2 Term.mul (negN x) (posN y)))) := by
+  pmode
+  prw (posN_unfold x)
+  prw (posN_unfold y)
+  prw (negN_unfold x)
+  prw (negN_unfold y)
+  pfrom hx := rat_sign_cases adm x
+  pcases hx with hx1 | hx0
+  · pfrom hy := rat_sign_cases adm y
+    pcases hy with hy1 | hy0
+    · prwby hx1
+      prwby hy1
+      prw (abs_diff_self adm (.app .succ .zero))
+      prw sg_bar_zero
+      prw (monus_self adm (.app .succ .zero))
+      prw (mul_one_l adm (.app Term.rat_num x))
+      prw (mul_one_l adm (.app Term.rat_num y))
+      prw (mul_zero_l adm (.app Term.rat_num x))
+      prw (mul_zero_l adm (.app Term.rat_num y))
+      prw (mul_zero adm (.app Term.rat_num x))
+      prw (add_zero_l adm Term.zero)
+      pthm (mul_zero_l adm (Term.app2 Term.mul
+        (.app Term.rat_num x) (.app Term.rat_num y)))
+    · prwby hx1
+      prwby hy0
+      prw (abs_diff_zero_r adm (.app .succ .zero))
+      prw (sg_bar_succ adm Term.zero)
+      prw (monus_self adm (.app .succ .zero))
+      prw (monus_zero adm (.app .succ .zero))
+      prw (mul_one_l adm (.app Term.rat_num x))
+      prw (mul_one_l adm (.app Term.rat_num y))
+      prw (mul_zero_l adm (.app Term.rat_num x))
+      prw (mul_zero_l adm (.app Term.rat_num y))
+      prw (mul_zero_l adm Term.zero)
+      prw (add_zero_r adm (Term.app2 Term.mul
+        (.app Term.rat_num x) (.app Term.rat_num y)))
+      pthm (mul_one_l adm (Term.app2 Term.mul
+        (.app Term.rat_num x) (.app Term.rat_num y)))
+  · pfrom hy := rat_sign_cases adm y
+    pcases hy with hy1 | hy0
+    · prwby hx0
+      prwby hy1
+      prw (abs_diff_comm adm Term.zero (.app .succ .zero))
+      prw (abs_diff_zero_r adm (.app .succ .zero))
+      prw (sg_bar_succ adm Term.zero)
+      prw (monus_self adm (.app .succ .zero))
+      prw (monus_zero adm (.app .succ .zero))
+      prw (mul_one_l adm (.app Term.rat_num x))
+      prw (mul_one_l adm (.app Term.rat_num y))
+      prw (mul_zero_l adm (.app Term.rat_num x))
+      prw (mul_zero_l adm (.app Term.rat_num y))
+      prw (mul_zero_l adm Term.zero)
+      prw (add_zero_l adm (Term.app2 Term.mul
+        (.app Term.rat_num x) (.app Term.rat_num y)))
+      pthm (mul_one_l adm (Term.app2 Term.mul
+        (.app Term.rat_num x) (.app Term.rat_num y)))
+    · prwby hx0
+      prwby hy0
+      prw (abs_diff_self adm Term.zero)
+      prw sg_bar_zero
+      prw (monus_self adm (.app .succ .zero))
+      prw (monus_zero adm (.app .succ .zero))
+      prw (mul_one_l adm (.app Term.rat_num x))
+      prw (mul_one_l adm (.app Term.rat_num y))
+      prw (mul_zero_l adm (.app Term.rat_num x))
+      prw (mul_zero_l adm (.app Term.rat_num y))
+      prw (mul_zero adm (.app Term.rat_num x))
+      prw (add_zero_l adm Term.zero)
+      pthm (mul_zero_l adm (Term.app2 Term.mul
+        (.app Term.rat_num x) (.app Term.rat_num y)))
+
+/-- The negative part of a product. -/
+def negN_mul_Q (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (negN (Term.app2 Term.mul_Q x y))
+        (Term.app2 Term.add
+          (Term.app2 Term.mul (posN x) (negN y))
+          (Term.app2 Term.mul (negN x) (posN y)))) :=
+  let M := Term.app2 Term.mul_Q x y
+  let S := (.app Term.sg_bar (Term.app2 Term.abs_diff
+    (.app Term.rat_sign x) (.app Term.rat_sign y)) : Term F Γ Ty.nat)
+  let N := Term.app2 Term.mul (.app Term.rat_num x) (.app Term.rat_num y)
+  qtrans (qtrans (mul_congr_l
+      (monus_congr_snd (.app .succ .zero) (rat_sign_mul_Q adm x y)) (.app Term.rat_num M))
+      (mul_congr_r _ (rat_num_mul_Q adm x y)))
+    (qtrans (signBit_compl_mul adm S N
+        (sg_bar_cases adm (Term.app2 Term.abs_diff
+          (.app Term.rat_sign x) (.app Term.rat_sign y))))
+      (diffSign_mul_split adm x y))
+
 end RationalOrderedField
 
 end Metatheorems
