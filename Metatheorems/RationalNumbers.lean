@@ -7114,6 +7114,157 @@ def lt_Q {Γ : Ctx ι} (a b : Term F Γ Ty.nat) : Formula F Γ :=
 def le_Q {Γ : Ctx ι} (a b : Term F Γ Ty.nat) : Formula F Γ :=
   Formula.eq0 (Term.app2 Term.le_Q_dec a b) Term.zero
 
+-- ── Order characterisation ─────────────────────────────────────────────────
+--
+-- Both `<_ℚ` and `≤_ℚ` are decision terms about the *difference* `y −_ℚ x`: `<` asks that its
+-- sign bit is `1` and its numerator nonzero, `≤` that the sign bit is `1` *or* the numerator
+-- is zero. Everything below states that correspondence in both directions, so that later
+-- order proofs never have to unfold `lt_Q_dec`/`le_Q_dec` again. `subQ` names the difference.
+
+/-- The difference `y −_ℚ x`, which is what both order decision terms are about. Note the
+argument flip: `lt_Q x y` asks about `sub_Q y x`. -/
+private abbrev subQ (x y : Term F Γ Ty.nat) : Term F Γ Ty.nat := Term.app2 Term.sub_Q y x
+
+/-- The body `sub_Q` compiles to, in the two-variable context. -/
+private def sub_Q_body {Γ : Ctx ι} : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat :=
+  Term.app2 Term.add_Q (.var (.vs .vz)) (.app Term.neg_Q (.var .vz))
+
+/-- `x −_ℚ y` is `x +_ℚ (−_ℚ y)`. -/
+def sub_Q_unfold (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.sub_Q x y)
+        (Term.app2 Term.add_Q x (.app Term.neg_Q y))) :=
+  have body_eq : (Term.sub_Q : Term F Γ _) = Term.lam (Term.lam sub_Q_body) := by rfl
+  have nf : ((sub_Q_body : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat).subst0 (y.weaken)).subst0 x =
+      Term.app2 Term.add_Q x (.app Term.neg_Q y) := by
+    qnorm [sub_Q_body]
+  body_eq ▸ lam2_correct_nf adm sub_Q_body x y nf
+
+/-- The body `lt_Q_dec` compiles to, in the two-variable context. -/
+private def lt_Q_dec_body {Γ : Ctx ι} : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat :=
+  let diff := Term.app2 Term.sub_Q (.var .vz) (.var (.vs .vz))
+  Term.app2 Term.add
+    (Term.app2 Term.abs_diff (.app Term.rat_sign diff) (.app .succ .zero))
+    (.app Term.sg_bar (.app Term.rat_num diff))
+
+/-- `lt_Q_dec x y` spelled out in terms of the difference `y −_ℚ x`. -/
+def lt_Q_dec_unfold (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.lt_Q_dec x y)
+        (Term.app2 Term.add
+          (Term.app2 Term.abs_diff (.app Term.rat_sign (subQ x y)) (.app .succ .zero))
+          (.app Term.sg_bar (.app Term.rat_num (subQ x y))))) :=
+  have body_eq : (Term.lt_Q_dec : Term F Γ _) = Term.lam (Term.lam lt_Q_dec_body) := by rfl
+  have nf : ((lt_Q_dec_body : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat).subst0 (y.weaken)).subst0 x =
+      Term.app2 Term.add
+        (Term.app2 Term.abs_diff (.app Term.rat_sign (subQ x y)) (.app .succ .zero))
+        (.app Term.sg_bar (.app Term.rat_num (subQ x y))) := by
+    qnorm [lt_Q_dec_body, subQ]
+  body_eq ▸ lam2_correct_nf adm lt_Q_dec_body x y nf
+
+/-- The body `le_Q_dec` compiles to, in the two-variable context. -/
+private def le_Q_dec_body {Γ : Ctx ι} : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat :=
+  let diff := Term.app2 Term.sub_Q (.var .vz) (.var (.vs .vz))
+  Term.app2 Term.mul
+    (Term.app2 Term.abs_diff (.app Term.rat_sign diff) (.app .succ .zero))
+    (.app Term.rat_num diff)
+
+/-- `le_Q_dec x y` spelled out in terms of the difference `y −_ℚ x`. -/
+def le_Q_dec_unfold (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.le_Q_dec x y)
+        (Term.app2 Term.mul
+          (Term.app2 Term.abs_diff (.app Term.rat_sign (subQ x y)) (.app .succ .zero))
+          (.app Term.rat_num (subQ x y)))) :=
+  have body_eq : (Term.le_Q_dec : Term F Γ _) = Term.lam (Term.lam le_Q_dec_body) := by rfl
+  have nf : ((le_Q_dec_body : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat).subst0 (y.weaken)).subst0 x =
+      Term.app2 Term.mul
+        (Term.app2 Term.abs_diff (.app Term.rat_sign (subQ x y)) (.app .succ .zero))
+        (.app Term.rat_num (subQ x y)) := by
+    qnorm [le_Q_dec_body, subQ]
+  body_eq ▸ lam2_correct_nf adm le_Q_dec_body x y nf
+
+/-- Both summands of `lt_Q_dec` vanish when `x <_ℚ y`. -/
+def lt_Q_parts (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (lt_Q x y →ᶠ
+        Formula.eq0 (Term.app2 Term.abs_diff
+          (.app Term.rat_sign (subQ x y)) (.app .succ .zero)) .zero
+        ∧ᶠ Formula.eq0 (.app Term.sg_bar (.app Term.rat_num (subQ x y))) .zero) :=
+  .syllogism
+    (.syllogism (pair_h (weaken_intro_h (.mp (lt_Q_dec_unfold adm x y) .sym0)) I_comb) .trans0)
+    (Derivable.mp (add_eq_zero_iff adm _ _) .and_weak)
+
+/-- `x <_ℚ y` makes the difference positively signed. -/
+def lt_Q_sign (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (lt_Q x y →ᶠ Formula.eq0 (.app Term.rat_sign (subQ x y)) (.app .succ .zero)) :=
+  .syllogism (.syllogism (lt_Q_parts adm x y) .and_weak) (abs_diff_zero_fwd adm _ _)
+
+/-- `x <_ℚ y` makes the difference nonzero. -/
+def lt_Q_num_ne (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (lt_Q x y →ᶠ ¬ᶠ(Formula.eq0 (.app Term.rat_num (subQ x y)) .zero)) :=
+  .syllogism (.syllogism (lt_Q_parts adm x y) and_proj2)
+    (Derivable.mp (sg_bar_eq_zero_iff adm _) .and_weak)
+
+/-- …and conversely: a positively signed nonzero difference *is* `<_ℚ`. -/
+def lt_Q_intro (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_sign (subQ x y)) (.app .succ .zero)
+        ∧ᶠ ¬ᶠ(Formula.eq0 (.app Term.rat_num (subQ x y)) .zero)
+        →ᶠ lt_Q x y) :=
+  let hA := Derivable.mp (abs_diff_eq_zero_iff adm
+    (.app Term.rat_sign (subQ x y)) (.app .succ .zero)) and_proj2
+  let hB := Derivable.mp (sg_bar_eq_zero_iff adm (.app Term.rat_num (subQ x y))) and_proj2
+  let hAB := Derivable.syllogism
+    (pair_h (.syllogism .and_weak hA) (.syllogism and_proj2 hB))
+    (Derivable.mp (add_eq_zero_iff adm _ _) and_proj2)
+  .syllogism hAB
+    (.syllogism (pair_h (weaken_intro_h (lt_Q_dec_unfold adm x y)) I_comb) .trans0)
+
+/-- `x ≤_ℚ y` holds as soon as the difference is positively signed. -/
+def le_Q_of_sign (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_sign (subQ x y)) (.app .succ .zero) →ᶠ le_Q x y) :=
+  let hA := Derivable.mp (abs_diff_eq_zero_iff adm
+    (.app Term.rat_sign (subQ x y)) (.app .succ .zero)) and_proj2
+  let hMul := Derivable.mp (mul_eq_zero_iff adm
+    (Term.app2 Term.abs_diff (.app Term.rat_sign (subQ x y)) (.app .succ .zero))
+    (.app Term.rat_num (subQ x y))) and_proj2
+  .syllogism (.syllogism (.syllogism hA .or_weak) hMul)
+    (.syllogism (pair_h (weaken_intro_h (le_Q_dec_unfold adm x y)) I_comb) .trans0)
+
+/-- `x ≤_ℚ y` also holds when the difference is zero — the `x =_ℚ y` case. -/
+def le_Q_of_num_zero (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_num (subQ x y)) .zero →ᶠ le_Q x y) :=
+  let hMul := Derivable.mp (mul_eq_zero_iff adm
+    (Term.app2 Term.abs_diff (.app Term.rat_sign (subQ x y)) (.app .succ .zero))
+    (.app Term.rat_num (subQ x y))) and_proj2
+  .syllogism (.syllogism or_inr hMul)
+    (.syllogism (pair_h (weaken_intro_h (le_Q_dec_unfold adm x y)) I_comb) .trans0)
+
+/-- …and conversely, `≤_ℚ` gives exactly that dichotomy. -/
+def le_Q_cases (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (le_Q x y →ᶠ
+        Formula.eq0 (.app Term.rat_sign (subQ x y)) (.app .succ .zero)
+        ∨ᶠ Formula.eq0 (.app Term.rat_num (subQ x y)) .zero) :=
+  let toMul : Derivable F EqX al Premises
+      (le_Q x y →ᶠ Formula.eq0 (Term.app2 Term.mul
+        (Term.app2 Term.abs_diff (.app Term.rat_sign (subQ x y)) (.app .succ .zero))
+        (.app Term.rat_num (subQ x y))) .zero) :=
+    .syllogism (pair_h (weaken_intro_h (.mp (le_Q_dec_unfold adm x y) .sym0)) I_comb) .trans0
+  .syllogism (.syllogism toMul
+      (Derivable.mp (mul_eq_zero_iff adm _ _) .and_weak))
+    (or_elim_rule (.syllogism (abs_diff_zero_fwd adm _ _) .or_weak) or_inr)
+
+/-- `<_ℚ` implies `≤_ℚ`. -/
+def lt_Q_imp_le_Q (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (lt_Q x y →ᶠ le_Q x y) :=
+  .syllogism (lt_Q_sign adm x y) (le_Q_of_sign adm x y)
+
 /-- From eq_Q(x, zero_Q), derive rat_num(x)*S(0) =₀ 0.
     eq_Q means eq_Q_dec(x, zero_Q) = 0, which after unfolding gives
     |num(x)*den(0) - 0*den(x)| + ... = 0. The cross part gives num(x)*S(0) = 0. -/
