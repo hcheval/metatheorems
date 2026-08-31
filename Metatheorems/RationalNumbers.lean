@@ -7849,14 +7849,6 @@ def zero_lt_one_Q :
   -- Chain: lt_Q_dec(zero_Q, one_Q) =₀ add(...) =₀ 0
   .mp (.mp h_sum (.mp h_unfold and_intro)) Derivable.trans0
 
-/-- Transitivity of `=₀` in the shape the chains below are actually written in. The file spells
-this out as `.mp (.mp h₂ (.mp h₁ and_intro)) .trans0` several hundred times. -/
-private def qtrans {a b c : Term F Γ Ty.nat}
-    (h₁ : Derivable F EqX al Premises (Formula.eq0 a b))
-    (h₂ : Derivable F EqX al Premises (Formula.eq0 b c)) :
-    Derivable F EqX al Premises (Formula.eq0 a c) :=
-  .mp (.mp h₂ (.mp h₁ and_intro)) .trans0
-
 /-- `2·n =₀ n + n`. Written out twice inline inside `rat_sign_rat_encode_pos/neg`; pulled out
 here because the sign half of `mul_Q_right_congr` needs it too. -/
 private def two_mul_eq_add (n : Term F Γ Ty.nat) :

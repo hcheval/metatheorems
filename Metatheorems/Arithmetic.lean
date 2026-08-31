@@ -2358,6 +2358,83 @@ def mul_assoc (x y z : Term F Γ Ty.nat) :
       Term.app2, add_closed_subst', mul_closed_subst', xw_subst0, yw_subst0]
   inst_nf ▸ .mp (Derivable.induction base (univ_gen step_body)) (.forall_ax z)
 
+-- ── Truncated subtraction against multiplication, and `geq` ────────────────
+--
+-- `monus` had a theory of its own — `monus_zero/succ/cancel/self/zero_l/succ_l`,
+-- `monus_eq_zero_antisym`, `monus_disjunct` — but nothing relating it to `mul`, and `geq` had
+-- no theory at all. These five are what the ℚ order theory needs: `add_Q`'s opposite-sign
+-- branch takes an `abs_diff` of two cross products and compares them with `geq`, and both
+-- have to survive being scaled by a denominator.
+
+/-- Transitivity of `=₀` in the shape the equational chains are actually written in. The
+development spells this out as `.mp (.mp h₂ (.mp h₁ and_intro)) .trans0` several hundred
+times. -/
+def qtrans {a b c : Term F Γ Ty.nat}
+    (h₁ : Derivable F EqX al Premises (Formula.eq0 a b))
+    (h₂ : Derivable F EqX al Premises (Formula.eq0 b c)) :
+    Derivable F EqX al Premises (Formula.eq0 a c) :=
+  .mp (.mp h₂ (.mp h₁ and_intro)) .trans0
+
+private def monus_congr_fst {s t : Term F Γ Ty.nat}
+    (h : Derivable F EqX al Premises (Formula.eq0 s t)) (u : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.monus s u) (Term.app2 Term.monus t u)) :=
+  qfer_no_premise_nat_nf h (monus_subst0_lw_nf u s) (monus_subst0_lw_nf u t)
+
+private def monus_congr_snd (u : Term F Γ Ty.nat) {s t : Term F Γ Ty.nat}
+    (h : Derivable F EqX al Premises (Formula.eq0 s t)) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.monus u s) (Term.app2 Term.monus u t)) :=
+  qfer_no_premise_nat_nf h (monus_subst0_rw_nf u s) (monus_subst0_rw_nf u t)
+
+/-- `a ∸ (b + c) =₀ (a ∸ b) ∸ c`. By induction on `c`: the successor step is `monus_succ` on
+both sides against `add_succ` on the left, with the two `pd`s matched by the IH. -/
+def monus_monus (a b c : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (Formula.eq0
+      (Term.app2 Term.monus a (Term.app2 Term.add b c))
+      (Term.app2 Term.monus (Term.app2 Term.monus a b) c)) :=
+  let aw := a.weaken (σ := Ty.nat)
+  let bw := b.weaken (σ := Ty.nat)
+  have aw_subst0 : ∀ s : Term F Γ Ty.nat,
+      Term.subst (fun {τ} ↦ Term.subst0_map s) a.weaken = a := Term.weaken_subst0 a
+  have bw_subst0 : ∀ s : Term F Γ Ty.nat,
+      Term.subst (fun {τ} ↦ Term.subst0_map s) b.weaken = b := Term.weaken_subst0 b
+  let A : Formula F (Ty.nat :: Γ) :=
+    Formula.eq0 (Term.app2 Term.monus aw (Term.app2 Term.add bw (.var .vz)))
+      (Term.app2 Term.monus (Term.app2 Term.monus aw bw) (.var .vz))
+  have base_nf : A.subst0 Term.zero =
+      Formula.eq0 (Term.app2 Term.monus a (Term.app2 Term.add b Term.zero))
+        (Term.app2 Term.monus (Term.app2 Term.monus a b) Term.zero) := by
+    simp only [A, aw, bw, Formula.subst0, Formula.substF, Term.subst, Term.subst0_map,
+      Term.app2, monus_closed_subst', add_closed_subst', aw_subst0, bw_subst0]
+  have base := base_nf ▸ (
+    -- a ∸ (b+0) = a ∸ b = (a∸b) ∸ 0
+    qtrans (monus_congr_snd a (add_zero_r adm b))
+      (.mp (monus_zero adm (Term.app2 Term.monus a b)) .sym0))
+  have step_nf : Formula.substVar0 A (.app .succ (.var .vz)) =
+      Formula.eq0 (Term.app2 Term.monus aw (Term.app2 Term.add bw (.app .succ (.var .vz))))
+        (Term.app2 Term.monus (Term.app2 Term.monus aw bw) (.app .succ (.var .vz))) := by
+    simp only [A, aw, bw, Formula.substVar0, Formula.substF, Term.subst, Term.substVar0_map,
+      Term.app2, monus_closed_subst', add_closed_subst', weaken_substVar0]
+  have step_body := step_nf ▸ (
+    let vz : Term F (Ty.nat :: Γ) Ty.nat := .var .vz
+    let ab := Term.app2 Term.monus aw bw
+    -- a ∸ (b + Sc) = a ∸ S(b+c) = pd(a ∸ (b+c))
+    let u1 := qtrans (monus_congr_snd aw (add_succ adm bw vz))
+      (monus_succ adm aw (Term.app2 Term.add bw vz))
+    -- IH → pd(a ∸ (b+c)) = pd((a∸b) ∸ c)
+    let u2 := qfer_nat_nf (by rfl) (by rfl) I_comb (r := .app Term.pd (.var .vz)) rfl rfl
+    -- pd((a∸b) ∸ c) = (a∸b) ∸ Sc
+    let u3 := .mp (monus_succ adm ab vz) .sym0
+    let c1 := .syllogism (pair_h (weaken_intro_h u1) u2) .trans0
+    .syllogism (pair_h c1 (weaken_intro_h u3)) .trans0)
+  have inst_nf : A.subst0 c =
+      Formula.eq0 (Term.app2 Term.monus a (Term.app2 Term.add b c))
+        (Term.app2 Term.monus (Term.app2 Term.monus a b) c) := by
+    simp only [A, aw, bw, Formula.subst0, Formula.substF, Term.subst, Term.subst0_map,
+      Term.app2, monus_closed_subst', add_closed_subst', aw_subst0, bw_subst0]
+  inst_nf ▸ .mp (Derivable.induction base (univ_gen step_body)) (.forall_ax c)
+
 end ArithProps
 
 -- ============================================================================
