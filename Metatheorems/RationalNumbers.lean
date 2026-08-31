@@ -7077,19 +7077,8 @@ def mul_Q_one :
     .mp (.mp h_reduced (.mp h_mul_red and_intro)) .trans0
   univ_gen (eq_Q_from_components adm h_cross h_sign)
 
--- ── Distributivity ─────────────────────────────────────────────────────────
-
-/-- ⊢ ∀a,b,c. eq_Q(mul_Q(a, add_Q(b,c)), add_Q(mul_Q(a,b), mul_Q(a,c))) -/
-def distrib_Q :
-    Derivable F EqX al Premises (Γ := Γ)
-      (Formula.all Ty.nat (Formula.all Ty.nat (Formula.all Ty.nat
-        (eq_Q
-          (Term.app2 Term.mul_Q (.var (.vs (.vs .vz)))
-            (Term.app2 Term.add_Q (.var (.vs .vz)) (.var .vz)))
-          (Term.app2 Term.add_Q
-            (Term.app2 Term.mul_Q (.var (.vs (.vs .vz))) (.var (.vs .vz)))
-            (Term.app2 Term.mul_Q (.var (.vs (.vs .vz))) (.var .vz))))))) :=
-  sorry
+-- `distrib_Q` needs the signed-numerator machinery and `eq_Q_of_signed_cross`, so it is
+-- proved at the end of the file, in the "Distributivity" block.
 
 -- ── `eq_Q` elimination ─────────────────────────────────────────────────────
 --
@@ -11679,6 +11668,231 @@ def eq_Q_of_signed_cross (u v : Term F Γ Ty.nat)
     (Derivable.mp hnum
       (Derivable.mp (abs_diff_eq_zero_iff adm _ _) (.syllogism .and_perm .and_weak)))
     (eq_Q_signpart_of_cross adm u v hA hB hnum)
+
+-- ── Distributivity ────────────────────────────────────────────────────────
+--
+-- Unlike `mul_Q_assoc`, this cannot be a rearrangement: `posN (b +_ℚ c)` is *not* a polynomial
+-- in `b` and `c`'s parts — the encoding renormalises, and `addQ_signed` only characterises it
+-- *relationally*. So the two sides are related by combining two such relations and cancelling
+-- the common term, and the denominators differ, which is what `eq_Q_of_signed_cross` is for.
+
+/-- The bracket that appears when distributivity is pushed through `addQ_signed`. Pure ℕ, but
+too shape-specific to earn a place in the general `Arithmetic` API, so it lives here beside its
+two uses — the positive and negative brackets are this same identity with the parts swapped. -/
+private def distrib_bracket (p n e f g h da db dc : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (Formula.eq0
+      (Term.app2 Term.add
+        (Term.app2 Term.mul
+          (Term.app2 Term.add (Term.app2 Term.mul p e) (Term.app2 Term.mul n f))
+          (Term.app2 Term.mul da dc))
+        (Term.app2 Term.mul
+          (Term.app2 Term.add (Term.app2 Term.mul p g) (Term.app2 Term.mul n h))
+          (Term.app2 Term.mul da db)))
+      (Term.app2 Term.mul da
+        (Term.app2 Term.add
+          (Term.app2 Term.mul p (Term.app2 Term.add
+            (Term.app2 Term.mul e dc) (Term.app2 Term.mul g db)))
+          (Term.app2 Term.mul n (Term.app2 Term.add
+            (Term.app2 Term.mul f dc) (Term.app2 Term.mul h db)))))) := by
+  pmode
+  prw (add_mul adm (Term.app2 Term.mul p e) (Term.app2 Term.mul n f)
+    (Term.app2 Term.mul da dc))
+  prw (add_mul adm (Term.app2 Term.mul p g) (Term.app2 Term.mul n h)
+    (Term.app2 Term.mul da db))
+  prw (mul_add adm da
+    (Term.app2 Term.mul p (Term.app2 Term.add
+      (Term.app2 Term.mul e dc) (Term.app2 Term.mul g db)))
+    (Term.app2 Term.mul n (Term.app2 Term.add
+      (Term.app2 Term.mul f dc) (Term.app2 Term.mul h db))))
+  prw (mul_add adm p (Term.app2 Term.mul e dc) (Term.app2 Term.mul g db))
+  prw (mul_add adm n (Term.app2 Term.mul f dc) (Term.app2 Term.mul h db))
+  prw (mul_add adm da (Term.app2 Term.mul p (Term.app2 Term.mul e dc))
+    (Term.app2 Term.mul p (Term.app2 Term.mul g db)))
+  prw (mul_add adm da (Term.app2 Term.mul n (Term.app2 Term.mul f dc))
+    (Term.app2 Term.mul n (Term.app2 Term.mul h db)))
+  prw (mul_swap4 adm p e da dc)
+  prw (mul_congr_l (mul_comm adm p da) (Term.app2 Term.mul e dc))
+  prw (mul_assoc adm da p (Term.app2 Term.mul e dc))
+  prw (mul_swap4 adm n f da dc)
+  prw (mul_congr_l (mul_comm adm n da) (Term.app2 Term.mul f dc))
+  prw (mul_assoc adm da n (Term.app2 Term.mul f dc))
+  prw (mul_swap4 adm p g da db)
+  prw (mul_congr_l (mul_comm adm p da) (Term.app2 Term.mul g db))
+  prw (mul_assoc adm da p (Term.app2 Term.mul g db))
+  prw (mul_swap4 adm n h da db)
+  prw (mul_congr_l (mul_comm adm n da) (Term.app2 Term.mul h db))
+  prw (mul_assoc adm da n (Term.app2 Term.mul h db))
+  prw (add_swap4 adm
+    (Term.app2 Term.mul da (Term.app2 Term.mul p (Term.app2 Term.mul e dc)))
+    (Term.app2 Term.mul da (Term.app2 Term.mul n (Term.app2 Term.mul f dc)))
+    (Term.app2 Term.mul da (Term.app2 Term.mul p (Term.app2 Term.mul g db)))
+    (Term.app2 Term.mul da (Term.app2 Term.mul n (Term.app2 Term.mul h db))))
+  prefl
+
+/-- Combine two relations sharing a common pair `Gm`/`Gp` and cancel it. -/
+private def combine2 (L₁ L₂ P N Gm Gp : Term F Γ Ty.nat)
+    (hA : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add L₁ Gm) (Term.app2 Term.add L₂ Gp)))
+    (hB : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add P Gm) (Term.app2 Term.add N Gp))) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add L₁ N) (Term.app2 Term.add P L₂)) := by
+  pmode
+  papplym (add_cancel_r adm
+    (Term.app2 Term.add L₁ N) (Term.app2 Term.add P L₂) Gm)
+  prw (add_swap_right adm L₁ N Gm)
+  prw hA
+  prw (add_swap_right adm P L₂ Gm)
+  prw hB
+  prw (add_swap_right adm N Gp L₂)
+  prw (add_congr_l (add_comm adm N L₂) Gp)
+  prw (add_swap_right adm L₂ N Gp)
+  prefl
+
+/-- `a ·_ℚ (b +_ℚ c) =_ℚ (a ·_ℚ b) +_ℚ (a ·_ℚ c)`, at explicit terms. -/
+def distrib_Q_inst (a b c : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (eq_Q (Term.app2 Term.mul_Q a (Term.app2 Term.add_Q b c))
+        (Term.app2 Term.add_Q (Term.app2 Term.mul_Q a b) (Term.app2 Term.mul_Q a c))) :=
+  let pa := posN a; let na := negN a
+  let pb := posN b; let nb := negN b
+  let pc := posN c; let nc := negN c
+  let da : Term F Γ Ty.nat := .app Term.rat_den a
+  let db : Term F Γ Ty.nat := .app Term.rat_den b
+  let dc : Term F Γ Ty.nat := .app Term.rat_den c
+  let W := Term.app2 Term.add_Q b c
+  let AB := Term.app2 Term.mul_Q a b
+  let AC := Term.app2 Term.mul_Q a c
+  let X := posN W; let Y := negN W
+  let P := posN (Term.app2 Term.add_Q AB AC)
+  let N := negN (Term.app2 Term.add_Q AB AC)
+  let Qm := Term.app2 Term.add (Term.app2 Term.mul nb dc) (Term.app2 Term.mul nc db)
+  let Qp := Term.app2 Term.add (Term.app2 Term.mul pb dc) (Term.app2 Term.mul pc db)
+  let Zm := Term.app2 Term.add (Term.app2 Term.mul pa Qm) (Term.app2 Term.mul na Qp)
+  let Zp := Term.app2 Term.add (Term.app2 Term.mul pa Qp) (Term.app2 Term.mul na Qm)
+  let dun := Term.app2 Term.mul da (Term.app2 Term.mul db dc)
+  let K := Term.app2 Term.mul (Term.app2 Term.mul da db) (Term.app2 Term.mul da dc)
+  let Gm := Term.app2 Term.mul K Zm
+  let Gp := Term.app2 Term.mul K Zp
+  let L₁ := Term.app2 Term.mul (Term.app2 Term.add
+    (Term.app2 Term.mul pa X) (Term.app2 Term.mul na Y)) K
+  let L₂ := Term.app2 Term.mul (Term.app2 Term.add
+    (Term.app2 Term.mul pa Y) (Term.app2 Term.mul na X)) K
+  -- denominators
+  let hdu : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_den (Term.app2 Term.mul_Q a W)) dun) :=
+    qtrans (rat_den_mul_Q adm a W) (mul_congr_r da (rat_den_add_Q adm b c))
+  let hdv : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_den (Term.app2 Term.add_Q AB AC)) K) :=
+    qtrans (rat_den_add_Q adm AB AC)
+      (qtrans (mul_congr_l (rat_den_mul_Q adm a b) (.app Term.rat_den AC))
+        (mul_congr_r (Term.app2 Term.mul da db) (rat_den_mul_Q adm a c)))
+  -- `K =₀ dun · da`, and the scaling it licenses
+  let hK : Derivable F EqX al Premises
+      (Formula.eq0 K (Term.app2 Term.mul dun da)) :=
+    qtrans (mul_swap4 adm da db da dc)
+      (qtrans (mul_assoc adm da da (Term.app2 Term.mul db dc))
+        (mul_comm adm da dun))
+  let hscale (Z : Term F Γ Ty.nat) : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul (Term.app2 Term.mul da Z) dun)
+        (Term.app2 Term.mul K Z)) :=
+    qtrans (mul_comm adm (Term.app2 Term.mul da Z) dun)
+      (qtrans (.mp (mul_assoc adm dun da Z) .sym0)
+        (mul_congr_l (.mp hK .sym0) Z))
+  -- the two brackets of `addQ_signed AB AC`, normalised
+  let em : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add
+        (Term.app2 Term.mul (negN AB) (.app Term.rat_den AC))
+        (Term.app2 Term.mul (negN AC) (.app Term.rat_den AB)))
+        (Term.app2 Term.mul da Zm)) :=
+    qtrans (add_congr_l
+        (qtrans (mul_congr_l (negN_mul_Q adm a b) (.app Term.rat_den AC))
+          (mul_congr_r _ (rat_den_mul_Q adm a c)))
+        (Term.app2 Term.mul (negN AC) (.app Term.rat_den AB)))
+      (qtrans (add_congr_r _
+          (qtrans (mul_congr_l (negN_mul_Q adm a c) (.app Term.rat_den AB))
+            (mul_congr_r _ (rat_den_mul_Q adm a b))))
+        (distrib_bracket adm pa na nb pb nc pc da db dc))
+  let ep : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add
+        (Term.app2 Term.mul (posN AB) (.app Term.rat_den AC))
+        (Term.app2 Term.mul (posN AC) (.app Term.rat_den AB)))
+        (Term.app2 Term.mul da Zp)) :=
+    qtrans (add_congr_l
+        (qtrans (mul_congr_l (posN_mul_Q adm a b) (.app Term.rat_den AC))
+          (mul_congr_r _ (rat_den_mul_Q adm a c)))
+        (Term.app2 Term.mul (posN AC) (.app Term.rat_den AB)))
+      (qtrans (add_congr_r _
+          (qtrans (mul_congr_l (posN_mul_Q adm a c) (.app Term.rat_den AB))
+            (mul_congr_r _ (rat_den_mul_Q adm a b))))
+        (distrib_bracket adm pa na pb nb pc nc da db dc))
+  let h8 : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add P (Term.app2 Term.mul da Zm))
+        (Term.app2 Term.add N (Term.app2 Term.mul da Zp))) :=
+    qtrans (add_congr_r P (.mp em .sym0))
+      (qtrans (addQ_signed adm AB AC) (add_congr_r N ep))
+  let hB : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add (Term.app2 Term.mul P dun) Gm)
+        (Term.app2 Term.add (Term.app2 Term.mul N dun) Gp)) :=
+    qtrans (add_congr_r (Term.app2 Term.mul P dun) (.mp (hscale Zm) .sym0))
+      (qtrans
+        (qtrans (.mp (add_mul adm P (Term.app2 Term.mul da Zm) dun) .sym0)
+          (qtrans (mul_congr_l h8 dun)
+            (add_mul adm N (Term.app2 Term.mul da Zp) dun)))
+        (add_congr_r (Term.app2 Term.mul N dun) (hscale Zp)))
+  let hA : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add L₁ Gm) (Term.app2 Term.add L₂ Gp)) := by
+    pmode
+    prw (mul_comm adm (Term.app2 Term.add
+      (Term.app2 Term.mul pa X) (Term.app2 Term.mul na Y)) K)
+    prw (mul_comm adm (Term.app2 Term.add
+      (Term.app2 Term.mul pa Y) (Term.app2 Term.mul na X)) K)
+    prw (Derivable.mp (mul_add adm K (Term.app2 Term.add
+      (Term.app2 Term.mul pa X) (Term.app2 Term.mul na Y)) Zm) Derivable.sym0)
+    prw (Derivable.mp (mul_add adm K (Term.app2 Term.add
+      (Term.app2 Term.mul pa Y) (Term.app2 Term.mul na X)) Zp) Derivable.sym0)
+    prw (add_swap4 adm (Term.app2 Term.mul pa X) (Term.app2 Term.mul na Y)
+      (Term.app2 Term.mul pa Qm) (Term.app2 Term.mul na Qp))
+    prw (add_swap4 adm (Term.app2 Term.mul pa Y) (Term.app2 Term.mul na X)
+      (Term.app2 Term.mul pa Qp) (Term.app2 Term.mul na Qm))
+    prw (Derivable.mp (mul_add adm pa X Qm) Derivable.sym0)
+    prw (Derivable.mp (mul_add adm na Y Qp) Derivable.sym0)
+    prw (Derivable.mp (mul_add adm pa Y Qp) Derivable.sym0)
+    prw (Derivable.mp (mul_add adm na X Qm) Derivable.sym0)
+    prw (addQ_signed adm b c)
+    prefl
+  let hgoal : Derivable F EqX al Premises
+      (Formula.eq0
+        (Term.app2 Term.add
+          (Term.app2 Term.mul (posN (Term.app2 Term.mul_Q a W))
+            (.app Term.rat_den (Term.app2 Term.add_Q AB AC)))
+          (Term.app2 Term.mul (negN (Term.app2 Term.add_Q AB AC))
+            (.app Term.rat_den (Term.app2 Term.mul_Q a W))))
+        (Term.app2 Term.add
+          (Term.app2 Term.mul (posN (Term.app2 Term.add_Q AB AC))
+            (.app Term.rat_den (Term.app2 Term.mul_Q a W)))
+          (Term.app2 Term.mul (negN (Term.app2 Term.mul_Q a W))
+            (.app Term.rat_den (Term.app2 Term.add_Q AB AC))))) := by
+    pmode
+    prw (posN_mul_Q adm a W)
+    prw (negN_mul_Q adm a W)
+    prw hdu
+    prw hdv
+    pthm (combine2 adm L₁ L₂ (Term.app2 Term.mul P dun) (Term.app2 Term.mul N dun) Gm Gp hA hB)
+  eq_Q_of_signed_cross adm _ _ hgoal
+
+/-- ⊢ ∀a,b,c. eq_Q(mul_Q(a, add_Q(b,c)), add_Q(mul_Q(a,b), mul_Q(a,c))) -/
+def distrib_Q :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all Ty.nat (Formula.all Ty.nat (Formula.all Ty.nat
+        (eq_Q
+          (Term.app2 Term.mul_Q (.var (.vs (.vs .vz)))
+            (Term.app2 Term.add_Q (.var (.vs .vz)) (.var .vz)))
+          (Term.app2 Term.add_Q
+            (Term.app2 Term.mul_Q (.var (.vs (.vs .vz))) (.var (.vs .vz)))
+            (Term.app2 Term.mul_Q (.var (.vs (.vs .vz))) (.var .vz))))))) :=
+  univ_gen (univ_gen (univ_gen (distrib_Q_inst adm
+    (.var (.vs (.vs .vz))) (.var (.vs .vz)) (.var .vz))))
 
 end RationalOrderedField
 

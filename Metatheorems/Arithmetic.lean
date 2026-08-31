@@ -2634,6 +2634,17 @@ def mul_swap_right (x y z : Term F Γ Ty.nat) :
   qtrans (qtrans (mul_assoc adm x y z) (mul_congr_r x (mul_comm adm y z)))
     (.mp (mul_assoc adm x z y) .sym0)
 
+/-- `(p·q)·(r·s) =₀ (p·r)·(q·s)` — the multiplicative counterpart of `add_swap4`. -/
+def mul_swap4 (p q r s : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (Formula.eq0
+      (Term.app2 Term.mul (Term.app2 Term.mul p q) (Term.app2 Term.mul r s))
+      (Term.app2 Term.mul (Term.app2 Term.mul p r) (Term.app2 Term.mul q s))) :=
+  qtrans (mul_assoc adm p q (Term.app2 Term.mul r s))
+    (qtrans (mul_congr_r p (.mp (mul_assoc adm q r s) .sym0))
+      (qtrans (mul_congr_r p (mul_congr_l (mul_comm adm q r) s))
+        (qtrans (mul_congr_r p (mul_assoc adm r q s))
+          (.mp (mul_assoc adm p r (Term.app2 Term.mul q s)) .sym0))))
+
 /-- `m·(x·y) =₀ (m·y)·x`. -/
 def mul_assoc_comm (m x y : Term F Γ Ty.nat) :
     Derivable F EqX al Premises (Formula.eq0
