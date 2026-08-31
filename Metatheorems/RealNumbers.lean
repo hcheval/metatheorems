@@ -319,6 +319,7 @@ def Term.round_nat {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ realTy ι) :=
 variable {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) →
     Term F Γ (Ty.base i) → Formula F Γ}
   {al : Allowed} {Premises : PremiseSet F}
+  (adm : AdmissibleEqX EqX)
 
 -- Notation: real-typed variables in context
 private abbrev rTy := realTy ι
@@ -470,11 +471,20 @@ def archimedean_R :
 
 -- ── =_ℝ is an equivalence relation ─────────────────────────────────────────
 
-/-- ⊢ ∀f : ℝ. f =_ℝ f -/
+/-- ⊢ ∀f : ℝ. f =_ℝ f
+
+`eq_R` is not an equation, so this is not `refl`: it says `|f̂(n+1) −ℚ f̂(n+1)|ℚ <ℚ 2^{-n}`,
+which is `0 <ℚ 2^{-n}` transported along `abs_Q_sub_self`. -/
 def eq_R_refl :
     Derivable F EqX al Premises (Γ := Γ)
       (Formula.all rTy (eq_R (.var .vz) (.var .vz))) :=
-  sorry
+  let A : Term F (Ty.nat :: rTy :: Γ) Ty.nat :=
+    Term.app (Term.app Term.cauchyfy (Term.weaken (.var .vz))) (.app .succ (.var .vz))
+  let e : Term F (Ty.nat :: rTy :: Γ) Ty.nat := .app Term.pow2neg_Q (.var .vz)
+  univ_gen (univ_gen
+    (Derivable.mp (zero_lt_pow2neg_Q adm (.var .vz))
+      (lt_Q_congr adm Term.zero_Q e (.app Term.abs_Q (Term.app2 Term.sub_Q A A)) e
+        (eqQsym adm (abs_Q_sub_self adm A)) (eq_Q_refl_inst adm e))))
 
 /-- ⊢ ∀f,g : ℝ. f =_ℝ g → g =_ℝ f -/
 def eq_R_sym :
@@ -515,5 +525,12 @@ def le_zero_eq_zero_R :
   sorry
 
 end OrderedFieldAxioms
+
+-- ============================================================================
+-- Axiom hygiene: every axiom claimed proved above is checked here
+-- ============================================================================
+-- A falling `sorry` count is not evidence (CLAUDE.md note 9); these are.
+
+#print axioms eq_R_refl
 
 end Metatheorems

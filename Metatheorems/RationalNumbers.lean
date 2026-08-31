@@ -12008,6 +12008,26 @@ def abs_diff_Q_comm (a b : Term F Γ Ty.nat) :
   eqQtrans adm (abs_Q_congr adm (eqQsym adm (neg_Q_sub_Q adm a b)))
     (abs_Q_neg_Q adm (Term.app2 Term.sub_Q b a))
 
+/-- `eq_Q` reflexivity at an explicit term. -/
+def eq_Q_refl_inst (e : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (eq_Q e e) :=
+  eq_Q_from_nat_eq (adm := adm) .refl0
+
+/-- `|0_ℚ|_ℚ =_ℚ 0_ℚ`. -/
+def abs_Q_zero_Q :
+    Derivable F EqX al Premises (Γ := Γ)
+      (eq_Q (.app Term.abs_Q Term.zero_Q) Term.zero_Q) :=
+  Derivable.mp (qtrans (rat_num_abs_Q adm Term.zero_Q) (rat_num_zero_Q adm))
+    (eq_Q_zero_of_num_zero adm _)
+
+/-- `|a −_ℚ a|_ℚ =_ℚ 0_ℚ`. The `=_ℝ`-reflexivity fact, at ℚ. -/
+def abs_Q_sub_self (a : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (eq_Q (.app Term.abs_Q (Term.app2 Term.sub_Q a a)) Term.zero_Q) :=
+  eqQtrans adm
+    (abs_Q_congr adm (eqQtrans adm (sub_Q_eq_add_neg adm a a) (add_Q_neg_inst adm a)))
+    (abs_Q_zero_Q adm)
+
 -- ── `eq_Q`-congruence for the order relations ──────────────────────────────
 
 /-- Negation respects `eq_Q`. Not a component calculation: `neg_Q` swaps the signed parts and
