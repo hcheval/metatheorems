@@ -3083,7 +3083,7 @@ private def inv_triag_triag_add (w r : Term F Γ Ty.nat)
     `fst_pair(pair(x,y)) = (triag(x+y) + x) ∸ triag(inv_triag(triag(x+y) + x))`
     `= (triag(x+y) + x) ∸ triag(x+y)` (by `inv_triag_triag_add`)
     `= x` (by `monus_add_cancel_l`). -/
-private def fst_pair_pair (x y : Term F Γ Ty.nat) :
+def fst_pair_pair (x y : Term F Γ Ty.nat) :
     Derivable F EqX al Premises
       (Formula.eq0 (.app Term.fst_pair (Term.app2 Term.pair x y)) x) :=
   -- tpxy := triag(x+y) + x (the unfolded form of pair(x,y))
@@ -3123,7 +3123,7 @@ private def fst_pair_pair (x y : Term F Γ Ty.nat) :
     `inv_triag(pair(x,y)) =₀ x+y` (via `pair_unfold` + `inv_triag_triag_add`),
     `fst_pair(pair(x,y)) =₀ x` (by `fst_pair_pair`).
     So `snd_pair(pair(x,y)) =₀ (x+y) ∸ x =₀ y` (by `monus_add_cancel_l`). -/
-private def snd_pair_pair (x y : Term F Γ Ty.nat) :
+def snd_pair_pair (x y : Term F Γ Ty.nat) :
     Derivable F EqX al Premises
       (Formula.eq0 (.app Term.snd_pair (Term.app2 Term.pair x y)) y) :=
   let pxy := Term.app2 Term.pair x y

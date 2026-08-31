@@ -207,6 +207,41 @@ variable {Γ Δ : Ctx ι} (σ : Term.Subst F Γ Δ)
 end ClosedSubst
 
 -- ============================================================================
+-- The `cauchyfy` recursion, named
+-- ============================================================================
+--
+-- `cauchyfy` is a `prec` over a `pair(value, violation flag)` state, buried under two
+-- lambdas. Nothing can be said about it until that state is a term one can name, so these
+-- three definitions expose it, and `cauchyfy_unfold` is the single beta step that connects
+-- them to `Term.cauchyfy` itself.
+
+namespace Term
+
+variable {Γ : Ctx ι}
+
+/-- The base of `cauchyfy`'s recursion: `pair(f 0, 0)` — value `f 0`, flag clear. -/
+def cauchyBase (f : Term F Γ (realTy ι)) : Term F Γ Ty.nat :=
+  Term.app2 Term.pair (.app f .zero) .zero
+
+/-- The step of `cauchyfy`'s recursion, as a function of `(state, index)`. -/
+def cauchyStep (f : Term F Γ (realTy ι)) :
+    Term F Γ (Ty.nat →ₜ Ty.nat →ₜ Ty.nat) :=
+  Term.lam (Term.lam
+    (Term.app3 Term.ite_nat (Term.app Term.snd_pair (.var (.vs .vz))) (.var (.vs .vz))
+      (Term.app3 Term.ite_nat
+        (.app Term.sg_bar (cauchy_check_at (f.weaken.weaken) (.var .vz)))
+        (Term.app2 Term.pair
+          (.app (f.weaken.weaken) (.app .succ (.var .vz))) .zero)
+        (Term.app2 Term.pair (Term.app Term.fst_pair (.var (.vs .vz)))
+          (.app .succ .zero)))))
+
+/-- The state of the recursion after `n` steps. `cauchyfy f n` is its first component. -/
+def cauchyState (f : Term F Γ (realTy ι)) (n : Term F Γ Ty.nat) : Term F Γ Ty.nat :=
+  Term.app3 (.prec Ty.nat) (cauchyBase f) (cauchyStep f) n
+
+end Term
+
+-- ============================================================================
 -- Real Number Formulas
 -- ============================================================================
 
@@ -326,6 +361,97 @@ private abbrev rTy := realTy ι
 -- In context [rTy, Γ]: f = var vz
 -- In context [rTy, rTy, Γ]: f = var (vs vz), g = var vz
 -- In context [rTy, rTy, rTy, Γ]: f = var (vs (vs vz)), g = var (vs vz), h = var vz
+
+-- ============================================================================
+-- `cauchyfy` theory
+-- ============================================================================
+
+section Cauchyfy
+
+variable {Γ : Ctx ι}
+
+/-- `Term.weaken_subst0` in the shape simp leaves behind once `Term.weaken` has been
+unfolded to `Term.rename`. Without it the last `subst0` of a beta step does not close. -/
+private theorem subst0_rename_vs {Γ : Ctx ι} {τ ρ : Ty ι}
+    (t : Term F Γ τ) (s : Term F Γ ρ) :
+    Term.subst (fun {_τ} => Term.subst0_map s) (Term.rename (fun {_τ} => Var.vs) t) = t :=
+  Term.weaken_subst0 t s
+
+/-- The body `cauchyfy` compiles to, in the two-variable context `[n, f, …Γ]`. -/
+private def cauchyfy_body : Term F (Ty.nat :: realTy ι :: Γ) Ty.nat :=
+  .app Term.fst_pair
+    (Term.app3 (.prec Ty.nat)
+      (Term.app2 Term.pair (.app (.var (.vs .vz)) .zero) .zero)
+      (Term.lam (Term.lam
+        (Term.app3 Term.ite_nat (Term.app Term.snd_pair (.var (.vs .vz))) (.var (.vs .vz))
+          (Term.app3 Term.ite_nat
+            (.app Term.sg_bar
+              (Term.app2 Term.lt_Q_dec
+                (.app Term.abs_Q (Term.app2 Term.sub_Q
+                  (.app (.var (.vs (.vs (.vs .vz)))) (.var .vz))
+                  (.app (.var (.vs (.vs (.vs .vz)))) (.app .succ (.var .vz)))))
+                (.app Term.pow2neg_Q (.app .succ (.var .vz)))))
+            (Term.app2 Term.pair
+              (.app (.var (.vs (.vs (.vs .vz)))) (.app .succ (.var .vz))) .zero)
+            (Term.app2 Term.pair (Term.app Term.fst_pair (.var (.vs .vz)))
+              (.app .succ .zero))))))
+      (.var .vz))
+
+/-- The one beta step: `cauchyfy f n =₀ fst_pair (state f n)`. Everything else about
+`cauchyfy` is reasoning about `cauchyState`, which is an ordinary `prec`. -/
+def cauchyfy_unfold (f : Term F Γ (realTy ι)) (n : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.cauchyfy f n)
+        (.app Term.fst_pair (Term.cauchyState f n))) :=
+  have body_eq : (Term.cauchyfy : Term F Γ _) = Term.lam (Term.lam cauchyfy_body) := by rfl
+  have nf : ((cauchyfy_body : Term F (Ty.nat :: realTy ι :: Γ) Ty.nat).subst0
+      (n.weaken)).subst0 f = .app Term.fst_pair (Term.cauchyState f n) := by
+    simp only [cauchyfy_body, Term.cauchyState, Term.cauchyBase, Term.cauchyStep,
+      Term.cauchy_check_at, Term.subst0, Term.subst, Term.subst0_map, Term.Subst.ext,
+      Term.app2, Term.app3, Term.weaken, Term.rename, Term.Renaming.shift,
+      subst0_rename_vs, closed_subst]
+  body_eq ▸ lam2_correct_nf adm cauchyfy_body f n nf
+
+/-- Congruence under `fst_pair`. -/
+private def fst_pair_congr {s t : Term F Γ Ty.nat}
+    (h : Derivable F EqX al Premises (Formula.eq0 s t)) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.fst_pair s) (.app Term.fst_pair t)) :=
+  qfer_no_premise_nat_nf h (r := .app Term.fst_pair (.var .vz))
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, closed_subst])
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, closed_subst])
+
+/-- Congruence under `snd_pair`. -/
+private def snd_pair_congr {s t : Term F Γ Ty.nat}
+    (h : Derivable F EqX al Premises (Formula.eq0 s t)) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.snd_pair s) (.app Term.snd_pair t)) :=
+  qfer_no_premise_nat_nf h (r := .app Term.snd_pair (.var .vz))
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, closed_subst])
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, closed_subst])
+
+/-- The recursion's base case, as a statement about the state. -/
+def cauchyState_zero (f : Term F Γ (realTy ι)) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.cauchyState f Term.zero) (Term.cauchyBase f)) :=
+  Derivable.rec_zero (ρ := Ty.nat) (y := Term.cauchyBase f) (z := Term.cauchyStep f)
+
+/-- The recursion's step, as a statement about the state. -/
+def cauchyState_succ (f : Term F Γ (realTy ι)) (n : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.cauchyState f (.app .succ n))
+        (Term.app2 (Term.cauchyStep f) (Term.cauchyState f n) n)) :=
+  Derivable.rec_succ (ρ := Ty.nat) (y := Term.cauchyBase f) (z := Term.cauchyStep f) (x := n)
+
+/-- `f̂(0) =₀ f(0)`: cauchyfication does not move the first term. -/
+def cauchyfy_zero (f : Term F Γ (realTy ι)) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.cauchyfy f Term.zero) (.app f .zero)) :=
+  qtrans (cauchyfy_unfold adm f Term.zero)
+    (qtrans (fst_pair_congr (cauchyState_zero f))
+      (fst_pair_pair adm (.app f .zero) Term.zero))
+
+end Cauchyfy
 
 section OrderedFieldAxioms
 
