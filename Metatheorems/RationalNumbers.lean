@@ -11027,14 +11027,156 @@ def lt_Q_trans :
     pexact h3
   univ_gen (univ_gen (univ_gen core))
 
-/-- ⊢ ∀a,b. lt_Q(a, b) ∨ eq_Q(a, b) ∨ lt_Q(b, a)  (trichotomy) -/
+/-- Negation is an involution, up to `eq_Q`. Immediate from the part-swapping lemmas. -/
+def neg_Q_neg_Q (z : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (eq_Q (.app Term.neg_Q (.app Term.neg_Q z)) z) :=
+  eq_Q_of_pos_neg adm _ _
+    (qtrans (posN_neg_Q adm (.app Term.neg_Q z)) (negN_neg_Q adm z))
+    (qtrans (negN_neg_Q adm (.app Term.neg_Q z)) (posN_neg_Q adm z))
+    (qtrans (rat_den_neg_Q adm (.app Term.neg_Q z)) (rat_den_neg_Q adm z))
+
+/-- `−_ℚ (b −_ℚ a) =_ℚ a −_ℚ b`: the difference the other way round. -/
+def neg_Q_sub_Q (a b : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (eq_Q (.app Term.neg_Q (Term.app2 Term.sub_Q b a)) (Term.app2 Term.sub_Q a b)) :=
+  let na : Term F Γ Ty.nat := .app Term.neg_Q a
+  let nb : Term F Γ Ty.nat := .app Term.neg_Q b
+  -- `−(b + −a) =_Q −b + −(−a) =_Q −b + a =_Q a + −b`
+  eqQtrans adm
+    (eq_Q_from_nat_eq (adm := adm)
+      (qfer_no_premise_nat_nf (sub_Q_unfold adm b a)
+        (r := .app Term.neg_Q (.var .vz)) rfl rfl))
+    (eqQtrans adm (neg_Q_add_Q adm b na)
+      (eqQtrans adm (addQr adm nb (neg_Q_neg_Q adm a))
+        (eqQtrans adm (add_Q_comm_inst adm nb a)
+          (eqQsym adm (sub_Q_eq_add_neg adm a b)))))
+
+/-- Transitivity of `eq_Q` under a common hypothesis. -/
+private def eqQhtrans {H : Formula F Γ} {x y z : Term F Γ Ty.nat}
+    (h₁ : Derivable F EqX al Premises (H →ᶠ eq_Q x y))
+    (h₂ : Derivable F EqX al Premises (H →ᶠ eq_Q y z)) :
+    Derivable F EqX al Premises (H →ᶠ eq_Q x z) :=
+  .syllogism (pair_h h₁ h₂) (eq_Q_trans_inst adm x y z)
+
+/-- A hypothesis-free `eq_Q`, under an arbitrary hypothesis. -/
+private def eqQhconst {H : Formula F Γ} {x y : Term F Γ Ty.nat}
+    (h : Derivable F EqX al Premises (eq_Q x y)) :
+    Derivable F EqX al Premises (H →ᶠ eq_Q x y) := weaken_intro_h h
+
+/-- Implication form of `addQl`, needed because the chain below applies it under a
+hypothesis and the kernel has no deduction theorem. -/
+private def addQl_imp (w : Term F Γ Ty.nat) {u v : Term F Γ Ty.nat} :
+    Derivable F EqX al Premises
+      (eq_Q u v →ᶠ eq_Q (Term.app2 Term.add_Q u w) (Term.app2 Term.add_Q v w)) :=
+  eqQhtrans adm (eqQhconst (add_Q_comm_inst adm u w))
+    (eqQhtrans adm (add_Q_right_congr_inst adm w u v)
+      (eqQhconst (add_Q_comm_inst adm w v)))
+
+/-- A rational with vanishing numerator is `0_ℚ`. -/
+private def eq_Q_zero_of_num_zero (p : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_num p) .zero →ᶠ eq_Q p Term.zero_Q) := by
+  pmode
+  pintro h
+  prw (eq_Q_dec_unfold adm p Term.zero_Q)
+  prw (rat_num_zero_Q (adm := adm))
+  prw (rat_den_zero_Q (adm := adm))
+  prwby h
+  prw (mul_zero_l adm (.app .succ .zero))
+  prw (mul_zero_l adm (.app Term.rat_den p))
+  prw (abs_diff_self adm Term.zero)
+  prw (add_zero_l adm Term.zero)
+  prw sg_zero
+  prw (mul_zero adm (Term.app2 Term.abs_diff
+    (.app Term.rat_sign p) (.app Term.rat_sign Term.zero_Q)))
+  pthm (add_zero_l adm Term.zero)
+
+/-- A vanishing difference means the two rationals are equal. -/
+private def eq_Q_of_sub_zero (a b : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (eq_Q (Term.app2 Term.sub_Q b a) Term.zero_Q →ᶠ eq_Q a b) :=
+  let na : Term F Γ Ty.nat := .app Term.neg_Q a
+  -- `b =_Q b +_ℚ 0 =_ℚ b +_ℚ (−a +_ℚ a) =_ℚ (b +_ℚ −a) +_ℚ a`, unconditionally
+  let hb : Derivable F EqX al Premises
+      (eq_Q b (Term.app2 Term.add_Q (Term.app2 Term.add_Q b na) a)) :=
+    eqQtrans adm (eqQsym adm (add_Q_zero_inst adm b))
+      (eqQtrans adm (addQr adm b (eqQsym adm
+          (eqQtrans adm (add_Q_comm_inst adm na a) (add_Q_neg_inst adm a))))
+        (eqQsym adm (add_Q_assoc_inst adm b na a)))
+  let h1 : Derivable F EqX al Premises
+      (eq_Q (Term.app2 Term.sub_Q b a) Term.zero_Q →ᶠ
+       eq_Q (Term.app2 Term.add_Q b na) Term.zero_Q) :=
+    eqQhtrans adm (eqQhconst (eqQsym adm (sub_Q_eq_add_neg adm b a))) I_comb
+  let h3 : Derivable F EqX al Premises
+      (eq_Q (Term.app2 Term.sub_Q b a) Term.zero_Q →ᶠ eq_Q b a) :=
+    eqQhtrans adm (eqQhconst hb)
+      (eqQhtrans adm (.syllogism h1 (addQl_imp adm a))
+        (eqQhconst (eqQtrans adm (add_Q_comm_inst adm Term.zero_Q a)
+          (add_Q_zero_inst adm a))))
+  .syllogism h3 (eq_Q_sym_inst adm b a)
+
+/-- ⊢ ∀a,b. lt_Q(a, b) ∨ eq_Q(a, b) ∨ lt_Q(b, a)  (trichotomy)
+
+The three cases are the three possibilities for the two signed parts of `b −_ℚ a`: they
+cannot both be nonzero, since they multiply to zero. -/
 def lt_Q_trichotomy :
     Derivable F EqX al Premises (Γ := Γ)
       (Formula.all Ty.nat (Formula.all Ty.nat
         (lt_Q (.var (.vs .vz)) (.var .vz)
           ∨ᶠ eq_Q (.var (.vs .vz)) (.var .vz)
           ∨ᶠ lt_Q (.var .vz) (.var (.vs .vz))))) :=
-  sorry
+  let a : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat := .var (.vs .vz)
+  let b : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat := .var .vz
+  let D := Term.app2 Term.sub_Q b a
+  let core : Derivable F EqX al Premises
+      (lt_Q a b ∨ᶠ eq_Q a b ∨ᶠ lt_Q b a) := by
+    pmode
+    pfrom hn := Derivable.mp eq0_decidable' (.forall_ax (negN D))
+    pcases hn with hnz | hnnz
+    · pfrom hp := Derivable.mp eq0_decidable' (.forall_ax (posN D))
+      pcases hp with hpz | hpnz
+      · -- both parts vanish: the difference is zero
+        pleft
+        pright
+        phave hnum : Formula.eq0 (.app Term.rat_num D) .zero
+        · prw (Derivable.mp (posN_add_negN adm D) Derivable.sym0)
+          prwby hpz
+          prwby hnz
+          pthm (add_zero_l adm Term.zero)
+        papplym (eq_Q_of_sub_zero adm a b)
+        papplym (eq_Q_zero_of_num_zero adm D)
+        pexact hnum
+      · -- positive part nonzero: `a <_ℚ b`
+        pleft
+        pleft
+        papplym (lt_Q_of_zero_sub adm a b)
+        papplym (lt_Q_zero_of_parts adm D)
+        psplit
+        · pexact hnz
+        · pexact hpnz
+    · -- negative part nonzero, so the positive one vanishes: `b <_ℚ a`
+      pright
+      phave hpz : Formula.eq0 (posN D) .zero
+      · pfrom hm := Derivable.mp (posN_mul_negN adm D)
+          (Derivable.mp (mul_eq_zero_iff adm (posN D) (negN D)) .and_weak)
+        pcases hm with h1 | h2
+        · pexact h1
+        · pexfalso
+          papply hnnz
+          pexact h2
+      papplym (lt_Q_of_zero_sub adm b a)
+      papplym (lt_Q_zero_congr adm (.app Term.neg_Q D) (Term.app2 Term.sub_Q a b)
+        (neg_Q_sub_Q adm a b))
+      papplym (lt_Q_zero_of_parts adm (.app Term.neg_Q D))
+      psplit
+      · prw (negN_neg_Q adm D)
+        pexact hpz
+      · pintro h0
+        prw (posN_neg_Q adm D) in h0 with h1
+        papply hnnz
+        pexact h1
+  univ_gen (univ_gen core)
 
 /-- ⊢ ∀a,b. lt_Q(zero_Q, a) ∧ lt_Q(zero_Q, b) → lt_Q(zero_Q, mul_Q(a, b))
     (positive times positive is positive)
