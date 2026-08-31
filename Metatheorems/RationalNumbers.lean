@@ -4657,6 +4657,22 @@ private def abs_diff_congr_r_imp {s t : Term F Γ Ty.nat} (u : Term F Γ Ty.nat)
     (r := Term.app2 Term.abs_diff u.weaken (.var .vz))
     (by qnorm [Term.app2]) (by qnorm [Term.app2])
 
+/-- `s =₀ t →ᶠ u ∸ s =₀ u ∸ t`. -/
+private def monus_congr_snd_imp {s t : Term F Γ Ty.nat} (u : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 s t →ᶠ
+       Formula.eq0 (Term.app2 Term.monus u s) (Term.app2 Term.monus u t)) :=
+  qfer_nat_nf (by rfl) (by rfl) I_comb
+    (r := Term.app2 Term.monus u.weaken (.var .vz))
+    (by qnorm [Term.app2]) (by qnorm [Term.app2])
+
+/-- `s =₀ t →ᶠ isEven s =₀ isEven t`. -/
+private def isEven_congr_imp {s t : Term F Γ Ty.nat} :
+    Derivable F EqX al Premises
+      (Formula.eq0 s t →ᶠ
+       Formula.eq0 (.app Term.isEven s) (.app Term.isEven t)) :=
+  qfer_nat_nf (by rfl) (by rfl) I_comb (r := .app Term.isEven (.var .vz)) rfl rfl
+
 /-- `s =₀ t →ᶠ sḡ s =₀ sḡ t`. -/
 private def sg_bar_congr_imp {s t : Term F Γ Ty.nat} :
     Derivable F EqX al Premises
@@ -8535,6 +8551,196 @@ def posN_mul_negN (x : Term F Γ Ty.nat) :
       htrans (mul_congr_l_imp n) (hconst (mul_zero_l adm n))
     htrans (.syllogism hposN (mul_congr_l_imp (negN x))) (hconst (mul_zero_l adm (negN x)))
   .mp (rat_sign_cases adm x) (or_elim_rule case1 case0)
+
+-- `rat_encode` does not store the sign bit verbatim: it stores `2n ∸ isEven s`, so the sign
+-- read back is `isEven(2n ∸ isEven s)`, which is `s` *except* when `n = 0`, where it is always
+-- `1` (both `±0` encode zero). Multiplying by `n` erases exactly that discrepancy, which is
+-- why the two lemmas below are stated as products.
+
+/-- `isEven(2N ∸ isEven S) · N =₀ S · N` for a bit `S`. -/
+private def signBit_mul (S N : Term F Γ Ty.nat)
+    (hS : Derivable F EqX al Premises
+      (Formula.eq0 S (.app .succ .zero) ∨ᶠ Formula.eq0 S .zero)) :
+    Derivable F EqX al Premises
+      (Formula.eq0
+        (Term.app2 Term.mul
+          (.app Term.isEven (Term.app2 Term.monus
+            (Term.app2 Term.mul (Term.ofNat 2) N) (.app Term.isEven S))) N)
+        (Term.app2 Term.mul S N)) :=
+  let S0 : Term F Γ Ty.nat := .app .succ .zero
+  let twoN := Term.app2 Term.mul (Term.ofNat 2) N
+  let readBack := .app Term.isEven (Term.app2 Term.monus twoN (.app Term.isEven S))
+  -- S = 1: the stored value is `2N`, which is even, so the bit reads back as `1`
+  let case1 : Derivable F EqX al Premises
+      (Formula.eq0 S S0 →ᶠ Formula.eq0 (Term.app2 Term.mul readBack N)
+        (Term.app2 Term.mul S N)) :=
+    let hie := htrans isEven_congr_imp (hconst (isEven_one adm))
+    let hsign := htrans (.syllogism (.syllogism hie (monus_congr_snd_imp twoN)) isEven_congr_imp)
+      (hconst (qtrans (isEven_congr (monus_zero adm twoN))
+        (qtrans (isEven_congr (two_mul_eq_add adm N)) (isEven_double adm N))))
+    htrans (.syllogism hsign (mul_congr_l_imp N))
+      (.syllogism (.syllogism (mul_congr_l_imp N) .sym0) I_comb)
+  -- S = 0: the stored value is `2N ∸ 1`, odd whenever `N ≠ 0`; and when `N = 0` the product
+  -- kills the discrepancy
+  let case0 : Derivable F EqX al Premises
+      (Formula.eq0 S .zero →ᶠ Formula.eq0 (Term.app2 Term.mul readBack N)
+        (Term.app2 Term.mul S N)) :=
+    let inner : Derivable F EqX al Premises
+        (Formula.eq0 (Term.app2 Term.mul
+          (.app Term.isEven (Term.app2 Term.monus twoN S0)) N) .zero) :=
+      let cN0 := htrans (mul_congr_r_imp (.app Term.isEven (Term.app2 Term.monus twoN S0)))
+        (hconst (mul_zero adm (.app Term.isEven (Term.app2 Term.monus twoN S0))))
+      let cNne := htrans (.syllogism (isEven_two_mul_monus_one adm N) (mul_congr_l_imp N))
+        (hconst (mul_zero_l adm N))
+      .mp (.mp eq0_decidable' (.forall_ax N)) (or_elim_rule cN0 cNne)
+    let hie := htrans isEven_congr_imp (hconst isEven_zero)
+    let hL := htrans
+      (.syllogism (.syllogism (.syllogism hie (monus_congr_snd_imp twoN)) isEven_congr_imp)
+        (mul_congr_l_imp N))
+      (hconst inner)
+    let hR := htrans (mul_congr_l_imp N) (hconst (mul_zero_l adm N))
+    htrans hL (.syllogism hR .sym0)
+  .mp hS (or_elim_rule case1 case0)
+
+/-- `(1 ∸ isEven(2N ∸ isEven S)) · N =₀ (1 ∸ S) · N` for a bit `S`: the complementary form. -/
+private def signBit_compl_mul (S N : Term F Γ Ty.nat)
+    (hS : Derivable F EqX al Premises
+      (Formula.eq0 S (.app .succ .zero) ∨ᶠ Formula.eq0 S .zero)) :
+    Derivable F EqX al Premises
+      (Formula.eq0
+        (Term.app2 Term.mul
+          (Term.app2 Term.monus (.app .succ .zero)
+            (.app Term.isEven (Term.app2 Term.monus
+              (Term.app2 Term.mul (Term.ofNat 2) N) (.app Term.isEven S)))) N)
+        (Term.app2 Term.mul (Term.app2 Term.monus (.app .succ .zero) S) N)) :=
+  let S0 : Term F Γ Ty.nat := .app .succ .zero
+  let twoN := Term.app2 Term.mul (Term.ofNat 2) N
+  let readBack := .app Term.isEven (Term.app2 Term.monus twoN (.app Term.isEven S))
+  -- S = 1: both complements are `0`
+  let case1 : Derivable F EqX al Premises
+      (Formula.eq0 S S0 →ᶠ
+       Formula.eq0 (Term.app2 Term.mul (Term.app2 Term.monus S0 readBack) N)
+         (Term.app2 Term.mul (Term.app2 Term.monus S0 S) N)) :=
+    let hie := htrans isEven_congr_imp (hconst (isEven_one adm))
+    let hsign := htrans (.syllogism (.syllogism hie (monus_congr_snd_imp twoN)) isEven_congr_imp)
+      (hconst (qtrans (isEven_congr (monus_zero adm twoN))
+        (qtrans (isEven_congr (two_mul_eq_add adm N)) (isEven_double adm N))))
+    let hL := htrans (.syllogism (.syllogism hsign (monus_congr_snd_imp S0)) (mul_congr_l_imp N))
+      (hconst (qtrans (mul_congr_l (monus_self adm S0) N) (mul_zero_l adm N)))
+    let hR := htrans (.syllogism (monus_congr_snd_imp S0) (mul_congr_l_imp N))
+      (hconst (qtrans (mul_congr_l (monus_self adm S0) N) (mul_zero_l adm N)))
+    htrans hL (.syllogism hR .sym0)
+  -- S = 0: the complement is `1`, and the read-back bit is `0` whenever `N ≠ 0`
+  let case0 : Derivable F EqX al Premises
+      (Formula.eq0 S .zero →ᶠ
+       Formula.eq0 (Term.app2 Term.mul (Term.app2 Term.monus S0 readBack) N)
+         (Term.app2 Term.mul (Term.app2 Term.monus S0 S) N)) :=
+    let inner : Derivable F EqX al Premises
+        (Formula.eq0 (Term.app2 Term.mul
+          (Term.app2 Term.monus S0 (.app Term.isEven (Term.app2 Term.monus twoN S0))) N) N) :=
+      let cN0 : Derivable F EqX al Premises
+          (Formula.eq0 N .zero →ᶠ Formula.eq0 (Term.app2 Term.mul
+            (Term.app2 Term.monus S0 (.app Term.isEven (Term.app2 Term.monus twoN S0))) N) N) :=
+        htrans (htrans (mul_congr_r_imp (Term.app2 Term.monus S0
+            (.app Term.isEven (Term.app2 Term.monus twoN S0))))
+          (hconst (mul_zero adm (Term.app2 Term.monus S0
+            (.app Term.isEven (Term.app2 Term.monus twoN S0))))))
+          (.syllogism I_comb .sym0)
+      let cNne := htrans
+        (.syllogism (.syllogism (isEven_two_mul_monus_one adm N) (monus_congr_snd_imp S0))
+          (mul_congr_l_imp N))
+        (hconst (qtrans (mul_congr_l (monus_zero adm S0) N) (mul_one_l adm N)))
+      .mp (.mp eq0_decidable' (.forall_ax N)) (or_elim_rule cN0 cNne)
+    let hie := htrans isEven_congr_imp (hconst isEven_zero)
+    let hL := htrans
+      (.syllogism (.syllogism (.syllogism (.syllogism hie (monus_congr_snd_imp twoN))
+        isEven_congr_imp) (monus_congr_snd_imp S0)) (mul_congr_l_imp N))
+      (hconst inner)
+    let hR := htrans (.syllogism (monus_congr_snd_imp S0) (mul_congr_l_imp N))
+      (hconst (qtrans (mul_congr_l (monus_zero adm S0) N) (mul_one_l adm N)))
+    htrans hL (.syllogism hR .sym0)
+  .mp hS (or_elim_rule case1 case0)
+
+/-- `ite_nat` of two bits, on a bit condition, is a bit. -/
+private def ite_nat_cases (b x y : Term F Γ Ty.nat)
+    (hb : Derivable F EqX al Premises
+      (Formula.eq0 b (.app .succ .zero) ∨ᶠ Formula.eq0 b .zero))
+    (hx : Derivable F EqX al Premises
+      (Formula.eq0 x (.app .succ .zero) ∨ᶠ Formula.eq0 x .zero))
+    (hy : Derivable F EqX al Premises
+      (Formula.eq0 y (.app .succ .zero) ∨ᶠ Formula.eq0 y .zero)) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app3 Term.ite_nat b x y) (.app .succ .zero)
+        ∨ᶠ Formula.eq0 (Term.app3 Term.ite_nat b x y) .zero) :=
+  let S0 : Term F Γ Ty.nat := .app .succ .zero
+  let I := Term.app3 Term.ite_nat b x y
+  let D : Formula F Γ := Formula.eq0 I S0 ∨ᶠ Formula.eq0 I .zero
+  -- once the branch value `v` is known, the disjunction for `v` transfers to `I`
+  let transfer (v : Term F Γ Ty.nat) (bc : Formula F Γ)
+      (he : Derivable F EqX al Premises (bc →ᶠ Formula.eq0 I v))
+      (hv : Derivable F EqX al Premises (Formula.eq0 v S0 ∨ᶠ Formula.eq0 v .zero)) :
+      Derivable F EqX al Premises (bc →ᶠ D) :=
+    let u1 : Derivable F EqX al Premises (Formula.eq0 v S0 →ᶠ bc →ᶠ D) :=
+      Derivable.exportation (.syllogism
+        (.syllogism (pair_h (.syllogism and_proj2 he) .and_weak) .trans0) .or_weak)
+    let u0 : Derivable F EqX al Premises (Formula.eq0 v .zero →ᶠ bc →ᶠ D) :=
+      Derivable.exportation (.syllogism
+        (.syllogism (pair_h (.syllogism and_proj2 he) .and_weak) .trans0) or_inr)
+    .mp hv (or_elim_rule u1 u0)
+  let toX := htrans (ite_nat_congr_b_imp x y) (hconst (ite_nat_one (adm := adm) x y))
+  let toY := htrans (ite_nat_congr_b_imp x y) (hconst (ite_nat_zero (adm := adm) x y))
+  .mp hb (or_elim_rule (transfer x (Formula.eq0 b S0) toX hx)
+    (transfer y (Formula.eq0 b .zero) toY hy))
+
+/-- `geq` returns a bit. -/
+private def geq_cases (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.geq x y) (.app .succ .zero)
+        ∨ᶠ Formula.eq0 (Term.app2 Term.geq x y) .zero) :=
+  let unf := geq_unfold adm x y
+  let m1 : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.sg_bar (Term.app2 Term.monus y x)) (.app .succ .zero) →ᶠ
+       Formula.eq0 (Term.app2 Term.geq x y) (.app .succ .zero)) :=
+    .syllogism (pair_h (weaken_intro_h unf) I_comb) .trans0
+  let m0 : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.sg_bar (Term.app2 Term.monus y x)) .zero →ᶠ
+       Formula.eq0 (Term.app2 Term.geq x y) .zero) :=
+    .syllogism (pair_h (weaken_intro_h unf) I_comb) .trans0
+  .mp (sg_bar_cases adm (Term.app2 Term.monus y x))
+    (or_elim_rule (.syllogism m1 .or_weak) (.syllogism m0 or_inr))
+
+/-- `addQ_sign` returns a bit. -/
+def addQ_sign_cases (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (addQ_sign x y) (.app .succ .zero)
+        ∨ᶠ Formula.eq0 (addQ_sign x y) .zero) :=
+  ite_nat_cases adm _ _ _
+    (sg_bar_cases adm (Term.app2 Term.abs_diff (.app Term.rat_sign x) (.app Term.rat_sign y)))
+    (rat_sign_cases adm x)
+    (ite_nat_cases adm _ _ _ (geq_cases adm (addQ_cross x y) (addQ_cross y x))
+      (rat_sign_cases adm x) (rat_sign_cases adm y))
+
+/-- The positive part of a sum, in terms of the branch data `add_Q` computes. -/
+def posN_add_Q (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (posN (Term.app2 Term.add_Q x y))
+        (Term.app2 Term.mul (addQ_sign x y) (addQ_num x y))) :=
+  let A := Term.app2 Term.add_Q x y
+  qtrans (qtrans (mul_congr_l (rat_sign_add_Q adm x y) (.app Term.rat_num A))
+      (mul_congr_r _ (rat_num_add_Q adm x y)))
+    (signBit_mul adm (addQ_sign x y) (addQ_num x y) (addQ_sign_cases adm x y))
+
+/-- The negative part of a sum. -/
+def negN_add_Q (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (negN (Term.app2 Term.add_Q x y))
+        (Term.app2 Term.mul
+          (Term.app2 Term.monus (.app .succ .zero) (addQ_sign x y)) (addQ_num x y))) :=
+  let A := Term.app2 Term.add_Q x y
+  qtrans (qtrans (mul_congr_l
+      (monus_congr_snd (.app .succ .zero) (rat_sign_add_Q adm x y)) (.app Term.rat_num A))
+      (mul_congr_r _ (rat_num_add_Q adm x y)))
+    (signBit_compl_mul adm (addQ_sign x y) (addQ_num x y) (addQ_sign_cases adm x y))
 
 -- ── `add_Q` under `eq_Q` in the second argument ────────────────────────────
 --
