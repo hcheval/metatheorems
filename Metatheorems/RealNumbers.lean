@@ -168,13 +168,15 @@ end Term
 section ClosedSubst
 variable {Γ Δ : Ctx ι} (σ : Term.Subst F Γ Δ)
 
-@[simp] private theorem cauchyfy_closed_subst :
+@[simp] theorem cauchyfy_closed_subst :
     (Term.cauchyfy : Term F Γ _).subst σ = Term.cauchyfy := by
   simp only [Term.cauchyfy, Term.subst, Term.Subst.ext, Term.app2, Term.app3,
     Term.weaken, Term.rename, Term.Renaming.ext, Term.Renaming.shift,
     fst_pair_closed_subst, pair_closed_subst, snd_pair_closed_subst,
     lt_Q_dec_closed_subst, abs_Q_closed_subst, sub_Q_closed_subst,
     pow2neg_Q_closed_subst, ite_nat_closed_subst, sg_bar_closed_subst]
+
+attribute [closed_subst] cauchyfy_closed_subst
 @[simp] theorem zero_R_closed_subst :
     (Term.zero_R : Term F Γ _).subst σ = Term.zero_R := by rfl
 @[simp] theorem one_R_closed_subst :
@@ -964,7 +966,45 @@ def lt_mul_pos_R :
 def zero_lt_one_R :
     Derivable F EqX al Premises (Γ := Γ)
       (lt_R Term.zero_R Term.one_R) :=
-  sorry
+  -- `2^{-0} = 1_ℚ`, and both sides are constant, so the witness is `n = 0`:
+  -- `1̂(1) −ℚ 0̂(1) = 1_ℚ −ℚ 0_ℚ = 1_ℚ ≥ℚ 2^{-0}`.
+  let pow0 : Derivable F EqX al Premises (Γ := Γ)
+      (Formula.eq0 (.app Term.pow2neg_Q Term.zero) Term.one_Q) := by
+    pmode
+    prw (pow2neg_Q_unfold Term.zero)
+    prw exp2_zero
+    prw (pd_succ adm Term.zero)
+    prefl
+  let body : Derivable F EqX al Premises (Γ := Γ)
+      (Formula.eq0
+        (Term.app2 Term.le_Q_dec (.app Term.pow2neg_Q Term.zero)
+          (Term.app2 Term.sub_Q
+            (Term.app2 Term.cauchyfy Term.one_R (.app .succ Term.zero))
+            (Term.app2 Term.cauchyfy Term.zero_R (.app .succ Term.zero))))
+        Term.zero) := by
+    pmode
+    prw (cauchyfy_one_R adm (.app .succ Term.zero))
+    prw (cauchyfy_zero_R adm (.app .succ Term.zero))
+    prw (sub_Q_one_zero adm)
+    prw pow0
+    pthm (le_Q_refl adm Term.one_Q)
+  have nf : (Formula.eq0
+      (Term.app2 Term.le_Q_dec (.app Term.pow2neg_Q (.var .vz))
+        (Term.app2 Term.sub_Q
+          (Term.app2 Term.cauchyfy (Term.one_R : Term F Γ _).weaken
+            (.app .succ (.var .vz)))
+          (Term.app2 Term.cauchyfy (Term.zero_R : Term F Γ _).weaken
+            (.app .succ (.var .vz)))))
+      Term.zero).subst0 Term.zero =
+      Formula.eq0
+        (Term.app2 Term.le_Q_dec (.app Term.pow2neg_Q Term.zero)
+          (Term.app2 Term.sub_Q
+            (Term.app2 Term.cauchyfy Term.one_R (.app .succ Term.zero))
+            (Term.app2 Term.cauchyfy Term.zero_R (.app .succ Term.zero))))
+        Term.zero := by
+    simp only [Formula.subst0, Formula.substF, Term.subst, Term.subst0_map, Term.app2,
+      subst_subst0_map_weaken, cauchyfy_closed_subst, closed_subst]
+  Derivable.mp (nf ▸ body) (Derivable.exist_ax Term.zero _)
 
 -- ── Archimedean property ────────────────────────────────────────────────────
 
@@ -1050,5 +1090,13 @@ end OrderedFieldAxioms
 #print axioms eq_R_refl
 #print axioms eq_R_sym
 #print axioms lt_irrefl_R
+#print axioms zero_lt_one_R
+-- The `cauchyfy` theory the remaining axioms rest on:
+#print axioms cauchy_inv
+#print axioms cauchyState_cauchy
+#print axioms cauchyfy_zero
+#print axioms cauchyState_id_of_cauchy
+#print axioms cauchyfy_zero_R
+#print axioms cauchyfy_one_R
 
 end Metatheorems

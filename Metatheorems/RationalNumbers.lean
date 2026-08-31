@@ -7865,7 +7865,7 @@ private def add_Q_one_zero (adm : AdmissibleEqX EqX) :
   .mp (.mp h_nf_to_one (.mp h_unfold and_intro)) Derivable.trans0
 
 /-- sub_Q(one_Q, zero_Q) =₀ one_Q -/
-private def sub_Q_one_zero (adm : AdmissibleEqX EqX) :
+def sub_Q_one_zero (adm : AdmissibleEqX EqX) :
     Derivable F EqX al Premises (Γ := Γ)
       (Formula.eq0 (Term.app2 Term.sub_Q Term.one_Q Term.zero_Q) Term.one_Q) :=
   .mp (.mp (add_Q_one_zero adm)
