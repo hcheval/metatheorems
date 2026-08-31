@@ -7457,6 +7457,182 @@ def zero_lt_one_Q :
   -- Chain: lt_Q_dec(zero_Q, one_Q) =₀ add(...) =₀ 0
   .mp (.mp h_sum (.mp h_unfold and_intro)) Derivable.trans0
 
+/-- S(pd(S(x)*S(y))) =₀ S(x)*S(y). Products of successors are successors, so S∘pd is identity. -/
+private def succ_pd_mul_succ (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app .succ (.app Term.pd (Term.app2 Term.mul (.app .succ x) (.app .succ y))))
+                   (Term.app2 Term.mul (.app .succ x) (.app .succ y))) :=
+  let k := Term.app2 Term.add (Term.app2 Term.mul x (.app .succ y)) y
+  let h1 := mul_succ_l adm x (.app .succ y)
+  let h2 := add_succ adm (Term.app2 Term.mul x (.app .succ y)) y
+  let h_eq := .mp (.mp h2 (.mp h1 and_intro)) .trans0
+  let h_pd := pd_succ adm k
+  let h_pd_eq := .mp (.mp h_pd (.mp (pd_congr h_eq) and_intro)) .trans0
+  .mp (.mp (.mp h_eq .sym0) (.mp (succ_congr h_pd_eq) and_intro)) .trans0
+
+/-- S(pd(da*dc)) =₀ da*dc where da = rat_den(a), dc = rat_den(c). -/
+private def succ_pd_den_mul (a c : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app .succ (.app Term.pd
+          (Term.app2 Term.mul (.app Term.rat_den a) (.app Term.rat_den c))))
+        (Term.app2 Term.mul (.app Term.rat_den a) (.app Term.rat_den c))) :=
+  let spa := Term.app Term.snd_pair a
+  let spc := Term.app Term.snd_pair c
+  let h_da := rat_den_unfold_eq a
+  let h_dc := rat_den_unfold_eq c
+  let h_prod := .mp (.mp (mul_congr_r _ h_dc) (.mp (mul_congr_l h_da _) and_intro)) .trans0
+  let h_core := succ_pd_mul_succ adm spa spc
+  let h1 := succ_congr (pd_congr h_prod)
+  .mp (.mp (.mp h_prod .sym0) (.mp (.mp (.mp h_core (.mp h1 and_intro)) .trans0) and_intro)) .trans0
+
+-- ── `add_Q` component lemmas ───────────────────────────────────────────────
+--
+-- The `body`/`body_eq`/`nf`/`lam2_correct_nf` unfolding is rebuilt inline sixteen times in
+-- this file, once per proof that needs it. These name it once for `add_Q`, the way
+-- `mul_Q_body`/`mul_Q_unfold`/`rat_*_mul_Q` below do for `mul_Q`.
+--
+-- `add_Q` is the harder of the two: both its numerator and its sign are `ite_nat`s over the
+-- "do the two arguments have the same sign bit" test, so the components are *conditional*.
+-- The unconditional lemmas below state them with the `ite_nat` still in place; the four
+-- `addQ_num_*`/`addQ_sign_*` lemmas discharge it once the test's value is known.
+
+/-- The cross product `rat_num x · rat_den y` — the numerator of `x` once both arguments are
+put over the common denominator `rat_den x · rat_den y`. -/
+def addQ_cross (x y : Term F Γ Ty.nat) : Term F Γ Ty.nat :=
+  Term.app2 Term.mul (.app Term.rat_num x) (.app Term.rat_den y)
+
+/-- The same-sign test `add_Q` branches on: `S0` when the sign bits agree, `0` when they do
+not. -/
+def addQ_same (x y : Term F Γ Ty.nat) : Term F Γ Ty.nat :=
+  Term.app Term.sg_bar (Term.app2 Term.abs_diff
+    (.app Term.rat_sign x) (.app Term.rat_sign y))
+
+/-- The numerator `add_Q x y` is encoded with: the sum of the cross products when the signs
+agree, their absolute difference when they do not. -/
+def addQ_num (x y : Term F Γ Ty.nat) : Term F Γ Ty.nat :=
+  Term.app3 Term.ite_nat (addQ_same x y)
+    (Term.app2 Term.add (addQ_cross x y) (addQ_cross y x))
+    (Term.app2 Term.abs_diff (addQ_cross x y) (addQ_cross y x))
+
+/-- The sign `add_Q x y` is encoded with: `rat_sign x` when the signs agree, and otherwise the
+sign of whichever cross product is the larger. -/
+def addQ_sign (x y : Term F Γ Ty.nat) : Term F Γ Ty.nat :=
+  Term.app3 Term.ite_nat (addQ_same x y) (.app Term.rat_sign x)
+    (Term.app3 Term.ite_nat (Term.app2 Term.geq (addQ_cross x y) (addQ_cross y x))
+      (.app Term.rat_sign x) (.app Term.rat_sign y))
+
+/-- The body `add_Q` compiles to, in the two-variable context. -/
+private def add_Q_body {Γ : Ctx ι} : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat :=
+  let n₁ : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat := Term.var (.vs .vz)
+  let n₂ : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat := Term.var .vz
+  let s₁ := Term.app Term.rat_sign n₁
+  let p₁ := Term.app Term.rat_num n₁
+  let d₁ := Term.app Term.rat_den n₁
+  let s₂ := Term.app Term.rat_sign n₂
+  let p₂ := Term.app Term.rat_num n₂
+  let d₂ := Term.app Term.rat_den n₂
+  let a  := Term.app2 Term.mul p₁ d₂
+  let b  := Term.app2 Term.mul p₂ d₁
+  let same := Term.app Term.sg_bar (Term.app2 Term.abs_diff s₁ s₂)
+  let result_num := Term.app3 Term.ite_nat same
+    (Term.app2 Term.add a b)
+    (Term.app2 Term.abs_diff a b)
+  let result_sign := Term.app3 Term.ite_nat same s₁
+    (Term.app3 Term.ite_nat (Term.app2 Term.geq a b) s₁ s₂)
+  let result_den_m1 := Term.app Term.pd (Term.app2 Term.mul d₁ d₂)
+  Term.app3 Term.rat_encode result_sign result_num result_den_m1
+
+/-- `add_Q x y` in encoded form: sign, numerator and denominator spelled out. -/
+def add_Q_unfold (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add_Q x y)
+        (Term.app3 Term.rat_encode (addQ_sign x y) (addQ_num x y)
+          (.app Term.pd (Term.app2 Term.mul
+            (.app Term.rat_den x) (.app Term.rat_den y))))) :=
+  have body_eq : (Term.add_Q : Term F Γ _) = Term.lam (Term.lam add_Q_body) := by rfl
+  have nf : ((add_Q_body : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat).subst0 (y.weaken)).subst0 x =
+      Term.app3 Term.rat_encode (addQ_sign x y) (addQ_num x y)
+        (.app Term.pd (Term.app2 Term.mul
+          (.app Term.rat_den x) (.app Term.rat_den y))) := by
+    qnorm [add_Q_body, addQ_sign, addQ_num, addQ_same, addQ_cross]
+  body_eq ▸ lam2_correct_nf adm add_Q_body x y nf
+
+/-- The numerator of a sum, with the branch on the same-sign test still in place. -/
+def rat_num_add_Q (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_num (Term.app2 Term.add_Q x y)) (addQ_num x y)) := by
+  pmode
+  prw (add_Q_unfold adm x y)
+  pthm (rat_num_rat_encode adm _ _ _ (isEven_cases adm _))
+
+/-- The denominator of a sum is the product of the denominators. The `pd`/`succ` pair cancels
+because a denominator is always a successor. -/
+def rat_den_add_Q (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_den (Term.app2 Term.add_Q x y))
+        (Term.app2 Term.mul (.app Term.rat_den x) (.app Term.rat_den y))) := by
+  pmode
+  prw (add_Q_unfold adm x y)
+  prw (rat_den_rat_encode adm _ _ _)
+  pthm (succ_pd_den_mul adm x y)
+
+/-- The sign of a sum, reduced to the parity form the sign lemmas work with. -/
+def rat_sign_add_Q (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_sign (Term.app2 Term.add_Q x y))
+        (.app Term.isEven (Term.app2 Term.monus
+          (Term.app2 Term.mul (Term.ofNat 2) (addQ_num x y))
+          (.app Term.isEven (addQ_sign x y))))) := by
+  pmode
+  prw (add_Q_unfold adm x y)
+  pthm (rat_sign_rat_encode_unfold adm _ _ _)
+
+/-- `ite_nat b x y =₀ x` once `b` is known to be `S0`. The workhorse behind the four branch
+lemmas below: `addQ_num`/`addQ_sign` are `ite_nat`s by definition, so the stated conclusion is
+defeq to the one about the named component. -/
+private def ite_nat_of_S0 {b : Term F Γ Ty.nat} (x y : Term F Γ Ty.nat)
+    (h : Derivable F EqX al Premises (Formula.eq0 b (.app .succ .zero))) :
+    Derivable F EqX al Premises (Formula.eq0 (Term.app3 Term.ite_nat b x y) x) :=
+  .mp (.mp (ite_nat_one (adm := adm) x y) (.mp (ite_nat_congr_b h) and_intro)) .trans0
+
+/-- `ite_nat b x y =₀ y` once `b` is known to be `0`. -/
+private def ite_nat_of_zero {b : Term F Γ Ty.nat} (x y : Term F Γ Ty.nat)
+    (h : Derivable F EqX al Premises (Formula.eq0 b .zero)) :
+    Derivable F EqX al Premises (Formula.eq0 (Term.app3 Term.ite_nat b x y) y) :=
+  .mp (.mp (ite_nat_zero (adm := adm) x y) (.mp (ite_nat_congr_b h) and_intro)) .trans0
+
+/-- Same-sign branch of the numerator. -/
+def addQ_num_same (x y : Term F Γ Ty.nat)
+    (h : Derivable F EqX al Premises (Formula.eq0 (addQ_same x y) (.app .succ .zero))) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (addQ_num x y)
+        (Term.app2 Term.add (addQ_cross x y) (addQ_cross y x))) :=
+  ite_nat_of_S0 (adm := adm) _ _ h
+
+/-- Opposite-sign branch of the numerator. -/
+def addQ_num_diff (x y : Term F Γ Ty.nat)
+    (h : Derivable F EqX al Premises (Formula.eq0 (addQ_same x y) .zero)) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (addQ_num x y)
+        (Term.app2 Term.abs_diff (addQ_cross x y) (addQ_cross y x))) :=
+  ite_nat_of_zero (adm := adm) _ _ h
+
+/-- Same-sign branch of the sign. -/
+def addQ_sign_same (x y : Term F Γ Ty.nat)
+    (h : Derivable F EqX al Premises (Formula.eq0 (addQ_same x y) (.app .succ .zero))) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (addQ_sign x y) (.app Term.rat_sign x)) :=
+  ite_nat_of_S0 (adm := adm) _ _ h
+
+/-- Opposite-sign branch of the sign. -/
+def addQ_sign_diff (x y : Term F Γ Ty.nat)
+    (h : Derivable F EqX al Premises (Formula.eq0 (addQ_same x y) .zero)) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (addQ_sign x y)
+        (Term.app3 Term.ite_nat (Term.app2 Term.geq (addQ_cross x y) (addQ_cross y x))
+          (.app Term.rat_sign x) (.app Term.rat_sign y))) :=
+  ite_nat_of_zero (adm := adm) _ _ h
+
 -- ── Congruence (eq_Q respects operations) ──────────────────────────────────
 
 /-- Right congruence for add_Q: eq_Q(c,d) → eq_Q(add_Q(a,c), add_Q(a,d)). -/
@@ -7519,34 +7695,6 @@ def add_Q_congr :
     .syllogism (pair_h (.syllogism and_proj2 rc_inst_a) (.syllogism .and_weak step2b))
       (trans_inst aac aad abd)
   univ_gen (univ_gen (univ_gen (univ_gen combined)))
-
-/-- S(pd(S(x)*S(y))) =₀ S(x)*S(y). Products of successors are successors, so S∘pd is identity. -/
-private def succ_pd_mul_succ (x y : Term F Γ Ty.nat) :
-    Derivable F EqX al Premises
-      (Formula.eq0 (.app .succ (.app Term.pd (Term.app2 Term.mul (.app .succ x) (.app .succ y))))
-                   (Term.app2 Term.mul (.app .succ x) (.app .succ y))) :=
-  let k := Term.app2 Term.add (Term.app2 Term.mul x (.app .succ y)) y
-  let h1 := mul_succ_l adm x (.app .succ y)
-  let h2 := add_succ adm (Term.app2 Term.mul x (.app .succ y)) y
-  let h_eq := .mp (.mp h2 (.mp h1 and_intro)) .trans0
-  let h_pd := pd_succ adm k
-  let h_pd_eq := .mp (.mp h_pd (.mp (pd_congr h_eq) and_intro)) .trans0
-  .mp (.mp (.mp h_eq .sym0) (.mp (succ_congr h_pd_eq) and_intro)) .trans0
-
-/-- S(pd(da*dc)) =₀ da*dc where da = rat_den(a), dc = rat_den(c). -/
-private def succ_pd_den_mul (a c : Term F Γ Ty.nat) :
-    Derivable F EqX al Premises
-      (Formula.eq0 (.app .succ (.app Term.pd
-          (Term.app2 Term.mul (.app Term.rat_den a) (.app Term.rat_den c))))
-        (Term.app2 Term.mul (.app Term.rat_den a) (.app Term.rat_den c))) :=
-  let spa := Term.app Term.snd_pair a
-  let spc := Term.app Term.snd_pair c
-  let h_da := rat_den_unfold_eq a
-  let h_dc := rat_den_unfold_eq c
-  let h_prod := .mp (.mp (mul_congr_r _ h_dc) (.mp (mul_congr_l h_da _) and_intro)) .trans0
-  let h_core := succ_pd_mul_succ adm spa spc
-  let h1 := succ_congr (pd_congr h_prod)
-  .mp (.mp (.mp h_prod .sym0) (.mp (.mp (.mp h_core (.mp h1 and_intro)) .trans0) and_intro)) .trans0
 
 -- ── `mul_Q` component lemmas ───────────────────────────────────────────────
 --
