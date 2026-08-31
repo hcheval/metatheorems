@@ -11037,7 +11037,10 @@ def lt_Q_trichotomy :
   sorry
 
 /-- ⊢ ∀a,b. lt_Q(zero_Q, a) ∧ lt_Q(zero_Q, b) → lt_Q(zero_Q, mul_Q(a, b))
-    (positive times positive is positive) -/
+    (positive times positive is positive)
+
+No group algebra here: `mul_Q`'s components are unconditional, so both sign bits being `1`
+makes the same-sign test fire directly, and the numerator is a product of two nonzeros. -/
 def lt_Q_mul_pos :
     Derivable F EqX al Premises (Γ := Γ)
       (Formula.all Ty.nat (Formula.all Ty.nat
@@ -11045,7 +11048,47 @@ def lt_Q_mul_pos :
           ∧ᶠ lt_Q Term.zero_Q (.var .vz)
           →ᶠ lt_Q Term.zero_Q
             (Term.app2 Term.mul_Q (.var (.vs .vz)) (.var .vz))))) :=
-  sorry
+  let a : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat := .var (.vs .vz)
+  let b : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat := .var .vz
+  let N := Term.app2 Term.mul (.app Term.rat_num a) (.app Term.rat_num b)
+  let core : Derivable F EqX al Premises
+      (lt_Q Term.zero_Q a ∧ᶠ lt_Q Term.zero_Q b →ᶠ
+       lt_Q Term.zero_Q (Term.app2 Term.mul_Q a b)) := by
+    pmode
+    pintro hyp
+    pdestruct hyp with ha hb
+    papplym (lt_Q_zero_fwd adm a) in ha with hab
+    papplym (lt_Q_zero_fwd adm b) in hb with hbb
+    pdestruct hab with hsa hna
+    pdestruct hbb with hsb hnb
+    phave hS : Formula.eq0 (.app Term.sg_bar (Term.app2 Term.abs_diff
+        (.app Term.rat_sign a) (.app Term.rat_sign b))) (.app .succ .zero)
+    · prwby hsa
+      prwby hsb
+      prw (abs_diff_self adm (.app .succ .zero))
+      pthm sg_bar_zero
+    phave hnum : ¬ᶠ(Formula.eq0 N .zero)
+    · pintro h0
+      papplym (Derivable.mp (mul_eq_zero_iff adm
+        (.app Term.rat_num a) (.app Term.rat_num b)) .and_weak) in h0 with hor
+      pcases hor with h1 | h2
+      · papply hna
+        pexact h1
+      · papply hnb
+        pexact h2
+    papplym (lt_Q_zero_bwd adm (Term.app2 Term.mul_Q a b))
+    psplit
+    · prw (rat_sign_mul_Q adm a b)
+      prwby hS
+      prw (isEven_one adm)
+      prw (monus_zero adm (Term.app2 Term.mul (Term.ofNat 2) N))
+      prw (two_mul_eq_add adm N)
+      pthm (isEven_double adm N)
+    · pintro h0
+      prw (rat_num_mul_Q adm a b) in h0 with h1
+      papply hnum
+      pexact h1
+  univ_gen (univ_gen core)
 
 end RationalOrderedField
 
