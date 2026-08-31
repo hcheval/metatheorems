@@ -2534,6 +2534,45 @@ def monus_mul_distrib (x y k : Term F Γ Ty.nat) :
       Term.app2, mul_closed_subst', monus_closed_subst', xw_subst0, kw_subst0]
   inst_nf ▸ .mp (Derivable.induction base (univ_gen step_body)) (.forall_ax y)
 
+/-- `sḡ(m · S j) =₀ sḡ(m)`: scaling by a positive number does not change whether a natural is
+zero. Both sides are `S0` when `m = 0` and `0` when it is not, so the proof is the decidability
+split with `mul_eq_zero_iff` ruling out the `S j = 0` disjunct. -/
+def sg_bar_mul_succ (m j : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (Formula.eq0
+      (.app Term.sg_bar (Term.app2 Term.mul m (.app .succ j)))
+      (.app Term.sg_bar m)) :=
+  let sj : Term F Γ Ty.nat := .app .succ j
+  let msj := Term.app2 Term.mul m sj
+  -- `m = 0`: both sides are `S0`.
+  let case_zero : Derivable F EqX al Premises
+      (Formula.eq0 m Term.zero →ᶠ
+        Formula.eq0 (.app Term.sg_bar msj) (.app Term.sg_bar m)) :=
+    let hm := Derivable.syllogism
+      (pair_h (qfer_nat_nf (by rfl) (by rfl) I_comb
+        (r := .app Term.sg_bar (.var .vz)) rfl rfl) (weaken_intro_h sg_bar_zero)) .trans0
+    let hp := Derivable.syllogism
+      (pair_h (qfer_nat_nf (by rfl) (by rfl) I_comb
+        (r := Term.app2 Term.mul (.var .vz) sj.weaken)
+        (mul_subst0_l_nf sj m) (mul_subst0_l_nf sj Term.zero))
+        (weaken_intro_h (mul_zero_l adm sj))) .trans0
+    let hq := Derivable.syllogism
+      (pair_h (qfer_nat_nf (by rfl) (by rfl) hp
+        (r := .app Term.sg_bar (.var .vz)) rfl rfl) (weaken_intro_h sg_bar_zero)) .trans0
+    .syllogism (pair_h hq (.syllogism hm .sym0)) .trans0
+  -- `m ≠ 0`: `m · S j ≠ 0` too, so both sides are `0`.
+  let case_ne : Derivable F EqX al Premises
+      (¬ᶠ(Formula.eq0 m Term.zero) →ᶠ
+        Formula.eq0 (.app Term.sg_bar msj) (.app Term.sg_bar m)) :=
+    let msj_to_m : Derivable F EqX al Premises
+        (Formula.eq0 msj Term.zero →ᶠ Formula.eq0 m Term.zero) :=
+      .syllogism (Derivable.mp (mul_eq_zero_iff adm m sj) .and_weak)
+        (or_elim_rule I_comb (.syllogism (.mp .succ_ne_zero (.forall_ax j)) .exfalso))
+    let hl := .syllogism (contrapositive msj_to_m)
+      (Derivable.mp (sg_bar_eq_zero_iff adm msj) and_proj2)
+    let hr := Derivable.mp (sg_bar_eq_zero_iff adm m) and_proj2
+    .syllogism (pair_h hl (.syllogism hr .sym0)) .trans0
+  .mp (.mp eq0_decidable' (.forall_ax m)) (or_elim_rule case_zero case_ne)
+
 end ArithProps
 
 -- ============================================================================
