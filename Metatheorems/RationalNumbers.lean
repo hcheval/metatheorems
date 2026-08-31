@@ -7756,6 +7756,32 @@ def zero_lt_one_Q :
   -- Chain: lt_Q_dec(zero_Q, one_Q) =₀ add(...) =₀ 0
   .mp (.mp h_sum (.mp h_unfold and_intro)) Derivable.trans0
 
+/-- Transitivity of `=₀` in the shape the chains below are actually written in. The file spells
+this out as `.mp (.mp h₂ (.mp h₁ and_intro)) .trans0` several hundred times. -/
+private def qtrans {a b c : Term F Γ Ty.nat}
+    (h₁ : Derivable F EqX al Premises (Formula.eq0 a b))
+    (h₂ : Derivable F EqX al Premises (Formula.eq0 b c)) :
+    Derivable F EqX al Premises (Formula.eq0 a c) :=
+  .mp (.mp h₂ (.mp h₁ and_intro)) .trans0
+
+/-- `2·n =₀ n + n`. Written out twice inline inside `rat_sign_rat_encode_pos/neg`; pulled out
+here because the sign half of `mul_Q_right_congr` needs it too. -/
+private def two_mul_eq_add (n : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul (Term.ofNat 2) n) (Term.app2 Term.add n n)) :=
+  let h_ms := mul_succ_l adm (.app .succ .zero) n
+  let h_m1 := qtrans (mul_comm adm (.app .succ .zero) n) (mul_one_r adm n)
+  qtrans h_ms (add_congr_l h_m1 n)
+
+/-- `(a + b)·x =₀ a·x + b·x`. `Arithmetic.lean` has `mul_add` on the other side only. -/
+private def add_mul (a b x : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul (Term.app2 Term.add a b) x)
+        (Term.app2 Term.add (Term.app2 Term.mul a x) (Term.app2 Term.mul b x))) :=
+  let h3 := qtrans (add_congr_l (mul_comm adm x a) (Term.app2 Term.mul x b))
+    (add_congr_r (Term.app2 Term.mul a x) (mul_comm adm x b))
+  qtrans (qtrans (mul_comm adm (Term.app2 Term.add a b) x) (mul_add adm x a b)) h3
+
 -- ── Positivity ─────────────────────────────────────────────────────────────
 --
 -- `0_ℚ <_ℚ p` is the shape every real-number side condition bottoms out in — `eq_R` is a
@@ -7833,6 +7859,80 @@ def lt_Q_zero_bwd (p : Term F Γ Ty.nat) :
     .syllogism (pair_h (.syllogism (.syllogism and_proj2 hsg) .sym0) .and_weak) .trans0
   .syllogism (pair_h hs (.syllogism and_proj2 hne)) (lt_Q_intro adm Term.zero_Q p)
 
+-- ── `exp2` ─────────────────────────────────────────────────────────────────
+--
+-- `exp2` had no theory at all: it was defined in section 1 and then only ever appeared inside
+-- `pow2neg_Q`. These are the three facts `2^{-n}` needs — the two recursion equations and
+-- positivity, the last by object-level induction.
+
+/-- The body `exp2` compiles to. -/
+private def exp2_body {Γ : Ctx ι} : Term F (Ty.nat :: Γ) Ty.nat :=
+  Term.app3 (.prec Ty.nat) (.app .succ .zero)
+    (Term.lam (Term.lam (Term.app2 Term.add (.var (.vs .vz)) (.var (.vs .vz)))))
+    (.var .vz)
+
+/-- `2^0 =₀ 1`. -/
+def exp2_zero :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.eq0 (.app Term.exp2 Term.zero) (.app .succ .zero)) :=
+  .mp (.mp (.rec_zero (ρ := Ty.nat))
+    (.mp (Term.lam_correct exp2_body Term.zero) and_intro)) .trans0
+
+/-- `2^(n+1) =₀ 2^n + 2^n`. -/
+def exp2_succ (n : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.exp2 (.app .succ n))
+        (Term.app2 Term.add (.app Term.exp2 n) (.app Term.exp2 n))) :=
+  let step : Term F Γ (Ty.nat →ₜ Ty.nat →ₜ Ty.nat) :=
+    Term.lam (Term.lam (Term.app2 Term.add (.var (.vs .vz)) (.var (.vs .vz))))
+  let base : Term F Γ Ty.nat := .app .succ .zero
+  let rec_n : Term F Γ Ty.nat := Term.app3 (.prec Ty.nat) base step n
+  let h1 := Term.lam_correct exp2_body (.app .succ n)
+  let c1 := .mp (.mp (.rec_succ (ρ := Ty.nat)) (.mp h1 and_intro)) (eqAtType_trans adm)
+  let h2 := lam2_correct_nf adm
+    (Term.app2 Term.add (.var (.vs .vz)) (.var (.vs .vz))
+      : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat)
+    rec_n n (by qnorm [rec_n, base, step])
+  let c2 := .mp (.mp h2 (.mp c1 and_intro)) (eqAtType_trans adm)
+  let h3 : Derivable F EqX al Premises (Formula.eq0 rec_n (.app Term.exp2 n)) :=
+    .mp (Term.lam_correct exp2_body n) .sym0
+  let h4 := .mp (.mp (add_congr_r (.app Term.exp2 n) h3)
+    (.mp (add_congr_l h3 rec_n) and_intro)) .trans0
+  .mp (.mp h4 (.mp c2 and_intro)) .trans0
+
+/-- `2^n ≠ 0`, by induction: `2^0 = 1`, and a sum of two nonzero naturals is nonzero. -/
+def exp2_ne_zero :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all Ty.nat (¬ᶠ(Formula.eq0 (.app Term.exp2 (.var .vz)) .zero))) :=
+  let base : Derivable F EqX al Premises (Γ := Γ)
+      (¬ᶠ(Formula.eq0 (.app Term.exp2 Term.zero) .zero)) :=
+    .syllogism
+      (.syllogism (pair_h (weaken_intro_h (.mp exp2_zero .sym0)) I_comb) .trans0)
+      (.mp .succ_ne_zero (.forall_ax Term.zero))
+  let step : Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
+      (¬ᶠ(Formula.eq0 (.app Term.exp2 (.var .vz)) .zero) →ᶠ
+       ¬ᶠ(Formula.eq0 (.app Term.exp2 (.app .succ (.var .vz))) .zero)) := by
+    pmode
+    pintro hn
+    pintro h0
+    papply hn
+    phave hsum : Formula.eq0 (Term.app2 Term.add
+        (.app Term.exp2 (.var .vz)) (.app Term.exp2 (.var .vz))) .zero
+    · prw (Derivable.mp (exp2_succ adm (.var .vz)) Derivable.sym0)
+      pexact h0
+    papplym (Derivable.mp (add_eq_zero_iff adm
+      (.app Term.exp2 (.var .vz)) (.app Term.exp2 (.var .vz))) .and_weak) in hsum with hb
+    pdestruct hb with h1 _h2
+    pexact h1
+  Derivable.induction base (univ_gen step)
+
+/-- `2^n =₀ S(2^n ∸ 1)` — the form the `pd`/`succ` cancellation in a denominator needs. -/
+def exp2_succ_pd (n : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.exp2 n) (.app .succ (.app Term.pd (.app Term.exp2 n)))) :=
+  .mp (.mp (exp2_ne_zero (adm := adm)) (.forall_ax n))
+    (ne_zero_eq_succ_pd adm (.app Term.exp2 n))
+
 -- ── `2^{-n}` as a rational ──────────────────────────────────────────────────
 
 /-- `pow2neg_Q n =₀ pair(2, exp2(n) ∸ 1)`. -/
@@ -7890,6 +7990,23 @@ def rat_num_pow2neg_Q (n : Term F Γ Ty.nat) :
       (Formula.eq0 (.app Term.rat_num (.app Term.pow2neg_Q n)) (.app .succ .zero)) :=
   .mp (.mp (rat_num_pair_two adm (.app Term.pd (.app Term.exp2 n)))
     (.mp (rat_num_congr (pow2neg_Q_unfold n)) and_intro)) .trans0
+
+/-- …and denominator `k+1`. -/
+def rat_den_pair_two (k : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_den (Term.app2 Term.pair (Term.ofNat 2) k))
+        (.app .succ k)) :=
+  qtrans (rat_den_unfold_eq (Term.app2 Term.pair (Term.ofNat 2) k))
+    (succ_congr (snd_pair_pair adm (Term.ofNat 2) k))
+
+/-- `rat_den(⟨2^{-n}⟩_ℚ) =₀ 2^n`. The `S`/`pd` pair cancels because `2^n` is positive. -/
+def rat_den_pow2neg_Q (n : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_den (.app Term.pow2neg_Q n)) (.app Term.exp2 n)) :=
+  qtrans
+    (qtrans (rat_den_congr (pow2neg_Q_unfold n))
+      (rat_den_pair_two adm (.app Term.pd (.app Term.exp2 n))))
+    (.mp (exp2_succ_pd adm n) .sym0)
 
 /-- `0_ℚ <_ℚ ⟨2^{-n}⟩_ℚ` — the positivity every real-number modulus argument needs. -/
 def zero_lt_pow2neg_Q (n : Term F Γ Ty.nat) :
@@ -8081,6 +8198,82 @@ def addQ_sign_diff (x y : Term F Γ Ty.nat)
           (.app Term.rat_sign x) (.app Term.rat_sign y))) :=
   ite_nat_of_zero (adm := adm) _ _ h
 
+/-- `⟨2^{-(n+1)}⟩_ℚ +_ℚ ⟨2^{-(n+1)}⟩_ℚ =_ℚ ⟨2^{-n}⟩_ℚ` — the halving law every real-number
+modulus argument runs on. The first real use of the `add_Q` component lemmas: both summands
+have sign bit `1`, so the same-sign branch fires and the numerator is just `2^{n+1}` twice. -/
+def pow2neg_Q_halve (n : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (eq_Q (Term.app2 Term.add_Q
+              (.app Term.pow2neg_Q (.app .succ n)) (.app Term.pow2neg_Q (.app .succ n)))
+            (.app Term.pow2neg_Q n)) :=
+  let p : Term F Γ Ty.nat := .app Term.pow2neg_Q (.app .succ n)
+  let q : Term F Γ Ty.nat := .app Term.pow2neg_Q n
+  let A : Term F Γ Ty.nat := Term.app2 Term.add_Q p p
+  let d : Term F Γ Ty.nat := .app Term.exp2 (.app .succ n)
+  let e : Term F Γ Ty.nat := .app Term.exp2 n
+  let hnp := rat_num_pow2neg_Q adm (.app .succ n)
+  let hdp := rat_den_pow2neg_Q adm (.app .succ n)
+  let hsp := rat_sign_pow2neg_Q adm (.app .succ n)
+  let hnq := rat_num_pow2neg_Q adm n
+  let hdq := rat_den_pow2neg_Q adm n
+  let hsq := rat_sign_pow2neg_Q adm n
+  let hde := exp2_succ adm n
+  -- The two summands are literally the same term, so the same-sign test is `S0`.
+  let hsame : Derivable F EqX al Premises
+      (Formula.eq0 (addQ_same p p) (.app .succ .zero)) :=
+    qtrans (sg_bar_congr (abs_diff_self adm (.app Term.rat_sign p))) sg_bar_zero
+  -- Each cross product is `1 · 2^{n+1}`.
+  let hcpp : Derivable F EqX al Premises (Formula.eq0 (addQ_cross p p) d) :=
+    qtrans (qtrans (mul_congr_l hnp (.app Term.rat_den p))
+      (mul_congr_r (.app .succ .zero) hdp)) (mul_one_l adm d)
+  let N := addQ_num p p
+  let hnumA : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_num A) (Term.app2 Term.add d d)) :=
+    qtrans (qtrans (rat_num_add_Q adm p p) (addQ_num_same adm p p hsame))
+      (qtrans (add_congr_l hcpp (addQ_cross p p)) (add_congr_r d hcpp))
+  let hdenA : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_den A) (Term.app2 Term.mul d d)) :=
+    qtrans (rat_den_add_Q adm p p)
+      (qtrans (mul_congr_l hdp (.app Term.rat_den p)) (mul_congr_r d hdp))
+  -- The sign bit survives: the branch value is `rat_sign p = 1`, and `2·N` is even.
+  let hsignA : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_sign A) (.app .succ .zero)) :=
+    let hsignpp := qtrans (addQ_sign_same adm p p hsame) hsp
+    let hie := qtrans (isEven_congr hsignpp) (isEven_one adm)
+    let hmon := qtrans (monus_congr_r (Term.app2 Term.mul (Term.ofNat 2) N) hie)
+      (monus_zero adm (Term.app2 Term.mul (Term.ofNat 2) N))
+    qtrans (rat_sign_add_Q adm p p)
+      (qtrans (isEven_congr hmon)
+        (qtrans (isEven_congr (two_mul_eq_add adm N)) (isEven_double adm N)))
+  -- Cross condition: `(2^{n+1} + 2^{n+1}) · 2^n = 2^{n+1} · 2^{n+1}`, both sides `2·2^n·2^{n+1}`.
+  let X := Term.app2 Term.mul (.app Term.rat_num A) (.app Term.rat_den q)
+  let Y := Term.app2 Term.mul (.app Term.rat_num q) (.app Term.rat_den A)
+  let hX : Derivable F EqX al Premises
+      (Formula.eq0 X (Term.app2 Term.mul (Term.app2 Term.add d d) e)) :=
+    qtrans (mul_congr_l hnumA (.app Term.rat_den q))
+      (mul_congr_r (Term.app2 Term.add d d) hdq)
+  let hY : Derivable F EqX al Premises
+      (Formula.eq0 Y (Term.app2 Term.mul d d)) :=
+    qtrans (qtrans (mul_congr_l hnq (.app Term.rat_den A))
+      (mul_congr_r (.app .succ .zero) hdenA)) (mul_one_l adm (Term.app2 Term.mul d d))
+  let hXY : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul (Term.app2 Term.add d d) e)
+        (Term.app2 Term.mul d d)) :=
+    qtrans (add_mul adm d d e)
+      (.mp (qtrans (mul_congr_r d hde) (mul_add adm d e e)) .sym0)
+  let h_cross := Derivable.mp (qtrans (qtrans hX hXY) (.mp hY .sym0))
+    (Derivable.mp (abs_diff_eq_zero_iff adm X Y) (.syllogism .and_perm .and_weak))
+  -- Sign condition: both sign bits are `1`, so the discrepancy factor vanishes.
+  let habs : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.abs_diff
+        (.app Term.rat_sign A) (.app Term.rat_sign q)) .zero) :=
+    qtrans (qtrans (abs_diff_congr_l hsignA (.app Term.rat_sign q))
+      (abs_diff_congr_r (.app .succ .zero) hsq)) (abs_diff_self adm (.app .succ .zero))
+  let h_sign := qtrans (mul_congr_l habs
+    (.app Term.sg (Term.app2 Term.add (.app Term.rat_num A) (.app Term.rat_num q))))
+    (mul_zero_l adm _)
+  eq_Q_from_components adm h_cross h_sign
+
 -- ── Congruence (eq_Q respects operations) ──────────────────────────────────
 
 /-- Right congruence for add_Q: eq_Q(c,d) → eq_Q(add_Q(a,c), add_Q(a,d)). -/
@@ -8216,16 +8409,6 @@ def rat_sign_mul_Q (x y : Term F Γ Ty.nat) :
   pmode
   prw (mul_Q_unfold adm x y)
   pthm (rat_sign_rat_encode_unfold adm _ _ _)
-
-/-- `2·n =₀ n + n`. Written out twice inline inside `rat_sign_rat_encode_pos/neg`; pulled out
-here because the sign half of `mul_Q_right_congr` needs it too. -/
-private def two_mul_eq_add (n : Term F Γ Ty.nat) :
-    Derivable F EqX al Premises
-      (Formula.eq0 (Term.app2 Term.mul (Term.ofNat 2) n) (Term.app2 Term.add n n)) :=
-  let h_ms := mul_succ_l adm (.app .succ .zero) n
-  let h_m1 := .mp (.mp (mul_one_r adm n)
-    (.mp (mul_comm adm (.app .succ .zero) n) and_intro)) .trans0
-  .mp (.mp (add_congr_l h_m1 n) (.mp h_ms and_intro)) .trans0
 
 /-- `n ≠ 0 → isEven(2·n ∸ 1) =₀ 0`, i.e. one less than a positive even number is odd.
 
