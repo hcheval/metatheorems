@@ -8448,6 +8448,53 @@ def addQ_sign_diff (x y : Term F Γ Ty.nat)
           (.app Term.rat_sign x) (.app Term.rat_sign y))) :=
   ite_nat_of_zero (adm := adm) _ _ h
 
+-- The same four, in implication form: they have to be applied under a hypothesis, and the
+-- kernel has no deduction theorem to convert the closed versions.
+
+/-- Implication form of `addQ_num_same`. -/
+private def addQ_num_same_imp (a c : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (addQ_same a c) (.app .succ .zero) →ᶠ
+       Formula.eq0 (addQ_num a c)
+         (Term.app2 Term.add (addQ_cross a c) (addQ_cross c a))) :=
+  let X := Term.app2 Term.add (addQ_cross a c) (addQ_cross c a)
+  let Y := Term.app2 Term.abs_diff (addQ_cross a c) (addQ_cross c a)
+  htrans (ite_nat_congr_b_imp X Y) (hconst (ite_nat_one (adm := adm) X Y))
+
+/-- Implication form of `addQ_num_diff`. -/
+private def addQ_num_diff_imp (a c : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (addQ_same a c) .zero →ᶠ
+       Formula.eq0 (addQ_num a c)
+         (Term.app2 Term.abs_diff (addQ_cross a c) (addQ_cross c a))) :=
+  let X := Term.app2 Term.add (addQ_cross a c) (addQ_cross c a)
+  let Y := Term.app2 Term.abs_diff (addQ_cross a c) (addQ_cross c a)
+  htrans (ite_nat_congr_b_imp X Y) (hconst (ite_nat_zero (adm := adm) X Y))
+
+/-- Implication form of `addQ_sign_same`. -/
+private def addQ_sign_same_imp (a c : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (addQ_same a c) (.app .succ .zero) →ᶠ
+       Formula.eq0 (addQ_sign a c) (.app Term.rat_sign a)) :=
+  let X : Term F Γ Ty.nat := .app Term.rat_sign a
+  let Y := Term.app3 Term.ite_nat
+    (Term.app2 Term.geq (addQ_cross a c) (addQ_cross c a))
+    (.app Term.rat_sign a) (.app Term.rat_sign c)
+  htrans (ite_nat_congr_b_imp X Y) (hconst (ite_nat_one (adm := adm) X Y))
+
+/-- Implication form of `addQ_sign_diff`. -/
+private def addQ_sign_diff_imp (a c : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (addQ_same a c) .zero →ᶠ
+       Formula.eq0 (addQ_sign a c)
+         (Term.app3 Term.ite_nat (Term.app2 Term.geq (addQ_cross a c) (addQ_cross c a))
+           (.app Term.rat_sign a) (.app Term.rat_sign c))) :=
+  let X : Term F Γ Ty.nat := .app Term.rat_sign a
+  let Y := Term.app3 Term.ite_nat
+    (Term.app2 Term.geq (addQ_cross a c) (addQ_cross c a))
+    (.app Term.rat_sign a) (.app Term.rat_sign c)
+  htrans (ite_nat_congr_b_imp X Y) (hconst (ite_nat_zero (adm := adm) X Y))
+
 -- ── Signed numerators ──────────────────────────────────────────────────────
 --
 -- The encoding stores a magnitude and a sign bit, which makes addition a three-way case
@@ -8745,6 +8792,264 @@ def negN_add_Q (x y : Term F Γ Ty.nat) :
       (mul_congr_r _ (rat_num_add_Q adm x y)))
     (signBit_compl_mul adm (addQ_sign x y) (addQ_num x y) (addQ_sign_cases adm x y))
 
+-- `addQ_same`/`addQ_cross` are `def`s, so a rewrite cannot see inside them. These expose the
+-- definitions as derivable equations — `refl0` at the stated type, which is a single delta of
+-- a small definition, not a `subst` reduction.
+
+private def addQ_same_unfold (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (addQ_same x y)
+        (.app Term.sg_bar (Term.app2 Term.abs_diff
+          (.app Term.rat_sign x) (.app Term.rat_sign y)))) := .refl0
+
+/-- `posN x · rat_den y =₀ rat_sign x · (the cross product)`. -/
+private def posN_mul_den (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul (posN x) (.app Term.rat_den y))
+        (Term.app2 Term.mul (.app Term.rat_sign x) (addQ_cross x y))) :=
+  mul_assoc adm (.app Term.rat_sign x) (.app Term.rat_num x) (.app Term.rat_den y)
+
+/-- `negN x · rat_den y =₀ (1 ∸ rat_sign x) · (the cross product)`. -/
+private def negN_mul_den (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul (negN x) (.app Term.rat_den y))
+        (Term.app2 Term.mul (Term.app2 Term.monus (.app .succ .zero) (.app Term.rat_sign x))
+          (addQ_cross x y))) :=
+  mul_assoc adm _ (.app Term.rat_num x) (.app Term.rat_den y)
+
+/-- `|P − Q| + Q =₀ P` when `Q ≤ P`. The truncated difference is recovered by adding back. -/
+private def abs_diff_add_of_le (P Q : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.monus Q P) .zero →ᶠ
+       Formula.eq0 (Term.app2 Term.add (Term.app2 Term.abs_diff P Q) Q) P) := by
+  pmode
+  pintro h
+  prw (abs_diff_unfold adm P Q)
+  prwby h
+  prw (add_zero_r adm (Term.app2 Term.monus P Q))
+  papplym (monus_add_cancel adm P Q)
+  pexact h
+
+/-- The signed-value identity for `add_Q`: the sum's positive part, plus the two summands'
+negative parts over the common denominator, equals the sum's negative part plus the two
+summands' positive parts.
+
+This is the whole content of `add_Q` as far as associativity is concerned, and it contains no
+subtraction and no comparison — which is exactly why it composes. The four sign combinations
+are taken here, once, and never again. -/
+def addQ_signed (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0
+        (Term.app2 Term.add (posN (Term.app2 Term.add_Q x y))
+          (Term.app2 Term.add
+            (Term.app2 Term.mul (negN x) (.app Term.rat_den y))
+            (Term.app2 Term.mul (negN y) (.app Term.rat_den x))))
+        (Term.app2 Term.add (negN (Term.app2 Term.add_Q x y))
+          (Term.app2 Term.add
+            (Term.app2 Term.mul (posN x) (.app Term.rat_den y))
+            (Term.app2 Term.mul (posN y) (.app Term.rat_den x))))) := by
+  pmode
+  -- put both sides in terms of the branch data and the two cross products
+  prw (posN_add_Q adm x y)
+  prw (negN_add_Q adm x y)
+  prw (negN_mul_den adm x y)
+  prw (negN_mul_den adm y x)
+  prw (posN_mul_den adm x y)
+  prw (posN_mul_den adm y x)
+  pfrom hx := rat_sign_cases adm x
+  pcases hx with hx1 | hx0
+  · pfrom hy := rat_sign_cases adm y
+    pcases hy with hy1 | hy0
+    · -- both positive: the same-sign branch, sign `1`
+      phave hsame : Formula.eq0 (addQ_same x y) (.app .succ .zero)
+      · prw (addQ_same_unfold x y)
+        prwby hx1
+        prwby hy1
+        prw (abs_diff_self adm (.app .succ .zero))
+        pthm sg_bar_zero
+      papplym (addQ_num_same_imp adm x y) in hsame with hN
+      papplym (addQ_sign_same_imp adm x y) in hsame with hS
+      prwby hN
+      prwby hS
+      prwby hx1
+      prwby hy1
+      prw (monus_self adm (.app .succ .zero))
+      prw (mul_zero_l adm (addQ_cross x y))
+      prw (mul_zero_l adm (addQ_cross y x))
+      prw (mul_zero_l adm (Term.app2 Term.add (addQ_cross x y) (addQ_cross y x)))
+      prw (add_zero_l adm Term.zero)
+      prw (add_zero_r adm (Term.app2 Term.mul (.app .succ .zero)
+        (Term.app2 Term.add (addQ_cross x y) (addQ_cross y x))))
+      prw (add_zero_l adm (Term.app2 Term.add
+        (Term.app2 Term.mul (.app .succ .zero) (addQ_cross x y))
+        (Term.app2 Term.mul (.app .succ .zero) (addQ_cross y x))))
+      pthm (mul_add adm (.app .succ .zero) (addQ_cross x y) (addQ_cross y x))
+    · -- positive plus negative: the opposite-sign branch, sign decided by `geq`
+      phave hsame : Formula.eq0 (addQ_same x y) .zero
+      · prw (addQ_same_unfold x y)
+        prwby hx1
+        prwby hy0
+        prw (abs_diff_zero_r adm (.app .succ .zero))
+        pthm (sg_bar_succ adm Term.zero)
+      papplym (addQ_num_diff_imp adm x y) in hsame with hN
+      papplym (addQ_sign_diff_imp adm x y) in hsame with hSd
+      prwby hN
+      prwby hx1
+      prwby hy0
+      prw (monus_self adm (.app .succ .zero))
+      prw (monus_zero adm (.app .succ .zero))
+      prw (mul_zero_l adm (addQ_cross x y))
+      prw (mul_zero_l adm (addQ_cross y x))
+      prw (mul_one_l adm (addQ_cross x y))
+      prw (mul_one_l adm (addQ_cross y x))
+      prw (add_zero_l adm (addQ_cross y x))
+      prw (add_zero_r adm (addQ_cross x y))
+      pfrom hg := geq_cases adm (addQ_cross x y) (addQ_cross y x)
+      pcases hg with hg1 | hg0
+      · -- the first cross product dominates: sign `1`
+        phave hQP : Formula.eq0
+            (Term.app2 Term.monus (addQ_cross y x) (addQ_cross x y)) .zero
+        · papplym (sg_bar_eq_S0_implies_zero adm
+            (Term.app2 Term.monus (addQ_cross y x) (addQ_cross x y)))
+          prw (Derivable.mp (geq_unfold adm (addQ_cross x y) (addQ_cross y x)) Derivable.sym0)
+          pexact hg1
+        phave hS : Formula.eq0 (addQ_sign x y) (.app .succ .zero)
+        · prwby hSd
+          prwby hg1
+          prw (ite_nat_one (adm := adm) (.app Term.rat_sign x) (.app Term.rat_sign y))
+          pexact hx1
+        prwby hS
+        prw (monus_self adm (.app .succ .zero))
+        prw (mul_one_l adm (Term.app2 Term.abs_diff (addQ_cross x y) (addQ_cross y x)))
+        prw (mul_zero_l adm (Term.app2 Term.abs_diff (addQ_cross x y) (addQ_cross y x)))
+        prw (add_zero_l adm (addQ_cross x y))
+        papplym (abs_diff_add_of_le adm (addQ_cross x y) (addQ_cross y x))
+        pexact hQP
+      · -- the second dominates: sign `0`
+        phave hQPne : ¬ᶠ(Formula.eq0
+            (Term.app2 Term.monus (addQ_cross y x) (addQ_cross x y)) .zero)
+        · papplym (Derivable.mp (sg_bar_eq_zero_iff adm
+            (Term.app2 Term.monus (addQ_cross y x) (addQ_cross x y))) .and_weak)
+          prw (Derivable.mp (geq_unfold adm (addQ_cross x y) (addQ_cross y x)) Derivable.sym0)
+          pexact hg0
+        phave hPQ : Formula.eq0
+            (Term.app2 Term.monus (addQ_cross x y) (addQ_cross y x)) .zero
+        · pfrom hd := monus_disjunct adm (addQ_cross x y) (addQ_cross y x)
+          pcases hd with h1 | h2
+          · pexact h1
+          · pexfalso
+            papply hQPne
+            pexact h2
+        phave hS : Formula.eq0 (addQ_sign x y) .zero
+        · prwby hSd
+          prwby hg0
+          prw (ite_nat_zero (adm := adm) (.app Term.rat_sign x) (.app Term.rat_sign y))
+          pexact hy0
+        prwby hS
+        prw (monus_zero adm (.app .succ .zero))
+        prw (mul_zero_l adm (Term.app2 Term.abs_diff (addQ_cross x y) (addQ_cross y x)))
+        prw (mul_one_l adm (Term.app2 Term.abs_diff (addQ_cross x y) (addQ_cross y x)))
+        prw (add_zero_l adm (addQ_cross y x))
+        prw (abs_diff_comm adm (addQ_cross x y) (addQ_cross y x))
+        psym
+        papplym (abs_diff_add_of_le adm (addQ_cross y x) (addQ_cross x y))
+        pexact hPQ
+  · pfrom hy := rat_sign_cases adm y
+    pcases hy with hy1 | hy0
+    · -- negative plus positive: mirror of the previous case
+      phave hsame : Formula.eq0 (addQ_same x y) .zero
+      · prw (addQ_same_unfold x y)
+        prwby hx0
+        prwby hy1
+        prw (abs_diff_comm adm Term.zero (.app .succ .zero))
+        prw (abs_diff_zero_r adm (.app .succ .zero))
+        pthm (sg_bar_succ adm Term.zero)
+      papplym (addQ_num_diff_imp adm x y) in hsame with hN
+      papplym (addQ_sign_diff_imp adm x y) in hsame with hSd
+      prwby hN
+      prwby hx0
+      prwby hy1
+      prw (monus_self adm (.app .succ .zero))
+      prw (monus_zero adm (.app .succ .zero))
+      prw (mul_zero_l adm (addQ_cross y x))
+      prw (mul_zero_l adm (addQ_cross x y))
+      prw (mul_one_l adm (addQ_cross x y))
+      prw (mul_one_l adm (addQ_cross y x))
+      prw (add_zero_r adm (addQ_cross x y))
+      prw (add_zero_l adm (addQ_cross y x))
+      pfrom hg := geq_cases adm (addQ_cross x y) (addQ_cross y x)
+      pcases hg with hg1 | hg0
+      · phave hQP : Formula.eq0
+            (Term.app2 Term.monus (addQ_cross y x) (addQ_cross x y)) .zero
+        · papplym (sg_bar_eq_S0_implies_zero adm
+            (Term.app2 Term.monus (addQ_cross y x) (addQ_cross x y)))
+          prw (Derivable.mp (geq_unfold adm (addQ_cross x y) (addQ_cross y x)) Derivable.sym0)
+          pexact hg1
+        phave hS : Formula.eq0 (addQ_sign x y) .zero
+        · prwby hSd
+          prwby hg1
+          prw (ite_nat_one (adm := adm) (.app Term.rat_sign x) (.app Term.rat_sign y))
+          pexact hx0
+        prwby hS
+        prw (monus_zero adm (.app .succ .zero))
+        prw (mul_zero_l adm (Term.app2 Term.abs_diff (addQ_cross x y) (addQ_cross y x)))
+        prw (mul_one_l adm (Term.app2 Term.abs_diff (addQ_cross x y) (addQ_cross y x)))
+        prw (add_zero_l adm (addQ_cross x y))
+        psym
+        papplym (abs_diff_add_of_le adm (addQ_cross x y) (addQ_cross y x))
+        pexact hQP
+      · phave hQPne : ¬ᶠ(Formula.eq0
+            (Term.app2 Term.monus (addQ_cross y x) (addQ_cross x y)) .zero)
+        · papplym (Derivable.mp (sg_bar_eq_zero_iff adm
+            (Term.app2 Term.monus (addQ_cross y x) (addQ_cross x y))) .and_weak)
+          prw (Derivable.mp (geq_unfold adm (addQ_cross x y) (addQ_cross y x)) Derivable.sym0)
+          pexact hg0
+        phave hPQ : Formula.eq0
+            (Term.app2 Term.monus (addQ_cross x y) (addQ_cross y x)) .zero
+        · pfrom hd := monus_disjunct adm (addQ_cross x y) (addQ_cross y x)
+          pcases hd with h1 | h2
+          · pexact h1
+          · pexfalso
+            papply hQPne
+            pexact h2
+        phave hS : Formula.eq0 (addQ_sign x y) (.app .succ .zero)
+        · prwby hSd
+          prwby hg0
+          prw (ite_nat_zero (adm := adm) (.app Term.rat_sign x) (.app Term.rat_sign y))
+          pexact hy1
+        prwby hS
+        prw (monus_self adm (.app .succ .zero))
+        prw (mul_one_l adm (Term.app2 Term.abs_diff (addQ_cross x y) (addQ_cross y x)))
+        prw (mul_zero_l adm (Term.app2 Term.abs_diff (addQ_cross x y) (addQ_cross y x)))
+        prw (add_zero_l adm (addQ_cross y x))
+        prw (abs_diff_comm adm (addQ_cross x y) (addQ_cross y x))
+        papplym (abs_diff_add_of_le adm (addQ_cross y x) (addQ_cross x y))
+        pexact hPQ
+    · -- both negative: the same-sign branch, sign `0`
+      phave hsame : Formula.eq0 (addQ_same x y) (.app .succ .zero)
+      · prw (addQ_same_unfold x y)
+        prwby hx0
+        prwby hy0
+        prw (abs_diff_self adm Term.zero)
+        pthm sg_bar_zero
+      papplym (addQ_num_same_imp adm x y) in hsame with hN
+      papplym (addQ_sign_same_imp adm x y) in hsame with hS
+      prwby hN
+      prwby hS
+      prwby hx0
+      prwby hy0
+      prw (monus_zero adm (.app .succ .zero))
+      prw (mul_zero_l adm (addQ_cross x y))
+      prw (mul_zero_l adm (addQ_cross y x))
+      prw (mul_zero_l adm (Term.app2 Term.add (addQ_cross x y) (addQ_cross y x)))
+      prw (mul_one_l adm (addQ_cross x y))
+      prw (mul_one_l adm (addQ_cross y x))
+      prw (mul_one_l adm (Term.app2 Term.add (addQ_cross x y) (addQ_cross y x)))
+      prw (add_zero_l adm Term.zero)
+      prw (add_zero_l adm (Term.app2 Term.add (addQ_cross x y) (addQ_cross y x)))
+      prw (add_zero_r adm (Term.app2 Term.add (addQ_cross x y) (addQ_cross y x)))
+      prefl
+
 -- ── `add_Q` under `eq_Q` in the second argument ────────────────────────────
 --
 -- The pieces of `add_Q_right_congr`. Everything is stated at the level of the components, so
@@ -8819,53 +9124,9 @@ def addQ_sign_of_num_zero (a c : Term F Γ Ty.nat)
   qtrans (ite_nat_congr_y (b := addQ_same a c) (x := sa) hinner)
     (ite_nat_sg_bar_same adm (Term.app2 Term.abs_diff sa sc) sa)
 
--- The four branch lemmas and the two `_of_num_zero` lemmas again, in implication form: the
--- congruence proof has to apply them under a hypothesis, and the kernel has no deduction
--- theorem to convert the closed versions.
-
-/-- Implication form of `addQ_num_same`. -/
-private def addQ_num_same_imp (a c : Term F Γ Ty.nat) :
-    Derivable F EqX al Premises
-      (Formula.eq0 (addQ_same a c) (.app .succ .zero) →ᶠ
-       Formula.eq0 (addQ_num a c)
-         (Term.app2 Term.add (addQ_cross a c) (addQ_cross c a))) :=
-  let X := Term.app2 Term.add (addQ_cross a c) (addQ_cross c a)
-  let Y := Term.app2 Term.abs_diff (addQ_cross a c) (addQ_cross c a)
-  htrans (ite_nat_congr_b_imp X Y) (hconst (ite_nat_one (adm := adm) X Y))
-
-/-- Implication form of `addQ_num_diff`. -/
-private def addQ_num_diff_imp (a c : Term F Γ Ty.nat) :
-    Derivable F EqX al Premises
-      (Formula.eq0 (addQ_same a c) .zero →ᶠ
-       Formula.eq0 (addQ_num a c)
-         (Term.app2 Term.abs_diff (addQ_cross a c) (addQ_cross c a))) :=
-  let X := Term.app2 Term.add (addQ_cross a c) (addQ_cross c a)
-  let Y := Term.app2 Term.abs_diff (addQ_cross a c) (addQ_cross c a)
-  htrans (ite_nat_congr_b_imp X Y) (hconst (ite_nat_zero (adm := adm) X Y))
-
-/-- Implication form of `addQ_sign_same`. -/
-private def addQ_sign_same_imp (a c : Term F Γ Ty.nat) :
-    Derivable F EqX al Premises
-      (Formula.eq0 (addQ_same a c) (.app .succ .zero) →ᶠ
-       Formula.eq0 (addQ_sign a c) (.app Term.rat_sign a)) :=
-  let X : Term F Γ Ty.nat := .app Term.rat_sign a
-  let Y := Term.app3 Term.ite_nat
-    (Term.app2 Term.geq (addQ_cross a c) (addQ_cross c a))
-    (.app Term.rat_sign a) (.app Term.rat_sign c)
-  htrans (ite_nat_congr_b_imp X Y) (hconst (ite_nat_one (adm := adm) X Y))
-
-/-- Implication form of `addQ_sign_diff`. -/
-private def addQ_sign_diff_imp (a c : Term F Γ Ty.nat) :
-    Derivable F EqX al Premises
-      (Formula.eq0 (addQ_same a c) .zero →ᶠ
-       Formula.eq0 (addQ_sign a c)
-         (Term.app3 Term.ite_nat (Term.app2 Term.geq (addQ_cross a c) (addQ_cross c a))
-           (.app Term.rat_sign a) (.app Term.rat_sign c))) :=
-  let X : Term F Γ Ty.nat := .app Term.rat_sign a
-  let Y := Term.app3 Term.ite_nat
-    (Term.app2 Term.geq (addQ_cross a c) (addQ_cross c a))
-    (.app Term.rat_sign a) (.app Term.rat_sign c)
-  htrans (ite_nat_congr_b_imp X Y) (hconst (ite_nat_zero (adm := adm) X Y))
+-- The two `_of_num_zero` lemmas again, in implication form: the congruence proof has to apply
+-- them under a hypothesis, and the kernel has no deduction theorem to convert the closed
+-- versions. (The four branch `_imp` lemmas moved up next to their closed counterparts.)
 
 /-- Implication form of `addQ_cross_snd_scaled`. -/
 private def addQ_cross_snd_scaled_imp (a c d : Term F Γ Ty.nat) :
