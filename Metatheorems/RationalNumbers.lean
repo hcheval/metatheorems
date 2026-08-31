@@ -8602,6 +8602,187 @@ def posN_mul_negN (x : Term F Γ Ty.nat) :
     htrans (.syllogism hposN (mul_congr_l_imp (negN x))) (hconst (mul_zero_l adm (negN x)))
   .mp (rat_sign_cases adm x) (or_elim_rule case1 case0)
 
+private def posN_unfold (x : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (posN x)
+        (Term.app2 Term.mul (.app Term.rat_sign x) (.app Term.rat_num x))) := .refl0
+
+/-- Two signed values written as pairs `(A, B)` meaning `A − B` agree componentwise as soon as
+their cross sums agree — *because* at most one component of each pair is nonzero. Without that
+side condition `A₁ + B₂ =₀ A₂ + B₁` says nothing about the components separately. -/
+def signed_pair_eq (A₁ B₁ A₂ B₂ : Term F Γ Ty.nat)
+    (h1 : Derivable F EqX al Premises (Formula.eq0 (Term.app2 Term.mul A₁ B₁) .zero))
+    (h2 : Derivable F EqX al Premises (Formula.eq0 (Term.app2 Term.mul A₂ B₂) .zero)) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add A₁ B₂) (Term.app2 Term.add A₂ B₁) →ᶠ
+       Formula.eq0 A₁ A₂ ∧ᶠ Formula.eq0 B₁ B₂) := by
+  pmode
+  pintro h
+  pfrom hd1 := Derivable.mp eq0_decidable' (.forall_ax A₁)
+  pcases hd1 with ha1z | ha1n
+  · -- `A₁ = 0`
+    pfrom hd2 := Derivable.mp eq0_decidable' (.forall_ax A₂)
+    pcases hd2 with ha2z | ha2n
+    · -- `A₂ = 0` too, and the hypothesis collapses to `B₂ =₀ B₁`
+      psplit
+      · prwby ha1z
+        prwby ha2z
+        prefl
+      · prwby ha1z in h with hb
+        prwby ha2z in hb with hc
+        prw (add_zero_l adm B₂) in hc with hd
+        prw (add_zero_l adm B₁) in hd with he
+        psym in he with hf
+        pexact hf
+    · -- `A₂ ≠ 0` forces `B₂ = 0`, and then `A₂ + B₁ = 0` forces `A₂ = 0`
+      pexfalso
+      pfrom hor := Derivable.mp h2 (Derivable.mp (mul_eq_zero_iff adm A₂ B₂) .and_weak)
+      pcases hor with hz | hb2z
+      · papply ha2n
+        pexact hz
+      · prwby ha1z in h with hb
+        prwby hb2z in hb with hc
+        prw (add_zero_l adm Term.zero) in hc with hd
+        psym in hd with he
+        papply ha2n
+        papplym (Derivable.mp (add_eq_zero_iff adm A₂ B₁) .and_weak) in he with hf
+        pdestruct hf with hg _hh
+        pexact hg
+  · -- `A₁ ≠ 0` forces `B₁ = 0`
+    pfrom hor1 := Derivable.mp h1 (Derivable.mp (mul_eq_zero_iff adm A₁ B₁) .and_weak)
+    pcases hor1 with hz | hb1z
+    · pexfalso
+      papply ha1n
+      pexact hz
+    · prwby hb1z in h with hb
+      prw (add_zero_r adm A₂) in hb with hc
+      phave hb2z : Formula.eq0 B₂ .zero
+      · pfrom hor2 := Derivable.mp h2 (Derivable.mp (mul_eq_zero_iff adm A₂ B₂) .and_weak)
+        pcases hor2 with ha2z | hb2
+        · pexfalso
+          papply ha1n
+          prwby ha2z in hc with hd
+          papplym (Derivable.mp (add_eq_zero_iff adm A₁ B₂) .and_weak) in hd with he
+          pdestruct he with hf _hg
+          pexact hf
+        · pexact hb2
+      psplit
+      · prwby hb2z in hc with hd
+        prw (add_zero_r adm A₁) in hd with he
+        pexact he
+      · prwby hb1z
+        psym
+        pexact hb2z
+
+/-- The sign half of `eq_Q` from agreeing positive parts and numerators. When the numerators
+are nonzero the positive part decides the sign bit outright. -/
+private def eq_Q_signpart_of_parts (u v : Term F Γ Ty.nat)
+    (hp : Derivable F EqX al Premises (Formula.eq0 (posN u) (posN v)))
+    (hnum : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_num u) (.app Term.rat_num v))) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul
+        (Term.app2 Term.abs_diff (.app Term.rat_sign u) (.app Term.rat_sign v))
+        (.app Term.sg (Term.app2 Term.add
+          (.app Term.rat_num u) (.app Term.rat_num v)))) .zero) := by
+  pmode
+  pfrom hcases := sg_bar_cases adm
+    (Term.app2 Term.add (.app Term.rat_num u) (.app Term.rat_num v))
+  pcases hcases with hz | hnz
+  · -- the numerators sum to zero, so the `sg` factor does
+    phave hsum : Formula.eq0
+        (Term.app2 Term.add (.app Term.rat_num u) (.app Term.rat_num v)) .zero
+    · papplym (sg_bar_eq_S0_implies_zero adm
+        (Term.app2 Term.add (.app Term.rat_num u) (.app Term.rat_num v)))
+      pexact hz
+    prwby hsum
+    prw sg_zero
+    pthm (mul_zero adm _)
+  · phave hne : ¬ᶠ(Formula.eq0
+        (Term.app2 Term.add (.app Term.rat_num u) (.app Term.rat_num v)) .zero)
+    · papplym (Derivable.mp (sg_bar_eq_zero_iff adm
+        (Term.app2 Term.add (.app Term.rat_num u) (.app Term.rat_num v))) .and_weak)
+      pexact hnz
+    phave hnu : ¬ᶠ(Formula.eq0 (.app Term.rat_num u) .zero)
+    · pintro h0
+      papply hne
+      prw (Derivable.mp hnum Derivable.sym0)
+      prwby h0
+      pthm (add_zero_l adm Term.zero)
+    phave hsuv : Formula.eq0 (.app Term.rat_sign u) (.app Term.rat_sign v)
+    · pfrom hsu := rat_sign_cases adm u
+      pcases hsu with hu1 | hu0
+      · -- `u` is positive, so its positive part is its (nonzero) numerator
+        phave hpv : ¬ᶠ(Formula.eq0 (posN v) .zero)
+        · pintro hp0
+          papply hnu
+          phave hpu : Formula.eq0 (Term.app2 Term.mul
+              (.app Term.rat_sign u) (.app Term.rat_num u)) .zero
+          · prw (Derivable.mp (posN_unfold u) Derivable.sym0)
+            prw hp
+            pexact hp0
+          prwby hu1 in hpu with hq2
+          prw (mul_one_l adm (.app Term.rat_num u)) in hq2 with hq3
+          pexact hq3
+        pfrom hsv := rat_sign_cases adm v
+        pcases hsv with hv1 | hv0
+        · prwby hu1
+          prwby hv1
+          prefl
+        · pexfalso
+          papply hpv
+          prw (posN_unfold v)
+          prwby hv0
+          pthm (mul_zero_l adm (.app Term.rat_num v))
+      · -- `u` is negative, so its positive part vanishes, and so must `v`'s
+        phave hpv0 : Formula.eq0 (posN v) .zero
+        · prw (Derivable.mp hp Derivable.sym0)
+          prw (posN_unfold u)
+          prwby hu0
+          pthm (mul_zero_l adm (.app Term.rat_num u))
+        pfrom hsv := rat_sign_cases adm v
+        pcases hsv with hv1 | hv0
+        · pexfalso
+          papply hnu
+          phave hnv0 : Formula.eq0 (.app Term.rat_num v) .zero
+          · prw (posN_unfold v) in hpv0 with hq1
+            prwby hv1 in hq1 with hq2
+            prw (mul_one_l adm (.app Term.rat_num v)) in hq2 with hq3
+            pexact hq3
+          prw hnum
+          pexact hnv0
+        · prwby hu0
+          prwby hv0
+          prefl
+    phave habs : Formula.eq0 (Term.app2 Term.abs_diff
+        (.app Term.rat_sign u) (.app Term.rat_sign v)) .zero
+    · papplym (Derivable.mp (abs_diff_eq_zero_iff adm
+        (.app Term.rat_sign u) (.app Term.rat_sign v))
+        (.syllogism .and_perm .and_weak))
+      pexact hsuv
+    prwby habs
+    pthm (mul_zero_l adm _)
+
+/-- Two rationals with the same positive part, negative part and denominator are `eq_Q`. This
+is the bridge from the signed-numerator world back to the encoding's own equality. -/
+def eq_Q_of_pos_neg (u v : Term F Γ Ty.nat)
+    (hp : Derivable F EqX al Premises (Formula.eq0 (posN u) (posN v)))
+    (hn : Derivable F EqX al Premises (Formula.eq0 (negN u) (negN v)))
+    (hd : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_den u) (.app Term.rat_den v))) :
+    Derivable F EqX al Premises (eq_Q u v) :=
+  let nv : Term F Γ Ty.nat := .app Term.rat_num v
+  let dv : Term F Γ Ty.nat := .app Term.rat_den v
+  let hnum : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_num u) nv) :=
+    qtrans (.mp (posN_add_negN adm u) .sym0)
+      (qtrans (qtrans (add_congr_l hp (negN u)) (add_congr_r (posN v) hn))
+        (posN_add_negN adm v))
+  let h_cross := Derivable.mp
+    (qtrans (mul_congr_l hnum dv) (.mp (mul_congr_r nv hd) .sym0))
+    (Derivable.mp (abs_diff_eq_zero_iff adm _ _) (.syllogism .and_perm .and_weak))
+  eq_Q_from_components adm h_cross (eq_Q_signpart_of_parts adm u v hp hnum)
+
 -- `rat_encode` does not store the sign bit verbatim: it stores `2n ∸ isEven s`, so the sign
 -- read back is `isEven(2n ∸ isEven s)`, which is `s` *except* when `n = 0`, where it is always
 -- `1` (both `±0` encode zero). Multiplying by `n` erases exactly that discrepancy, which is
