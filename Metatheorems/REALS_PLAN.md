@@ -79,16 +79,38 @@ This is the larger gap and the one nobody has started. Needed, roughly in order:
 `cauchyfy` is defined by `prec` over a `pair(value, violation_flag)` state, so these are
 induction proofs. `seq_induction` (`ProofMode/Induction.lean`) is the tool.
 
-### 3.2 The ℚ order toolkit — one proved lemma, four sorries, no ≤ theory
+### 3.2 The ℚ order toolkit — partly built, and gated on ℕ
 
-Currently the whole of it is `lt_Q_irrefl` plus the four sorries. Missing entirely, and
-needed by the reals:
+Missing entirely, and needed by the reals:
 
 - `abs_Q` triangle inequality `|a +_ℚ b|_ℚ ≤_ℚ |a|_ℚ +_ℚ |b|_ℚ`
 - `≤_ℚ` transitivity and additive monotonicity (`le_Q` is defined but has no theory)
-- `pow2neg_Q` halving `⟨2^{-(n+1)}⟩ +_ℚ ⟨2^{-(n+1)}⟩ =_ℚ ⟨2^{-n}⟩`
-- `pow2neg_Q` positivity `0_ℚ <_ℚ ⟨2^{-n}⟩_ℚ` — needed by *every* Class A axiom
+- ~~`pow2neg_Q` halving~~ — **done**, `pow2neg_Q_halve` (`2ff23eb`)
+- ~~`pow2neg_Q` positivity~~ — **done**, `zero_lt_pow2neg_Q` (`e5a62c1`)
 - `|a −_ℚ b|_ℚ =_ℚ |b −_ℚ a|_ℚ` — for `eq_R_sym`
+
+Also landed on the way (2026-08-31): `add_Q` and `eq_Q` component lemmas, `lt_Q`/`le_Q`
+characterised in both directions via the difference's sign bit and numerator, `exp2`
+theory (it had none), and `lt_Q_of_eq_Q_diff` / `le_Q_of_eq_Q_diff`.
+
+### 3.3 The real blocker is one level lower: ℕ truncated subtraction against `mul`
+
+All four ℚ order sorries reduce, via `lt_Q_of_eq_Q_diff`, to `add_Q` abelian-group
+identities — so **`add_Q_right_congr` is the gateway, not `lt_Q_add`**. And that in turn
+needs two ℕ facts that exist nowhere in the development:
+
+- `(x ∸ y) · k =₀ x·k ∸ y·k` — for `add_Q`'s opposite-sign numerator branch `|na·dc − nc·da|`
+- `geq` invariance under scaling by a positive, `sg_bar((v·k) ∸ (u·k)) =₀ sg_bar(v ∸ u)` —
+  because the opposite-sign *sign* branch is `ite(geq(na·dc, nc·da), sa, sc)`, which
+  `eq_Q c d` must preserve
+
+`Arithmetic.lean` has `monus_zero/succ/cancel/self/zero_l/succ_l/eq_zero_antisym/disjunct`
+and nothing relating `monus` to `mul`; there is no `geq` theory at all. Route:
+`monus_monus` (induction on `c`) → `pd_mul` (induction on `m`, via `monus_cancel`) →
+`monus_mul_distrib` (induction on `y`), plus `sg_bar_mul_succ` from `mul_eq_zero_iff`.
+
+**The dependency chain is therefore: ℕ `monus`×`mul` → `add_Q_right_congr` → ℚ order →
+`RealNumbers.lean`.** Everything in §4 and §5 sits above it.
 
 ## 4. The 20 axioms, classified by what they actually need
 
