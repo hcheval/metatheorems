@@ -7646,45 +7646,9 @@ def lt_Q_irrefl :
     .syllogism (pair_h (weaken_intro_h h_succ_sym) I_comb) (.syllogism .trans0 h_ne)
   univ_gen step
 
-/-- ⊢ ∀a,b,c. lt_Q(a, b) ∧ lt_Q(b, c) → lt_Q(a, c)  (transitivity) -/
-def lt_Q_trans :
-    Derivable F EqX al Premises (Γ := Γ)
-      (Formula.all Ty.nat (Formula.all Ty.nat (Formula.all Ty.nat
-        (lt_Q (.var (.vs (.vs .vz))) (.var (.vs .vz))
-          ∧ᶠ lt_Q (.var (.vs .vz)) (.var .vz)
-          →ᶠ lt_Q (.var (.vs (.vs .vz))) (.var .vz))))) :=
-  sorry
-
-/-- ⊢ ∀a,b. lt_Q(a, b) ∨ eq_Q(a, b) ∨ lt_Q(b, a)  (trichotomy) -/
-def lt_Q_trichotomy :
-    Derivable F EqX al Premises (Γ := Γ)
-      (Formula.all Ty.nat (Formula.all Ty.nat
-        (lt_Q (.var (.vs .vz)) (.var .vz)
-          ∨ᶠ eq_Q (.var (.vs .vz)) (.var .vz)
-          ∨ᶠ lt_Q (.var .vz) (.var (.vs .vz))))) :=
-  sorry
-
-/-- ⊢ ∀a,b,c. lt_Q(a, b) → lt_Q(add_Q(a, c), add_Q(b, c))
-    (order compatible with addition) -/
-def lt_Q_add :
-    Derivable F EqX al Premises (Γ := Γ)
-      (Formula.all Ty.nat (Formula.all Ty.nat (Formula.all Ty.nat
-        (lt_Q (.var (.vs (.vs .vz))) (.var (.vs .vz))
-          →ᶠ lt_Q
-            (Term.app2 Term.add_Q (.var (.vs (.vs .vz))) (.var .vz))
-            (Term.app2 Term.add_Q (.var (.vs .vz)) (.var .vz)))))) :=
-  sorry
-
-/-- ⊢ ∀a,b. lt_Q(zero_Q, a) ∧ lt_Q(zero_Q, b) → lt_Q(zero_Q, mul_Q(a, b))
-    (positive times positive is positive) -/
-def lt_Q_mul_pos :
-    Derivable F EqX al Premises (Γ := Γ)
-      (Formula.all Ty.nat (Formula.all Ty.nat
-        (lt_Q Term.zero_Q (.var (.vs .vz))
-          ∧ᶠ lt_Q Term.zero_Q (.var .vz)
-          →ᶠ lt_Q Term.zero_Q
-            (Term.app2 Term.mul_Q (.var (.vs .vz)) (.var .vz))))) :=
-  sorry
+-- `lt_Q_trans`, `lt_Q_trichotomy`, `lt_Q_add` and `lt_Q_mul_pos` all need the additive-group
+-- laws and the signed-numerator machinery, so they are proved further down, in the "Order"
+-- block after `neg_Q_add_Q`.
 
 /-- neg_Q(zero_Q) =₀ zero_Q -/
 private def neg_Q_zero_Q :
@@ -9320,6 +9284,56 @@ def addQ_signed (x y : Term F Γ Ty.nat) :
       prw (add_zero_r adm (Term.app2 Term.add (addQ_cross x y) (addQ_cross y x)))
       prefl
 
+/-- `neg_Q` distributes over `add_Q`, up to `eq_Q`. Both sides satisfy signed identities
+against the same two totals `P` and `Q`, with the roles of positive and negative swapped; that
+pins the parts by `signed_pair_eq`. -/
+def neg_Q_add_Q (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (eq_Q (.app Term.neg_Q (Term.app2 Term.add_Q x y))
+        (Term.app2 Term.add_Q (.app Term.neg_Q x) (.app Term.neg_Q y))) :=
+  let dx : Term F Γ Ty.nat := .app Term.rat_den x
+  let dy : Term F Γ Ty.nat := .app Term.rat_den y
+  let S := Term.app2 Term.add_Q x y
+  let N := Term.app2 Term.add_Q (.app Term.neg_Q x) (.app Term.neg_Q y)
+  let P := Term.app2 Term.add (Term.app2 Term.mul (posN x) dy) (Term.app2 Term.mul (posN y) dx)
+  let Q := Term.app2 Term.add (Term.app2 Term.mul (negN x) dy) (Term.app2 Term.mul (negN y) dx)
+  -- the signed identity for `neg x +_ℚ neg y`, with the swapped parts pushed back to `x`, `y`
+  let hi : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add (posN N) P) (Term.app2 Term.add (negN N) Q)) := by
+    pmode
+    prw (Derivable.mp (negN_neg_Q adm x) Derivable.sym0)
+    prw (Derivable.mp (negN_neg_Q adm y) Derivable.sym0)
+    prw (Derivable.mp (posN_neg_Q adm x) Derivable.sym0)
+    prw (Derivable.mp (posN_neg_Q adm y) Derivable.sym0)
+    prw (Derivable.mp (rat_den_neg_Q adm x) Derivable.sym0)
+    prw (Derivable.mp (rat_den_neg_Q adm y) Derivable.sym0)
+    pthm (addQ_signed adm (.app Term.neg_Q x) (.app Term.neg_Q y))
+  let key : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add (posN N) (posN S))
+        (Term.app2 Term.add (negN N) (negN S))) := by
+    pmode
+    papplym (add_cancel_r adm
+      (Term.app2 Term.add (posN N) (posN S))
+      (Term.app2 Term.add (negN N) (negN S))
+      (Term.app2 Term.add P Q))
+    prw (add_swap4 adm (posN N) (posN S) P Q)
+    prw hi
+    prw (addQ_signed adm x y)
+    prw (add_swap4 adm (negN N) Q (negN S) P)
+    prw (add_comm adm Q P)
+    prefl
+  let parts := Derivable.mp (qtrans key (add_comm adm (negN N) (negN S)))
+    (signed_pair_eq adm (posN N) (negN N) (negN S) (posN S)
+      (posN_mul_negN adm N)
+      (qtrans (mul_comm adm (negN S) (posN S)) (posN_mul_negN adm S)))
+  let hp := qtrans (posN_neg_Q adm S) (.mp (Derivable.mp parts .and_weak) .sym0)
+  let hn := qtrans (negN_neg_Q adm S) (.mp (Derivable.mp parts and_proj2) .sym0)
+  let hd := qtrans (qtrans (rat_den_neg_Q adm S) (rat_den_add_Q adm x y))
+    (.mp (qtrans (rat_den_add_Q adm (.app Term.neg_Q x) (.app Term.neg_Q y))
+      (qtrans (mul_congr_l (rat_den_neg_Q adm x) (.app Term.rat_den (.app Term.neg_Q y)))
+        (mul_congr_r dx (rat_den_neg_Q adm y)))) .sym0)
+  eq_Q_of_pos_neg adm _ _ hp hn hd
+
 -- ── Associativity ─────────────────────────────────────────────────────────
 --
 -- Both associations of `a +_ℚ b +_ℚ c` satisfy the *same* signed-value identity against the
@@ -10694,6 +10708,133 @@ def mul_Q_congr :
     .syllogism (pair_h (.syllogism and_proj2 rc_inst_a) (.syllogism .and_weak step2b))
       (trans_inst mac mad mbd)
   univ_gen (univ_gen (univ_gen (univ_gen combined)))
+
+-- ── The additive group, as a chaining toolkit ──────────────────────────────
+--
+-- `eq_Q` is not `=₀`, so the ordinary congruence and transitivity combinators do not apply to
+-- it. These are the `eq_Q` analogues, and with them the order proofs below read as ordinary
+-- abelian-group calculations.
+
+/-- Transitivity of `eq_Q`. -/
+def eqQtrans {x y z : Term F Γ Ty.nat}
+    (h₁ : Derivable F EqX al Premises (eq_Q x y))
+    (h₂ : Derivable F EqX al Premises (eq_Q y z)) :
+    Derivable F EqX al Premises (eq_Q x z) :=
+  .mp (.mp h₂ (.mp h₁ and_intro)) (eq_Q_trans_inst adm x y z)
+
+/-- Symmetry of `eq_Q`. -/
+def eqQsym {x y : Term F Γ Ty.nat}
+    (h : Derivable F EqX al Premises (eq_Q x y)) :
+    Derivable F EqX al Premises (eq_Q y x) :=
+  .mp h (eq_Q_sym_inst adm x y)
+
+/-- Right congruence for `add_Q` under `eq_Q`. -/
+def addQr (w : Term F Γ Ty.nat) {u v : Term F Γ Ty.nat}
+    (h : Derivable F EqX al Premises (eq_Q u v)) :
+    Derivable F EqX al Premises
+      (eq_Q (Term.app2 Term.add_Q w u) (Term.app2 Term.add_Q w v)) :=
+  .mp h (add_Q_right_congr_inst adm w u v)
+
+/-- Left congruence, from the right one by commuting twice. -/
+def addQl {u v : Term F Γ Ty.nat}
+    (h : Derivable F EqX al Premises (eq_Q u v)) (w : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (eq_Q (Term.app2 Term.add_Q u w) (Term.app2 Term.add_Q v w)) :=
+  eqQtrans adm (add_Q_comm_inst adm u w)
+    (eqQtrans adm (addQr adm w h) (add_Q_comm_inst adm w v))
+
+/-- `add_Q_zero` at an explicit term. -/
+def add_Q_zero_inst (adm : AdmissibleEqX EqX) (p : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (eq_Q (Term.app2 Term.add_Q p Term.zero_Q) p) := by
+  have h := Derivable.mp
+    (add_Q_zero (adm := adm) (al := al) (Premises := Premises) (Γ := Γ)) (.forall_ax p)
+  q_norm using h
+
+/-- `add_Q_neg` at an explicit term. -/
+def add_Q_neg_inst (adm : AdmissibleEqX EqX) (p : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (eq_Q (Term.app2 Term.add_Q p (.app Term.neg_Q p)) Term.zero_Q) := by
+  have h := Derivable.mp
+    (add_Q_neg (adm := adm) (al := al) (Premises := Premises) (Γ := Γ)) (.forall_ax p)
+  q_norm using h
+
+/-- `x −_ℚ y =_ℚ x +_ℚ (−_ℚ y)`, as an `eq_Q`. -/
+def sub_Q_eq_add_neg (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (eq_Q (Term.app2 Term.sub_Q x y)
+        (Term.app2 Term.add_Q x (.app Term.neg_Q y))) :=
+  eq_Q_from_nat_eq (adm := adm) (sub_Q_unfold adm x y)
+
+/-- `(b +_ℚ c) −_ℚ (a +_ℚ c) =_ℚ b −_ℚ a`: adding a common term to both sides of a difference
+leaves it unchanged. Ordinary abelian-group calculation, now that `neg_Q` distributes. -/
+def sub_Q_add_cancel (a b c : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (eq_Q (Term.app2 Term.sub_Q (Term.app2 Term.add_Q b c) (Term.app2 Term.add_Q a c))
+        (Term.app2 Term.sub_Q b a)) :=
+  let na : Term F Γ Ty.nat := .app Term.neg_Q a
+  let nc : Term F Γ Ty.nat := .app Term.neg_Q c
+  let bc := Term.app2 Term.add_Q b c
+  let ac := Term.app2 Term.add_Q a c
+  -- `c +_ℚ (−a +_ℚ −c) =_ℚ −a`
+  let inner : Derivable F EqX al Premises
+      (eq_Q (Term.app2 Term.add_Q c (Term.app2 Term.add_Q na nc)) na) :=
+    eqQtrans adm (eqQsym adm (add_Q_assoc_inst adm c na nc))
+      (eqQtrans adm (addQl adm (add_Q_comm_inst adm c na) nc)
+        (eqQtrans adm (add_Q_assoc_inst adm na c nc)
+          (eqQtrans adm (addQr adm na (add_Q_neg_inst adm c))
+            (add_Q_zero_inst adm na))))
+  eqQtrans adm (sub_Q_eq_add_neg adm bc ac)
+    (eqQtrans adm (addQr adm bc (neg_Q_add_Q adm a c))
+      (eqQtrans adm (add_Q_assoc_inst adm b c (Term.app2 Term.add_Q na nc))
+        (eqQtrans adm (addQr adm b inner)
+          (eqQsym adm (sub_Q_eq_add_neg adm b a)))))
+
+-- ── Order ─────────────────────────────────────────────────────────────────
+
+/-- ⊢ ∀a,b,c. lt_Q(a, b) → lt_Q(add_Q(a, c), add_Q(b, c))
+    (order compatible with addition) -/
+def lt_Q_add :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all Ty.nat (Formula.all Ty.nat (Formula.all Ty.nat
+        (lt_Q (.var (.vs (.vs .vz))) (.var (.vs .vz))
+          →ᶠ lt_Q
+            (Term.app2 Term.add_Q (.var (.vs (.vs .vz))) (.var .vz))
+            (Term.app2 Term.add_Q (.var (.vs .vz)) (.var .vz)))))) :=
+  let a : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat := .var (.vs (.vs .vz))
+  let b : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat := .var (.vs .vz)
+  let c : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat := .var .vz
+  univ_gen (univ_gen (univ_gen
+    (lt_Q_of_eq_Q_diff adm a b (Term.app2 Term.add_Q a c) (Term.app2 Term.add_Q b c)
+      (eqQsym adm (sub_Q_add_cancel adm a b c)))))
+
+/-- ⊢ ∀a,b,c. lt_Q(a, b) ∧ lt_Q(b, c) → lt_Q(a, c)  (transitivity) -/
+def lt_Q_trans :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all Ty.nat (Formula.all Ty.nat (Formula.all Ty.nat
+        (lt_Q (.var (.vs (.vs .vz))) (.var (.vs .vz))
+          ∧ᶠ lt_Q (.var (.vs .vz)) (.var .vz)
+          →ᶠ lt_Q (.var (.vs (.vs .vz))) (.var .vz))))) :=
+  sorry
+
+/-- ⊢ ∀a,b. lt_Q(a, b) ∨ eq_Q(a, b) ∨ lt_Q(b, a)  (trichotomy) -/
+def lt_Q_trichotomy :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all Ty.nat (Formula.all Ty.nat
+        (lt_Q (.var (.vs .vz)) (.var .vz)
+          ∨ᶠ eq_Q (.var (.vs .vz)) (.var .vz)
+          ∨ᶠ lt_Q (.var .vz) (.var (.vs .vz))))) :=
+  sorry
+
+/-- ⊢ ∀a,b. lt_Q(zero_Q, a) ∧ lt_Q(zero_Q, b) → lt_Q(zero_Q, mul_Q(a, b))
+    (positive times positive is positive) -/
+def lt_Q_mul_pos :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all Ty.nat (Formula.all Ty.nat
+        (lt_Q Term.zero_Q (.var (.vs .vz))
+          ∧ᶠ lt_Q Term.zero_Q (.var .vz)
+          →ᶠ lt_Q Term.zero_Q
+            (Term.app2 Term.mul_Q (.var (.vs .vz)) (.var .vz))))) :=
+  sorry
 
 end RationalOrderedField
 
