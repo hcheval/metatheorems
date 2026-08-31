@@ -11894,6 +11894,169 @@ def distrib_Q :
   univ_gen (univ_gen (univ_gen (distrib_Q_inst adm
     (.var (.vs (.vs .vz))) (.var (.vs .vz)) (.var .vz))))
 
+-- ══════════════════════════════════════════════════════════════════════════
+-- `abs_Q`, and `eq_Q`-congruence for the order relations
+-- ══════════════════════════════════════════════════════════════════════════
+--
+-- Everything above this line is what the ℚ layer needed for its own sake. What follows is
+-- what the *real* layer needs and ℚ did not: `abs_Q` had no lemmas at all (`eq_R` is stated
+-- through `|·|_ℚ`), and neither `<_ℚ` nor `≤_ℚ` had a congruence rule under `eq_Q` — the
+-- order proofs above all went through `lt_Q_of_eq_Q_diff` on the *difference*, which is not
+-- the shape a real-number proof arrives in.
+
+/-- `abs_Q z` in its `rat_encode` form: sign forced to `1`, numerator and denominator kept. -/
+private def abs_Q_unfold (z : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.abs_Q z)
+        (Term.app3 Term.rat_encode (.app .succ .zero)
+          (.app Term.rat_num z) (.app Term.snd_pair z))) :=
+  lam_correct_nf
+    (Term.app3 Term.rat_encode (.app .succ .zero)
+      (.app Term.rat_num (.var .vz)) (.app Term.snd_pair (.var .vz))
+      : Term F (Ty.nat :: Γ) _) z (by qnorm [Term.subst0])
+
+/-- `|·|_ℚ` keeps the numerator. -/
+def rat_num_abs_Q (z : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_num (.app Term.abs_Q z)) (.app Term.rat_num z)) :=
+  qtrans (rat_num_congr (abs_Q_unfold z))
+    (rat_num_rat_encode adm (.app .succ .zero) (.app Term.rat_num z) (.app Term.snd_pair z)
+      (isEven_cases adm (.app .succ .zero)))
+
+/-- `|·|_ℚ` keeps the denominator. -/
+def rat_den_abs_Q (z : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_den (.app Term.abs_Q z)) (.app Term.rat_den z)) :=
+  qtrans (qtrans (rat_den_congr (abs_Q_unfold z))
+      (rat_den_rat_encode adm _ _ (.app Term.snd_pair z)))
+    (.mp (rat_den_unfold_eq z) .sym0)
+
+/-- `|·|_ℚ` always has sign bit `1` — including on `0`, where the encoding is `+0`. -/
+def rat_sign_abs_Q (z : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_sign (.app Term.abs_Q z)) (.app .succ .zero)) :=
+  qtrans (rat_sign_congr (abs_Q_unfold z))
+    (rat_sign_rat_encode_pos adm (.app .succ .zero) (.app Term.rat_num z)
+      (.app Term.snd_pair z) (isEven_one adm))
+
+/-- The positive part of `|z|_ℚ` is the whole numerator. -/
+def posN_abs_Q (z : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (posN (.app Term.abs_Q z)) (.app Term.rat_num z)) :=
+  qtrans (mul_congr_l (rat_sign_abs_Q adm z) (.app Term.rat_num (.app Term.abs_Q z)))
+    (qtrans (mul_congr_r (.app .succ .zero) (rat_num_abs_Q adm z))
+      (mul_one_l adm (.app Term.rat_num z)))
+
+/-- …and the negative part vanishes. -/
+def negN_abs_Q (z : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (negN (.app Term.abs_Q z)) .zero) :=
+  qtrans (mul_congr_l
+      (monus_congr_snd (.app .succ .zero) (rat_sign_abs_Q adm z))
+      (.app Term.rat_num (.app Term.abs_Q z)))
+    (qtrans (mul_congr_l (monus_self adm (.app .succ .zero))
+        (.app Term.rat_num (.app Term.abs_Q z)))
+      (mul_zero_l adm (.app Term.rat_num (.app Term.abs_Q z))))
+
+/-- Negation keeps the magnitude: `num(−_ℚ z) =₀ num z`. The two signed parts swap, and their
+sum is the numerator either way. -/
+def rat_num_neg_Q (z : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_num (.app Term.neg_Q z)) (.app Term.rat_num z)) :=
+  qtrans (.mp (posN_add_negN adm (.app Term.neg_Q z)) .sym0)
+    (qtrans (qtrans (add_congr_l (posN_neg_Q adm z) (negN (.app Term.neg_Q z)))
+        (add_congr_r (negN z) (negN_neg_Q adm z)))
+      (qtrans (add_comm adm (negN z) (posN z)) (posN_add_negN adm z)))
+
+/-- `|·|_ℚ` respects `eq_Q`. Both absolute values have positive sign and vanishing negative
+part, so the signed cross-equation collapses to the plain cross-equation of `eq_Q a b`. -/
+def abs_Q_congr {a b : Term F Γ Ty.nat}
+    (h : Derivable F EqX al Premises (eq_Q a b)) :
+    Derivable F EqX al Premises
+      (eq_Q (.app Term.abs_Q a) (.app Term.abs_Q b)) :=
+  let hcross := Derivable.mp h (eq_Q_cross_eq adm a b)
+  eq_Q_of_signed_cross adm _ _ (by
+    pmode
+    prw (posN_abs_Q adm a)
+    prw (posN_abs_Q adm b)
+    prw (negN_abs_Q adm a)
+    prw (negN_abs_Q adm b)
+    prw (rat_den_abs_Q adm a)
+    prw (rat_den_abs_Q adm b)
+    prw (mul_zero_l adm (.app Term.rat_den a))
+    prw (mul_zero_l adm (.app Term.rat_den b))
+    prw (add_zero_r adm (Term.app2 Term.mul (.app Term.rat_num a) (.app Term.rat_den b)))
+    prw (add_zero_r adm (Term.app2 Term.mul (.app Term.rat_num b) (.app Term.rat_den a)))
+    pthm hcross)
+
+/-- `|−_ℚ z|_ℚ =_ℚ |z|_ℚ`. -/
+def abs_Q_neg_Q (z : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (eq_Q (.app Term.abs_Q (.app Term.neg_Q z)) (.app Term.abs_Q z)) :=
+  eq_Q_of_pos_neg adm _ _
+    (qtrans (posN_abs_Q adm (.app Term.neg_Q z))
+      (qtrans (rat_num_neg_Q adm z) (.mp (posN_abs_Q adm z) .sym0)))
+    (qtrans (negN_abs_Q adm (.app Term.neg_Q z)) (.mp (negN_abs_Q adm z) .sym0))
+    (qtrans (rat_den_abs_Q adm (.app Term.neg_Q z))
+      (qtrans (rat_den_neg_Q adm z) (.mp (rat_den_abs_Q adm z) .sym0)))
+
+/-- `|a −_ℚ b|_ℚ =_ℚ |b −_ℚ a|_ℚ`. Needed by `eq_R_sym`. -/
+def abs_diff_Q_comm (a b : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (eq_Q (.app Term.abs_Q (Term.app2 Term.sub_Q a b))
+        (.app Term.abs_Q (Term.app2 Term.sub_Q b a))) :=
+  eqQtrans adm (abs_Q_congr adm (eqQsym adm (neg_Q_sub_Q adm a b)))
+    (abs_Q_neg_Q adm (Term.app2 Term.sub_Q b a))
+
+-- ── `eq_Q`-congruence for the order relations ──────────────────────────────
+
+/-- Negation respects `eq_Q`. Not a component calculation: `neg_Q` swaps the signed parts and
+`eq_Q` does not determine them individually, so this is the group argument
+`−b =_ℚ −a +_ℚ (a +_ℚ −b) =_ℚ −a +_ℚ 0`. -/
+def neg_Q_congr {a b : Term F Γ Ty.nat}
+    (h : Derivable F EqX al Premises (eq_Q a b)) :
+    Derivable F EqX al Premises
+      (eq_Q (.app Term.neg_Q a) (.app Term.neg_Q b)) :=
+  let na : Term F Γ Ty.nat := .app Term.neg_Q a
+  let nb : Term F Γ Ty.nat := .app Term.neg_Q b
+  -- `a +_ℚ −b =_ℚ b +_ℚ −b =_ℚ 0`
+  let hz : Derivable F EqX al Premises (eq_Q (Term.app2 Term.add_Q a nb) Term.zero_Q) :=
+    eqQtrans adm (addQl adm h nb) (add_Q_neg_inst adm b)
+  -- `−b =_ℚ 0 +_ℚ −b =_ℚ (−a +_ℚ a) +_ℚ −b =_ℚ −a +_ℚ (a +_ℚ −b) =_ℚ −a +_ℚ 0 =_ℚ −a`
+  eqQsym adm
+    (eqQtrans adm (eqQsym adm (add_Q_zero_inst adm nb))
+      (eqQtrans adm (add_Q_comm_inst adm nb Term.zero_Q)
+        (eqQtrans adm (addQl adm
+            (eqQsym adm (eqQtrans adm (add_Q_comm_inst adm na a) (add_Q_neg_inst adm a))) nb)
+          (eqQtrans adm (add_Q_assoc_inst adm na a nb)
+            (eqQtrans adm (addQr adm na hz) (add_Q_zero_inst adm na))))))
+
+/-- Subtraction respects `eq_Q` in both arguments. -/
+def sub_Q_congr {a a' b b' : Term F Γ Ty.nat}
+    (ha : Derivable F EqX al Premises (eq_Q a a'))
+    (hb : Derivable F EqX al Premises (eq_Q b b')) :
+    Derivable F EqX al Premises
+      (eq_Q (Term.app2 Term.sub_Q a b) (Term.app2 Term.sub_Q a' b')) :=
+  eqQtrans adm (sub_Q_eq_add_neg adm a b)
+    (eqQtrans adm (eqQtrans adm (addQl adm ha (.app Term.neg_Q b))
+        (addQr adm a' (neg_Q_congr adm hb)))
+      (eqQsym adm (sub_Q_eq_add_neg adm a' b')))
+
+/-- `<_ℚ` respects `eq_Q` in both arguments. `lt_Q_of_eq_Q_diff` already says `<_ℚ` sees only
+the difference; this is that with the difference computed by `sub_Q_congr`. -/
+def lt_Q_congr (x y x' y' : Term F Γ Ty.nat)
+    (hx : Derivable F EqX al Premises (eq_Q x x'))
+    (hy : Derivable F EqX al Premises (eq_Q y y')) :
+    Derivable F EqX al Premises (lt_Q x y →ᶠ lt_Q x' y') :=
+  lt_Q_of_eq_Q_diff adm x y x' y' (sub_Q_congr adm hy hx)
+
+/-- `≤_ℚ` respects `eq_Q` in both arguments. -/
+def le_Q_congr (x y x' y' : Term F Γ Ty.nat)
+    (hx : Derivable F EqX al Premises (eq_Q x x'))
+    (hy : Derivable F EqX al Premises (eq_Q y y')) :
+    Derivable F EqX al Premises (le_Q x y →ᶠ le_Q x' y') :=
+  le_Q_of_eq_Q_diff adm x y x' y' (sub_Q_congr adm hy hx)
+
 end RationalOrderedField
 
 end Metatheorems
