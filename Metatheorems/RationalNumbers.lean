@@ -6965,6 +6965,145 @@ def distrib_Q :
             (Term.app2 Term.mul_Q (.var (.vs (.vs .vz))) (.var .vz))))))) :=
   sorry
 
+-- ── `eq_Q` elimination ─────────────────────────────────────────────────────
+--
+-- `eq_Q_from_components` builds an `eq_Q` out of its two halves. These go the other way:
+-- they take one apart. The two consequences that matter downstream are that "the numerator
+-- vanishes" is an `eq_Q`-invariant, and that once the numerators are nonzero the sign bits
+-- have to agree — the argument the sign half of `mul_Q_right_congr` makes inline.
+
+/-- The body `eq_Q_dec` compiles to, in the two-variable context. -/
+private def eq_Q_dec_body {Γ : Ctx ι} : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat :=
+  Term.app2 Term.add
+    (Term.app2 Term.abs_diff
+      (Term.app2 Term.mul (Term.app Term.rat_num (.var (.vs .vz)))
+        (Term.app Term.rat_den (.var .vz)))
+      (Term.app2 Term.mul (Term.app Term.rat_num (.var .vz))
+        (Term.app Term.rat_den (.var (.vs .vz)))))
+    (Term.app2 Term.mul
+      (Term.app2 Term.abs_diff (Term.app Term.rat_sign (.var (.vs .vz)))
+        (Term.app Term.rat_sign (.var .vz)))
+      (Term.app Term.sg (Term.app2 Term.add (Term.app Term.rat_num (.var (.vs .vz)))
+        (Term.app Term.rat_num (.var .vz)))))
+
+/-- `eq_Q_dec x y` spelled out: the cross-product difference plus the sign discrepancy. -/
+def eq_Q_dec_unfold (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.eq_Q_dec x y)
+        (Term.app2 Term.add
+          (Term.app2 Term.abs_diff
+            (Term.app2 Term.mul (.app Term.rat_num x) (.app Term.rat_den y))
+            (Term.app2 Term.mul (.app Term.rat_num y) (.app Term.rat_den x)))
+          (Term.app2 Term.mul
+            (Term.app2 Term.abs_diff (.app Term.rat_sign x) (.app Term.rat_sign y))
+            (.app Term.sg (Term.app2 Term.add
+              (.app Term.rat_num x) (.app Term.rat_num y)))))) :=
+  have body_eq : (Term.eq_Q_dec : Term F Γ _) = Term.lam (Term.lam eq_Q_dec_body) := by rfl
+  have nf : ((eq_Q_dec_body : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat).subst0 (y.weaken)).subst0 x =
+      Term.app2 Term.add
+        (Term.app2 Term.abs_diff
+          (Term.app2 Term.mul (.app Term.rat_num x) (.app Term.rat_den y))
+          (Term.app2 Term.mul (.app Term.rat_num y) (.app Term.rat_den x)))
+        (Term.app2 Term.mul
+          (Term.app2 Term.abs_diff (.app Term.rat_sign x) (.app Term.rat_sign y))
+          (.app Term.sg (Term.app2 Term.add
+            (.app Term.rat_num x) (.app Term.rat_num y)))) := by
+    qnorm [eq_Q_dec_body]
+  body_eq ▸ lam2_correct_nf adm eq_Q_dec_body x y nf
+
+/-- Both halves of `eq_Q_dec` vanish when `eq_Q` holds. -/
+def eq_Q_parts (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (eq_Q x y →ᶠ
+        Formula.eq0 (Term.app2 Term.abs_diff
+          (Term.app2 Term.mul (.app Term.rat_num x) (.app Term.rat_den y))
+          (Term.app2 Term.mul (.app Term.rat_num y) (.app Term.rat_den x))) .zero
+        ∧ᶠ
+        Formula.eq0 (Term.app2 Term.mul
+          (Term.app2 Term.abs_diff (.app Term.rat_sign x) (.app Term.rat_sign y))
+          (.app Term.sg (Term.app2 Term.add
+            (.app Term.rat_num x) (.app Term.rat_num y)))) .zero) :=
+  .syllogism
+    (.syllogism (pair_h (weaken_intro_h (.mp (eq_Q_dec_unfold adm x y) .sym0)) I_comb) .trans0)
+    (Derivable.mp (add_eq_zero_iff adm _ _) .and_weak)
+
+/-- The cross products of two `eq_Q`-equal rationals agree. -/
+def eq_Q_cross_eq (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (eq_Q x y →ᶠ Formula.eq0
+        (Term.app2 Term.mul (.app Term.rat_num x) (.app Term.rat_den y))
+        (Term.app2 Term.mul (.app Term.rat_num y) (.app Term.rat_den x))) :=
+  .syllogism (.syllogism (eq_Q_parts adm x y) .and_weak) (abs_diff_zero_fwd adm _ _)
+
+/-- The sign half of `eq_Q_dec` vanishes when `eq_Q` holds. -/
+def eq_Q_signPart_zero (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (eq_Q x y →ᶠ Formula.eq0 (Term.app2 Term.mul
+        (Term.app2 Term.abs_diff (.app Term.rat_sign x) (.app Term.rat_sign y))
+        (.app Term.sg (Term.app2 Term.add
+          (.app Term.rat_num x) (.app Term.rat_num y)))) .zero) :=
+  .syllogism (eq_Q_parts adm x y) and_proj2
+
+/-- A vanishing numerator is an `eq_Q`-invariant. Denominators are successors, so they cannot
+absorb a zero on either side of the cross-product identity. -/
+def eq_Q_num_ne_zero (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (eq_Q x y →ᶠ ¬ᶠ(Formula.eq0 (.app Term.rat_num x) .zero) →ᶠ
+        ¬ᶠ(Formula.eq0 (.app Term.rat_num y) .zero)) := by
+  pmode
+  pintro hxy
+  pintro hnx
+  pintro hy0
+  papply hnx
+  papplym (eq_Q_cross_eq adm x y) in hxy with hcross
+  phave hz : Formula.eq0
+      (Term.app2 Term.mul (.app Term.rat_num x) (.app Term.rat_den y)) .zero
+  · prwby hcross
+    prwby hy0
+    pthm (mul_zero_l adm _)
+  papplym (mul_succ_eq_zero_imp adm (.app Term.rat_num x) (.app Term.snd_pair y))
+  prw (Derivable.mp (rat_den_unfold_eq y) Derivable.sym0)
+  pexact hz
+
+/-- Two `eq_Q`-equal rationals with nonzero numerator have the same sign bit. The `±0`
+loophole in the encoding is exactly why the numerator hypothesis is needed. -/
+def eq_Q_sign_eq (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (eq_Q x y →ᶠ ¬ᶠ(Formula.eq0 (.app Term.rat_num x) .zero) →ᶠ
+        Formula.eq0 (.app Term.rat_sign x) (.app Term.rat_sign y)) := by
+  pmode
+  pintro hxy
+  pintro hnx
+  phave hsumne : ¬ᶠ(Formula.eq0 (Term.app2 Term.add
+      (.app Term.rat_num x) (.app Term.rat_num y)) .zero)
+  · pintro h
+    papply hnx
+    papplym (Derivable.mp (add_eq_zero_iff adm
+      (.app Term.rat_num x) (.app Term.rat_num y)) .and_weak) in h with hb
+    pdestruct hb with h1 _h2
+    pexact h1
+  phave hsgne : ¬ᶠ(Formula.eq0 (.app Term.sg (Term.app2 Term.add
+      (.app Term.rat_num x) (.app Term.rat_num y))) .zero)
+  · pintro h
+    papply hsumne
+    papplym (sg_zero_fwd adm _)
+    pexact h
+  papplym (eq_Q_signPart_zero adm x y) in hxy with hsp
+  phave habsd : Formula.eq0 (Term.app2 Term.abs_diff
+      (.app Term.rat_sign x) (.app Term.rat_sign y)) .zero
+  · papplym (Derivable.mp (mul_eq_zero_iff adm
+      (Term.app2 Term.abs_diff (.app Term.rat_sign x) (.app Term.rat_sign y))
+      (.app Term.sg (Term.app2 Term.add
+        (.app Term.rat_num x) (.app Term.rat_num y)))) .and_weak) in hsp with hor
+    pcases hor with hl | hr
+    · pexact hl
+    · pexfalso
+      papply hsgne
+      pexact hr
+  papplym (Derivable.mp (abs_diff_eq_zero_iff adm
+    (.app Term.rat_sign x) (.app Term.rat_sign y)) .and_weak)
+  pexact habsd
+
 -- ── Order properties ───────────────────────────────────────────────────────
 
 /-- Rational less-than as a QF formula: a <_ℚ b ≡ lt_Q_dec(a, b) =₀ 0. -/
