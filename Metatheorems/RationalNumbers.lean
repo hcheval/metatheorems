@@ -8576,6 +8576,117 @@ private def addQ_sign_of_num_zero_imp (a c : Term F Γ Ty.nat) :
   htrans (.syllogism hinner (ite_nat_congr_y_imp (addQ_same a c) sa))
     (hconst (ite_nat_sg_bar_same adm (Term.app2 Term.abs_diff sa sc) sa))
 
+/-- The cross identity for `add_Q`'s numerator: `N_ac · dd =₀ N_ad · dc`, writing `N_ac` for
+`addQ_num a c`.
+
+Three cases. If `nc = 0` then `nd = 0` too and both numerators collapse to the first cross
+product, whichever branch of the same-sign test is live. If `nc ≠ 0` then `eq_Q c d` forces
+`sc =₀ sd`, so the two same-sign tests agree and the two sides take *the same* branch; the
+same-sign branch is then `add_mul` on both sides and the opposite-sign branch is
+`abs_diff_mul_distrib` on both sides, with `P·dd =₀ P'·dc` and `Q·dd =₀ Q'·dc` matching the
+summands. -/
+def addQ_num_scaled (a c d : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (eq_Q c d →ᶠ Formula.eq0
+        (Term.app2 Term.mul (addQ_num a c) (.app Term.rat_den d))
+        (Term.app2 Term.mul (addQ_num a d) (.app Term.rat_den c))) :=
+  let nc : Term F Γ Ty.nat := .app Term.rat_num c
+  let dc : Term F Γ Ty.nat := .app Term.rat_den c
+  let dd : Term F Γ Ty.nat := .app Term.rat_den d
+  let sa : Term F Γ Ty.nat := .app Term.rat_sign a
+  let sc : Term F Γ Ty.nat := .app Term.rat_sign c
+  let P := addQ_cross a c
+  let Q := addQ_cross c a
+  let P' := addQ_cross a d
+  let Q' := addQ_cross d a
+  let goal : Formula F Γ := Formula.eq0
+    (Term.app2 Term.mul (addQ_num a c) dd) (Term.app2 Term.mul (addQ_num a d) dc)
+  -- ═══ nc = 0: both numerators are the first cross product ═══
+  let caseZ : Derivable F EqX al Premises
+      (Formula.eq0 nc .zero →ᶠ eq_Q c d →ᶠ goal) :=
+    Derivable.exportation (
+      let HZ : Formula F Γ := Formula.eq0 nc .zero ∧ᶠ eq_Q c d
+      let gnc : Derivable F EqX al Premises (HZ →ᶠ Formula.eq0 nc .zero) := .and_weak
+      let gH : Derivable F EqX al Premises (HZ →ᶠ eq_Q c d) := and_proj2
+      let gnd := eval_h (.syllogism gH (eq_Q_num_zero adm c d)) gnc
+      let gNac := Derivable.syllogism gnc (addQ_num_of_num_zero_imp adm a c)
+      let gNad := Derivable.syllogism gnd (addQ_num_of_num_zero_imp adm a d)
+      htrans (htrans (.syllogism gNac (mul_congr_l_imp dd))
+          (hconst (addQ_cross_fst_scaled adm a c d)))
+        (.syllogism (.syllogism gNad (mul_congr_l_imp dc)) .sym0))
+  -- ═══ nc ≠ 0: the sign bits agree, so the same branch is live on both sides ═══
+  let caseN : Derivable F EqX al Premises
+      (¬ᶠ(Formula.eq0 nc .zero) →ᶠ eq_Q c d →ᶠ goal) :=
+    Derivable.exportation (
+      let HN : Formula F Γ := ¬ᶠ(Formula.eq0 nc .zero) ∧ᶠ eq_Q c d
+      let gne : Derivable F EqX al Premises (HN →ᶠ ¬ᶠ(Formula.eq0 nc .zero)) := .and_weak
+      let gH : Derivable F EqX al Premises (HN →ᶠ eq_Q c d) := and_proj2
+      let gscd := eval_h (.syllogism gH (eq_Q_sign_eq adm c d)) gne
+      let gsame := Derivable.syllogism
+        (.syllogism gscd (abs_diff_congr_r_imp sa)) sg_bar_congr_imp
+      let gcd := Derivable.syllogism gH (eq_Q_cross_eq adm c d)
+      -- same-sign branch
+      let caseS : Derivable F EqX al Premises
+          (Formula.eq0 (addQ_same a c) (.app .succ .zero) →ᶠ HN →ᶠ goal) :=
+        Derivable.exportation (
+          let K : Formula F Γ := Formula.eq0 (addQ_same a c) (.app .succ .zero) ∧ᶠ HN
+          let gsm : Derivable F EqX al Premises
+              (K →ᶠ Formula.eq0 (addQ_same a c) (.app .succ .zero)) := .and_weak
+          let gHN : Derivable F EqX al Premises (K →ᶠ HN) := and_proj2
+          let gsmd := htrans (.syllogism (.syllogism gHN gsame) .sym0) gsm
+          let gNac := Derivable.syllogism gsm (addQ_num_same_imp adm a c)
+          let gNad := Derivable.syllogism gsmd (addQ_num_same_imp adm a d)
+          let eP : Derivable F EqX al Premises
+              (K →ᶠ Formula.eq0 (Term.app2 Term.mul P dd) (Term.app2 Term.mul P' dc)) :=
+            hconst (addQ_cross_fst_scaled adm a c d)
+          let eQ := Derivable.syllogism (.syllogism gHN gcd)
+            (addQ_cross_snd_scaled_imp adm a c d)
+          let m1 : Derivable F EqX al Premises
+              (K →ᶠ Formula.eq0 (Term.app2 Term.mul (Term.app2 Term.add P Q) dd)
+                (Term.app2 Term.add (Term.app2 Term.mul P dd) (Term.app2 Term.mul Q dd))) :=
+            hconst (add_mul adm P Q dd)
+          let m2 := htrans (.syllogism eP (add_congr_l_imp (Term.app2 Term.mul Q dd)))
+            (.syllogism eQ (add_congr_r_imp (Term.app2 Term.mul P' dc)))
+          let m3 : Derivable F EqX al Premises
+              (K →ᶠ Formula.eq0
+                (Term.app2 Term.add (Term.app2 Term.mul P' dc) (Term.app2 Term.mul Q' dc))
+                (Term.app2 Term.mul (Term.app2 Term.add P' Q') dc)) :=
+            hconst (.mp (add_mul adm P' Q' dc) .sym0)
+          htrans (htrans (.syllogism gNac (mul_congr_l_imp dd)) (htrans (htrans m1 m2) m3))
+            (.syllogism (.syllogism gNad (mul_congr_l_imp dc)) .sym0))
+      -- opposite-sign branch
+      let caseD : Derivable F EqX al Premises
+          (Formula.eq0 (addQ_same a c) .zero →ᶠ HN →ᶠ goal) :=
+        Derivable.exportation (
+          let K : Formula F Γ := Formula.eq0 (addQ_same a c) .zero ∧ᶠ HN
+          let gsm : Derivable F EqX al Premises
+              (K →ᶠ Formula.eq0 (addQ_same a c) .zero) := .and_weak
+          let gHN : Derivable F EqX al Premises (K →ᶠ HN) := and_proj2
+          let gsmd := htrans (.syllogism (.syllogism gHN gsame) .sym0) gsm
+          let gNac := Derivable.syllogism gsm (addQ_num_diff_imp adm a c)
+          let gNad := Derivable.syllogism gsmd (addQ_num_diff_imp adm a d)
+          let eP : Derivable F EqX al Premises
+              (K →ᶠ Formula.eq0 (Term.app2 Term.mul P dd) (Term.app2 Term.mul P' dc)) :=
+            hconst (addQ_cross_fst_scaled adm a c d)
+          let eQ := Derivable.syllogism (.syllogism gHN gcd)
+            (addQ_cross_snd_scaled_imp adm a c d)
+          let m1 : Derivable F EqX al Premises
+              (K →ᶠ Formula.eq0 (Term.app2 Term.mul (Term.app2 Term.abs_diff P Q) dd)
+                (Term.app2 Term.abs_diff
+                  (Term.app2 Term.mul P dd) (Term.app2 Term.mul Q dd))) :=
+            hconst (abs_diff_mul_distrib adm P Q dd)
+          let m2 := htrans (.syllogism eP (abs_diff_congr_l_imp (Term.app2 Term.mul Q dd)))
+            (.syllogism eQ (abs_diff_congr_r_imp (Term.app2 Term.mul P' dc)))
+          let m3 : Derivable F EqX al Premises
+              (K →ᶠ Formula.eq0
+                (Term.app2 Term.abs_diff (Term.app2 Term.mul P' dc) (Term.app2 Term.mul Q' dc))
+                (Term.app2 Term.mul (Term.app2 Term.abs_diff P' Q') dc)) :=
+            hconst (.mp (abs_diff_mul_distrib adm P' Q' dc) .sym0)
+          htrans (htrans (.syllogism gNac (mul_congr_l_imp dd)) (htrans (htrans m1 m2) m3))
+            (.syllogism (.syllogism gNad (mul_congr_l_imp dc)) .sym0))
+      .mp (sg_bar_cases adm (Term.app2 Term.abs_diff sa sc)) (or_elim_rule caseS caseD))
+  .mp (.mp eq0_decidable' (.forall_ax nc)) (or_elim_rule caseZ caseN)
+
 /-- `⟨2^{-(n+1)}⟩_ℚ +_ℚ ⟨2^{-(n+1)}⟩_ℚ =_ℚ ⟨2^{-n}⟩_ℚ` — the halving law every real-number
 modulus argument runs on. The first real use of the `add_Q` component lemmas: both summands
 have sign bit `1`, so the same-sign branch fires and the numerator is just `2^{n+1}` twice. -/
