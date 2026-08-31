@@ -2573,6 +2573,20 @@ def sg_bar_mul_succ (m j : Term F Γ Ty.nat) :
     .syllogism (pair_h hl (.syllogism hr .sym0)) .trans0
   .mp (.mp eq0_decidable' (.forall_ax m)) (or_elim_rule case_zero case_ne)
 
+/-- `sḡ(v·S j ∸ u·S j) =₀ sḡ(v ∸ u)`: comparison survives scaling both sides by a positive
+number. This is the arithmetic content of `geq`'s scaling invariance — `geq x y` is
+`sḡ(y ∸ x)` — and it is what lets an `eq_Q` between two rationals be pushed through the
+`geq` test in `add_Q`'s opposite-sign branch. -/
+def sg_bar_monus_mul_succ (u v j : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (Formula.eq0
+      (.app Term.sg_bar (Term.app2 Term.monus
+        (Term.app2 Term.mul v (.app .succ j)) (Term.app2 Term.mul u (.app .succ j))))
+      (.app Term.sg_bar (Term.app2 Term.monus v u))) :=
+  let sj : Term F Γ Ty.nat := .app .succ j
+  let h := qfer_no_premise_nat_nf (.mp (monus_mul_distrib adm v u sj) .sym0)
+    (r := .app Term.sg_bar (.var .vz)) rfl rfl
+  qtrans h (sg_bar_mul_succ adm (Term.app2 Term.monus v u) j)
+
 end ArithProps
 
 -- ============================================================================

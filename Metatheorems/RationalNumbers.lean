@@ -5018,6 +5018,22 @@ def geq_unfold (x y : Term F Γ Ty.nat) :
     x y (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
         sg_bar_closed_subst, monus_closed_subst, weaken_subst0_eta])
 
+/-- `geq` is invariant under scaling both sides by a positive number:
+`geq(x·S j, y·S j) =₀ geq(x, y)`. The `geq` face of `sg_bar_monus_mul_succ`.
+
+This is what an `eq_Q` hypothesis needs in order to be pushed through the `geq` test that
+`add_Q` uses to pick the sign in its opposite-sign branch: the two comparisons being made are
+the same one scaled by the two denominators. -/
+def geq_mul_succ (x y j : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0
+        (Term.app2 Term.geq
+          (Term.app2 Term.mul x (.app .succ j)) (Term.app2 Term.mul y (.app .succ j)))
+        (Term.app2 Term.geq x y)) :=
+  qtrans (geq_unfold adm (Term.app2 Term.mul x (.app .succ j))
+      (Term.app2 Term.mul y (.app .succ j)))
+    (qtrans (sg_bar_monus_mul_succ adm x y j) (.mp (geq_unfold adm x y) .sym0))
+
 /-- ⊢ ∀a,b. eq_Q(add_Q(a, b), add_Q(b, a)) -/
 def add_Q_comm :
     Derivable F EqX al Premises (Γ := Γ)
