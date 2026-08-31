@@ -566,7 +566,7 @@ private def sg_congr {Γ : Ctx ι} {s t : Term F Γ Ty.nat}
     Derivable F EqX al Premises (Formula.eq0 (Term.app Term.sg s) (Term.app Term.sg t)) :=
   qfer_no_premise_nat_nf h (r := Term.app Term.sg (.var .vz)) rfl rfl
 
-private def sg_bar_congr {Γ : Ctx ι} {s t : Term F Γ Ty.nat}
+def sg_bar_congr {Γ : Ctx ι} {s t : Term F Γ Ty.nat}
     (h : Derivable F EqX al Premises (Formula.eq0 s t)) :
     Derivable F EqX al Premises (Formula.eq0 (Term.app Term.sg_bar s) (Term.app Term.sg_bar t)) :=
   qfer_no_premise_nat_nf h (r := Term.app Term.sg_bar (.var .vz)) rfl rfl

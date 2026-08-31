@@ -672,6 +672,85 @@ def cauchyState_cauchy (f : Term F Γ (realTy ι)) (n : Term F Γ Ty.nat) :
     prwby hst
     pthm (lt_Q_abs_sub_self adm (.app Term.fst_pair (Term.cauchyState f n)) (.app .succ n))
 
+-- ── `cauchyfy` is the identity on sequences that are already Cauchy ────────
+
+/-- "The flag never trips and the value is `f n`", in context `[n, …Γ]`. -/
+private def idF (f : Term F Γ (realTy ι)) : Formula F (Ty.nat :: Γ) :=
+  Formula.eq0 (.app Term.snd_pair (Term.cauchyState f.weaken (.var .vz))) .zero
+    ∧ᶠ Formula.eq0 (.app Term.fst_pair (Term.cauchyState f.weaken (.var .vz)))
+        (.app f.weaken (.var .vz))
+
+/-- The same at an explicit index. -/
+abbrev idAt (f : Term F Γ (realTy ι)) (s : Term F Γ Ty.nat) : Formula F Γ :=
+  Formula.eq0 (.app Term.snd_pair (Term.cauchyState f s)) .zero
+    ∧ᶠ Formula.eq0 (.app Term.fst_pair (Term.cauchyState f s)) (.app f s)
+
+private theorem idF_subst0 (f : Term F Γ (realTy ι)) (s : Term F Γ Ty.nat) :
+    (idF f).subst0 s = idAt f s := by
+  simp only [idF, idAt, Term.cauchyState, Term.cauchyBase, Term.cauchyStep,
+    Term.cauchy_check_at, Formula.subst0, Formula.substF, Term.subst,
+    Term.subst0_map, Term.Subst.ext, Term.app2, Term.app3,
+    Term.weaken_subst_ext, Term.weaken_var, subst_subst0_map_weaken, closed_subst]
+
+private theorem idF_substVar0 (f : Term F Γ (realTy ι)) :
+    Formula.substVar0 (idF f) (.app .succ (.var .vz)) =
+      idAt f.weaken (.app .succ (.var .vz)) := by
+  simp only [idF, idAt, Term.cauchyState, Term.cauchyBase, Term.cauchyStep,
+    Term.cauchy_check_at, Formula.substVar0, Formula.substF, Term.subst,
+    Term.substVar0_map, Term.Subst.ext, Term.app2, Term.app3,
+    Term.weaken_subst_ext, Term.weaken_var, weaken_substVar0, closed_subst]
+
+/-- **`cauchyfy` is the identity on sequences that already pass the check everywhere.**
+
+The hypothesis is stated at the bound index `x₀` of the context `[n, …Γ]`, which is exactly
+where the induction step needs it — so no weakening of a derivation is required, and this is
+why the lemma takes a Lean-level argument rather than an object-level antecedent. -/
+def cauchyState_id_of_cauchy (f : Term F Γ (realTy ι))
+    (hC : Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
+      (Formula.eq0 (Term.cauchy_check_at f.weaken (.var .vz)) .zero)) :
+    Derivable F EqX al Premises (Formula.all Ty.nat (idF f)) :=
+  let base : Derivable F EqX al Premises ((idF f).subst0 Term.zero) :=
+    idF_subst0 f Term.zero ▸
+      Derivable.mp (cVal_zero adm f) (Derivable.mp (cFlag_zero adm f) and_intro)
+  let fw : Term F (Ty.nat :: Γ) (realTy ι) := f.weaken
+  let nv : Term F (Ty.nat :: Γ) Ty.nat := .var .vz
+  let hsg : Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
+      (Formula.eq0 (.app Term.sg_bar (Term.cauchy_check_at fw nv)) (.app .succ .zero)) :=
+    qtrans (sg_bar_congr hC) sg_bar_zero
+  let step : Derivable F EqX al Premises
+      (idF f →ᶠ Formula.substVar0 (idF f) (.app .succ (.var .vz))) :=
+    idF_substVar0 f ▸ (by
+      pmode
+      pintro ih
+      pdestruct ih with h0 _hv
+      pfrom hs1 := hsg
+      pconj h0 hs1 with hboth
+      papplym (cauchyState_advance adm fw nv) in hboth with hst
+      psplit
+      · prwby hst
+        pthm (snd_pair_pair adm (.app fw (.app .succ nv)) Term.zero)
+      · prwby hst
+        pthm (fst_pair_pair adm (.app fw (.app .succ nv)) Term.zero))
+  .induction base (univ_gen step)
+
+/-- The same, at an explicit index. -/
+def cauchyState_id_at (f : Term F Γ (realTy ι))
+    (hC : Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
+      (Formula.eq0 (Term.cauchy_check_at f.weaken (.var .vz)) .zero))
+    (s : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (idAt f s) :=
+  idF_subst0 f s ▸ Derivable.mp (cauchyState_id_of_cauchy adm f hC) (.forall_ax s)
+
+/-- `f̂(n) =₀ f(n)` for a sequence that already passes the check everywhere. -/
+def cauchyfy_id (f : Term F Γ (realTy ι))
+    (hC : Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
+      (Formula.eq0 (Term.cauchy_check_at f.weaken (.var .vz)) .zero))
+    (s : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.cauchyfy f s) (.app f s)) :=
+  qtrans (cauchyfy_unfold adm f s)
+    (Derivable.mp (cauchyState_id_at adm f hC s) and_proj2)
+
 end Cauchyfy
 
 section OrderedFieldAxioms
