@@ -8687,6 +8687,104 @@ def addQ_num_scaled (a c d : Term F Γ Ty.nat) :
       .mp (sg_bar_cases adm (Term.app2 Term.abs_diff sa sc)) (or_elim_rule caseS caseD))
   .mp (.mp eq0_decidable' (.forall_ax nc)) (or_elim_rule caseZ caseN)
 
+/-- `geq(x·den e, y·den e) =₀ geq(x, y)`: a denominator is a successor, so scaling by it does
+not change the comparison. `geq_mul_succ` with `rat_den_unfold_eq` supplying the successor. -/
+private def geq_mul_den (x y e : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (Formula.eq0
+      (Term.app2 Term.geq
+        (Term.app2 Term.mul x (.app Term.rat_den e))
+        (Term.app2 Term.mul y (.app Term.rat_den e)))
+      (Term.app2 Term.geq x y)) :=
+  let sp := Term.app Term.snd_pair e
+  let h := rat_den_unfold_eq e
+  let h1 := Derivable.mp (mul_congr_r x h)
+    (geq_congr_l_imp (Term.app2 Term.mul y (.app Term.rat_den e)))
+  let h2 := Derivable.mp (mul_congr_r y h)
+    (geq_congr_r_imp (Term.app2 Term.mul x (.app .succ sp)))
+  qtrans (qtrans h1 h2) (geq_mul_succ adm x y sp)
+
+/-- `eq_Q c d` makes `add_Q a c` and `add_Q a d` carry the same sign bit.
+
+Same three cases as `addQ_num_scaled`. The interesting one is the opposite-sign branch, where
+the sign is chosen by comparing the two cross products: the comparisons `geq(P, Q)` and
+`geq(P', Q')` are the same one scaled by `dd` and by `dc` respectively, so `geq_mul_den`
+identifies them. -/
+def addQ_sign_congr (a c d : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (eq_Q c d →ᶠ Formula.eq0 (addQ_sign a c) (addQ_sign a d)) :=
+  let nc : Term F Γ Ty.nat := .app Term.rat_num c
+  let dc : Term F Γ Ty.nat := .app Term.rat_den c
+  let dd : Term F Γ Ty.nat := .app Term.rat_den d
+  let sa : Term F Γ Ty.nat := .app Term.rat_sign a
+  let sc : Term F Γ Ty.nat := .app Term.rat_sign c
+  let sd : Term F Γ Ty.nat := .app Term.rat_sign d
+  let P := addQ_cross a c
+  let Q := addQ_cross c a
+  let P' := addQ_cross a d
+  let Q' := addQ_cross d a
+  let goal : Formula F Γ := Formula.eq0 (addQ_sign a c) (addQ_sign a d)
+  -- ═══ nc = 0: both signs are `rat_sign a` ═══
+  let caseZ : Derivable F EqX al Premises
+      (Formula.eq0 nc .zero →ᶠ eq_Q c d →ᶠ goal) :=
+    Derivable.exportation (
+      let HZ : Formula F Γ := Formula.eq0 nc .zero ∧ᶠ eq_Q c d
+      let gnc : Derivable F EqX al Premises (HZ →ᶠ Formula.eq0 nc .zero) := .and_weak
+      let gH : Derivable F EqX al Premises (HZ →ᶠ eq_Q c d) := and_proj2
+      let gnd := eval_h (.syllogism gH (eq_Q_num_zero adm c d)) gnc
+      let gSac := Derivable.syllogism gnc (addQ_sign_of_num_zero_imp adm a c)
+      let gSad := Derivable.syllogism gnd (addQ_sign_of_num_zero_imp adm a d)
+      htrans gSac (.syllogism gSad .sym0))
+  -- ═══ nc ≠ 0 ═══
+  let caseN : Derivable F EqX al Premises
+      (¬ᶠ(Formula.eq0 nc .zero) →ᶠ eq_Q c d →ᶠ goal) :=
+    Derivable.exportation (
+      let HN : Formula F Γ := ¬ᶠ(Formula.eq0 nc .zero) ∧ᶠ eq_Q c d
+      let gne : Derivable F EqX al Premises (HN →ᶠ ¬ᶠ(Formula.eq0 nc .zero)) := .and_weak
+      let gH : Derivable F EqX al Premises (HN →ᶠ eq_Q c d) := and_proj2
+      let gscd := eval_h (.syllogism gH (eq_Q_sign_eq adm c d)) gne
+      let gsame := Derivable.syllogism
+        (.syllogism gscd (abs_diff_congr_r_imp sa)) sg_bar_congr_imp
+      let gcd := Derivable.syllogism gH (eq_Q_cross_eq adm c d)
+      -- same-sign branch: both signs are `rat_sign a`
+      let caseS : Derivable F EqX al Premises
+          (Formula.eq0 (addQ_same a c) (.app .succ .zero) →ᶠ HN →ᶠ goal) :=
+        Derivable.exportation (
+          let K : Formula F Γ := Formula.eq0 (addQ_same a c) (.app .succ .zero) ∧ᶠ HN
+          let gsm : Derivable F EqX al Premises
+              (K →ᶠ Formula.eq0 (addQ_same a c) (.app .succ .zero)) := .and_weak
+          let gHN : Derivable F EqX al Premises (K →ᶠ HN) := and_proj2
+          let gsmd := htrans (.syllogism (.syllogism gHN gsame) .sym0) gsm
+          let gSac := Derivable.syllogism gsm (addQ_sign_same_imp adm a c)
+          let gSad := Derivable.syllogism gsmd (addQ_sign_same_imp adm a d)
+          htrans gSac (.syllogism gSad .sym0))
+      -- opposite-sign branch: the two `geq` tests are the same comparison, scaled
+      let caseD : Derivable F EqX al Premises
+          (Formula.eq0 (addQ_same a c) .zero →ᶠ HN →ᶠ goal) :=
+        Derivable.exportation (
+          let K : Formula F Γ := Formula.eq0 (addQ_same a c) .zero ∧ᶠ HN
+          let gsm : Derivable F EqX al Premises
+              (K →ᶠ Formula.eq0 (addQ_same a c) .zero) := .and_weak
+          let gHN : Derivable F EqX al Premises (K →ᶠ HN) := and_proj2
+          let gsmd := htrans (.syllogism (.syllogism gHN gsame) .sym0) gsm
+          let gSac := Derivable.syllogism gsm (addQ_sign_diff_imp adm a c)
+          let gSad := Derivable.syllogism gsmd (addQ_sign_diff_imp adm a d)
+          let eP : Derivable F EqX al Premises
+              (K →ᶠ Formula.eq0 (Term.app2 Term.mul P dd) (Term.app2 Term.mul P' dc)) :=
+            hconst (addQ_cross_fst_scaled adm a c d)
+          let eQ := Derivable.syllogism (.syllogism gHN gcd)
+            (addQ_cross_snd_scaled_imp adm a c d)
+          -- geq P Q =₀ geq(P·dd, Q·dd) =₀ geq(P'·dc, Q'·dc) =₀ geq P' Q'
+          let ggeq := htrans (hconst (.mp (geq_mul_den adm P Q d) .sym0))
+            (htrans (htrans (.syllogism eP (geq_congr_l_imp (Term.app2 Term.mul Q dd)))
+                (.syllogism eQ (geq_congr_r_imp (Term.app2 Term.mul P' dc))))
+              (hconst (geq_mul_den adm P' Q' c)))
+          let gin := htrans (.syllogism ggeq (ite_nat_congr_b_imp sa sc))
+            (.syllogism (.syllogism gHN gscd)
+              (ite_nat_congr_y_imp (Term.app2 Term.geq P' Q') sa))
+          htrans (htrans gSac gin) (.syllogism gSad .sym0))
+      .mp (sg_bar_cases adm (Term.app2 Term.abs_diff sa sc)) (or_elim_rule caseS caseD))
+  .mp (.mp eq0_decidable' (.forall_ax nc)) (or_elim_rule caseZ caseN)
+
 /-- `⟨2^{-(n+1)}⟩_ℚ +_ℚ ⟨2^{-(n+1)}⟩_ℚ =_ℚ ⟨2^{-n}⟩_ℚ` — the halving law every real-number
 modulus argument runs on. The first real use of the `add_Q` component lemmas: both summands
 have sign bit `1`, so the same-sign branch fires and the numerator is just `2^{n+1}` twice. -/
