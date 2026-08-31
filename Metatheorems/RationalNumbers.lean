@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Horatiu
 -/
 import Metatheorems.Arithmetic
+import Metatheorems.ProofMode.Rewrite
 
 namespace Metatheorems
 
@@ -7547,6 +7548,55 @@ private def succ_pd_den_mul (a c : Term F Γ Ty.nat) :
   let h1 := succ_congr (pd_congr h_prod)
   .mp (.mp (.mp h_prod .sym0) (.mp (.mp (.mp h_core (.mp h1 and_intro)) .trans0) and_intro)) .trans0
 
+/-- `2·n =₀ n + n`. Written out twice inline inside `rat_sign_rat_encode_pos/neg`; pulled out
+here because the sign half of `mul_Q_right_congr` needs it too. -/
+private def two_mul_eq_add (n : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul (Term.ofNat 2) n) (Term.app2 Term.add n n)) :=
+  let h_ms := mul_succ_l adm (.app .succ .zero) n
+  let h_m1 := .mp (.mp (mul_one_r adm n)
+    (.mp (mul_comm adm (.app .succ .zero) n) and_intro)) .trans0
+  .mp (.mp (add_congr_l h_m1 n) (.mp h_ms and_intro)) .trans0
+
+/-- `n ≠ 0 → isEven(2·n ∸ 1) =₀ 0`, i.e. one less than a positive even number is odd.
+
+This is the content of `rat_sign_rat_encode_neg` in *implication* form. The kernel has no
+deduction theorem, so the closed version — which takes `n ≠ 0` as a Lean argument — cannot be
+turned into this one; the two have to be proved separately. What makes the second cheap is
+that `n ≠ 0` can sit in the proof mode's hypothesis context instead. -/
+private def isEven_two_mul_monus_one (n : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (¬ᶠ(Formula.eq0 n .zero) →ᶠ
+       Formula.eq0 (.app Term.isEven (Term.app2 Term.monus
+         (Term.app2 Term.mul (Term.ofNat 2) n) (.app .succ .zero))) .zero) := by
+  pmode
+  pintro hn
+  -- 2·n ∸ 1  =  (n+n) ∸ 1  =  pd (n+n)
+  prw (two_mul_eq_add adm n)
+  prw (monus_succ adm (Term.app2 Term.add n n) Term.zero)
+  prw (monus_zero adm (Term.app2 Term.add n n))
+  phave hnn : ¬ᶠ(Formula.eq0 (Term.app2 Term.add n n) .zero)
+  · pintro h
+    papply hn
+    papplym (Derivable.mp (add_eq_zero_iff adm n n) .and_weak) in h with hb
+    pdestruct hb with h1 _h2
+    pexact h1
+  phave heq : Formula.eq0 (Term.app2 Term.add n n)
+      (.app .succ (.app Term.pd (Term.app2 Term.add n n)))
+  · papplym (ne_zero_eq_succ_pd adm (Term.app2 Term.add n n))
+    pexact hnn
+  -- sg_bar(isEven(pd(n+n))) =₀ isEven(S(pd(n+n))) =₀ isEven(n+n) =₀ S0
+  phave hsgb : Formula.eq0 (.app Term.sg_bar
+      (.app Term.isEven (.app Term.pd (Term.app2 Term.add n n)))) (.app .succ .zero)
+  · prw (Derivable.mp (isEven_succ adm (.app Term.pd (Term.app2 Term.add n n)))
+      Derivable.sym0)
+    psym in heq with heq'
+    prwby heq'
+    pthm (isEven_double adm n)
+  papplym (sg_bar_eq_S0_implies_zero adm
+    (.app Term.isEven (.app Term.pd (Term.app2 Term.add n n))))
+  pexact hsgb
+
 /-- ⊢ ∀a,c,d. eq_Q(c,d) → eq_Q(mul_Q(a,c), mul_Q(a,d)).
     Right congruence: when the first argument is fixed. -/
 private def mul_Q_right_congr :
@@ -7751,32 +7801,144 @@ private def mul_Q_right_congr :
         (Term.app2 Term.mul
           (Term.app2 Term.abs_diff (.app Term.rat_sign mac) (.app Term.rat_sign mad))
           (Term.app Term.sg (Term.app2 Term.add (.app Term.rat_num mac) (.app Term.rat_num mad))))
-        .zero) :=
-    -- PLAN (checked against the available lemmas; not yet written).
-    -- Write `numS := rat_num mac + rat_num mad`, `signD := |rat_sign mac − rat_sign mad|`.
-    -- Both branches finish through `mul_eq_zero_iff adm signD (sg numS) |> and_proj2`,
-    -- fed `.or_weak` (left) or `or_inr` (right). Split with `sg_bar_cases adm numS`, using
-    -- the under-hypothesis idiom `.syllogism (pair_h I_comb (weaken_intro …))
-    --   (.syllogism and_or_dist (or_elim_rule … …))`.
-    --
-    -- Branch `sg_bar numS =₀ S0`: `sg_bar_eq_S0_implies_zero` gives `numS =₀ 0`; then
-    --   `.qfer (r := .app Term.sg (.var .vz))` plus `sg_zero` gives `sg numS =₀ 0`. No H needed.
-    --
-    -- Branch `sg_bar numS =₀ 0` (so `numS ≠ 0`): must show `rat_sign mac =₀ rat_sign mad`,
-    -- then `abs_diff_eq_zero_iff` closes. Steps:
-    --   1. `h_num_ac`/`h_num_ad` rewrite `numS` to `na*nc + na*nd`. From `numS ≠ 0`:
-    --      `na ≠ 0`, and `nc ≠ 0 ∨ nd ≠ 0`.
-    --   2. `H_to_eq_cd : nc*dd =₀ nd*dc` upgrades that to `nc ≠ 0 ∧ nd ≠ 0`: if `nc =₀ 0`
-    --      then `nd*dc =₀ 0`, and `dc` is a successor (`rat_den_unfold_eq`), so
-    --      `mul_succ_eq_zero_imp` gives `nd =₀ 0` — contradicting step 1. Symmetrically.
-    --   3. `H_to_sign_cd : |sc − sd| * sg(nc + nd) =₀ 0` with `nc + nd ≠ 0`: `mul_eq_zero_iff`
-    --      forward plus `sg_zero_fwd` kills the right disjunct, leaving `sc =₀ sd`.
-    --   4. `sc =₀ sd` ⟹ `sign_ac =₀ sign_ad` (`abs_diff_congr_r`, `sg_bar_congr`)
-    --      ⟹ `isEven sign_ac =₀ isEven sign_ad` (`isEven_congr`).
-    --   5. `isEven_cases adm sign_ac`, and in each branch `rat_sign_rat_encode_pos` /
-    --      `rat_sign_rat_encode_neg` (the latter needs `num_ac ≠ 0`, which is step 1+2)
-    --      applied through `unfold_ac`/`unfold_ad` gives `rat_sign mac =₀ rat_sign mad`.
-    sorry
+        .zero) := by
+    -- The product is zero because one factor is. Which factor depends on whether the
+    -- numerator sum vanishes, so that is the split.
+    pmode
+    pintro H
+    prw h_num_ac
+    prw h_num_ad
+    pfrom hcases := sg_bar_cases adm (Term.app2 Term.add num_ac num_ad)
+    pcases hcases with hz | hnz
+    · -- `sg_bar (num_ac + num_ad) =₀ S0`, so the sum is zero and so is `sg` of it.
+      phave hsum : Formula.eq0 (Term.app2 Term.add num_ac num_ad) .zero
+      · papplym (sg_bar_eq_S0_implies_zero adm (Term.app2 Term.add num_ac num_ad))
+        pexact hz
+      prwby hsum
+      prw sg_zero
+      pthm (mul_zero adm _)
+    · -- The sum is nonzero, so the two signs must agree.
+      -- The sum being nonzero forces *both* numerators nonzero. One of them vanishing would
+      -- make `na` or one of `nc`, `nd` vanish, and `eq_Q c d` then drags the other down too —
+      -- denominators are successors, so they cannot absorb a zero.
+      phave hne : ¬ᶠ(Formula.eq0 (Term.app2 Term.add num_ac num_ad) .zero)
+      · papplym (Derivable.mp (sg_bar_eq_zero_iff adm
+          (Term.app2 Term.add num_ac num_ad)) .and_weak)
+        pexact hnz
+      papplym H_to_eq_cd in H with heq
+      phave hac : ¬ᶠ(Formula.eq0 num_ac .zero)
+      · pintro h0
+        papply hne
+        phave hnad : Formula.eq0 num_ad .zero
+        · papplym (Derivable.mp (mul_eq_zero_iff adm na nc) .and_weak) in h0 with hor
+          pcases hor with hna | hnc
+          · prwby hna
+            pthm (mul_zero_l adm nd)
+          · phave hzero : Formula.eq0 (Term.app2 Term.mul nd dc) .zero
+            · psym in heq with heq'
+              prwby heq'
+              prwby hnc
+              pthm (mul_zero_l adm dd)
+            phave hnd0 : Formula.eq0 nd .zero
+            · papplym (mul_succ_eq_zero_imp adm nd (.app Term.snd_pair c))
+              prw (Derivable.mp (rat_den_unfold_eq c) Derivable.sym0)
+              pexact hzero
+            prwby hnd0
+            pthm (mul_zero adm na)
+        prwby h0
+        prwby hnad
+        pthm (add_zero_r adm .zero)
+      phave had : ¬ᶠ(Formula.eq0 num_ad .zero)
+      · pintro h0
+        papply hne
+        phave hnac : Formula.eq0 num_ac .zero
+        · papplym (Derivable.mp (mul_eq_zero_iff adm na nd) .and_weak) in h0 with hor
+          pcases hor with hna | hnd
+          · prwby hna
+            pthm (mul_zero_l adm nc)
+          · phave hzero : Formula.eq0 (Term.app2 Term.mul nc dd) .zero
+            · prwby heq
+              prwby hnd
+              pthm (mul_zero_l adm dc)
+            phave hnc0 : Formula.eq0 nc .zero
+            · papplym (mul_succ_eq_zero_imp adm nc (.app Term.snd_pair d))
+              prw (Derivable.mp (rat_den_unfold_eq d) Derivable.sym0)
+              pexact hzero
+            prwby hnc0
+            pthm (mul_zero adm na)
+        prwby hnac
+        prwby h0
+        pthm (add_zero_r adm .zero)
+      phave hsigns : Formula.eq0 (.app Term.rat_sign mac) (.app Term.rat_sign mad)
+      · -- `nc ≠ 0`, hence `nc + nd ≠ 0`, hence `sg (nc + nd) ≠ 0`; so the sign factor of
+        -- `eq_Q c d` is what vanishes, giving `sc =₀ sd`.
+        phave hncne : ¬ᶠ(Formula.eq0 nc .zero)
+        · pintro h
+          papply hac
+          prwby h
+          pthm (mul_zero adm na)
+        phave hsumne : ¬ᶠ(Formula.eq0 (Term.app2 Term.add nc nd) .zero)
+        · pintro h
+          papply hncne
+          papplym (Derivable.mp (add_eq_zero_iff adm nc nd) .and_weak) in h with hb
+          pdestruct hb with h1 _h2
+          pexact h1
+        phave hsgne : ¬ᶠ(Formula.eq0 (.app Term.sg (Term.app2 Term.add nc nd)) .zero)
+        · pintro h
+          papply hsumne
+          papplym (sg_zero_fwd adm (Term.app2 Term.add nc nd))
+          pexact h
+        papplym H_to_sign_cd in H with hsgn
+        phave habsd : Formula.eq0 (Term.app2 Term.abs_diff sc sd) .zero
+        · papplym (Derivable.mp (mul_eq_zero_iff adm (Term.app2 Term.abs_diff sc sd)
+            (.app Term.sg (Term.app2 Term.add nc nd))) .and_weak) in hsgn with hor
+          pcases hor with hl | hr
+          · pexact hl
+          · pexfalso
+            papply hsgne
+            pexact hr
+        phave hscd : Formula.eq0 sc sd
+        · papplym (Derivable.mp (abs_diff_eq_zero_iff adm sc sd) .and_weak)
+          pexact habsd
+        -- Both signs go through `rat_sign(rat_encode s n d) =₀ isEven(2n ∸ isEven s)`, and
+        -- `sc =₀ sd` makes the two `isEven s` agree. What is left depends only on that value.
+        prw unfold_ac
+        prw unfold_ad
+        prw (rat_sign_rat_encode_unfold adm sign_ac num_ac den_ac)
+        prw (rat_sign_rat_encode_unfold adm sign_ad num_ad den_ad)
+        prwby hscd
+        pfrom hie := isEven_cases adm sign_ad
+        pcases hie with he1 | he0
+        · -- odd sign bit: both numerators are nonzero, so both sides are `0`
+          prwby he1
+          phave hl : Formula.eq0 (.app Term.isEven (Term.app2 Term.monus
+              (Term.app2 Term.mul (Term.ofNat 2) num_ac) (.app .succ .zero))) .zero
+          · papplym (isEven_two_mul_monus_one adm num_ac)
+            pexact hac
+          phave hr : Formula.eq0 (.app Term.isEven (Term.app2 Term.monus
+              (Term.app2 Term.mul (Term.ofNat 2) num_ad) (.app .succ .zero))) .zero
+          · papplym (isEven_two_mul_monus_one adm num_ad)
+            pexact had
+          prwby hl
+          prwby hr
+          prefl
+        · -- even sign bit: nothing is subtracted, and `2k` is even whatever `k` is
+          prwby he0
+          prw (monus_zero adm (Term.app2 Term.mul (Term.ofNat 2) num_ac))
+          prw (monus_zero adm (Term.app2 Term.mul (Term.ofNat 2) num_ad))
+          prw (two_mul_eq_add adm num_ac)
+          prw (two_mul_eq_add adm num_ad)
+          prw (isEven_double adm num_ac)
+          prw (isEven_double adm num_ad)
+          prefl
+      phave habs : Formula.eq0
+          (Term.app2 Term.abs_diff (.app Term.rat_sign mac) (.app Term.rat_sign mad)) .zero
+      · papplym (Derivable.mp (abs_diff_eq_zero_iff adm
+          (.app Term.rat_sign mac) (.app Term.rat_sign mad))
+          (.syllogism .and_perm .and_weak))
+        pexact hsigns
+      prwby habs
+      pthm (mul_zero_l adm _)
   -- ═══ COMBINE ═══
   -- Unfold eq_Q_dec(mac, mad)
   let eqd2 : Term F (Ty.nat :: Ty.nat :: Ty.nat :: Ty.nat :: Ty.nat :: Γ) Ty.nat :=
