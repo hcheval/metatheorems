@@ -4635,6 +4635,32 @@ private def add_congr_r_imp {s t : Term F Γ Ty.nat} (u : Term F Γ Ty.nat) :
   qfer_nat_nf (by rfl) (by rfl) I_comb
     (r := Term.app2 Term.add u.weaken (.var .vz)) (by qnorm [Term.app2]) (by qnorm [Term.app2])
 
+/-- `s =₀ t →ᶠ s + u =₀ t + u`. -/
+private def add_congr_l_imp {s t : Term F Γ Ty.nat} (u : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 s t →ᶠ
+       Formula.eq0 (Term.app2 Term.add s u) (Term.app2 Term.add t u)) :=
+  qfer_nat_nf (by rfl) (by rfl) I_comb
+    (r := Term.app2 Term.add (.var .vz) u.weaken) (by qnorm [Term.app2]) (by qnorm [Term.app2])
+
+/-- `s =₀ t →ᶠ |s − u| =₀ |t − u|`. -/
+private def abs_diff_congr_l_imp {s t : Term F Γ Ty.nat} (u : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 s t →ᶠ
+       Formula.eq0 (Term.app2 Term.abs_diff s u) (Term.app2 Term.abs_diff t u)) :=
+  qfer_nat_nf (by rfl) (by rfl) I_comb
+    (r := Term.app2 Term.abs_diff (.var .vz) u.weaken)
+    (by qnorm [Term.app2]) (by qnorm [Term.app2])
+
+/-- `s =₀ t →ᶠ s ∸ u =₀ t ∸ u`. -/
+private def monus_congr_fst_imp {s t : Term F Γ Ty.nat} (u : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 s t →ᶠ
+       Formula.eq0 (Term.app2 Term.monus s u) (Term.app2 Term.monus t u)) :=
+  qfer_nat_nf (by rfl) (by rfl) I_comb
+    (r := Term.app2 Term.monus (.var .vz) u.weaken)
+    (by qnorm [Term.app2]) (by qnorm [Term.app2])
+
 /-- `s =₀ t →ᶠ |u − s| =₀ |u − t|`. -/
 private def abs_diff_congr_r_imp {s t : Term F Γ Ty.nat} (u : Term F Γ Ty.nat) :
     Derivable F EqX al Premises
@@ -8450,6 +8476,105 @@ def addQ_sign_of_num_zero (a c : Term F Γ Ty.nat)
     qtrans (ite_nat_congr_b (x := sa) (y := sc) hgeq) (ite_nat_one (adm := adm) sa sc)
   qtrans (ite_nat_congr_y (b := addQ_same a c) (x := sa) hinner)
     (ite_nat_sg_bar_same adm (Term.app2 Term.abs_diff sa sc) sa)
+
+-- The four branch lemmas and the two `_of_num_zero` lemmas again, in implication form: the
+-- congruence proof has to apply them under a hypothesis, and the kernel has no deduction
+-- theorem to convert the closed versions.
+
+/-- Implication form of `addQ_num_same`. -/
+private def addQ_num_same_imp (a c : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (addQ_same a c) (.app .succ .zero) →ᶠ
+       Formula.eq0 (addQ_num a c)
+         (Term.app2 Term.add (addQ_cross a c) (addQ_cross c a))) :=
+  let X := Term.app2 Term.add (addQ_cross a c) (addQ_cross c a)
+  let Y := Term.app2 Term.abs_diff (addQ_cross a c) (addQ_cross c a)
+  htrans (ite_nat_congr_b_imp X Y) (hconst (ite_nat_one (adm := adm) X Y))
+
+/-- Implication form of `addQ_num_diff`. -/
+private def addQ_num_diff_imp (a c : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (addQ_same a c) .zero →ᶠ
+       Formula.eq0 (addQ_num a c)
+         (Term.app2 Term.abs_diff (addQ_cross a c) (addQ_cross c a))) :=
+  let X := Term.app2 Term.add (addQ_cross a c) (addQ_cross c a)
+  let Y := Term.app2 Term.abs_diff (addQ_cross a c) (addQ_cross c a)
+  htrans (ite_nat_congr_b_imp X Y) (hconst (ite_nat_zero (adm := adm) X Y))
+
+/-- Implication form of `addQ_sign_same`. -/
+private def addQ_sign_same_imp (a c : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (addQ_same a c) (.app .succ .zero) →ᶠ
+       Formula.eq0 (addQ_sign a c) (.app Term.rat_sign a)) :=
+  let X : Term F Γ Ty.nat := .app Term.rat_sign a
+  let Y := Term.app3 Term.ite_nat
+    (Term.app2 Term.geq (addQ_cross a c) (addQ_cross c a))
+    (.app Term.rat_sign a) (.app Term.rat_sign c)
+  htrans (ite_nat_congr_b_imp X Y) (hconst (ite_nat_one (adm := adm) X Y))
+
+/-- Implication form of `addQ_sign_diff`. -/
+private def addQ_sign_diff_imp (a c : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (addQ_same a c) .zero →ᶠ
+       Formula.eq0 (addQ_sign a c)
+         (Term.app3 Term.ite_nat (Term.app2 Term.geq (addQ_cross a c) (addQ_cross c a))
+           (.app Term.rat_sign a) (.app Term.rat_sign c))) :=
+  let X : Term F Γ Ty.nat := .app Term.rat_sign a
+  let Y := Term.app3 Term.ite_nat
+    (Term.app2 Term.geq (addQ_cross a c) (addQ_cross c a))
+    (.app Term.rat_sign a) (.app Term.rat_sign c)
+  htrans (ite_nat_congr_b_imp X Y) (hconst (ite_nat_zero (adm := adm) X Y))
+
+/-- Implication form of `addQ_cross_snd_scaled`. -/
+private def addQ_cross_snd_scaled_imp (a c d : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul (.app Term.rat_num c) (.app Term.rat_den d))
+        (Term.app2 Term.mul (.app Term.rat_num d) (.app Term.rat_den c)) →ᶠ
+       Formula.eq0
+        (Term.app2 Term.mul (addQ_cross c a) (.app Term.rat_den d))
+        (Term.app2 Term.mul (addQ_cross d a) (.app Term.rat_den c))) :=
+  htrans (hconst (mul_swap_right adm (.app Term.rat_num c)
+      (.app Term.rat_den a) (.app Term.rat_den d)))
+    (htrans (mul_congr_l_imp (.app Term.rat_den a))
+      (hconst (mul_swap_right adm (.app Term.rat_num d)
+        (.app Term.rat_den c) (.app Term.rat_den a))))
+
+/-- Implication form of `addQ_num_of_num_zero`. -/
+private def addQ_num_of_num_zero_imp (a c : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_num c) .zero →ᶠ
+       Formula.eq0 (addQ_num a c) (addQ_cross a c)) :=
+  let P := addQ_cross a c
+  let Q := addQ_cross c a
+  let da : Term F Γ Ty.nat := .app Term.rat_den a
+  let sa : Term F Γ Ty.nat := .app Term.rat_sign a
+  let sc : Term F Γ Ty.nat := .app Term.rat_sign c
+  let hQ := htrans (mul_congr_l_imp da) (hconst (mul_zero_l adm da))
+  let hx := htrans (.syllogism hQ (add_congr_r_imp P)) (hconst (add_zero_r adm P))
+  let hy := htrans (.syllogism hQ (abs_diff_congr_r_imp P)) (hconst (abs_diff_zero_r adm P))
+  htrans (htrans (.syllogism hx (ite_nat_congr_x_imp (addQ_same a c) (Term.app2 Term.abs_diff P Q)))
+      (.syllogism hy (ite_nat_congr_y_imp (addQ_same a c) P)))
+    (hconst (ite_nat_sg_bar_same adm (Term.app2 Term.abs_diff sa sc) P))
+
+/-- Implication form of `addQ_sign_of_num_zero`. -/
+private def addQ_sign_of_num_zero_imp (a c : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_num c) .zero →ᶠ
+       Formula.eq0 (addQ_sign a c) (.app Term.rat_sign a)) :=
+  let P := addQ_cross a c
+  let Q := addQ_cross c a
+  let da : Term F Γ Ty.nat := .app Term.rat_den a
+  let sa : Term F Γ Ty.nat := .app Term.rat_sign a
+  let sc : Term F Γ Ty.nat := .app Term.rat_sign c
+  let hQ := htrans (mul_congr_l_imp da) (hconst (mul_zero_l adm da))
+  -- geq(P, Q) =₀ sḡ(Q ∸ P) =₀ sḡ(0 ∸ P) =₀ sḡ 0 =₀ S0
+  let hgeq := htrans (hconst (geq_unfold adm P Q))
+    (htrans (.syllogism (.syllogism hQ (monus_congr_fst_imp P)) sg_bar_congr_imp)
+      (htrans (hconst (sg_bar_congr (monus_zero_l adm P))) (hconst sg_bar_zero)))
+  let hinner := htrans (.syllogism hgeq (ite_nat_congr_b_imp sa sc))
+    (hconst (ite_nat_one (adm := adm) sa sc))
+  htrans (.syllogism hinner (ite_nat_congr_y_imp (addQ_same a c) sa))
+    (hconst (ite_nat_sg_bar_same adm (Term.app2 Term.abs_diff sa sc) sa))
 
 /-- `⟨2^{-(n+1)}⟩_ℚ +_ℚ ⟨2^{-(n+1)}⟩_ℚ =_ℚ ⟨2^{-n}⟩_ℚ` — the halving law every real-number
 modulus argument runs on. The first real use of the `add_Q` component lemmas: both summands
