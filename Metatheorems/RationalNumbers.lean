@@ -7074,6 +7074,25 @@ def eq_Q_num_ne_zero (x y : Term F Γ Ty.nat) :
   prw (Derivable.mp (rat_den_unfold_eq y) Derivable.sym0)
   pexact hz
 
+/-- The positive form of the same fact: a zero numerator transfers across `eq_Q`. -/
+def eq_Q_num_zero (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (eq_Q x y →ᶠ Formula.eq0 (.app Term.rat_num x) .zero →ᶠ
+        Formula.eq0 (.app Term.rat_num y) .zero) := by
+  pmode
+  pintro hxy
+  pintro hx0
+  papplym (eq_Q_cross_eq adm x y) in hxy with hcross
+  phave hz : Formula.eq0
+      (Term.app2 Term.mul (.app Term.rat_num y) (.app Term.rat_den x)) .zero
+  · psym in hcross with hcross'
+    prwby hcross'
+    prwby hx0
+    pthm (mul_zero_l adm _)
+  papplym (mul_succ_eq_zero_imp adm (.app Term.rat_num y) (.app Term.snd_pair x))
+  prw (Derivable.mp (rat_den_unfold_eq x) Derivable.sym0)
+  pexact hz
+
 /-- Two `eq_Q`-equal rationals with nonzero numerator have the same sign bit. The `±0`
 loophole in the encoding is exactly why the numerator hypothesis is needed. -/
 def eq_Q_sign_eq (x y : Term F Γ Ty.nat) :
@@ -7273,6 +7292,80 @@ def le_Q_cases (x y : Term F Γ Ty.nat) :
 def lt_Q_imp_le_Q (x y : Term F Γ Ty.nat) :
     Derivable F EqX al Premises (lt_Q x y →ᶠ le_Q x y) :=
   .syllogism (lt_Q_sign adm x y) (le_Q_of_sign adm x y)
+
+/-- `<_ℚ` sees its two arguments only through their difference, and only up to `eq_Q`. This is
+what makes order proofs reduce to `add_Q` algebra: exhibit the two differences as `eq_Q`-equal
+and the order statement transfers. -/
+def lt_Q_of_eq_Q_diff (x y x' y' : Term F Γ Ty.nat)
+    (h : Derivable F EqX al Premises (eq_Q (subQ x y) (subQ x' y'))) :
+    Derivable F EqX al Premises (lt_Q x y →ᶠ lt_Q x' y') :=
+  let hne := Derivable.mp h (eq_Q_num_ne_zero adm (subQ x y) (subQ x' y'))
+  let hsg := Derivable.mp h (eq_Q_sign_eq adm (subQ x y) (subQ x' y'))
+  let hnD := lt_Q_num_ne adm x y
+  let hsD := lt_Q_sign adm x y
+  let hs : Derivable F EqX al Premises
+      (lt_Q x y →ᶠ Formula.eq0 (.app Term.rat_sign (subQ x' y')) (.app .succ .zero)) :=
+    .syllogism (pair_h (.syllogism (.syllogism hnD hsg) .sym0) hsD) .trans0
+  .syllogism (pair_h hs (.syllogism hnD hne)) (lt_Q_intro adm x' y')
+
+/-- The same for `≤_ℚ`. The zero-numerator branch has to be handled separately, because that
+is the branch on which the sign bits are allowed to disagree. -/
+def le_Q_of_eq_Q_diff (x y x' y' : Term F Γ Ty.nat)
+    (h : Derivable F EqX al Premises (eq_Q (subQ x y) (subQ x' y'))) :
+    Derivable F EqX al Premises (le_Q x y →ᶠ le_Q x' y') := by
+  pmode
+  pintro hle
+  pfrom hdec := Derivable.mp eq0_decidable' (.forall_ax (.app Term.rat_num (subQ x y)))
+  pcases hdec with hz | hnz
+  · -- the difference is zero on both sides
+    papplym (le_Q_of_num_zero adm x' y')
+    papplym (Derivable.mp h (eq_Q_num_zero adm (subQ x y) (subQ x' y')))
+    pexact hz
+  · -- nonzero: the sign bits agree, so a positive sign transfers
+    papplym (le_Q_cases adm x y) in hle with hor
+    pcases hor with hsgn | hnum
+    · papplym (le_Q_of_sign adm x' y')
+      papplym (Derivable.mp h (eq_Q_sign_eq adm (subQ x y) (subQ x' y'))) in hnz with hsq
+      psym in hsq with hsq'
+      prwby hsq'
+      pexact hsgn
+    · pexfalso
+      papply hnz
+      pexact hnum
+
+/-- `a ≤_ℚ a`. -/
+def le_Q_refl (a : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (le_Q a a) :=
+  -- `a −_ℚ a =_ℚ 0_ℚ`, so its numerator vanishes and the zero branch of `≤_ℚ` applies.
+  let h_sub_unfold := sub_Q_unfold adm a a
+  let h_eq_neg : Derivable F EqX al Premises
+      (eq_Q (Term.app2 Term.add_Q a (.app Term.neg_Q a)) Term.zero_Q) := by
+    have h := Derivable.mp
+      (add_Q_neg (adm := adm) (al := al) (Premises := Premises) (Γ := Γ)) (.forall_ax a)
+    q_norm using h
+  let h_eq_sub_zero : Derivable F EqX al Premises
+      (eq_Q (Term.app2 Term.sub_Q a a) Term.zero_Q) :=
+    .mp (.mp h_eq_neg (.mp (eq_Q_from_nat_eq (adm := adm) h_sub_unfold) and_intro))
+      (eq_Q_trans_inst adm _ _ _)
+  -- `num(d)·den(0_ℚ) = num(0_ℚ)·den(d)`, and `den(0_ℚ) = S0`, `num(0_ℚ) = 0`.
+  let d := Term.app2 Term.sub_Q a a
+  let h_cross := Derivable.mp h_eq_sub_zero (eq_Q_cross_eq adm d Term.zero_Q)
+  let h_lhs : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul (.app Term.rat_num d) (.app .succ .zero))
+        (Term.app2 Term.mul (.app Term.rat_num d) (.app Term.rat_den Term.zero_Q))) :=
+    mul_congr_r _ (.mp (rat_den_zero_Q (adm := adm)) .sym0)
+  let h_rhs : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul (.app Term.rat_num Term.zero_Q) (.app Term.rat_den d))
+        .zero) :=
+    .mp (.mp (mul_zero_l adm (.app Term.rat_den d))
+      (.mp (mul_congr_l (rat_num_zero_Q (adm := adm)) _) and_intro)) .trans0
+  let h_num_mul : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.mul (.app Term.rat_num d) (.app .succ .zero)) .zero) :=
+    .mp (.mp h_rhs (.mp (.mp (.mp h_cross (.mp h_lhs and_intro)) .trans0) and_intro)) .trans0
+  let h_num_zero : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_num d) .zero) :=
+    .mp h_num_mul (mul_succ_eq_zero_imp adm _ _)
+  .mp h_num_zero (le_Q_of_num_zero adm a a)
 
 /-- From eq_Q(x, zero_Q), derive rat_num(x)*S(0) =₀ 0.
     eq_Q means eq_Q_dec(x, zero_Q) = 0, which after unfolding gives
