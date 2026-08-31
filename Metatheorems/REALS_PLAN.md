@@ -79,19 +79,29 @@ This is the larger gap and the one nobody has started. Needed, roughly in order:
 `cauchyfy` is defined by `prec` over a `pair(value, violation_flag)` state, so these are
 induction proofs. `seq_induction` (`ProofMode/Induction.lean`) is the tool.
 
-### 3.2 The ℚ order toolkit — partly built, and gated on ℕ
+### 3.2 The ℚ order toolkit — strict order DONE, `≤` side still missing
 
-Missing entirely, and needed by the reals:
+**`RationalNumbers.lean` reached zero sorries on 2026-08-31.** ℚ is an Archimedean ordered
+field, provably. What that gives the reals:
 
-- `abs_Q` triangle inequality `|a +_ℚ b|_ℚ ≤_ℚ |a|_ℚ +_ℚ |b|_ℚ`
-- `≤_ℚ` transitivity and additive monotonicity (`le_Q` is defined but has no theory)
-- ~~`pow2neg_Q` halving~~ — **done**, `pow2neg_Q_halve` (`2ff23eb`)
-- ~~`pow2neg_Q` positivity~~ — **done**, `zero_lt_pow2neg_Q` (`e5a62c1`)
-- `|a −_ℚ b|_ℚ =_ℚ |b −_ℚ a|_ℚ` — for `eq_R_sym`
+- ✅ `lt_Q_trans`, `lt_Q_add`, `lt_Q_mul_pos`, `lt_Q_trichotomy`, `lt_Q_irrefl`
+- ✅ `zero_lt_pow2neg_Q`, `pow2neg_Q_halve` — the two `2^{-n}` facts every real axiom needs
+- ✅ `add_Q_assoc`, `mul_Q_assoc`, `distrib_Q`, `add_Q_congr`, `mul_Q_congr`, `neg_Q_add_Q`
+- ✅ `eq_Q_of_signed_cross` — `eq_Q` from cross-multiplied signed parts with *mismatched*
+  denominators. Built for `distrib_Q`; it is the general bridge the reals will want, since
+  `add_R`/`mul_R` produce different denominators on the two sides of an equation.
+- ✅ `lt_Q_of_eq_Q_diff` / `le_Q_of_eq_Q_diff`, the `lt_Q`/`le_Q` characterisations, `exp2`
+  theory, and the ℕ `monus`×`mul` layer of §3.3.
 
-Also landed on the way (2026-08-31): `add_Q` and `eq_Q` component lemmas, `lt_Q`/`le_Q`
-characterised in both directions via the difference's sign bit and numerator, `exp2`
-theory (it had none), and `lt_Q_of_eq_Q_diff` / `le_Q_of_eq_Q_diff`.
+Still missing, verified 2026-08-31, and all four are needed by the reals:
+
+- `|a −_ℚ b|_ℚ =_ℚ |b −_ℚ a|_ℚ` — needed by `eq_R_sym`, so **even Class A is not fully clear**
+- `≤_ℚ` transitivity and additive monotonicity (`le_Q` is defined; only `le_Q_refl` exists)
+- `abs_Q` triangle inequality `|a +_ℚ b|_ℚ ≤_ℚ |a|_ℚ +_ℚ |b|_ℚ` — needs the two above
+
+These should now be cheap: the `eq_Q` chaining toolkit (`eqQtrans`, `eqQsym`, `addQr`, `addQl`,
+`sub_Q_eq_add_neg`), the `posN`/`negN` signed-numerator route, and `eq_Q_of_signed_cross` all
+exist. Nothing here needs new ℕ theory.
 
 ### 3.3 The real blocker is one level lower: ℕ truncated subtraction against `mul`
 
@@ -145,16 +155,24 @@ on that ℚ sorry.
 - `archimedean_R` — the odd one out: needs `round_nat`/`embed_nat_R` and a bound on `f̂(0)`
   from §1's majorization argument. Self-contained, and the only place `round_nat` is used.
 
-## 5. Recommended order
+## 5. Recommended order (revised 2026-08-31, after ℚ reached zero sorries)
 
-1. The `nat →ₜ nat` pattern-type probe for `prw` (§2 caveat). Small, and everything
-   downstream assumes it.
-2. `pow2neg_Q` positivity, then Class A. This gets four axioms and proves the §2b
-   technique works end to end.
-3. `lt_irrefl_R` — already unblocked.
-4. `cauchyfy` theory (§3.1), then Class B.
-5. The ℚ order sorries (§3.2), then Class D.
-6. The triangle inequality, then Class C.
+1. **The `nat →ₜ nat` pattern-type probe for `prw`** (§2 caveat). Small, and *everything*
+   downstream assumes it. If it fails, that is a tactic-level fix to make before any real-number
+   work, not something to route around.
+2. **Four small ℚ lemmas**: `abs_diff_Q_comm`, `le_Q_trans`, `le_Q_add`, then `abs_Q_triangle`.
+   All four are listed in §3.2 as missing; none needs new ℕ theory.
+3. **Class A + `lt_irrefl_R`** — five axioms. The first end-to-end evidence that the §2b
+   technique (pointwise ℚ identity → QF-ER at arrow type → `0 <ℚ 2^{-n}`) actually works.
+4. **`cauchyfy` theory** (§3.1) — the real unknown, and the largest remaining gap: the file has
+   exactly one `cauchyfy` theorem and it is `closed_subst`. Induction over a `prec` with a
+   `pair(value, flag)` state; `ProofMode/Induction.lean`'s `seq_induction` is the tool.
+5. **Class B**, then **Class D** (each now unblocked, its ℚ counterpart being proved).
+6. **Class C** last — needs the triangle inequality *and* `cauchyfy` theory at once.
+
+Status counts, verified 2026-08-31: `RealNumbers.lean` has **20** sorries (all axioms; the
+encoding is complete). `RationalNumbers.lean` has **0**. The only sorry in the build is
+`general_metatheorem_classical`, which is out of scope.
 
 `distrib_R` and `mul_assoc_R` are the last two and the hardest; they need both bodies of
 theory at once.
