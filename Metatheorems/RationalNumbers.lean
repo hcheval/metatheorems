@@ -12020,13 +12020,16 @@ def abs_Q_zero_Q :
   Derivable.mp (qtrans (rat_num_abs_Q adm Term.zero_Q) (rat_num_zero_Q adm))
     (eq_Q_zero_of_num_zero adm _)
 
+/-- `a −_ℚ a =_ℚ 0_ℚ`. -/
+def sub_Q_self (a : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (eq_Q (Term.app2 Term.sub_Q a a) Term.zero_Q) :=
+  eqQtrans adm (sub_Q_eq_add_neg adm a a) (add_Q_neg_inst adm a)
+
 /-- `|a −_ℚ a|_ℚ =_ℚ 0_ℚ`. The `=_ℝ`-reflexivity fact, at ℚ. -/
 def abs_Q_sub_self (a : Term F Γ Ty.nat) :
     Derivable F EqX al Premises
       (eq_Q (.app Term.abs_Q (Term.app2 Term.sub_Q a a)) Term.zero_Q) :=
-  eqQtrans adm
-    (abs_Q_congr adm (eqQtrans adm (sub_Q_eq_add_neg adm a a) (add_Q_neg_inst adm a)))
-    (abs_Q_zero_Q adm)
+  eqQtrans adm (abs_Q_congr adm (sub_Q_self adm a)) (abs_Q_zero_Q adm)
 
 -- ── `eq_Q`-congruence for the order relations ──────────────────────────────
 
@@ -12076,6 +12079,91 @@ def le_Q_congr (x y x' y' : Term F Γ Ty.nat)
     (hy : Derivable F EqX al Premises (eq_Q y y')) :
     Derivable F EqX al Premises (le_Q x y →ᶠ le_Q x' y') :=
   le_Q_of_eq_Q_diff adm x y x' y' (sub_Q_congr adm hy hx)
+
+/-- `q_norm` plus the two order-relation definitions.
+
+`lt_Q` and `le_Q` are `def`s introduced *after* `q_norm`, so they are not in its simp set,
+and the substitution `.forall_ax` leaves behind sits outside them. Unless simp may unfold
+them in the same pass, `simpa`'s closing `exact` has to push `Term.subst` through
+`lt_Q_dec` by `whnf` — exactly the blow-up `q_norm` exists to avoid, and it does exhaust the
+heartbeat budget. Use this for any ∀-instantiation whose body is `<_ℚ` or `≤_ℚ`. -/
+syntax "q_norm_ord" "using" term : tactic
+
+macro_rules
+  | `(tactic| q_norm_ord using $h:term) =>
+    `(tactic| simpa only [lt_Q, le_Q, eq_Q, Formula.neg, Formula.subst0, Formula.substF,
+        Term.subst0,
+        Term.subst, Term.subst0_map, Term.Subst.ext, Term.app2, Term.weaken_subst_ext,
+        Term.weaken_subst0, subst_subst0_map_weaken,
+        add_closed_subst, mul_closed_subst, monus_closed_subst, abs_diff_closed_subst,
+        pd_closed_subst, sg_bar_closed_subst, sg_closed_subst, isEven_closed_subst,
+        isOdd_closed_subst, triag_closed_subst, exp2_closed_subst, ite_nat_closed_subst,
+        geq_closed_subst, max_closed_subst, min_closed_subst, pair_closed_subst,
+        inv_triag_closed_subst, fst_pair_closed_subst, snd_pair_closed_subst,
+        div2_closed_subst, rat_num_closed_subst, rat_den_closed_subst,
+        rat_sign_closed_subst, rat_encode_closed_subst, neg_Q_closed_subst,
+        add_Q_closed_subst, sub_Q_closed_subst, mul_Q_closed_subst, abs_Q_closed_subst,
+        lt_Q_dec_closed_subst, le_Q_dec_closed_subst, eq_Q_dec_closed_subst,
+        encode_nat_Q_closed_subst, pow2neg_Q_closed_subst, zero_Q_closed_subst,
+        one_Q_closed_subst] using $h)
+
+/-- `lt_Q_irrefl` at an explicit term. -/
+def lt_Q_irrefl_inst (a : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (¬ᶠ lt_Q a a) := by
+  have h := Derivable.mp
+    (lt_Q_irrefl (adm := adm) (al := al) (Premises := Premises) (Γ := Γ)) (.forall_ax a)
+  q_norm_ord using h
+
+/-- `lt_Q_trans` at explicit terms. -/
+def lt_Q_trans_inst (a b c : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (lt_Q a b ∧ᶠ lt_Q b c →ᶠ lt_Q a c) := by
+  have h := Derivable.mp (Derivable.mp (Derivable.mp
+    (lt_Q_trans (adm := adm) (al := al) (Premises := Premises) (Γ := Γ)) (.forall_ax a))
+    (.forall_ax b)) (.forall_ax c)
+  q_norm_ord using h
+
+/-- `x <_ℚ y` and `y ≤_ℚ x` cannot both hold. This is the antisymmetry the reals need and the
+ℚ layer never stated: `≤_ℚ` had only `le_Q_refl`. -/
+def lt_Q_le_Q_absurd (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (lt_Q x y ∧ᶠ le_Q y x →ᶠ ⊥ᶠ) :=
+  -- `x −_ℚ y` is the negation of `y −_ℚ x`, so their numerators vanish together.
+  let hneg : Derivable F EqX al Premises
+      (eq_Q (Term.app2 Term.sub_Q x y) (.app Term.neg_Q (Term.app2 Term.sub_Q y x))) :=
+    eqQsym adm (neg_Q_sub_Q adm x y)
+  let hnum_transfer : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_num (Term.app2 Term.sub_Q x y)) .zero →ᶠ
+       Formula.eq0 (.app Term.rat_num (Term.app2 Term.sub_Q y x)) .zero) := by
+    pmode
+    pintro hz
+    papplym (Derivable.mp hneg (eq_Q_num_zero adm (Term.app2 Term.sub_Q x y)
+      (.app Term.neg_Q (Term.app2 Term.sub_Q y x)))) in hz with hz'
+    prw (Derivable.mp (rat_num_neg_Q adm (Term.app2 Term.sub_Q y x)) Derivable.sym0)
+    pexact hz'
+  by
+  pmode
+  pintro hyp
+  pdestruct hyp with hlt hle
+  papplym (lt_Q_num_ne adm x y) in hlt with hnum_ne
+  phave hxy_ne : ¬ᶠ(Formula.eq0 (.app Term.rat_num (Term.app2 Term.sub_Q x y)) .zero)
+  · pintro hz
+    papply hnum_ne
+    papplym hnum_transfer in hz with hz'
+    pexact hz'
+  papplym (le_Q_cases adm y x) in hle with hor
+  pcases hor with hsgn | hnum
+  · -- both differences are positively signed: `y <_ℚ x` too, so `x <_ℚ x`
+    phave hyx : lt_Q y x
+    · papplym (lt_Q_intro adm y x)
+      psplit
+      · pexact hsgn
+      · pexact hxy_ne
+    papplym (lt_Q_irrefl_inst adm x)
+    papplym (lt_Q_trans_inst adm x y x)
+    psplit
+    · pexact hlt
+    · pexact hyx
+  · papply hxy_ne
+    pexact hnum
 
 end RationalOrderedField
 

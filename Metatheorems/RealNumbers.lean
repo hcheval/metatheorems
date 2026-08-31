@@ -421,7 +421,18 @@ def distrib_R :
 def lt_irrefl_R :
     Derivable F EqX al Premises (Γ := Γ)
       (Formula.all rTy (Formula.neg (lt_R (.var .vz) (.var .vz)))) :=
-  sorry
+  let A : Term F (Ty.nat :: rTy :: Γ) Ty.nat :=
+    Term.app (Term.app Term.cauchyfy (Term.weaken (.var .vz))) (.app .succ (.var .vz))
+  let e : Term F (Ty.nat :: rTy :: Γ) Ty.nat := .app Term.pow2neg_Q (.var .vz)
+  -- `f̂(n+1) −ℚ f̂(n+1) =ℚ 0`, and `2^{-n} ≤ℚ 0` contradicts `0 <ℚ 2^{-n}`.
+  let step : Derivable F EqX al Premises
+      (le_Q e (Term.app2 Term.sub_Q A A) →ᶠ ⊥ᶠ) :=
+    .syllogism
+      (le_Q_congr adm e (Term.app2 Term.sub_Q A A) e Term.zero_Q
+        (eq_Q_refl_inst adm e) (sub_Q_self adm A))
+      (.syllogism (pair_h (weaken_intro_h (zero_lt_pow2neg_Q adm (.var .vz))) I_comb)
+        (lt_Q_le_Q_absurd adm Term.zero_Q e))
+  univ_gen (.exist_rule step)
 
 /-- ⊢ ∀f,g,h : ℝ. f <_ℝ g ∧ g <_ℝ h → f <_ℝ h -/
 def lt_trans_R :
@@ -492,7 +503,15 @@ def eq_R_sym :
       (Formula.all rTy (Formula.all rTy
         (eq_R (.var (.vs .vz)) (.var .vz) →ᶠ
          eq_R (.var .vz) (.var (.vs .vz))))) :=
-  sorry
+  let A : Term F (Ty.nat :: rTy :: rTy :: Γ) Ty.nat :=
+    Term.app (Term.app Term.cauchyfy (Term.weaken (.var (.vs .vz)))) (.app .succ (.var .vz))
+  let B : Term F (Ty.nat :: rTy :: rTy :: Γ) Ty.nat :=
+    Term.app (Term.app Term.cauchyfy (Term.weaken (.var .vz))) (.app .succ (.var .vz))
+  let e : Term F (Ty.nat :: rTy :: rTy :: Γ) Ty.nat := .app Term.pow2neg_Q (.var .vz)
+  univ_gen (univ_gen (forall_map
+    (lt_Q_congr adm (.app Term.abs_Q (Term.app2 Term.sub_Q A B)) e
+        (.app Term.abs_Q (Term.app2 Term.sub_Q B A)) e
+      (abs_diff_Q_comm adm A B) (eq_Q_refl_inst adm e))))
 
 /-- ⊢ ∀f,g,h : ℝ. f =_ℝ g ∧ g =_ℝ h → f =_ℝ h -/
 def eq_R_trans :
@@ -532,5 +551,7 @@ end OrderedFieldAxioms
 -- A falling `sorry` count is not evidence (CLAUDE.md note 9); these are.
 
 #print axioms eq_R_refl
+#print axioms eq_R_sym
+#print axioms lt_irrefl_R
 
 end Metatheorems
