@@ -525,12 +525,21 @@ attribute [closed_subst] sub_Q_closed_subst mul_Q_closed_subst abs_Q_closed_subs
 @[simp] theorem one_Q_closed_subst :
     (Term.one_Q : Term F Γ _).subst σ = Term.one_Q := by rfl
 
+/-- Numerals are closed. Proved by induction rather than `rfl` so the cost is linear in the
+numeral rather than a delta-expansion of the whole `succ` tower. -/
+@[simp] theorem ofNat_closed_subst (n : Nat) :
+    (Term.ofNat n : Term F Γ Ty.nat).subst σ = Term.ofNat n := by
+  induction n with
+  | zero => rfl
+  | succ k ih => simp only [Term.ofNat, Term.subst, ih]
+
 -- The remaining rational constants join `closed_subst` (declared in `SimpSets.lean`, seeded
 -- with the arithmetic ones in `Arithmetic.lean`); the rest were tagged above, as they were
 -- needed. `qnorm` picks them all up, so a normalising step no longer has to name every closed
 -- constant that happens to appear in the goal.
 attribute [closed_subst] lt_Q_dec_closed_subst le_Q_dec_closed_subst eq_Q_dec_closed_subst
   encode_nat_Q_closed_subst pow2neg_Q_closed_subst zero_Q_closed_subst one_Q_closed_subst
+  ofNat_closed_subst
 
 end ClosedSubst
 
@@ -7746,6 +7755,155 @@ def zero_lt_one_Q :
       (.mp (add_congr_l h_abs _) and_intro)) Derivable.trans0) and_intro)) Derivable.trans0
   -- Chain: lt_Q_dec(zero_Q, one_Q) =₀ add(...) =₀ 0
   .mp (.mp h_sum (.mp h_unfold and_intro)) Derivable.trans0
+
+-- ── Positivity ─────────────────────────────────────────────────────────────
+--
+-- `0_ℚ <_ℚ p` is the shape every real-number side condition bottoms out in — `eq_R` is a
+-- `lt_Q_dec` about `2^{-n}`. `lt_Q` asks about the difference `p −_ℚ 0_ℚ`, which is only
+-- `eq_Q`-equal to `p`, not equal to it; the `eq_Q` invariance lemmas bridge that gap and turn
+-- positivity into a statement about `p`'s own sign bit and numerator.
+
+/-- Congruence for `add_Q` in its second argument, at the level of `=₀` (not `eq_Q`). -/
+private def add_Q_congr_r_nat (u : Term F Γ Ty.nat) {s t : Term F Γ Ty.nat}
+    (h : Derivable F EqX al Premises (Formula.eq0 s t)) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.add_Q u s) (Term.app2 Term.add_Q u t)) :=
+  qfer_no_premise_nat_nf h (r := Term.app2 Term.add_Q u.weaken (.var .vz))
+    (by qnorm [Term.subst0]) (by qnorm [Term.subst0])
+
+/-- `eq_Q_sym` instantiated at two explicit terms. -/
+def eq_Q_sym_inst (adm : AdmissibleEqX EqX) (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (eq_Q x y →ᶠ eq_Q y x) := by
+  have h := Derivable.mp (Derivable.mp
+    (eq_Q_sym (adm := adm) (al := al) (Premises := Premises) (Γ := Γ)) (.forall_ax x))
+    (.forall_ax y)
+  q_norm using h
+
+/-- `p −_ℚ 0_ℚ =_ℚ p`. -/
+def sub_Q_zero_Q (p : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (eq_Q (Term.app2 Term.sub_Q p Term.zero_Q) p) :=
+  let h1 := sub_Q_unfold adm p Term.zero_Q
+  let h2 := add_Q_congr_r_nat p (neg_Q_zero_Q (adm := adm))
+  let hnat : Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.sub_Q p Term.zero_Q)
+        (Term.app2 Term.add_Q p Term.zero_Q)) :=
+    .mp (.mp h2 (.mp h1 and_intro)) .trans0
+  let heq1 := eq_Q_from_nat_eq (adm := adm) hnat
+  let heq2 : Derivable F EqX al Premises
+      (eq_Q (Term.app2 Term.add_Q p Term.zero_Q) p) := by
+    have h := Derivable.mp
+      (add_Q_zero (adm := adm) (al := al) (Premises := Premises) (Γ := Γ)) (.forall_ax p)
+    q_norm using h
+  .mp (.mp heq2 (.mp heq1 and_intro)) (eq_Q_trans_inst adm _ _ _)
+
+/-- `0_ℚ <_ℚ p` forces `p`'s own sign bit to be `1` and its numerator to be nonzero. -/
+def lt_Q_zero_fwd (p : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (lt_Q Term.zero_Q p →ᶠ
+        Formula.eq0 (.app Term.rat_sign p) (.app .succ .zero)
+        ∧ᶠ ¬ᶠ(Formula.eq0 (.app Term.rat_num p) .zero)) :=
+  let D := Term.app2 Term.sub_Q p Term.zero_Q
+  let hd := sub_Q_zero_Q (adm := adm) p
+  -- ¬(num D = 0) → ¬(num p = 0)  and  ¬(num D = 0) → sign D = sign p
+  let hne := Derivable.mp hd (eq_Q_num_ne_zero adm D p)
+  let hsg := Derivable.mp hd (eq_Q_sign_eq adm D p)
+  let hnD := lt_Q_num_ne adm Term.zero_Q p
+  let hsD := lt_Q_sign adm Term.zero_Q p
+  -- sign p =₀ sign D =₀ S0
+  let hs : Derivable F EqX al Premises
+      (lt_Q Term.zero_Q p →ᶠ Formula.eq0 (.app Term.rat_sign p) (.app .succ .zero)) :=
+    .syllogism (pair_h (.syllogism (.syllogism hnD hsg) .sym0) hsD) .trans0
+  pair_h hs (.syllogism hnD hne)
+
+/-- …and conversely, a positive sign bit with a nonzero numerator makes `p` positive. -/
+def lt_Q_zero_bwd (p : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_sign p) (.app .succ .zero)
+        ∧ᶠ ¬ᶠ(Formula.eq0 (.app Term.rat_num p) .zero)
+        →ᶠ lt_Q Term.zero_Q p) :=
+  let D := Term.app2 Term.sub_Q p Term.zero_Q
+  let hd := Derivable.mp (sub_Q_zero_Q (adm := adm) p) (eq_Q_sym_inst adm D p)
+  let hne := Derivable.mp hd (eq_Q_num_ne_zero adm p D)
+  let hsg := Derivable.mp hd (eq_Q_sign_eq adm p D)
+  -- sign D =₀ sign p =₀ S0
+  let hs : Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_sign p) (.app .succ .zero)
+        ∧ᶠ ¬ᶠ(Formula.eq0 (.app Term.rat_num p) .zero) →ᶠ
+       Formula.eq0 (.app Term.rat_sign D) (.app .succ .zero)) :=
+    .syllogism (pair_h (.syllogism (.syllogism and_proj2 hsg) .sym0) .and_weak) .trans0
+  .syllogism (pair_h hs (.syllogism and_proj2 hne)) (lt_Q_intro adm Term.zero_Q p)
+
+-- ── `2^{-n}` as a rational ──────────────────────────────────────────────────
+
+/-- `pow2neg_Q n =₀ pair(2, exp2(n) ∸ 1)`. -/
+def pow2neg_Q_unfold (n : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.pow2neg_Q n)
+        (Term.app2 Term.pair (Term.ofNat 2) (.app Term.pd (.app Term.exp2 n)))) :=
+  lam_correct_nf
+    (Term.app2 Term.pair (Term.ofNat 2) (.app Term.pd (.app Term.exp2 (.var .vz)))
+      : Term F (Ty.nat :: Γ) _) n (by qnorm [Term.subst0])
+
+/-- Every `pair(2, k)` is the code of `1/(k+1)`: sign bit `1`. -/
+def rat_sign_pair_two (k : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_sign (Term.app2 Term.pair (Term.ofNat 2) k))
+        (.app .succ .zero)) :=
+  let h1 := lam_correct_nf
+    (.app Term.isEven (.app Term.fst_pair (.var .vz)) : Term F (Ty.nat :: Γ) _)
+    (Term.app2 Term.pair (Term.ofNat 2) k) (by qnorm [Term.subst0])
+  let h2 := isEven_congr (fst_pair_pair adm (Term.ofNat 2) k)
+  let c := .mp (.mp h2 (.mp h1 and_intro)) .trans0
+  .mp (.mp (isEven_two adm) (.mp c and_intro)) .trans0
+
+/-- …and numerator `1`. -/
+def rat_num_pair_two (k : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_num (Term.app2 Term.pair (Term.ofNat 2) k))
+        (.app .succ .zero)) :=
+  let p := Term.app2 Term.pair (Term.ofNat 2) k
+  let rat_num_body : Term F (Ty.nat :: Γ) Ty.nat :=
+    .app Term.div2
+      (Term.app2 Term.add
+        (.app Term.fst_pair (.var .vz))
+        (.app Term.isOdd (.app Term.fst_pair (.var .vz))))
+  let h1 := lam_correct_nf rat_num_body p (by qnorm [rat_num_body, p])
+  let h_fst := fst_pair_pair adm (Term.ofNat 2) k
+  let h_isOdd := .mp (.mp (isOdd_two adm) (.mp (isOdd_congr h_fst) and_intro)) .trans0
+  let h_add1 := add_congr_l h_fst (.app Term.isOdd (.app Term.fst_pair p))
+  let h_add2 := add_congr_r (Term.ofNat 2) h_isOdd
+  let h_add3 := .mp (.mp h_add2 (.mp h_add1 and_intro)) .trans0
+  let h_add4 := .mp (.mp (add_zero_r adm (Term.ofNat 2)) (.mp h_add3 and_intro)) .trans0
+  let c := .mp (.mp (div2_congr h_add4) (.mp h1 and_intro)) .trans0
+  .mp (.mp (div2_two adm) (.mp c and_intro)) .trans0
+
+/-- `rat_sign(⟨2^{-n}⟩_ℚ) =₀ 1`. -/
+def rat_sign_pow2neg_Q (n : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_sign (.app Term.pow2neg_Q n)) (.app .succ .zero)) :=
+  .mp (.mp (rat_sign_pair_two adm (.app Term.pd (.app Term.exp2 n)))
+    (.mp (rat_sign_congr (pow2neg_Q_unfold n)) and_intro)) .trans0
+
+/-- `rat_num(⟨2^{-n}⟩_ℚ) =₀ 1`. -/
+def rat_num_pow2neg_Q (n : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (.app Term.rat_num (.app Term.pow2neg_Q n)) (.app .succ .zero)) :=
+  .mp (.mp (rat_num_pair_two adm (.app Term.pd (.app Term.exp2 n)))
+    (.mp (rat_num_congr (pow2neg_Q_unfold n)) and_intro)) .trans0
+
+/-- `0_ℚ <_ℚ ⟨2^{-n}⟩_ℚ` — the positivity every real-number modulus argument needs. -/
+def zero_lt_pow2neg_Q (n : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (lt_Q Term.zero_Q (.app Term.pow2neg_Q n)) :=
+  -- `rat_num` of `2^{-n}` is `S0`, and `S0 = 0` is absurd, so the numerator is nonzero.
+  let hnum := rat_num_pow2neg_Q adm n
+  let hne : Derivable F EqX al Premises
+      (¬ᶠ(Formula.eq0 (.app Term.rat_num (.app Term.pow2neg_Q n)) .zero)) :=
+    let toS0 : Derivable F EqX al Premises
+        (Formula.eq0 (.app Term.rat_num (.app Term.pow2neg_Q n)) .zero →ᶠ
+         Formula.eq0 (.app .succ .zero) .zero) :=
+      .syllogism (pair_h (weaken_intro_h (.mp hnum .sym0)) I_comb) .trans0
+    .syllogism toS0 (.mp .succ_ne_zero (.forall_ax Term.zero))
+  .mp (.mp hne (.mp (rat_sign_pow2neg_Q adm n) and_intro)) (lt_Q_zero_bwd adm _)
 
 /-- S(pd(S(x)*S(y))) =₀ S(x)*S(y). Products of successors are successors, so S∘pd is identity. -/
 private def succ_pd_mul_succ (x y : Term F Γ Ty.nat) :
