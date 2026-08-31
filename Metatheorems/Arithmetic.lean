@@ -2875,6 +2875,70 @@ def add_cancel_r (x y k : Term F Γ Ty.nat) :
   .syllogism (pair_h (weaken_intro_h (.mp (monus_cancel adm x k) .sym0))
     (.syllogism (pair_h sub_k (weaken_intro_h (monus_cancel adm y k))) .trans0)) .trans0
 
+-- ── Associativity/commutativity shuffles for `+` ───────────────────────────
+--
+-- There is no AC normaliser for the object language, and the signed-value bookkeeping in
+-- `RationalNumbers.lean` needs a handful of fixed rearrangements. Each is a short chain of
+-- `add_assoc`/`add_comm`; naming them keeps the call sites to one rewrite apiece.
+
+/-- `p + (q + r) =₀ q + (p + r)`. -/
+def add_left_comm (p q r : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (Formula.eq0
+      (Term.app2 Term.add p (Term.app2 Term.add q r))
+      (Term.app2 Term.add q (Term.app2 Term.add p r))) :=
+  qtrans (.mp (add_assoc adm p q r) .sym0)
+    (qtrans (add_congr_l (add_comm adm p q) r) (add_assoc adm q p r))
+
+/-- `(p + q) + (r + s) =₀ (p + r) + (q + s)`. -/
+def add_swap4 (p q r s : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (Formula.eq0
+      (Term.app2 Term.add (Term.app2 Term.add p q) (Term.app2 Term.add r s))
+      (Term.app2 Term.add (Term.app2 Term.add p r) (Term.app2 Term.add q s))) :=
+  qtrans (add_assoc adm p q (Term.app2 Term.add r s))
+    (qtrans (add_congr_r p (.mp (add_assoc adm q r s) .sym0))
+      (qtrans (add_congr_r p (add_congr_l (add_comm adm q r) s))
+        (qtrans (add_congr_r p (add_assoc adm r q s))
+          (.mp (add_assoc adm p r (Term.app2 Term.add q s)) .sym0))))
+
+/-- `(p + (u + a)) + x =₀ (p + (a + x)) + u` — move `u` out to the far right. -/
+def add_shuffle_l (p u a x : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (Formula.eq0
+      (Term.app2 Term.add (Term.app2 Term.add p (Term.app2 Term.add u a)) x)
+      (Term.app2 Term.add (Term.app2 Term.add p (Term.app2 Term.add a x)) u)) :=
+  qtrans (add_assoc adm p (Term.app2 Term.add u a) x)
+    (qtrans (add_congr_r p (add_assoc adm u a x))
+      (qtrans (add_congr_r p (add_comm adm u (Term.app2 Term.add a x)))
+        (.mp (add_assoc adm p (Term.app2 Term.add a x) u) .sym0)))
+
+/-- `(n + (v + b)) + x =₀ (n + b) + (v + x)`. -/
+def add_shuffle_r (n v b x : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (Formula.eq0
+      (Term.app2 Term.add (Term.app2 Term.add n (Term.app2 Term.add v b)) x)
+      (Term.app2 Term.add (Term.app2 Term.add n b) (Term.app2 Term.add v x))) :=
+  qtrans (add_assoc adm n (Term.app2 Term.add v b) x)
+    (qtrans (add_congr_r n (add_congr_l (add_comm adm v b) x))
+      (qtrans (add_congr_r n (add_assoc adm b v x))
+        (.mp (add_assoc adm n b (Term.app2 Term.add v x)) .sym0)))
+
+/-- `(n + b) + (u + y) =₀ (n + (b + y)) + u`. -/
+def add_shuffle_r' (n b u y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (Formula.eq0
+      (Term.app2 Term.add (Term.app2 Term.add n b) (Term.app2 Term.add u y))
+      (Term.app2 Term.add (Term.app2 Term.add n (Term.app2 Term.add b y)) u)) :=
+  qtrans (add_assoc adm n b (Term.app2 Term.add u y))
+    (qtrans (add_congr_r n (.mp (add_assoc adm b u y) .sym0))
+      (qtrans (add_congr_r n (add_congr_l (add_comm adm b u) y))
+        (qtrans (add_congr_r n (add_assoc adm u b y))
+          (qtrans (add_congr_r n (add_comm adm u (Term.app2 Term.add b y)))
+            (.mp (add_assoc adm n (Term.app2 Term.add b y) u) .sym0)))))
+
+/-- `r + (p + q) =₀ p + (q + r)` — rotate a three-term sum. -/
+def add_rot3 (p q r : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (Formula.eq0
+      (Term.app2 Term.add r (Term.app2 Term.add p q))
+      (Term.app2 Term.add p (Term.app2 Term.add q r))) :=
+  qtrans (add_left_comm adm r p q) (add_congr_r p (add_comm adm r q))
+
 end ArithProps
 
 -- ============================================================================
