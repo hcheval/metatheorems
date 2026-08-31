@@ -12080,6 +12080,17 @@ def le_Q_congr (x y x' y' : Term F Γ Ty.nat)
     Derivable F EqX al Premises (le_Q x y →ᶠ le_Q x' y') :=
   le_Q_of_eq_Q_diff adm x y x' y' (sub_Q_congr adm hy hx)
 
+/-- `|a −_ℚ a|_ℚ <_ℚ 2^{-m}` for every `m`. The shape every "the two sides are literally the
+same rational" real-number goal reduces to. -/
+def lt_Q_abs_sub_self (a m : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (lt_Q (.app Term.abs_Q (Term.app2 Term.sub_Q a a)) (.app Term.pow2neg_Q m)) :=
+  Derivable.mp (zero_lt_pow2neg_Q adm m)
+    (lt_Q_congr adm Term.zero_Q (.app Term.pow2neg_Q m)
+      (.app Term.abs_Q (Term.app2 Term.sub_Q a a)) (.app Term.pow2neg_Q m)
+      (eqQsym adm (abs_Q_sub_self adm a))
+      (eq_Q_refl_inst adm (.app Term.pow2neg_Q m)))
+
 /-- `q_norm` plus the two order-relation definitions.
 
 `lt_Q` and `le_Q` are `def`s introduced *after* `q_norm`, so they are not in its simp set,

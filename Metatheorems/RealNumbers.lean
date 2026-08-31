@@ -568,7 +568,7 @@ private def invF (f : Term F Γ (realTy ι)) : Formula F (Ty.nat :: Γ) :=
         (.app .succ .zero)
 
 /-- The invariant at an explicit index. -/
-private abbrev invAt (f : Term F Γ (realTy ι)) (s : Term F Γ Ty.nat) : Formula F Γ :=
+abbrev invAt (f : Term F Γ (realTy ι)) (s : Term F Γ Ty.nat) : Formula F Γ :=
   (Formula.eq0 (.app Term.snd_pair (Term.cauchyState f s)) .zero
       ∧ᶠ Formula.eq0 (.app Term.fst_pair (Term.cauchyState f s)) (.app f s))
     ∨ᶠ Formula.eq0 (.app Term.snd_pair (Term.cauchyState f s)) (.app .succ .zero)
@@ -631,6 +631,46 @@ def cauchy_inv (f : Term F Γ (realTy ι)) :
         prwby hst
         pexact hR)
   .induction base (univ_gen step)
+
+/-- The invariant at an explicit index. -/
+def cauchy_inv_at (f : Term F Γ (realTy ι)) (s : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (invAt f s) :=
+  invF_subst0 f s ▸ Derivable.mp (cauchy_inv adm f) (.forall_ax s)
+
+/-- **`cauchyfy` produces a Cauchy sequence**, for *any* `f` whatsoever:
+`|f̂(n) −ℚ f̂(n+1)|ℚ <ℚ 2^{-(n+1)}`. Stated on the state's value component; `cauchyfy_unfold`
+turns it into a statement about `cauchyfy` itself.
+
+Three cases, all supplied by the invariant: the check passed at `n` (so the two values are
+`f n` and `f (n+1)`, and the check *is* the inequality), the check failed at `n`, or the flag
+was already set — in the latter two the value does not move and the difference is `0`. -/
+def cauchyState_cauchy (f : Term F Γ (realTy ι)) (n : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (lt_Q (.app Term.abs_Q (Term.app2 Term.sub_Q
+              (.app Term.fst_pair (Term.cauchyState f n))
+              (.app Term.fst_pair (Term.cauchyState f (.app .succ n)))))
+            (.app Term.pow2neg_Q (.app .succ n))) := by
+  pmode
+  pfrom hinv := cauchy_inv_at adm f n
+  pcases hinv with hL | hR
+  · pdestruct hL with h0 hv
+    pfrom hsg := sg_bar_cases adm (Term.cauchy_check_at f n)
+    pcases hsg with hs1 | hs0
+    · pconj h0 hs1 with hboth
+      papplym (cauchyState_advance adm f n) in hboth with hst
+      prwby hst
+      prw (fst_pair_pair adm (.app f (.app .succ n)) Term.zero)
+      prwby hv
+      papplym (sg_bar_eq_S0_implies_zero adm (Term.cauchy_check_at f n)) in hs1 with hchk
+      pexact hchk
+    · pconj h0 hs0 with hboth
+      papplym (cauchyState_trip adm f n) in hboth with hst
+      prwby hst
+      prw (fst_pair_pair adm (.app Term.fst_pair (Term.cauchyState f n)) (.app .succ .zero))
+      pthm (lt_Q_abs_sub_self adm (.app Term.fst_pair (Term.cauchyState f n)) (.app .succ n))
+  · papplym (cauchyState_frozen adm f n) in hR with hst
+    prwby hst
+    pthm (lt_Q_abs_sub_self adm (.app Term.fst_pair (Term.cauchyState f n)) (.app .succ n))
 
 end Cauchyfy
 
