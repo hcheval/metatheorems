@@ -216,4 +216,82 @@ theorem majorant_of_closed_term {ι : Type} {X : ι → Type} {F : ι → Ty ι}
   obtain ⟨t_star, ht⟩ := all_closed_terms_majorizable am t
   exact ⟨t_star am.N, ht am.N (Nat.le_refl _)⟩
 
+-- ============================================================================
+-- Building an `AbstractMajorizability` from a base-type relation
+-- ============================================================================
+
+/-! The document's route (`particular-cases-metric-spaces.tex`, and Kohlenbach's Proposition
+in §17) fixes the relation only at the base types and then discharges *two structural
+conditions* plus *one obligation per constant*. `bezemMaj` is exactly that extension of a
+base relation, and every structural field of `AbstractMajorizability` holds for it by
+definitional unfolding — `arrow_intro` in particular is `fun _ _ h => h`, because
+`bezemMaj base (ρ →ₜ τ)` *is* the ∀-statement the field demands.
+
+So instantiating for a concrete space means supplying only the five constant majorants.
+That is `bezemAbstract`. -/
+
+section BezemAbstract
+
+variable {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+
+/-- The structural half of `AbstractMajorizability` for `bezemMaj base`, packaged so that a
+concrete space supplies only the per-constant obligations.
+
+`N` is the uniform threshold; the five majorant arguments are the document's per-constant
+conditions, stated against `bezemMaj base`. -/
+def bezemAbstract (si : SpaceInterp X F) (base : (i : ι) → Nat → X i → Prop)
+    (N : ℕ)
+    (zero_maj : ∃ z_star : ℕ → Nat, ∀ n ≥ N, bezemMaj base .nat (z_star n) (0 : Nat))
+    (succ_maj : ∃ s_star : ℕ → Ty.interpret X (Ty.nat →ₜ Ty.nat).hat,
+      ∀ n ≥ N, bezemMaj base (.nat →ₜ .nat) (s_star n) (Nat.succ : Nat → Nat))
+    (prec_maj : ∀ (ρ : Ty ι), ∃ r_star : ℕ → Ty.interpret X (recTy ρ).hat,
+      ∀ n ≥ N, bezemMaj base (recTy ρ) (r_star n)
+        (fun (y : Ty.interpret X ρ)
+             (z : Ty.interpret X ρ → Ty.interpret X Ty.nat → Ty.interpret X ρ)
+             (n : Nat) => Nat.rec y (fun n ih => z ih n) n))
+    (func_maj : ∀ (f : ι), ∃ f_star : ℕ → Ty.interpret X (F f).hat,
+      ∀ n ≥ N, bezemMaj base (F f) (f_star n) (si.funcInterp f))
+    (zeroX_maj : ∀ (i : ι), ∃ z_star : ℕ → Nat,
+      ∀ n ≥ N, bezemMaj base (.base i) (z_star n) (si.zeroInterp i)) :
+    AbstractMajorizability si where
+  maj := bezemMaj base
+  nat_order _ _ h := h
+  app_compat _ _ _ _ hf hx := hf _ _ hx
+  arrow_intro _ _ h := h
+  prod_intro _ _ h₁ h₂ := ⟨h₁, h₂⟩
+  prod_fst _ _ h := h.1
+  prod_snd _ _ h := h.2
+  unit_maj := trivial
+  N := N
+  zero_maj := zero_maj
+  succ_maj := succ_maj
+  prec_maj := prec_maj
+  func_maj := func_maj
+  zeroX_maj := zeroX_maj
+
+/-! ### The two ℕ constants are majorizable for *any* base relation
+
+`0` and `S` say nothing about the space, so they are discharged once here rather than in each
+instance. `R` is not of this kind — see `prec_maj` in the document's Proposition, which needs
+an induction and a `max`-variant majorant. -/
+
+/-- `0` majorizes itself, for any base relation. -/
+theorem bezem_zero_maj (base : (i : ι) → Nat → X i → Prop) (N : ℕ) :
+    ∃ z_star : ℕ → Nat, ∀ n ≥ N, bezemMaj (X := X) base .nat (z_star n) (0 : Nat) :=
+  ⟨fun _ => 0, fun _ _ => Nat.le_refl 0⟩
+
+/-- `S` majorizes itself, for any base relation. -/
+theorem bezem_succ_maj (base : (i : ι) → Nat → X i → Prop) (N : ℕ) :
+    ∃ s_star : ℕ → Ty.interpret X (Ty.nat →ₜ Ty.nat).hat,
+      ∀ n ≥ N, bezemMaj base (.nat →ₜ .nat) (s_star n) (Nat.succ : Nat → Nat) :=
+  ⟨fun _ => Nat.succ, fun _ _ _ _ h => Nat.succ_le_succ h⟩
+
+/-- `bezemAbstract` and `bezemRel` agree, so a space built the per-constant way still feeds
+anything stated against `MajorizabilityRel`. -/
+theorem bezemAbstract_toRel_maj (si : SpaceInterp X F) (base : (i : ι) → Nat → X i → Prop)
+    {N hz hs hp hf hx} :
+    (bezemAbstract si base N hz hs hp hf hx).toRel.maj = (bezemRel si base).maj := rfl
+
+end BezemAbstract
+
 end Metatheorems
