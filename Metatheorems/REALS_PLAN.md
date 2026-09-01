@@ -1,5 +1,149 @@
 # The real-number layer: what it needs, in dependency order
 
+> **Revision 2026-09-01 — read §0 first. Three of this note's claims are wrong.**
+
+## 0. What the 2026-09-01 session established
+
+`RealNumbers.lean` is now **in the build** (`Metatheorems.lean` imports it), so its `sorry`s
+are visible and its breakage is a build failure.
+
+**There are 19 ordered-field axioms, not 20.** Count them: `add_comm_R`, `add_assoc_R`,
+`add_zero_R`, `add_neg_R`, `mul_comm_R`, `mul_assoc_R`, `mul_one_R`, `distrib_R`,
+`lt_irrefl_R`, `lt_trans_R`, `lt_add_R`, `lt_mul_pos_R`, `zero_lt_one_R`, `archimedean_R`,
+`eq_R_refl`, `eq_R_sym`, `eq_R_trans`, `add_eq_zero_R`, `le_zero_eq_zero_R`. The "20" in §5
+below was never checked.
+
+**Proved (4/19), `#print axioms` = `[propext, Quot.sound]` in-file:**
+`eq_R_refl`, `eq_R_sym`, `lt_irrefl_R`, `zero_lt_one_R`.
+
+### 0.1 The `prw` arrow-type probe passed — with one limit
+
+`Metatheorems/Probes/RwArrow.lean` (in the build) exercises `prw` at pattern type
+`nat →ₜ nat`, in both the folded `eqAtType` spelling and the unfolded `∀x. f x =₀ g x` one.
+All three cases work unchanged. §2's caveat is discharged.
+
+**But `prwby` at an arrow type is impossible, not merely unimplemented.** `prwby` instantiates
+QF-ER's premise `A₀` with the hypothesis's own formula and discharges `A₀.isQF = true` by
+`rfl`; at an arrow type that formula is a `Formula.all`, so it is not quantifier-free. Checked:
+the error is `(eqAtType EqX (nat →ₜ nat) f g).isQF is not definitionally equal to true`.
+Function-typed rewriting is available from **closed** rules only.
+
+There is a second, sharper limit that cost time to find: **`prw` finds its pattern by
+descending through `Term.app`/`app2`/`app3` nodes only** (`scanTerm`'s match), so any named
+wrapper hides its contents from the rewrite. `Term.cauchy_check_at f n`, or a `def cVal f n :=
+.app fst_pair (cauchyState f n)`, are opaque to it. Formula statements that `prw` must see
+inside have to be spelled out. This is why `RealNumbers.lean` has no `cVal`/`cFlag`
+abbreviations.
+
+### 0.2 §4's "Class A — the two sides are pointwise-identical" is **wrong**
+
+`add_Q_comm` and `mul_Q_comm` are `eq_Q` statements, not `=₀` statements: the ℚ encoding does
+not commute on the nose (the sign field of `add_Q x y` is `ite(geq a b, s₁, s₂)` and of
+`add_Q y x` is `ite(geq b a, s₂, s₁)`, which differ when `a =₀ b`; they agree only because the
+numerator is then `0` and `rat_encode` ignores the sign there). So the two sides of
+`add_comm_R` are pointwise **`eq_Q`**, and §2b's technique — pointwise `=₀`, then QF-ER at
+`nat →ₜ nat` — does not apply to them.
+
+`add_comm_R` and `mul_comm_R` therefore need **one of**:
+
+- `add_Q_comm_nat : add_Q x y =₀ add_Q y x` at the *code* level (true; needs the `geq`
+  trichotomy and a "`rat_encode` ignores the sign when the numerator is 0" lemma — neither
+  exists), or
+- an `eq_Q`-level congruence for `cauchyfy`: pointwise `f k =ℚ g k` ⟹ `f̂ n =ℚ ĝ n`. This is
+  *now* within reach (§0.3 supplies the invariant), but is an induction carrying an
+  object-level hypothesis, so it needs `seq_induction` and the weakened-hypothesis plumbing.
+
+Only `eq_R_refl` and `eq_R_sym` were genuinely Class A, and both are done.
+
+### 0.3 `cauchyfy` is open — the invariant and the Cauchy property are proved
+
+This was the plan's declared main risk. It is real work but it is **not** an obstruction.
+`RealNumbers.lean` now has:
+
+| lemma | statement |
+|---|---|
+| `Term.cauchyBase/cauchyStep/cauchyState` | the recursion, named, so it can be talked about |
+| `cauchyfy_unfold` | `cauchyfy f n =₀ fst_pair (cauchyState f n)` — the one beta step |
+| `cauchyState_zero/succ` | `rec_zero`/`rec_succ` at this recursion |
+| `cauchyState_succ_unfold` | the step with both state components exposed |
+| `cauchyState_frozen` | flag set ⟹ the state does not move |
+| `cauchyState_advance` | flag clear ∧ check passes ⟹ next state is `pair(f(n+1), 0)` |
+| `cauchyState_trip` | flag clear ∧ check fails ⟹ value freezes, flag sets |
+| **`cauchy_inv`** | **the invariant**: at every `n`, either flag `= 0` and value `=₀ f n`, or flag `= 1` |
+| **`cauchyState_cauchy`** | **`\|f̂(n) −ℚ f̂(n+1)\|ℚ <ℚ 2^{-(n+1)}` for *any* `f`** |
+| `cauchyState_id_of_cauchy`, `cauchyfy_id` | `f̂(n) =₀ f(n)` when the check passes everywhere |
+| `cauchyfy_zero` | `f̂(0) =₀ f(0)` |
+| `cauchyfy_zero_R`, `cauchyfy_one_R` | the constant sequences are fixed |
+
+The invariant is what makes any of it possible: without it nothing pins the flag to `{0,1}`,
+and `ite_nat` on anything else computes garbage. Every step above went through the proof mode
+essentially first try; the expensive part was the four `subst0`/`substVar0` normal-form lemmas
+(`invF_subst0`, `invF_substVar0`, `idF_subst0`, `idF_substVar0`), which need
+`Term.weaken_subst_ext`, `Term.weaken_var` and `subst_subst0_map_weaken` with `Term.weaken`
+left **folded** — unfolding `Term.weaken` to `Term.rename` stops `weaken_subst_ext` firing.
+
+### 0.4 §4's Class D — "each lifts fairly directly from its ℚ counterpart" — is **wrong**
+
+`lt_R f g` is `∃n. ĝ(n+1) −ℚ f̂(n+1) ≥ℚ 2^{-n}`. Transitivity has to combine two witnesses at
+*different* indices, which needs the Cauchy property of `cauchyfy` to move between them, and
+`lt_add_R`/`lt_mul_pos_R` need the same. Only `lt_irrefl_R` was direct (done). Class D belongs
+with Class C.
+
+### 0.5 `eq_R_trans` is much harder than "triangle inequality + halving"
+
+The bound in `eq_R` is exactly tight — `2^{-n} = 2·2^{-(n+1)}` — so no route through
+"|f̂−ĝ| + |ĝ−ĥ| at a common index" closes: every such estimate overshoots by exactly one
+dyadic step, at *every* choice of index. Worked out:
+
+    |f̂(n+1) − ĥ(n+1)| ≤ |f̂(n+1) − f̂(m)| + |f̂(m) − ĝ(m)| + |ĝ(m) − ĥ(m)| + |ĥ(m) − ĥ(n+1)|
+                      <  (2^{-(n+1)} − 2^{-m}) + 2^{-(m-1)} + 2^{-(m-1)} + (2^{-(n+1)} − 2^{-m})
+                      =  2^{-n} + 2^{-(m-1)}        -- over, for every m
+
+The statement *is* true, and the proof that works keeps the first Cauchy step **strict** and
+carries its slack:
+
+    |f̂(n+1) − ĥ(n+1)| ≤ |f̂(n+1)−f̂(n+2)|  +  |f̂(n+2)−f̂(m)|  +  |f̂(m)−ĥ(m)|
+                        + |ĥ(m)−ĥ(n+2)|   +  |ĥ(n+2)−ĥ(n+1)|
+                      <  2^{-(n+2)} + (2^{-(n+2)} − 2^{-m}) + 2^{-(m-1)}
+                        + (2^{-(n+2)} − 2^{-m}) + 2^{-(n+2)}   =  2^{-n}
+
+with the two outer terms strict and the rest `≤`. That needs, none of which exists:
+
+1. `abs_Q_triangle` (`|a +ℚ b| ≤ℚ |a| +ℚ |b|`), `le_Q_trans`, `le_Q_add` — §3.2's three
+   remaining items;
+2. a **mixed** `<`/`≤` addition lemma (`a <ℚ A`, `b ≤ℚ B` ⟹ `a +ℚ b <ℚ A +ℚ B`);
+3. an **unbounded telescoping induction**: `|f̂(p) − f̂(p+k)| ≤ℚ 2^{-p} − 2^{-(p+k)}`, by
+   induction on `k`, on top of `cauchyState_cauchy`;
+4. the exact dyadic identities `4·2^{-(n+2)} =ℚ 2^{-n}` and `2^{-p} − 2^{-(p+k)}` telescoping.
+
+Item 3 is a second `cauchyfy`-scale induction. Everything in Class C — and `lt_trans_R`,
+`lt_add_R`, `add_zero_R`, `mul_one_R` — sits on it, because those all compare two *different*
+sequences that merely converge together. **This, not `cauchyfy`, is the real remaining
+project.**
+
+### 0.6 One statement-level change was made
+
+The 19 axioms now take `(adm : AdmissibleEqX EqX)`, as every ℚ theorem already does. Nothing
+else about any statement changed.
+
+### 0.7 Revised work order
+
+1. `abs_Q_triangle`, `le_Q_trans`, `le_Q_add`, and the mixed `<`/`≤` addition lemma (§3.2 plus
+   one). All four are ℚ-level and unblocked.
+2. The telescoping induction `|f̂(p) − f̂(p+k)| ≤ℚ 2^{-p} − 2^{-(p+k)}` (§0.5 item 3).
+3. `eq_R_trans` — with 1 and 2 it is assembly, and it completes `AdmissibleEqX` for
+   `MetricSpaces.lean` (`eq_R_refl`/`eq_R_sym` are done).
+4. `cauchyfy_congr_eqQ` (§0.2), then `add_comm_R` and `mul_comm_R`.
+5. The rest of Class C and Class D, which all reuse 1–2.
+6. `archimedean_R` last; it is the only one that is genuinely self-contained
+   (`round_nat` + the §1 majorization argument) and could be done at any time.
+
+---
+
+*Original note, 2026-08-31, follows. §2's caveat is discharged (§0.1); §4's Class A and Class D
+classifications are wrong (§0.2, §0.4); §5's count of 20 is wrong (§0).*
+
+
 Status of `Metatheorems/RealNumbers.lean` as of 2026-08-31. Not in the build.
 
 CLAUDE.md calls this a "skeleton". That undersells it: **every operation is already
