@@ -12531,9 +12531,299 @@ def le_lt_Q_trans (a b c : Term F Γ Ty.nat) :
       (eqQsym adm (sub_Q_trans_split adm a b c)))) in hsum with h3
   pexact h3
 
+-- ── ℕ order in `monus` form ────────────────────────────────────────────────
+--
+-- `a ≤ b` at ℕ is `a ∸ b =₀ 0`. `Arithmetic.lean` has the `monus` calculus but no order
+-- *relation* facts — no transitivity, no monotonicity. By subject these four belong there;
+-- they are here because `Arithmetic.lean` sits below `ProofMode` in the import graph and
+-- these are a few lines in proof mode against a page each in Hilbert style.
+--
+-- Note the shape of the two `_aux` lemmas: the reasoning is done over *fresh* variables and
+-- instantiated afterwards. A rewrite hits every occurrence of its pattern, so rewriting `b`
+-- by `(b ∸ a) + a` in a goal that also mentions `c ∸ b` corrupts the other occurrence. Stating
+-- the step generically, where the five terms are opaque, is what makes the rewrites safe.
+
+/-- `x ≤ u + x`. -/
+def monus_add_self (x u : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.monus x (Term.app2 Term.add u x)) .zero) :=
+  qtrans (monus_congr_r x (add_comm adm u x))
+    (qtrans (monus_monus adm x x u)
+      (qtrans (monus_congr_l (monus_self adm x) u) (monus_zero_l adm u)))
+
+/-- `c =₀ M + a` gives `a ≤ c`. -/
+def monus_le_of_eq_add (a c M : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 c (Term.app2 Term.add M a) →ᶠ
+       Formula.eq0 (Term.app2 Term.monus a c) .zero) := by
+  pmode
+  pintro h
+  prwby h
+  pthm (monus_add_self adm a M)
+
+private def monus_le_trans_aux (a b c k m : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 b (Term.app2 Term.add k a) →ᶠ
+       Formula.eq0 c (Term.app2 Term.add m b) →ᶠ
+       Formula.eq0 (Term.app2 Term.monus a c) .zero) := by
+  pmode
+  pintro hb
+  pintro hc
+  prwby hb in hc with hc1
+  prw (Derivable.mp (add_assoc adm m k a) Derivable.sym0) in hc1 with hc2
+  papplym (monus_le_of_eq_add adm a c (Term.app2 Term.add m k))
+  pexact hc2
+
+/-- Transitivity of `≤` at ℕ. -/
+def monus_le_trans (a b c : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.monus a b) .zero
+        ∧ᶠ Formula.eq0 (Term.app2 Term.monus b c) .zero →ᶠ
+       Formula.eq0 (Term.app2 Term.monus a c) .zero) := by
+  pmode
+  pintro hyp
+  pdestruct hyp with hab hbc
+  papplym (monus_add_cancel adm b a) in hab with e1
+  papplym (monus_add_cancel adm c b) in hbc with e2
+  psym in e1 with e1'
+  psym in e2 with e2'
+  papplym (monus_le_trans_aux adm a b c
+    (Term.app2 Term.monus b a) (Term.app2 Term.monus c b)) in e1' with h1
+  papply h1 in e2' with h2
+  pexact h2
+
+/-- `(k + a) + (m + c) =₀ (k + m) + (a + c)`. -/
+private def add_swap4_nat (k a m c : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0
+        (Term.app2 Term.add (Term.app2 Term.add k a) (Term.app2 Term.add m c))
+        (Term.app2 Term.add (Term.app2 Term.add k m) (Term.app2 Term.add a c))) :=
+  qtrans (add_assoc adm k a (Term.app2 Term.add m c))
+    (qtrans (add_congr_r k (.mp (add_assoc adm a m c) .sym0))
+      (qtrans (add_congr_r k (add_congr_l (add_comm adm a m) c))
+        (qtrans (add_congr_r k (add_assoc adm m a c))
+          (.mp (add_assoc adm k m (Term.app2 Term.add a c)) .sym0))))
+
+private def add_le_mono_aux (a b c d k m : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 b (Term.app2 Term.add k a) →ᶠ
+       Formula.eq0 d (Term.app2 Term.add m c) →ᶠ
+       Formula.eq0 (Term.app2 Term.monus
+         (Term.app2 Term.add a c) (Term.app2 Term.add b d)) .zero) := by
+  pmode
+  pintro hb
+  pintro hd
+  phave hbd : Formula.eq0 (Term.app2 Term.add b d)
+      (Term.app2 Term.add (Term.app2 Term.add k m) (Term.app2 Term.add a c))
+  · prwby hb
+    prwby hd
+    pthm (add_swap4_nat adm k a m c)
+  papplym (monus_le_of_eq_add adm (Term.app2 Term.add a c)
+    (Term.app2 Term.add b d) (Term.app2 Term.add k m))
+  pexact hbd
+
+/-- `≤` at ℕ is compatible with addition on both sides. -/
+def add_le_mono (a b c d : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.monus a b) .zero
+        ∧ᶠ Formula.eq0 (Term.app2 Term.monus c d) .zero →ᶠ
+       Formula.eq0 (Term.app2 Term.monus
+         (Term.app2 Term.add a c) (Term.app2 Term.add b d)) .zero) := by
+  pmode
+  pintro hyp
+  pdestruct hyp with hab hcd
+  papplym (monus_add_cancel adm b a) in hab with e1
+  papplym (monus_add_cancel adm d c) in hcd with e2
+  psym in e1 with e1'
+  psym in e2 with e2'
+  papplym (add_le_mono_aux adm a b c d
+    (Term.app2 Term.monus b a) (Term.app2 Term.monus d c)) in e1' with h1
+  papply h1 in e2' with h2
+  pexact h2
+
+/-- `1 ≤ 2^n`. -/
+def one_le_exp2 (n : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.monus (.app .succ .zero) (.app Term.exp2 n)) .zero) := by
+  pmode
+  prw (exp2_succ_pd adm n)
+  prw (monus_succ_l adm Term.zero (.app Term.pd (.app Term.exp2 n)))
+  pthm (monus_zero_l adm (.app Term.pd (.app Term.exp2 n)))
+
+/-- **`n ≤ 2^n`.** The ℕ fact behind the ℚ-Archimedean index below: it is what makes the
+denominator field of a positive rational's code an explicit index at which `2^{-·}` has
+already fallen below it. -/
+def exp2_ge_self :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all Ty.nat
+        (Formula.eq0 (Term.app2 Term.monus (.var .vz) (.app Term.exp2 (.var .vz))) .zero)) :=
+  let base : Derivable F EqX al Premises (Γ := Γ)
+      (Formula.eq0 (Term.app2 Term.monus Term.zero (.app Term.exp2 Term.zero)) .zero) :=
+    monus_zero_l adm (.app Term.exp2 Term.zero)
+  let step : Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
+      (Formula.eq0 (Term.app2 Term.monus (.var .vz) (.app Term.exp2 (.var .vz))) .zero →ᶠ
+       Formula.eq0 (Term.app2 Term.monus (.app .succ (.var .vz))
+         (.app Term.exp2 (.app .succ (.var .vz)))) .zero) := by
+    pmode
+    pintro ih
+    prw (exp2_succ adm (.var .vz))
+    -- `S n =₀ S0 + n`, so the goal is an instance of two-sided monotonicity
+    phave hSn : Formula.eq0 (.app .succ (.var .vz : Term F (Ty.nat :: Γ) Ty.nat))
+        (Term.app2 Term.add (.app .succ .zero) (.var .vz))
+    · pthm (Derivable.mp (qtrans
+        (add_succ_l adm (Term.zero : Term F (Ty.nat :: Γ) Ty.nat) (.var .vz))
+        (succ_congr (add_zero_l adm (.var .vz : Term F (Ty.nat :: Γ) Ty.nat))))
+        Derivable.sym0)
+    prwby hSn
+    papplym (add_le_mono adm (.app .succ .zero) (.app Term.exp2 (.var .vz))
+      (.var .vz) (.app Term.exp2 (.var .vz)))
+    psplit
+    · pthm (one_le_exp2 adm (.var .vz))
+    · pexact ih
+  Derivable.induction base (univ_gen step)
+
+/-- `n ≤ 2^n` at an explicit term. -/
+def exp2_ge_self_inst (n : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.monus n (.app Term.exp2 n)) .zero) := by
+  have h := Derivable.mp (exp2_ge_self (adm := adm) (al := al) (Premises := Premises) (Γ := Γ))
+    (.forall_ax n)
+  q_norm using h
+
+-- ── The cross-multiplication criterion for `≤_ℚ` ────────────────────────────
+
+/-- **`≤_ℚ` from an ℕ inequality between cross products.** Writing a rational as
+`posN − negN` over `rat_den`, `x ≤_ℚ y` is
+`negN y · den x + posN x · den y  ≤  posN y · den x + negN x · den y` — no subtraction and no
+`sub_Q` anywhere. This is the `≤_ℚ` counterpart of `eq_Q_of_signed_cross`, and it is what turns
+a ℚ order goal into ordinary ℕ arithmetic. -/
+def le_Q_of_cross (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.monus
+        (Term.app2 Term.add
+          (Term.app2 Term.mul (negN y) (.app Term.rat_den x))
+          (Term.app2 Term.mul (posN x) (.app Term.rat_den y)))
+        (Term.app2 Term.add
+          (Term.app2 Term.mul (posN y) (.app Term.rat_den x))
+          (Term.app2 Term.mul (negN x) (.app Term.rat_den y)))) .zero →ᶠ
+       le_Q x y) := by
+  -- `D := y −_ℚ x`; the identity `posN D + L =₀ negN D + R` is `addQ_signed` at `(y, −x)`,
+  -- with the three `neg_Q` part-swaps applied.
+  let nx : Term F Γ Ty.nat := .app Term.neg_Q x
+  let D : Term F Γ Ty.nat := Term.app2 Term.sub_Q y x
+  let L : Term F Γ Ty.nat :=
+    Term.app2 Term.add
+      (Term.app2 Term.mul (negN y) (.app Term.rat_den x))
+      (Term.app2 Term.mul (posN x) (.app Term.rat_den y))
+  let R : Term F Γ Ty.nat :=
+    Term.app2 Term.add
+      (Term.app2 Term.mul (posN y) (.app Term.rat_den x))
+      (Term.app2 Term.mul (negN x) (.app Term.rat_den y))
+  let hD : Derivable F EqX al Premises
+      (Formula.eq0 D (Term.app2 Term.add_Q y nx)) := sub_Q_unfold adm y x
+  -- `posN`/`negN` are named wrappers, and `prw` cannot see inside one (REALS_PLAN §0.1), so
+  -- the sum `E` is never rewritten to `D` under them: the whole argument moves instead, by
+  -- `le_Q_zero_congr`, before the parts are ever mentioned.
+  let E : Term F Γ Ty.nat := Term.app2 Term.add_Q y nx
+  pmode
+  pintro h
+  papplym (le_Q_of_zero_sub adm x y)
+  papplym (le_Q_zero_congr adm E D
+    (eq_Q_from_nat_eq (adm := adm) (Derivable.mp hD Derivable.sym0)))
+  papplym (le_Q_zero_of_parts adm E)
+  phave hkey : Formula.eq0 (Term.app2 Term.add (posN E) L)
+      (Term.app2 Term.add (negN E) R)
+  · pfrom hs := addQ_signed adm y nx
+    prw (rat_den_neg_Q adm x) in hs with h1
+    prw (negN_neg_Q adm x) in h1 with h2
+    prw (posN_neg_Q adm x) in h2 with h3
+    pexact h3
+  pfrom hdec := Derivable.mp eq0_decidable' (.forall_ax (negN E))
+  pcases hdec with hz | hnz
+  · pexact hz
+  · pexfalso
+    phave hposz : Formula.eq0 (posN E) .zero
+    · pfrom hm := Derivable.mp (posN_mul_negN adm E)
+        (Derivable.mp (mul_eq_zero_iff adm (posN E) (negN E)) .and_weak)
+      pcases hm with h1 | h2
+      · pexact h1
+      · pexfalso
+        papply hnz
+        pexact h2
+    papply hnz
+    -- `L =₀ negN E + R`, so `L ∸ R =₀ (negN E + R) ∸ R =₀ negN E`, and `h` says that is `0`
+    prwby hposz in hkey with hk1
+    prw (add_zero_l adm L) in hk1 with hk2
+    prwby hk2 in h with h1
+    prw (monus_cancel adm (negN E) R) in h1 with h2
+    pexact h2
+
+/-- **The ℚ-Archimedean index.** For a *positive* rational `q`, the denominator field of its
+own code is an index at which the dyadic scale has fallen below it: `⟨2^{-den q}⟩_ℚ ≤_ℚ q`.
+
+This is the function every constructive "choose `n` with `2^{-n} ≤ δ`" step needs, and it is
+the piece `REALS_PLAN.md` does not list. `q = p/d` with `p ≥ 1` gives
+`2^{-d} = 1/2^d ≤ p/d` because `d ≤ 2^d ≤ p · 2^d`. -/
+def pow2neg_rat_den_le (q : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (lt_Q Term.zero_Q q →ᶠ
+       le_Q (.app Term.pow2neg_Q (.app Term.rat_den q)) q) := by
+  pmode
+  pintro hpos
+  papplym (lt_Q_zero_parts adm q) in hpos with hb
+  pdestruct hb with hneg hnum
+  -- the cross inequality: `den q ≤ posN q · 2^{den q}`
+  phave hle : Formula.eq0 (Term.app2 Term.monus
+      (Term.app2 Term.add
+        (Term.app2 Term.mul (negN q) (.app Term.rat_den (.app Term.pow2neg_Q
+          (.app Term.rat_den q))))
+        (Term.app2 Term.mul (posN (.app Term.pow2neg_Q (.app Term.rat_den q)))
+          (.app Term.rat_den q)))
+      (Term.app2 Term.add
+        (Term.app2 Term.mul (posN q) (.app Term.rat_den (.app Term.pow2neg_Q
+          (.app Term.rat_den q))))
+        (Term.app2 Term.mul (negN (.app Term.pow2neg_Q (.app Term.rat_den q)))
+          (.app Term.rat_den q)))) .zero
+  · -- both `negN` terms drop; `posN ⟨2^{-k}⟩ =₀ 1` and `den ⟨2^{-k}⟩ =₀ 2^k`
+    prw (rat_den_pow2neg_Q adm (.app Term.rat_den q))
+    prw (posN_unfold (.app Term.pow2neg_Q (.app Term.rat_den q)))
+    prw (negN_unfold (.app Term.pow2neg_Q (.app Term.rat_den q)))
+    prw (rat_sign_pow2neg_Q adm (.app Term.rat_den q))
+    prw (rat_num_pow2neg_Q adm (.app Term.rat_den q))
+    prwby hneg
+    prw (mul_zero_l adm (.app Term.exp2 (.app Term.rat_den q)))
+    prw (mul_one_l adm (.app .succ .zero : Term F Γ Ty.nat))
+    prw (mul_one_l adm (.app Term.rat_den q))
+    prw (add_zero_l adm (.app Term.rat_den q))
+    prw (monus_self adm (.app .succ .zero))
+    prw (mul_zero_l adm (.app .succ .zero : Term F Γ Ty.nat))
+    prw (mul_zero_l adm (.app Term.rat_den q))
+    prw (add_zero_r adm (Term.app2 Term.mul (posN q)
+      (.app Term.exp2 (.app Term.rat_den q))))
+    -- `den q ≤ 2^{den q} ≤ posN q · 2^{den q}`
+    papplym (monus_le_trans adm (.app Term.rat_den q)
+      (.app Term.exp2 (.app Term.rat_den q))
+      (Term.app2 Term.mul (posN q) (.app Term.exp2 (.app Term.rat_den q))))
+    psplit
+    · pthm (exp2_ge_self_inst adm (.app Term.rat_den q))
+    · papplym (ne_zero_eq_succ_pd adm (posN q)) in hnum with hsucc
+      prwby hsucc
+      prw (mul_succ_l adm (.app Term.pd (posN q))
+        (.app Term.exp2 (.app Term.rat_den q)))
+      pthm (monus_add_self adm (.app Term.exp2 (.app Term.rat_den q))
+        (Term.app2 Term.mul (.app Term.pd (posN q))
+          (.app Term.exp2 (.app Term.rat_den q))))
+  papplym (le_Q_of_cross adm (.app Term.pow2neg_Q (.app Term.rat_den q)) q)
+  pexact hle
+
 #print axioms le_Q_trans
 #print axioms lt_le_Q_add
 #print axioms le_Q_add_both
+#print axioms monus_le_trans
+#print axioms add_le_mono
+#print axioms exp2_ge_self
+#print axioms le_Q_of_cross
+#print axioms pow2neg_rat_den_le
 
 end RationalOrderedField
 
