@@ -12176,6 +12176,365 @@ def lt_Q_le_Q_absurd (x y : Term F Γ Ty.nat) :
   · papply hxy_ne
     pexact hnum
 
+-- ── The `≤_ℚ` toolkit ───────────────────────────────────────────────────────
+--
+-- `le_Q` had only `le_Q_refl`, `le_Q_cases`, `le_Q_of_sign`/`le_Q_of_num_zero` and the
+-- `eq_Q`-congruence. Everything below mirrors the `<_ℚ` development one lemma at a time:
+-- positivity in terms of the signed parts, the additive facts, transitivity. The one place
+-- the mirror is *not* mechanical is `addQ_negN_zero` — for `<_ℚ` the corresponding step is
+-- buried inside `lt_Q_zero_add`, and it is factored out here because the mixed `<`/`≤`
+-- addition lemma needs exactly that half of it and none of the rest.
+
+/-- `0_ℚ ≤_ℚ p` forces `p`'s negative part to vanish. -/
+def le_Q_zero_parts (p : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (le_Q Term.zero_Q p →ᶠ Formula.eq0 (negN p) .zero) := by
+  pmode
+  pintro hle
+  papplym (le_Q_cases adm Term.zero_Q p) in hle with hor
+  pcases hor with hsgn | hnum
+  · -- the difference is positively signed; unless its numerator vanishes, so is `p`
+    pfrom hdec := Derivable.mp eq0_decidable'
+      (.forall_ax (.app Term.rat_num (Term.app2 Term.sub_Q p Term.zero_Q)))
+    pcases hdec with hz | hnz
+    · papplym (Derivable.mp (sub_Q_zero_Q adm p)
+        (eq_Q_num_zero adm (Term.app2 Term.sub_Q p Term.zero_Q) p)) in hz with hpz
+      prw (negN_unfold p)
+      prwby hpz
+      pthm (mul_zero adm (Term.app2 Term.monus (.app .succ .zero) (.app Term.rat_sign p)))
+    · papplym (Derivable.mp (sub_Q_zero_Q adm p)
+        (eq_Q_sign_eq adm (Term.app2 Term.sub_Q p Term.zero_Q) p)) in hnz with hsq
+      psym in hsq with hsq'
+      phave hsp : Formula.eq0 (.app Term.rat_sign p) (.app .succ .zero)
+      · prwby hsq'
+        pexact hsgn
+      prw (negN_unfold p)
+      prwby hsp
+      prw (monus_self adm (.app .succ .zero))
+      pthm (mul_zero_l adm (.app Term.rat_num p))
+  · -- the difference is zero, hence so is `p`, hence so are both its parts
+    papplym (Derivable.mp (sub_Q_zero_Q adm p)
+      (eq_Q_num_zero adm (Term.app2 Term.sub_Q p Term.zero_Q) p)) in hnum with hpz
+    prw (negN_unfold p)
+    prwby hpz
+    pthm (mul_zero adm (Term.app2 Term.monus (.app .succ .zero) (.app Term.rat_sign p)))
+
+/-- …and conversely. -/
+def le_Q_zero_of_parts (p : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (negN p) .zero →ᶠ le_Q Term.zero_Q p) := by
+  pmode
+  pintro hneg
+  pfrom hdec := Derivable.mp eq0_decidable' (.forall_ax (.app Term.rat_num p))
+  pcases hdec with hz | hnz
+  · -- `p =_ℚ 0`: the zero-numerator branch of `≤_ℚ`
+    papplym (le_Q_of_num_zero adm Term.zero_Q p)
+    papplym (Derivable.mp (eqQsym adm (sub_Q_zero_Q adm p))
+      (eq_Q_num_zero adm p (Term.app2 Term.sub_Q p Term.zero_Q))) in hz with hDz
+    pexact hDz
+  · -- nonzero numerator: the vanishing negative part pins the sign bit to `1`
+    phave hsp : Formula.eq0 (.app Term.rat_sign p) (.app .succ .zero)
+    · pfrom hc := rat_sign_cases adm p
+      pcases hc with h1 | h0
+      · pexact h1
+      · pexfalso
+        papply hnz
+        prw (negN_unfold p) in hneg with h1
+        prwby h0 in h1 with h2
+        prw (monus_zero adm (.app .succ .zero)) in h2 with h3
+        prw (mul_one_l adm (.app Term.rat_num p)) in h3 with h4
+        pexact h4
+    papplym (le_Q_of_sign adm Term.zero_Q p)
+    papplym (Derivable.mp (eqQsym adm (sub_Q_zero_Q adm p))
+      (eq_Q_sign_eq adm p (Term.app2 Term.sub_Q p Term.zero_Q))) in hnz with hsq
+    psym in hsq with hsq'
+    prwby hsq'
+    pexact hsp
+
+/-- The signed identity of `addQ_signed`, specialised to two non-negative summands: both
+negative parts drop out, leaving the sum's positive part as its negative part plus the two
+positive cross products. This is the shared core of `le_Q_zero_add` and the mixed
+`<`/`≤` addition lemma. -/
+private def addQ_signed_nonneg (p q : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (negN p) .zero →ᶠ Formula.eq0 (negN q) .zero →ᶠ
+        Formula.eq0 (posN (Term.app2 Term.add_Q p q))
+          (Term.app2 Term.add (negN (Term.app2 Term.add_Q p q))
+            (Term.app2 Term.add
+              (Term.app2 Term.mul (posN p) (.app Term.rat_den q))
+              (Term.app2 Term.mul (posN q) (.app Term.rat_den p))))) := by
+  pmode
+  pintro hpneg
+  pintro hqneg
+  pfrom hs := addQ_signed adm p q
+  prwby hpneg in hs with h1
+  prwby hqneg in h1 with h2
+  prw (mul_zero_l adm (.app Term.rat_den q)) in h2 with h3
+  prw (mul_zero_l adm (.app Term.rat_den p)) in h3 with h4
+  prw (add_zero_l adm Term.zero) in h4 with h5
+  prw (add_zero_r adm (posN (Term.app2 Term.add_Q p q))) in h5 with h6
+  pexact h6
+
+/-- The negative part of a sum of two non-negatives vanishes. The argument is the one inside
+`lt_Q_zero_add`, which never used the *strict* half of either hypothesis: if the sum's negative
+part were nonzero its positive part would have to vanish (`posN_mul_negN`), and the identity
+above would then exhibit the negative part as a summand of `0`. -/
+def addQ_negN_zero (p q : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (negN p) .zero →ᶠ Formula.eq0 (negN q) .zero →ᶠ
+        Formula.eq0 (negN (Term.app2 Term.add_Q p q)) .zero) := by
+  pmode
+  pintro hpneg
+  pintro hqneg
+  papplym (addQ_signed_nonneg adm p q) in hpneg with hk1
+  papply hk1 in hqneg with hkey
+  pfrom hd := Derivable.mp eq0_decidable'
+    (.forall_ax (negN (Term.app2 Term.add_Q p q)))
+  pcases hd with hz | hnz
+  · pexact hz
+  · pexfalso
+    phave hposz : Formula.eq0 (posN (Term.app2 Term.add_Q p q)) .zero
+    · pfrom hm := Derivable.mp (posN_mul_negN adm (Term.app2 Term.add_Q p q))
+        (Derivable.mp (mul_eq_zero_iff adm
+          (posN (Term.app2 Term.add_Q p q)) (negN (Term.app2 Term.add_Q p q))) .and_weak)
+      pcases hm with h1 | h2
+      · pexact h1
+      · pexfalso
+        papply hnz
+        pexact h2
+    papply hnz
+    prwby hposz in hkey with hk2
+    psym in hk2 with hk3
+    papplym (Derivable.mp (add_eq_zero_iff adm
+      (negN (Term.app2 Term.add_Q p q))
+      (Term.app2 Term.add
+        (Term.app2 Term.mul (posN p) (.app Term.rat_den q))
+        (Term.app2 Term.mul (posN q) (.app Term.rat_den p)))) .and_weak) in hk3 with hb
+    pdestruct hb with hb1 _hb2
+    pexact hb1
+
+/-- A sum of two non-negative rationals is non-negative. -/
+def le_Q_zero_add (p q : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (le_Q Term.zero_Q p ∧ᶠ le_Q Term.zero_Q q →ᶠ
+        le_Q Term.zero_Q (Term.app2 Term.add_Q p q)) := by
+  pmode
+  pintro hyp
+  pdestruct hyp with hp hq
+  papplym (le_Q_zero_parts adm p) in hp with hpn
+  papplym (le_Q_zero_parts adm q) in hq with hqn
+  papplym (le_Q_zero_of_parts adm (Term.app2 Term.add_Q p q))
+  papplym (addQ_negN_zero adm p q) in hpn with h1
+  papply h1 in hqn with h2
+  pexact h2
+
+/-- A positive plus a non-negative is positive — the mixed `<`/`≤` fact at `0_ℚ`. -/
+def lt_Q_zero_add_le (p q : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (lt_Q Term.zero_Q p ∧ᶠ le_Q Term.zero_Q q →ᶠ
+        lt_Q Term.zero_Q (Term.app2 Term.add_Q p q)) := by
+  pmode
+  pintro hyp
+  pdestruct hyp with hp hq
+  papplym (lt_Q_zero_parts adm p) in hp with hpb
+  pdestruct hpb with hpneg hppos
+  papplym (le_Q_zero_parts adm q) in hq with hqneg
+  papplym (addQ_signed_nonneg adm p q) in hpneg with hk1
+  papply hk1 in hqneg with hkey
+  phave hR : ¬ᶠ(Formula.eq0 (Term.app2 Term.add
+      (Term.app2 Term.mul (posN p) (.app Term.rat_den q))
+      (Term.app2 Term.mul (posN q) (.app Term.rat_den p))) .zero)
+  · pintro h0
+    papply hppos
+    papplym (Derivable.mp (add_eq_zero_iff adm
+      (Term.app2 Term.mul (posN p) (.app Term.rat_den q))
+      (Term.app2 Term.mul (posN q) (.app Term.rat_den p))) .and_weak) in h0 with hb
+    pdestruct hb with hb1 _hb2
+    papplym (mul_succ_eq_zero_imp adm (posN p) (.app Term.snd_pair q))
+    prw (Derivable.mp (rat_den_unfold_eq q) Derivable.sym0)
+    pexact hb1
+  phave hnegzero : Formula.eq0 (negN (Term.app2 Term.add_Q p q)) .zero
+  · papplym (addQ_negN_zero adm p q) in hpneg with h1
+    papply h1 in hqneg with h2
+    pexact h2
+  papplym (lt_Q_zero_of_parts adm (Term.app2 Term.add_Q p q))
+  psplit
+  · pexact hnegzero
+  · pintro h0
+    papply hR
+    prwby hnegzero in hkey with hk2
+    prw (add_zero_l adm (Term.app2 Term.add
+      (Term.app2 Term.mul (posN p) (.app Term.rat_den q))
+      (Term.app2 Term.mul (posN q) (.app Term.rat_den p)))) in hk2 with hk3
+    psym in hk3 with hk4
+    prwby h0 in hk4 with hk5
+    pexact hk5
+
+-- ── `≤_ℚ` in difference form, and the additive laws ─────────────────────────
+
+/-- `x ≤_ℚ y` gives a non-negative difference. -/
+def le_Q_to_zero_sub (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (le_Q x y →ᶠ le_Q Term.zero_Q (Term.app2 Term.sub_Q y x)) :=
+  le_Q_of_eq_Q_diff adm x y Term.zero_Q (Term.app2 Term.sub_Q y x)
+    (eqQsym adm (sub_Q_zero_Q adm (Term.app2 Term.sub_Q y x)))
+
+/-- …and conversely. -/
+def le_Q_of_zero_sub (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (le_Q Term.zero_Q (Term.app2 Term.sub_Q y x) →ᶠ le_Q x y) :=
+  le_Q_of_eq_Q_diff adm Term.zero_Q (Term.app2 Term.sub_Q y x) x y
+    (sub_Q_zero_Q adm (Term.app2 Term.sub_Q y x))
+
+/-- Non-negativity only depends on the `eq_Q` class. -/
+def le_Q_zero_congr (P P' : Term F Γ Ty.nat)
+    (h : Derivable F EqX al Premises (eq_Q P P')) :
+    Derivable F EqX al Premises (le_Q Term.zero_Q P →ᶠ le_Q Term.zero_Q P') :=
+  le_Q_of_eq_Q_diff adm Term.zero_Q P Term.zero_Q P'
+    (eqQtrans adm (sub_Q_zero_Q adm P)
+      (eqQtrans adm h (eqQsym adm (sub_Q_zero_Q adm P'))))
+
+/-- `≤_ℚ` is compatible with adding a common term. -/
+def le_Q_add (a b c : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (le_Q a b →ᶠ le_Q (Term.app2 Term.add_Q a c) (Term.app2 Term.add_Q b c)) :=
+  le_Q_of_eq_Q_diff adm a b (Term.app2 Term.add_Q a c) (Term.app2 Term.add_Q b c)
+    (eqQsym adm (sub_Q_add_cancel adm a b c))
+
+/-- `(A +_ℚ B) −_ℚ (a +_ℚ b) =_ℚ (A −_ℚ a) +_ℚ (B −_ℚ b)`: the difference of two sums splits
+into the two differences. This is what makes both two-sided addition lemmas below one-liners. -/
+def sub_Q_add_split (a b A B : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (eq_Q (Term.app2 Term.sub_Q (Term.app2 Term.add_Q A B) (Term.app2 Term.add_Q a b))
+        (Term.app2 Term.add_Q
+          (Term.app2 Term.sub_Q A a) (Term.app2 Term.sub_Q B b))) :=
+  let na : Term F Γ Ty.nat := .app Term.neg_Q a
+  let nb : Term F Γ Ty.nat := .app Term.neg_Q b
+  eqQtrans adm (sub_Q_eq_add_neg adm (Term.app2 Term.add_Q A B) (Term.app2 Term.add_Q a b))
+    (eqQtrans adm (addQr adm (Term.app2 Term.add_Q A B) (neg_Q_add_Q adm a b))
+      (eqQtrans adm (addQ_swap4 adm A B na nb)
+        (eqQtrans adm
+          (addQl adm (eqQsym adm (sub_Q_eq_add_neg adm A a)) (Term.app2 Term.add_Q B nb))
+          (addQr adm (Term.app2 Term.sub_Q A a)
+            (eqQsym adm (sub_Q_eq_add_neg adm B b))))))
+
+/-- Two-sided additive monotonicity for `≤_ℚ`. -/
+def le_Q_add_both (a b A B : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (le_Q a A ∧ᶠ le_Q b B →ᶠ
+        le_Q (Term.app2 Term.add_Q a b) (Term.app2 Term.add_Q A B)) := by
+  pmode
+  pintro hyp
+  pdestruct hyp with hA hB
+  papplym (le_Q_to_zero_sub adm a A) in hA with h1
+  papplym (le_Q_to_zero_sub adm b B) in hB with h2
+  phave hsum : le_Q Term.zero_Q (Term.app2 Term.add_Q
+      (Term.app2 Term.sub_Q A a) (Term.app2 Term.sub_Q B b))
+  · papplym (le_Q_zero_add adm (Term.app2 Term.sub_Q A a) (Term.app2 Term.sub_Q B b))
+    psplit
+    · pexact h1
+    · pexact h2
+  papplym (le_Q_of_zero_sub adm (Term.app2 Term.add_Q a b) (Term.app2 Term.add_Q A B))
+  papplym (le_Q_zero_congr adm
+    (Term.app2 Term.add_Q (Term.app2 Term.sub_Q A a) (Term.app2 Term.sub_Q B b))
+    (Term.app2 Term.sub_Q (Term.app2 Term.add_Q A B) (Term.app2 Term.add_Q a b))
+    (eqQsym adm (sub_Q_add_split adm a b A B))) in hsum with h3
+  pexact h3
+
+/-- **The mixed `<`/`≤` addition lemma**: `a <_ℚ A` and `b ≤_ℚ B` give `a +_ℚ b <_ℚ A +_ℚ B`.
+Every tightness estimate over ℝ needs this — a chain of `≤` steps with one strict step in it
+stays strict, and no combination of `lt_Q_add` and `le_Q_add_both` produces that. -/
+def lt_le_Q_add (a b A B : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (lt_Q a A ∧ᶠ le_Q b B →ᶠ
+        lt_Q (Term.app2 Term.add_Q a b) (Term.app2 Term.add_Q A B)) := by
+  pmode
+  pintro hyp
+  pdestruct hyp with hA hB
+  papplym (lt_Q_to_zero_sub adm a A) in hA with h1
+  papplym (le_Q_to_zero_sub adm b B) in hB with h2
+  phave hsum : lt_Q Term.zero_Q (Term.app2 Term.add_Q
+      (Term.app2 Term.sub_Q A a) (Term.app2 Term.sub_Q B b))
+  · papplym (lt_Q_zero_add_le adm (Term.app2 Term.sub_Q A a) (Term.app2 Term.sub_Q B b))
+    psplit
+    · pexact h1
+    · pexact h2
+  papplym (lt_Q_of_zero_sub adm (Term.app2 Term.add_Q a b) (Term.app2 Term.add_Q A B))
+  papplym (lt_Q_zero_congr adm
+    (Term.app2 Term.add_Q (Term.app2 Term.sub_Q A a) (Term.app2 Term.sub_Q B b))
+    (Term.app2 Term.sub_Q (Term.app2 Term.add_Q A B) (Term.app2 Term.add_Q a b))
+    (eqQsym adm (sub_Q_add_split adm a b A B))) in hsum with h3
+  pexact h3
+
+/-- Transitivity of `≤_ℚ`. -/
+def le_Q_trans (a b c : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (le_Q a b ∧ᶠ le_Q b c →ᶠ le_Q a c) := by
+  pmode
+  pintro hyp
+  pdestruct hyp with hab hbc
+  papplym (le_Q_to_zero_sub adm a b) in hab with h1
+  papplym (le_Q_to_zero_sub adm b c) in hbc with h2
+  phave hsum : le_Q Term.zero_Q (Term.app2 Term.add_Q
+      (Term.app2 Term.sub_Q b a) (Term.app2 Term.sub_Q c b))
+  · papplym (le_Q_zero_add adm (Term.app2 Term.sub_Q b a) (Term.app2 Term.sub_Q c b))
+    psplit
+    · pexact h1
+    · pexact h2
+  papplym (le_Q_of_zero_sub adm a c)
+  papplym (le_Q_zero_congr adm
+    (Term.app2 Term.add_Q (Term.app2 Term.sub_Q b a) (Term.app2 Term.sub_Q c b))
+    (Term.app2 Term.sub_Q c a)
+    (eqQsym adm (sub_Q_trans_split adm a b c))) in hsum with h3
+  pexact h3
+
+/-- A `<_ℚ` step composed with a `≤_ℚ` step is strict. -/
+def lt_le_Q_trans (a b c : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (lt_Q a b ∧ᶠ le_Q b c →ᶠ lt_Q a c) := by
+  pmode
+  pintro hyp
+  pdestruct hyp with hab hbc
+  papplym (lt_Q_to_zero_sub adm a b) in hab with h1
+  papplym (le_Q_to_zero_sub adm b c) in hbc with h2
+  phave hsum : lt_Q Term.zero_Q (Term.app2 Term.add_Q
+      (Term.app2 Term.sub_Q b a) (Term.app2 Term.sub_Q c b))
+  · papplym (lt_Q_zero_add_le adm (Term.app2 Term.sub_Q b a) (Term.app2 Term.sub_Q c b))
+    psplit
+    · pexact h1
+    · pexact h2
+  papplym (lt_Q_of_zero_sub adm a c)
+  papplym (lt_Q_zero_congr adm
+    (Term.app2 Term.add_Q (Term.app2 Term.sub_Q b a) (Term.app2 Term.sub_Q c b))
+    (Term.app2 Term.sub_Q c a)
+    (eqQsym adm (sub_Q_trans_split adm a b c))) in hsum with h3
+  pexact h3
+
+/-- …and a `≤_ℚ` step composed with a `<_ℚ` step, likewise. -/
+def le_lt_Q_trans (a b c : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (le_Q a b ∧ᶠ lt_Q b c →ᶠ lt_Q a c) := by
+  pmode
+  pintro hyp
+  pdestruct hyp with hab hbc
+  papplym (le_Q_to_zero_sub adm a b) in hab with h1
+  papplym (lt_Q_to_zero_sub adm b c) in hbc with h2
+  phave hsum : lt_Q Term.zero_Q (Term.app2 Term.add_Q
+      (Term.app2 Term.sub_Q c b) (Term.app2 Term.sub_Q b a))
+  · papplym (lt_Q_zero_add_le adm (Term.app2 Term.sub_Q c b) (Term.app2 Term.sub_Q b a))
+    psplit
+    · pexact h2
+    · pexact h1
+  papplym (lt_Q_of_zero_sub adm a c)
+  papplym (lt_Q_zero_congr adm
+    (Term.app2 Term.add_Q (Term.app2 Term.sub_Q c b) (Term.app2 Term.sub_Q b a))
+    (Term.app2 Term.sub_Q c a)
+    (eqQtrans adm (add_Q_comm_inst adm
+        (Term.app2 Term.sub_Q c b) (Term.app2 Term.sub_Q b a))
+      (eqQsym adm (sub_Q_trans_split adm a b c)))) in hsum with h3
+  pexact h3
+
+#print axioms le_Q_trans
+#print axioms lt_le_Q_add
+#print axioms le_Q_add_both
+
 end RationalOrderedField
 
 end Metatheorems
