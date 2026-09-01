@@ -77,25 +77,51 @@ But `general_metatheorem` does **not** take `AbstractMajorizability`. It takes
 nowhere on the metatheorem path except in one comment.
 
 So the document's route (per-constant majorizability → all closed terms majorizable) and the
-formalization's route (a total majoriser) are **not the same route**. Either
-- `general_metatheorem` should be restated to take `AbstractMajorizability` +
-  `all_closed_terms_majorizable`, matching the document and Kohlenbach; or
-- the metric instance must supply a total majoriser, which is a stronger obligation than the
-  document discharges.
+formalization's route on `main` (a total majoriser) are **not the same route**.
 
-**This should be settled before any metric majorizability work starts.** Doing it in the wrong
-shape means either a discarded construction or a restated metatheorem, and the second is a
-change to a proved, load-bearing theorem.
+### This is already solved on `syntactic-witnesses` — and it is *why that branch exists*
+
+Recorded here because the scoping above rediscovered it the long way round. CLAUDE.md's
+Branches section says it plainly: the branch makes Dialectica witness/counter *types*
+object-level `Ty ι`, "so realizers are `Term`s and can be majorized by
+`all_closed_terms_majorizable`". That is exactly the per-constant route the document takes.
+
+The branch carries `Metatheorems/SyntacticMetatheorem.lean` with
+
+```lean
+theorem syntactic_general_metatheorem (eqxi) (spremise) (am : AbstractMajorizability si) …
+```
+
+whose own docstring reads: *"the `U_star`/`V_star` that `metatheorem_core_of_majorants` asks
+for are produced by `all_closed_terms_majorizable`, because the extracted functionals are
+closed terms. Compare `general_metatheorem`, which had to assume a total majorizer on every
+semantic value."*
+
+**Verified 2026-09-01:** `SyntacticMetatheorem.lean` and `Dialectica/Syntactic.lean` have
+**zero sorries**; the branch merges into current `main` with one conflict (the import list)
+and builds green at 8063 jobs with `mct_p1`/`mct_p2`/ℚ unregressed.
+
+So the metric-space work should target `syntactic_general_metatheorem` +
+`AbstractMajorizability`, not `general_metatheorem` + `Majorizability`. §3's hard part — a
+total majoriser for arbitrary set-theoretic functions at arrow types — **disappears**; what
+replaces it is the document's own per-constant obligations (`0`, `S`, `Π`, `Σ`, `R`, `0_X`,
+`d_X`), which is what §1's Proposition actually proves.
 
 ## 5. Suggested order
 
-1. **Resolve §4.** Cheap, and it determines the shape of everything below it.
+1. **Merge `syntactic-witnesses`** (§4). It is the prerequisite, it is proved, and the merge is
+   measured. It also brings products to `Ty`, which independently allows deleting ℚ's Cantor
+   pairing layer (`triag` 289 uses, `inv_triag` 207, `pair` 176, `fst_pair` 134, `snd_pair`
+   108) — a second payoff, and a separate optional job.
 2. **Rounding theory for `(·)∘`** — `round_nat` exists with no lemmas; it is needed by the
-   `X`-clause, by `0_X`, and by `d_X`, and nothing else is blocked on ℝ's field structure.
+   `X`-clause of `≽ᵃ`, by `0_X`, and by `d_X`, and nothing else is blocked on ℝ's field
+   structure.
 3. **The metric `base` relation + `bezemRel`**, giving `MajorizabilityRel` immediately.
-4. **`majorizer`/`majorizer_maj`**, or the `AbstractMajorizability` route, per §4.
-5. **The three `admissibleEqX` sorries**, which need the three Class C real facts — this is the
-   only place the ℝ obstruction actually bites, and it can proceed in parallel.
+4. **The per-constant obligations** — `0`, `S`, `Π`, `Σ` self-majorising via Lemma 17.80, `R`
+   by induction, `0_X`, `d_X`. This is §1's Proposition, transcribed. Note Lemma 17.80 is
+   `\solution{}`-empty in the document, so it must be proved, not transcribed.
+5. **The three `admissibleEqX` sorries**, needing the three Class C real facts — the only place
+   the ℝ obstruction actually bites, and it can proceed in parallel with 2–4.
 
 ## 6. What this says about the last two days
 
