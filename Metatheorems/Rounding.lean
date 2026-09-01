@@ -149,10 +149,12 @@ theorem Mmaj_mono (b : ℕ) (n : ℕ) : Mmaj b n ≤ Mmaj b (n + 1) := by
 /-! ## What is deliberately not here
 
 **Part (1)** — "`(x)◦` is a representative of `x`", i.e. `(x)◦` satisfies the Cauchy condition
-(4.2) and `((x)◦)^b =₁ (x)◦`. This is the one part that crosses between Mathlib's `ℝ` and the
-project's object-level representation, so it needs the `ℚ`-code semantics (a Lean-level
-"meaning of a rational code" function, which does not exist yet) and the `cauchyfy`
-correspondence. It is a real piece of work and it is the bridge, not a formality.
+(4.2) and `((x)◦)^b =₁ (x)◦`. The **first half is now proved, in `QVal.lean`**: that file
+defines `qval : ℕ → ℚ`, the missing Lean-level "meaning of a rational code", and proves
+`roundR_cauchy` (`|(x)◦(n) − (x)◦(n+1)| < 2^{-(n+1)}`) together with
+`qval_roundR_dist_le` and `roundR_tendsto`. It is stated at the level of actual rationals;
+relating it to the *object-level* decision term `Term.lt_Q_dec` under `Term.interpret` is
+still open, as is the `((x)◦)^b =₁ (x)◦` half, which needs `cauchyfy`.
 
 **Part (4)** — `x ≤ y → (y)◦ s-maj₁ (x)◦`. This one mentions strong majorizability, so it is
 blocked on the `bezemMaj` question recorded in `METRIC_PLAN.md` §2.5: the repo's `bezemMaj`

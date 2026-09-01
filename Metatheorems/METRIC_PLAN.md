@@ -31,7 +31,7 @@ package is what makes ℝ *an ordered field*; the metric-space metatheorem does 
 | `eq_R_trans` | `admissibleEqX.eqx_sym`/`eqx_trans` | ✗ Class C |
 | `add_eq_zero_R` | `eqx_trans` (with `ax_triangle`) | ✗ Class C |
 | `le_zero_eq_zero_R` | `eqx_trans` | ✗ Class C |
-| Lemma 17.8 for `(·)◦` — see the note below | the `d_X` and `0_X` majorants, and the `X`-clause of `≽ᵃ` | 🔶 **parts (2),(3),(5),(6) proved** in `Rounding.lean` 2026-09-02, zero sorry. (1) is the ℝ↔code bridge, still open; (4) blocked on §2.5 |
+| Lemma 17.8 for `(·)◦` — see the note below | the `d_X` and `0_X` majorants, and the `X`-clause of `≽ᵃ` | 🔶 **parts (2),(3),(5),(6) proved** in `Rounding.lean` 2026-09-02, zero sorry. **Part (1): the Cauchy half proved** in `QVal.lean` 2026-09-02 (`qval` + `roundR_cauchy`), the `((x)◦)^b =₁ (x)◦` half open; (4) blocked on §2.5 |
 | `abs_R_bound` (p. 430) | bounding a majorant | ✗ stated, sorried |
 
 `eq_R_refl` and `eq_R_sym` are proved; `substF_nat` and `eqx_pu` in `MetricSpaces.lean` are
