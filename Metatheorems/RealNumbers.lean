@@ -1080,6 +1080,85 @@ def le_zero_eq_zero_R :
           →ᶠ eq_R (.var (.vs .vz)) Term.zero_R))) :=
   sorry
 
+-- ── From Kohlenbach, *Applied Proof Theory*, §4.1 ───────────────────────────
+--
+-- Three facts the book states and uses but does not prove. They are NOT in
+-- `Metateorema-New3`, which is why they were missing here; added 2026-09-01
+-- after reading the book directly.
+--
+-- Note the book's own calibration of effort: it calls the ℚ ordered-field
+-- package "easily verified" (p. 79) — that is the ~4,600 lines of
+-- `RationalNumbers.lean` — and asserts the ℝ package in one parenthesis
+-- (p. 80) with no proof at all.
+
+/-- The constant real sequence at a rational code — the book's `r ↦ λn.⟨r⟩` embedding
+    of ℚ into ℝ (p. 80). `⟨2^{-k}⟩_ℝ` is `const_R (pow2neg_Q k)`. -/
+def const_R {Γ : Ctx ι} (q : Term F Γ Ty.nat) : Term F Γ (realTy ι) :=
+  Term.lam q.weaken
+
+/-- **Lemma 4.2** (Kohlenbach p. 80). `f̂(k)` is a rational `2^{-k}`-approximation of `f`:
+
+    `WE-HA^ω↾ ⊢ ∀f,k. |f −_ℝ λn.f̂(k)|_ℝ <_ℝ ⟨2^{-k}⟩_ℝ`
+
+    This is the workhorse for the tightness estimates that block Class C — it is what
+    lets a proof move between a real and a rational approximation of it at a chosen
+    index, which is exactly what the five-term split needs. -/
+def approx_R :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all rTy (Formula.all Ty.nat
+        (lt_R
+          (Term.app Term.abs_R
+            (Term.app2 Term.sub_R
+              (.var (.vs .vz))
+              (const_R (Term.app (Term.app Term.cauchyfy (.var (.vs .vz))) (.var .vz)))))
+          (const_R (.app Term.pow2neg_Q (.var .vz)))))) :=
+  sorry
+
+/-- **Lemma 4.3** (Kohlenbach p. 80). Cauchy completeness of ℝ:
+
+    `∀Φ^{1(0)}(∀n,m,k (n ≤ m → n ≤ k → |Φm −_ℝ Φk|_ℝ ≤_ℝ ⟨2^{-n}⟩)
+                → ∃f¹ ∀n (|Φn −_ℝ f|_ℝ ≤_ℝ ⟨2^{-n}⟩))`
+
+    The book notes the witness is definable outright — `f k := Φ(k+3)(k+3)` — so the
+    `∃` should not need to be found by search. -/
+def cauchy_complete_R :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all (Ty.nat →ₜ rTy)
+        (Formula.all Ty.nat (Formula.all Ty.nat (Formula.all Ty.nat
+            (Formula.eq0 (Term.app2 Term.monus (.var (.vs (.vs .vz))) (.var (.vs .vz)))
+               Term.zero →ᶠ
+             Formula.eq0 (Term.app2 Term.monus (.var (.vs (.vs .vz))) (.var .vz))
+               Term.zero →ᶠ
+             le_R
+               (Term.app Term.abs_R
+                 (Term.app2 Term.sub_R
+                   (Term.app (.var (.vs (.vs (.vs .vz)))) (.var (.vs .vz)))
+                   (Term.app (.var (.vs (.vs (.vs .vz)))) (.var .vz))))
+               (const_R (.app Term.pow2neg_Q (.var (.vs (.vs .vz))))))))
+          →ᶠ Formula.ex rTy (Formula.all Ty.nat
+              (le_R
+                (Term.app Term.abs_R
+                  (Term.app2 Term.sub_R
+                    (Term.app (.var (.vs (.vs .vz))) (.var .vz))
+                    (.var (.vs .vz))))
+                (const_R (.app Term.pow2neg_Q (.var .vz))))))) :=
+  sorry
+
+/-- Kohlenbach p. 430 (cited as Remark `rmrk:bound-on-real` in `real-numbers.tex`):
+
+    `|α|_ℝ ≤_ℝ (α(0) + 1)_ℝ`
+
+    This is the majorization fact `mul_R`'s operand bound silently relies on — a code
+    dominates the magnitude it encodes. It is Kohlenbach's lemma, not an invention of
+    this development, and `mul_R` should not be "fixed" to avoid it. -/
+def abs_R_bound :
+    Derivable F EqX al Premises (Γ := Γ)
+      (Formula.all rTy
+        (le_R (Term.app Term.abs_R (.var .vz))
+              (Term.app Term.embed_nat_R
+                (.app .succ (Term.app (.var .vz) Term.zero))))) :=
+  sorry
+
 end OrderedFieldAxioms
 
 -- ============================================================================
