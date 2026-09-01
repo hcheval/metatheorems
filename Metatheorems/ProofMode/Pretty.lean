@@ -245,8 +245,16 @@ syntax:lead "λᶠ " term " : " term ", " term : term
 syntax:max "R[" term "]" : term
 /-- Object-level application. Written `f ⬝ a` rather than by juxtaposition, which would be
 ambiguous with Lean's own application, and *printed* the same way so a term can be copied
-from a goal into a script. -/
-syntax:max term:max " ⬝ " term:max : term
+from a goal into a script.
+
+Left-associative at 80, so it binds tighter than `+ᵗ`/`∸ᵗ` (65) and `*ᵗ` (70) and chains
+`f ⬝ a ⬝ b` as `(f ⬝ a) ⬝ b`, matching `Term.app`. The precedences must stay *below* `max`
+and must differ between the two operands: written as `syntax:max term:max ⬝ term:max` — as
+it was until 2026-09-01 — the production is itself `max`, so a nested application needs no
+parentheses in *either* operand and `(f ⬝ a) ⬝ b` and `f ⬝ (a ⬝ b)` print identically. That
+defeats the copy-from-goal purpose above, and it made `#check` output on `RealNumbers.lean`
+unreadable. -/
+syntax:80 term:80 " ⬝ " term:81 : term
 
 macro_rules
   | `($f ⬝ $a) => `(Metatheorems.Term.app $f $a)
