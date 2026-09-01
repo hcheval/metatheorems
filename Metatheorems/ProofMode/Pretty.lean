@@ -454,6 +454,15 @@ def delabSpine : Delab := do
 @[app_delab Metatheorems.Term.zero]
 def delabTermZero : Delab := do `(0)
 
+/-- `Term.ofNat 3` prints as `3`, not as `Term.ofNat 3`. Without this, numerals leak into
+goals and into `#hilbert` output as their raw constructor application. -/
+@[app_delab Metatheorems.Term.ofNat]
+def delabTermOfNat : Delab := do
+  let args := (← SubExpr.getExpr).getAppArgs
+  guard (args.size == 4)
+  let some n := args[3]!.nat? | failure
+  return Syntax.mkNumLit (toString n)
+
 @[app_delab Metatheorems.Term.prec]
 def delabTermPrec : Delab := do
   let args := (← SubExpr.getExpr).getAppArgs
