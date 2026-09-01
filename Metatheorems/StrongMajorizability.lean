@@ -67,12 +67,37 @@ structure Majorizability {ι : Type} {X : ι → Type} {F : ι → Ty ι}
 -- The Bezem relation: a concrete `MajorizabilityRel`
 -- ============================================================================
 
-/-- Strong majorizability à la Bezem, parametric in the relation used at the base types.
+/-- Majorizability parametric in the relation used at the base types.
 
 At `nat` it is `≥`; at an arrow it is the usual "majorizes pointwise on majorized
 arguments". `Ty.hat` sends every base type to `nat`, so `base i` relates a natural to a
 point of `X i` — that is Def. 6.0.1's "majorized by a natural relative to a reference
-point", and it is exactly the space-specific datum. -/
+point", and it is exactly the space-specific datum.
+
+**This is NOT Bezem's strong majorizability, despite this file's name.** Recorded 2026-09-02.
+The document's `≽ᵃ` (`particular-cases-metric-spaces.tex:19`) is a *conjunction* at arrow
+type:
+
+    x ≽ᵃ_{ρ→τ} y  :≡  ∀z',z (z' ≽ᵃ_ρ z → x z' ≽ᵃ_τ y z)
+                    ∧  ∀z',z (z' ≽ᵃ_ρ̂ z → x z' ≽ᵃ_τ̂ x z)     -- self-majorization
+
+The `.arr` case below has only the first conjunct, i.e. this is Howard majorizability.
+
+Nothing currently in the build notices, because `MajorizabilityRel` asks only for `maj_le`
+and `maj_app` and both follow from the first conjunct. **The gap bites on the per-constant
+route** (`AbstractMajorizability`, `bezemAbstract`), in two places, both identified from the
+document's own proofs:
+
+* `prec_maj` — the document's induction (`.tex:82–96`) proves `R n y* z* ≽ R n y z` at
+  *equal* `n`, but `maj` at `nat →ₜ ρ` demands `n* ≥ n → R y* z* n* ≽ R y z n`. Bridging that
+  needs monotonicity in `n`, which is what the second conjunct supplies. This is the reason
+  Bezem introduced it.
+* `func_maj` for `d_X` — the document's proof says so outright: *"We also need to check that
+  `λx⁰,y⁰.(x+y)∘` majorizes itself."*
+
+Widening this to two clauses is the fix, and it is a change to a definition that
+`bezemRel` → `MajorizabilityRel` → `general_metatheorem` sit on top of. Deferred by decision,
+not overlooked. See `METRIC_PLAN.md`. -/
 def bezemMaj {ι : Type} {X : ι → Type} (base : (i : ι) → Nat → X i → Prop) :
     (ρ : Ty ι) → Ty.interpret X ρ.hat → Ty.interpret X ρ → Prop
   | .nat,     n,       m => @GE.ge Nat _ n m

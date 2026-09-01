@@ -90,6 +90,48 @@ Also worth having when `[0,1]`-valued data appears (W-hyperbolic spaces): Kohlen
 They are worth having — they are Kohlenbach's p. 80 assertion, and any *mined proof* that
 does real arithmetic will want them — but they do not gate the metatheorem.
 
+## 2.5 The blocker: `bezemMaj` is missing the self-majorization conjunct
+
+Found 2026-09-02 while doing §5 step 3, which is exactly what that step was for.
+
+The document's `≽ᵃ` at arrow type (`particular-cases-metric-spaces.tex:19`) is a
+**conjunction**; `bezemMaj` (`StrongMajorizability.lean`) has only the first half:
+
+| | document `≽ᵃ_{ρ→τ}` | `bezemMaj .arr` |
+|---|---|---|
+| majorization | `∀z',z (z' ≽ᵃ_ρ z → x z' ≽ᵃ_τ y z)` | ✅ present |
+| self-majorization | `∀z',z (z' ≽ᵃ_ρ̂ z → x z' ≽ᵃ_τ̂ x z)` | ❌ **absent** |
+
+So `bezemMaj` is Howard majorizability, not Bezem's, despite the file name and the old
+docstring (now corrected in place).
+
+**Why nothing has noticed.** `MajorizabilityRel` asks only for `maj_le` and `maj_app`, and
+both follow from the first conjunct alone. `bezemRel` is therefore genuinely correct as a
+`MajorizabilityRel`, and `general_metatheorem` is unaffected. The gap is invisible until the
+per-constant route is attempted.
+
+**Where it bites**, both read off the document's own proofs:
+
+* **`prec_maj`.** The document's induction (`.tex:82–96`) establishes
+  `R n y* z* ≽ᵃ R n y z` at *equal* `n`. But `maj` at `nat →ₜ ρ` unfolds to
+  `∀n*,n (n* ≥ n → R y* z* n* ≽ᵃ R y z n)`. Bridging equal-`n` to `n* ≥ n` needs monotonicity
+  in `n`, which is precisely what the second conjunct gives. This is *the* reason Bezem
+  introduced the clause; a one-clause relation cannot majorize the recursor.
+* **`func_maj` for `d_X`.** The document says it outright: *"We also need to check that
+  `λx⁰,y⁰.(x+y)∘` majorizes itself."*
+
+**Fix**: widen `bezemMaj`'s `.arr` case to the conjunction, then re-derive `bezemRel` (the
+first projection) and re-check `bezemAbstract`'s structural fields — `arrow_intro` will stop
+being `fun _ _ h => h` and will need the self-majorization witness threaded through, which is
+the one place this is more than mechanical. Deferred by decision 2026-09-02, not overlooked.
+
+**Free from the same passage**, and worth having written down before the fix:
+* `0_X` majorant: any `n ≥ d(a, 0_X)`.
+* `d_X` majorant: `λx⁰,y⁰.(x+y)∘`, justified by the triangle inequality
+  `d(x,y) ≤ d(a,x) + d(a,y) ≤ x* + y*` and then `≤ → s-maj₁` (Lemma 17.8(2,4)).
+* `Π`, `Σ` are self-majorising using only property 2 — no induction, no second conjunct
+  needed for the *first* clause (`.tex:70–79`).
+
 ## 3. The bulk of the work: the majorizability instance, and it is untouched
 
 `general_metatheorem` takes `Majorizability si` = `MajorizabilityRel` (`maj`, `maj_le`,
@@ -162,10 +204,16 @@ replaces it is the document's own per-constant obligations (`0`, `S`, `Π`, `Σ`
 2. **Rounding theory for `(·)∘`** — `round_nat` exists with no lemmas; it is needed by the
    `X`-clause of `≽ᵃ`, by `0_X`, and by `d_X`, and nothing else is blocked on ℝ's field
    structure.
-3. **The metric `base` relation + `bezemRel`**, giving `MajorizabilityRel` immediately.
-4. **The per-constant obligations** — `0`, `S`, `Π`, `Σ` self-majorising via Lemma 17.80, `R`
-   by induction, `0_X`, `d_X`. This is §1's Proposition, transcribed. Note Lemma 17.80 is
-   `\solution{}`-empty in the document, so it must be proved, not transcribed.
+3. ~~**The metric `base` relation + `bezemRel`**~~ — **partly done 2026-09-02, then blocked.**
+   `bezemAbstract` (`Majorizability.lean`) now builds the structural half of
+   `AbstractMajorizability` from any base relation: all seven structural fields hold by
+   definitional unfolding (`arrow_intro` is `fun _ _ h => h`), plus `bezem_zero_maj` /
+   `bezem_succ_maj` for the two ℕ constants, which are `base`-independent. **Blocked on §2.5**
+   before the metric `base` itself is worth writing.
+4. **The per-constant obligations** — `0` ✅, `S` ✅, `Π`, `Σ` self-majorising via Lemma 17.80,
+   `R` by induction (needs §2.5), `0_X`, `d_X` (needs §2.5). This is §1's Proposition,
+   transcribed. Note Lemma 17.80 is `\solution{}`-empty in the document, so it must be proved,
+   not transcribed.
 5. **The three `admissibleEqX` sorries**, needing the three Class C real facts — the only place
    the ℝ obstruction actually bites, and it can proceed in parallel with 2–4.
 
