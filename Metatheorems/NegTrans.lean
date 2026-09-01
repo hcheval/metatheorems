@@ -301,10 +301,21 @@ def negTrans_iff_pu {ι : Type} {F : ι → Ty ι}
   | .eq0 .., _ =>
     ⟨dnn_intro, qf_double_neg_elim adm (by rfl)⟩
   | .and A B, hpu => by
-    have hqf : (A.and B).isQF = true := hpu
-    have hki := kurodaInner_qf (A.and B) hqf
-    simp only [Formula.negTrans, hki]
-    exact ⟨dnn_intro, qf_double_neg_elim adm hqf⟩
+    -- `isPurelyUniversal` is closed under `∧`, so recurse rather than assuming QF.
+    have hAB : A.isPurelyUniversal = true ∧ B.isPurelyUniversal = true := by
+      simpa only [Formula.isPurelyUniversal, Bool.and_eq_true] using hpu
+    have hA := hAB.1
+    have hB := hAB.2
+    obtain ⟨ihA_fwd, ihA_bwd⟩ := negTrans_iff_pu adm A hA
+    obtain ⟨ihB_fwd, ihB_bwd⟩ := negTrans_iff_pu adm B hB
+    simp only [Formula.negTrans, Formula.kurodaInner]
+    refine ⟨?_, ?_⟩
+    · exact .syllogism
+        (pair_h (.syllogism .and_weak ihA_fwd) (.syllogism and_proj2 ihB_fwd))
+        (.importation neg_neg_and_intro)
+    · exact pair_h
+        (.syllogism neg_neg_and_left ihA_bwd)
+        (.syllogism neg_neg_and_right ihB_bwd)
   | .or A B, hpu => by
     have hqf : (A.or B).isQF = true := hpu
     have hki := kurodaInner_qf (A.or B) hqf
@@ -341,8 +352,14 @@ def kurodaInner_iff_pu {ι : Type} {F : ι → Ty ι}
   | .bot, _ => ⟨I_comb, I_comb⟩
   | .eq0 .., _ => ⟨I_comb, I_comb⟩
   | .and A B, hpu => by
-    have hqf : (A.and B).isQF = true := hpu
-    rw [kurodaInner_qf _ hqf]; exact ⟨I_comb, I_comb⟩
+    -- `isPurelyUniversal` is closed under `∧`, so recurse rather than assuming QF.
+    have hAB : A.isPurelyUniversal = true ∧ B.isPurelyUniversal = true := by
+      simpa only [Formula.isPurelyUniversal, Bool.and_eq_true] using hpu
+    obtain ⟨ihA_fwd, ihA_bwd⟩ := kurodaInner_iff_pu adm A hAB.1
+    obtain ⟨ihB_fwd, ihB_bwd⟩ := kurodaInner_iff_pu adm B hAB.2
+    simp only [Formula.kurodaInner]
+    exact ⟨pair_h (.syllogism .and_weak ihA_fwd) (.syllogism and_proj2 ihB_fwd),
+           pair_h (.syllogism .and_weak ihA_bwd) (.syllogism and_proj2 ihB_bwd)⟩
   | .or A B, hpu => by
     have hqf : (A.or B).isQF = true := hpu
     rw [kurodaInner_qf _ hqf]; exact ⟨I_comb, I_comb⟩
@@ -823,6 +840,10 @@ private theorem eqAtType_isPU (adm : AdmissibleEqX EqX) (ρ : Ty ι)
   induction ρ generalizing Γ with
   | nat => rfl
   | base i => exact adm.eqx_pu i s t
+  | unit => rfl
+  | prod ρ τ ih_ρ ih_τ =>
+    simp only [eqAtType, Formula.isPurelyUniversal, Bool.and_eq_true]
+    exact ⟨ih_ρ _ _, ih_τ _ _⟩
   | arr ρ τ ih_ρ ih_τ => simp only [eqAtType, Formula.isPurelyUniversal]; exact ih_τ _ _
 
 def negTrans_rec_zero (adm : AdmissibleEqX EqX)

@@ -76,8 +76,8 @@ def dialectica_and_perm {Γ : Ctx ι} {A B : Formula F Γ} (env : Ctx.interpret 
 def dialectica_or_weak {Γ : Ctx ι} {A B : Formula F Γ} (env : Ctx.interpret X Γ)
     (inhW : 𝕎 X B) :
     dialecticaRealizerCtx si (A →ᶠ A ∨ᶠ B) env :=
-  ⟨⟨fun xA => (true, xA, inhW), fun _ yAB => yAB.1⟩,
-   fun ⟨_, ⟨yA, _⟩⟩ h => ⟨fun _ => h, fun hf => Bool.noConfusion hf⟩⟩
+  ⟨⟨fun xA => (0, xA, inhW), fun _ yAB => yAB.1⟩,
+   fun ⟨_, ⟨yA, _⟩⟩ h => ⟨fun _ => h, fun hf => absurd rfl hf⟩⟩
 
 -- ============================================================================
 -- ∨-permutation: A ∨ B → B ∨ A
@@ -85,10 +85,14 @@ def dialectica_or_weak {Γ : Ctx ι} {A B : Formula F Γ} (env : Ctx.interpret X
 
 def dialectica_or_perm {Γ : Ctx ι} {A B : Formula F Γ} (env : Ctx.interpret X Γ) :
     dialecticaRealizerCtx si (A ∨ᶠ B →ᶠ B ∨ᶠ A) env :=
-  ⟨⟨fun xAB => (!xAB.1, xAB.2.2, xAB.2.1), fun _ yBA => (yBA.2, yBA.1)⟩,
-   fun ⟨⟨z, _, _⟩, ⟨_, _⟩⟩ ⟨hT, hF⟩ =>
-     ⟨fun h => hF (by cases z <;> simp_all),
-      fun h => hT (by cases z <;> simp_all)⟩⟩
+  ⟨⟨fun xAB => ((if xAB.1 = 0 then 1 else 0), xAB.2.2, xAB.2.1),
+    fun _ yBA => (yBA.2, yBA.1)⟩,
+   fun ⟨⟨z, _, _⟩, ⟨_, _⟩⟩ ⟨hT, hF⟩ => by
+     by_cases hz : z = 0
+     · refine ⟨fun h => ?_, fun _ => hT hz⟩
+       simp only [hz, if_pos rfl] at h
+       exact absurd h one_ne_zero
+     · exact ⟨fun _ => hF hz, fun h => absurd (by simp [hz]) h⟩⟩
 
 -- ============================================================================
 -- ∨-contraction: A ∨ A → A
@@ -96,8 +100,12 @@ def dialectica_or_perm {Γ : Ctx ι} {A B : Formula F Γ} (env : Ctx.interpret X
 
 def dialectica_or_contract {Γ : Ctx ι} {A : Formula F Γ} (env : Ctx.interpret X Γ) :
     dialecticaRealizerCtx si (A ∨ᶠ A →ᶠ A) env :=
-  ⟨⟨fun xAA => if xAA.1 then xAA.2.1 else xAA.2.2, fun _ yA => (yA, yA)⟩,
-   fun ⟨⟨z, _, _⟩, yA⟩ h => by cases z <;> simp_all [dialecticaMatrix]⟩
+  ⟨⟨fun xAA => if xAA.1 = 0 then xAA.2.1 else xAA.2.2, fun _ yA => (yA, yA)⟩,
+   fun ⟨⟨z, _, _⟩, yA⟩ h => by
+     simp only [dialecticaMatrix] at h ⊢
+     by_cases hz : z = 0
+     · simpa [hz] using h.1 hz
+     · simpa [hz] using h.2 hz⟩
 
 -- ============================================================================
 -- ∧-contraction: A → A ∧ A
@@ -190,27 +198,35 @@ private def Ty.interpret_default' {ι : Type} {X : ι → Type} {F : ι → Ty �
   | .nat    => Nat.zero
   | .base i => si.zeroInterp i
   | .arr _ τ => fun _ => Ty.interpret_default' si τ
+  | .unit    => ()
+  | .prod ρ τ => (Ty.interpret_default' si ρ, Ty.interpret_default' si τ)
 
 -- The QF-ER helpers below use section variables {EqX} and (eqxi) automatically.
 -- They avoid `induction` in `def` bodies to prevent the "code generator does not
 -- support recursor Ty.rec" error; use term-mode `match` instead.
 
 /-- A canonical counter for `eqAtType EqX ρ s t`. -/
-private def eqAtType_default_ctr {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ) :
+def eqAtType_default_ctr {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ) :
     ℂ X (eqAtType EqX ρ s t) :=
   match ρ, s, t with
   | .nat,      _, _  => ()
   | .base i,   s, t  => eqxi.counterDefault i s t
+  | .unit,     _, _  => ()
+  | .prod ρ' τ, s, t =>
+    (eqAtType_default_ctr ρ' (Term.fst s) (Term.fst t), eqAtType_default_ctr τ (Term.snd s) (Term.snd t))
   | .arr ρ' τ, s, t  =>
     (Ty.interpret_default' si ρ',
      eqAtType_default_ctr τ (s.weaken.app (.var .vz)) (t.weaken.app (.var .vz)))
 
 /-- A canonical witness for `eqAtType EqX ρ s t`. -/
-private def eqAtType_default_wit {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ) :
+def eqAtType_default_wit {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ) :
     𝕎 X (eqAtType EqX ρ s t) :=
   match ρ, s, t with
   | .nat,      _, _  => ()
   | .base i,   s, t  => eqxi.witnessDefault i s t
+  | .unit,     _, _  => ()
+  | .prod ρ' τ, s, t =>
+    (eqAtType_default_wit ρ' (Term.fst s) (Term.fst t), eqAtType_default_wit τ (Term.snd s) (Term.snd t))
   | .arr ρ' τ, s, t  =>
     fun _ => eqAtType_default_wit τ (s.weaken.app (.var .vz)) (t.weaken.app (.var .vz))
 
@@ -218,12 +234,19 @@ private def eqAtType_default_wit {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
     At `nat` the witness is `Unit`; at `base i` this follows from `EqX` being purely
     universal (encoded in `eqxi.witnessSubsingleton`); at function types the witness
     is a function into a subsingleton, which is again a subsingleton. -/
-private lemma dialecticaWitness_eqAtType_ss (eqxi : EqXInterp X F si EqX) (ρ : Ty ι) :
+lemma dialecticaWitness_eqAtType_ss (eqxi : EqXInterp X F si EqX) (ρ : Ty ι) :
     ∀ {Γ : Ctx ι} (s t : Term F Γ ρ),
     Subsingleton (𝕎 X (eqAtType EqX ρ s t)) := by
   induction ρ with
   | nat    => intro Γ s t; simp only [eqAtType, dialecticaWitness]; exact ⟨fun _ _ => rfl⟩
   | base i => intro Γ s t; exact eqxi.witnessSubsingleton i s t
+  | unit   => intro Γ s t; simp only [eqAtType, dialecticaWitness]; exact ⟨fun _ _ => rfl⟩
+  | prod ρ' τ ih_ρ ih_τ =>
+    intro Γ s t
+    simp only [eqAtType, dialecticaWitness]
+    exact ⟨fun a b => Prod.ext
+      ((ih_ρ (Term.fst s) (Term.fst t)).elim a.1 b.1)
+      ((ih_τ (Term.snd s) (Term.snd t)).elim a.2 b.2)⟩
   | arr ρ' τ _ ih_τ =>
     intro Γ s t
     simp only [eqAtType, dialecticaWitness]
@@ -231,12 +254,22 @@ private lemma dialecticaWitness_eqAtType_ss (eqxi : EqXInterp X F si EqX) (ρ : 
       (ih_τ (Term.app s.weaken (.var .vz)) (Term.app t.weaken (.var .vz))).elim (f z) (g z))⟩
 
 /-- Extract semantic equality from a full realizer for `eqAtType EqX ρ s t`. -/
-private def eqAtType_to_semEq {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
+def eqAtType_to_semEq {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
     (env : Ctx.interpret X Γ) (h : dialecticaRealizerCtx si (eqAtType EqX ρ s t) env) :
     Term.interpret si s env = Term.interpret si t env :=
   match ρ, s, t, env, h with
   | .nat, s, t, env, h => h.property ()
   | .base i, s, t, env, h => eqxi.extract i s t env h
+  | .unit, s, t, env, h => rfl
+  | .prod ρ' τ, s, t, env, h => by
+      have h₁ : dialecticaRealizerCtx si (eqAtType EqX ρ' (Term.fst s) (Term.fst t)) env :=
+        ⟨h.val.1, fun y => (h.property (y, dialecticaDefaultCounter si _)).1⟩
+      have h₂ : dialecticaRealizerCtx si (eqAtType EqX τ (Term.snd s) (Term.snd t)) env :=
+        ⟨h.val.2, fun y => (h.property (dialecticaDefaultCounter si _, y)).2⟩
+      have e₁ := eqAtType_to_semEq ρ' (Term.fst s) (Term.fst t) env h₁
+      have e₂ := eqAtType_to_semEq τ (Term.snd s) (Term.snd t) env h₂
+      simp only [Term.interpret] at e₁ e₂
+      exact Prod.ext e₁ e₂
   | .arr ρ' τ, s, t, env, h => by
       funext z
       have hz : dialecticaRealizerCtx si
@@ -251,12 +284,19 @@ private def eqAtType_to_semEq {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
 /-- Build a full realizer for `eqAtType EqX ρ s t` from a semantic equality.
     The `base i` case uses `eqxi.realize`, which encodes the semantic correctness
     of the base-type equality predicate `EqX i`. -/
-private def eqAtType_from_semEq {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
+def eqAtType_from_semEq {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
     (env : Ctx.interpret X Γ) (h : Term.interpret si s env = Term.interpret si t env) :
     dialecticaRealizerCtx si (eqAtType EqX ρ s t) env :=
   match ρ, s, t, env, h with
   | .nat, s, t, env, h => ⟨(), fun () => h⟩
   | .base i, s, t, env, h => eqxi.realize i s t env h
+  | .unit, s, t, env, h => ⟨(), fun () => rfl⟩
+  | .prod ρ' τ, s, t, env, h =>
+      let r₁ := eqAtType_from_semEq ρ' (Term.fst s) (Term.fst t) env (by
+        simp only [Term.interpret]; exact congrArg Prod.fst h)
+      let r₂ := eqAtType_from_semEq τ (Term.snd s) (Term.snd t) env (by
+        simp only [Term.interpret]; exact congrArg Prod.snd h)
+      ⟨(r₁.val, r₂.val), fun y => ⟨r₁.property y.1, r₂.property y.2⟩⟩
   | .arr ρ' τ, s, t, env, h =>
       have eq_z : ∀ z : Ty.interpret X ρ',
           Term.interpret si (Term.app s.weaken (.var .vz)) (z, env) =
@@ -463,6 +503,8 @@ private lemma Ty.interpret_nonempty {ι : Type} {X : ι → Type} {F : ι → Ty
   | nat    => exact ⟨Nat.zero⟩
   | base i => exact ⟨si.zeroInterp i⟩
   | arr _ _ _ ihτ => exact ⟨fun _ => ihτ.some⟩
+  | unit => exact ⟨()⟩
+  | prod _ _ ihρ ihτ => exact ⟨(ihρ.some, ihτ.some)⟩
 
 /-- Both `𝕎 X A` and `ℂ X A` are nonempty. -/
 private lemma dialectica_nonempty {ι : Type} {X : ι → Type} {F : ι → Ty ι}
@@ -474,7 +516,7 @@ private lemma dialectica_nonempty {ι : Type} {X : ι → Type} {F : ι → Ty �
   | and _ _ ihA ihB =>
     exact ⟨⟨ihA.1.some, ihB.1.some⟩, ⟨ihA.2.some, ihB.2.some⟩⟩
   | or  _ _ ihA ihB =>
-    exact ⟨⟨true, ihA.1.some, ihB.1.some⟩, ⟨ihA.2.some, ihB.2.some⟩⟩
+    exact ⟨⟨0, ihA.1.some, ihB.1.some⟩, ⟨ihA.2.some, ihB.2.some⟩⟩
   | imp _ _ ihA ihB =>
     exact ⟨⟨fun _ => ihB.1.some, fun _ _ => ihA.2.some⟩, ⟨ihA.1.some, ihB.2.some⟩⟩
   | all ρ _ ihA =>
@@ -647,7 +689,7 @@ def dialectica_soundness_ctx' {Γ : Ctx ι} {A : Formula F Γ}
          simp only [dialecticaMatrix, Term.interpret, Ctx.lookup] at h ⊢
          exact Nat.succ.inj h⟩
   | .rec_zero  => fun env =>
-      eqAtType_from_semEq si eqxi _ _ _ env (by simp [Term.interpret, Term.app3]; rfl)
+      eqAtType_from_semEq si eqxi _ _ _ env (by simp [Term.interpret, Term.app3])
   | .rec_succ  => fun env =>
       eqAtType_from_semEq si eqxi _ _ _ env (by simp [Term.interpret, Term.app3, Term.app2])
   | .beta_eq body u => fun env =>

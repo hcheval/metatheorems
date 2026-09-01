@@ -80,6 +80,9 @@ def bezemMaj {ι : Type} {X : ι → Type} (base : (i : ι) → Nat → X i → 
   | .arr ρ τ, f_star,  f =>
       ∀ (x_star : Ty.interpret X ρ.hat) (x : Ty.interpret X ρ),
         bezemMaj base ρ x_star x → bezemMaj base τ (f_star x_star) (f x)
+  -- `unit` is a singleton, so nothing to bound; a product is bounded componentwise
+  | .unit,    _,       _ => True
+  | .prod ρ τ, p_star, p => bezemMaj base ρ p_star.1 p.1 ∧ bezemMaj base τ p_star.2 p.2
 
 /-- `bezemMaj` satisfies the two properties the metatheorem uses. -/
 def bezemRel {ι : Type} {X : ι → Type} {F : ι → Ty ι} (si : SpaceInterp X F)

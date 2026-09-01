@@ -38,10 +38,12 @@ base type, we interpret:
   S_0       := ℕ
   S_{X_i}   := X i
   S_{ρ → τ} := S_τ ^ S_ρ  (function space) -/
-def Ty.interpret {ι : Type} (X : ι → Type) : Ty ι → Type
+@[reducible] def Ty.interpret {ι : Type} (X : ι → Type) : Ty ι → Type
   | .nat      => Nat
   | .base i   => X i
   | .arr ρ τ  => Ty.interpret X ρ → Ty.interpret X τ
+  | .unit     => Unit
+  | .prod ρ τ => Ty.interpret X ρ × Ty.interpret X τ
 
 /-- Interpretation of a typing context as a nested product. -/
 def Ctx.interpret {ι : Type} (X : ι → Type) : Ctx ι → Type
@@ -93,6 +95,10 @@ def Term.interpret {ι : Type} {X : ι → Type} {F : ι → Ty ι}
   | _, _, .prec _,      _   => fun y z n => Nat.rec y (fun n ih => z ih n) n
   | _, _, .func f,      _   => si.funcInterp f
   | _, _, .zeroX i,     _   => si.zeroInterp i
+  | _, _, .unitI,       _   => ()
+  | _, _, .mkPair a b,  env => (Term.interpret si a env, Term.interpret si b env)
+  | _, _, .fst pr,      env => (Term.interpret si pr env).1
+  | _, _, .snd pr,      env => (Term.interpret si pr env).2
 
 -- ============================================================================
 -- Formula interpretation
@@ -130,7 +136,7 @@ def Ctx.interpretSubst {ι : Type} {X : ι → Type} {F : ι → Ty ι}
 
 /-- General: evaluating a renamed term in env_Δ equals evaluating the original
     in env_Γ when the environments agree on variable lookups through the renaming. -/
-private lemma Term.interpret_rename_gen {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+lemma Term.interpret_rename_gen {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     (si : SpaceInterp X F) {Γ Δ : Ctx ι} {τ : Ty ι}
     (r : Renaming Γ Δ) (t : Term F Γ τ)
     (env_Δ : Ctx.interpret X Δ) (env_Γ : Ctx.interpret X Γ)
@@ -146,7 +152,11 @@ private lemma Term.interpret_rename_gen {ι : Type} {X : ι → Type} {F : ι �
     exact ih (Renaming.ext r) (x, env_Δ) (x, env_Γ) (fun v => by cases v with
       | vz => rfl
       | vs w => exact h w)
-  | zero | succ | prec | func | zeroX => rfl
+  | zero | succ | prec | func | zeroX | unitI => rfl
+  | mkPair _ _ ih₁ ih₂ =>
+    simp only [Term.rename, Term.interpret, ih₁ r env_Δ env_Γ h, ih₂ r env_Δ env_Γ h]
+  | fst _ ih => simp only [Term.rename, Term.interpret, ih r env_Δ env_Γ h]
+  | snd _ ih => simp only [Term.rename, Term.interpret, ih r env_Δ env_Γ h]
 
 -- ============================================================================
 -- Term evaluation commutes with weakening
@@ -222,6 +232,10 @@ lemma Term.interpret_substF {ι : Type} {X : ι → Type} {F : ι → Ty ι}
   | prec _ => simp [Term.subst, Term.interpret]
   | func _ => simp [Term.subst, Term.interpret]
   | zeroX _ => simp [Term.subst, Term.interpret]
+  | unitI => simp [Term.subst, Term.interpret]
+  | mkPair _ _ ih₁ ih₂ => simp [Term.subst, Term.interpret, ih₁, ih₂]
+  | fst _ ih => simp [Term.subst, Term.interpret, ih]
+  | snd _ ih => simp [Term.subst, Term.interpret, ih]
 
 -- ============================================================================
 -- Renaming is a special case of substitution

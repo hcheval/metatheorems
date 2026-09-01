@@ -48,6 +48,20 @@ structure AbstractMajorizability {ι : Type} {X : ι → Type} {F : ι → Ty ι
     (∀ (x_star : Ty.interpret X ρ.hat) (x : Ty.interpret X ρ),
       maj ρ x_star x → maj τ (f_star x_star) (f x)) →
     maj (ρ →ₜ τ) f_star f
+  /-- Product introduction: majorize componentwise. -/
+  prod_intro : ∀ {ρ τ : Ty ι}
+    (p_star : Ty.interpret X (ρ ×ₜ τ).hat) (p : Ty.interpret X (ρ ×ₜ τ)),
+    maj ρ p_star.1 p.1 → maj τ p_star.2 p.2 → maj (ρ ×ₜ τ) p_star p
+  /-- Product elimination, first component. -/
+  prod_fst : ∀ {ρ τ : Ty ι}
+    (p_star : Ty.interpret X (ρ ×ₜ τ).hat) (p : Ty.interpret X (ρ ×ₜ τ)),
+    maj (ρ ×ₜ τ) p_star p → maj ρ p_star.1 p.1
+  /-- Product elimination, second component. -/
+  prod_snd : ∀ {ρ τ : Ty ι}
+    (p_star : Ty.interpret X (ρ ×ₜ τ).hat) (p : Ty.interpret X (ρ ×ₜ τ)),
+    maj (ρ ×ₜ τ) p_star p → maj τ p_star.2 p.2
+  /-- The unit type is a singleton, so it is majorized outright. -/
+  unit_maj : maj .unit () ()
   /-- The uniform threshold N for constant majorizability. -/
   N : ℕ
   /-- Majorant for zero (0 : nat). -/
@@ -156,6 +170,21 @@ theorem all_terms_majorizable {ι : Type} {X : ι → Type} {F : ι → Ty ι}
   | zeroX i =>
     obtain ⟨z_star, hz⟩ := am.zeroX_maj i
     exact ⟨fun n _ => z_star n, fun n hn _ _ _ => hz n hn⟩
+  | unitI => exact ⟨fun _ _ => (), fun _ _ _ _ _ => am.unit_maj⟩
+  | mkPair a b iha ihb =>
+    obtain ⟨a_star, ha⟩ := iha
+    obtain ⟨b_star, hb⟩ := ihb
+    exact ⟨fun n env_star => (a_star n env_star, b_star n env_star),
+      fun n hn env_star env henv =>
+        am.prod_intro _ _ (ha n hn env_star env henv) (hb n hn env_star env henv)⟩
+  | fst p ih =>
+    obtain ⟨p_star, hp⟩ := ih
+    exact ⟨fun n env_star => (p_star n env_star).1,
+      fun n hn env_star env henv => am.prod_fst _ _ (hp n hn env_star env henv)⟩
+  | snd p ih =>
+    obtain ⟨p_star, hp⟩ := ih
+    exact ⟨fun n env_star => (p_star n env_star).2,
+      fun n hn env_star env henv => am.prod_snd _ _ (hp n hn env_star env henv)⟩
 
 /-- **Corollary**: All closed terms are majorizable. -/
 theorem all_closed_terms_majorizable {ι : Type} {X : ι → Type} {F : ι → Ty ι}

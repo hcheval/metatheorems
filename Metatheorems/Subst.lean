@@ -54,6 +54,10 @@ def subst (s : Subst F Γ Δ) : Term F Γ τ → Term F Δ τ
   | .prec ρ'       => .prec ρ'
   | .func ff       => .func ff
   | .zeroX i       => .zeroX i
+  | .unitI         => .unitI
+  | .mkPair a b    => .mkPair (subst s a) (subst s b)
+  | .fst pr        => .fst (subst s pr)
+  | .snd pr        => .snd (subst s pr)
 
 -- ============================================================================
 -- Substitution for variable 0
@@ -87,7 +91,10 @@ theorem rename_rename {Γ Δ Δ' : Ctx ι} {τ : Ty ι}
     congr 1; funext τ v; cases v with
     | vz => rfl
     | vs w => rfl
-  | zero | succ | prec | func | zeroX => rfl
+  | zero | succ | prec | func | zeroX | unitI => rfl
+  | mkPair _ _ ih₁ ih₂ => simp only [rename]; rw [ih₁ r₁ r₂, ih₂ r₁ r₂]
+  | fst _ ih => simp only [rename]; rw [ih r₁ r₂]
+  | snd _ ih => simp only [rename]; rw [ih r₁ r₂]
 
 /-- Renaming then substituting = substituting with composed map. -/
 theorem rename_subst {Γ Δ Δ' : Ctx ι} {τ : Ty ι}
@@ -102,7 +109,10 @@ theorem rename_subst {Γ Δ Δ' : Ctx ι} {τ : Ty ι}
     congr 1; funext τ v; cases v with
     | vz => rfl
     | vs w => rfl
-  | zero | succ | prec | func | zeroX => rfl
+  | zero | succ | prec | func | zeroX | unitI => rfl
+  | mkPair _ _ ih₁ ih₂ => simp only [rename, subst]; rw [ih₁ r s, ih₂ r s]
+  | fst _ ih => simp only [rename, subst]; rw [ih r s]
+  | snd _ ih => simp only [rename, subst]; rw [ih r s]
 
 /-- Substituting then renaming = substituting with renamed map. -/
 theorem subst_rename {Γ Δ Δ' : Ctx ι} {τ : Ty ι}
@@ -119,7 +129,10 @@ theorem subst_rename {Γ Δ Δ' : Ctx ι} {τ : Ty ι}
     | vs w =>
       show rename (Renaming.ext r) ((s w).weaken) = ((s w).rename r).weaken
       simp only [weaken]; rw [rename_rename, rename_rename]; rfl
-  | zero | succ | prec | func | zeroX => rfl
+  | zero | succ | prec | func | zeroX | unitI => rfl
+  | mkPair _ _ ih₁ ih₂ => simp only [subst, rename]; rw [ih₁ s r, ih₂ s r]
+  | fst _ ih => simp only [subst, rename]; rw [ih s r]
+  | snd _ ih => simp only [subst, rename]; rw [ih s r]
 
 /-- `Subst.ext` of the identity substitution is the identity. -/
 theorem Subst.ext_id {Γ : Ctx ι} {σ : Ty ι} :
@@ -134,7 +147,10 @@ theorem subst_id (t : Term F Γ τ) : t.subst Subst.id = t := by
   | var v => rfl
   | app _ _ ihf iha => simp only [subst]; exact congr (congrArg app ihf) iha
   | lam body ih => simp only [subst]; congr 1; rw [Subst.ext_id]; exact ih
-  | zero | succ | prec | func | zeroX => rfl
+  | zero | succ | prec | func | zeroX | unitI => rfl
+  | mkPair _ _ ih₁ ih₂ => simp only [subst]; rw [ih₁, ih₂]
+  | fst _ ih => simp only [subst]; rw [ih]
+  | snd _ ih => simp only [subst]; rw [ih]
 
 /-- Renaming equals substitution with variable injection. -/
 theorem rename_eq_subst (r : Renaming Γ Δ) (t : Term F Γ τ) :
@@ -147,7 +163,10 @@ theorem rename_eq_subst (r : Renaming Γ Δ) (t : Term F Γ τ) :
     rw [ih (Renaming.ext r)]; congr 1; funext τ v; cases v with
     | vz => rfl
     | vs w => rfl
-  | zero | succ | prec | func | zeroX => rfl
+  | zero | succ | prec | func | zeroX | unitI => rfl
+  | mkPair _ _ ih₁ ih₂ => simp only [rename, subst]; rw [ih₁ r, ih₂ r]
+  | fst _ ih => simp only [rename, subst]; rw [ih r]
+  | snd _ ih => simp only [rename, subst]; rw [ih r]
 
 /-- Applying a substitution after a renaming with an identity composition leaves terms
     unchanged.  Corollary of `rename_subst`. -/
