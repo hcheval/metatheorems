@@ -31,11 +31,57 @@ package is what makes ℝ *an ordered field*; the metric-space metatheorem does 
 | `eq_R_trans` | `admissibleEqX.eqx_sym`/`eqx_trans` | ✗ Class C |
 | `add_eq_zero_R` | `eqx_trans` (with `ax_triangle`) | ✗ Class C |
 | `le_zero_eq_zero_R` | `eqx_trans` | ✗ Class C |
-| rounding theory for `(·)∘` — `(n)ℝ ≥ℝ (x)∘ ↔ n ≤ x`, `x ≤ y → (x)∘ ≼₁ (y)∘` (Kohlenbach Lem. 17.8) | the `d_X` and `0_X` majorants, and the `X`-clause of `≽ᵃ` | ✗ **worse than this table first said.** `Term.round_nat` is *not* the rounding operator: its type is `nat →ₜ realTy` and its own docstring says "embeds ℕ into ℝ", i.e. it is the embedding `(·)ℝ`. The section header above it mislabels it. Nothing of type `realTy ι →ₜ Ty.nat` exists in the file, so the ℝ→ℕ direction is **undefined, not merely unproved** |
+| Lemma 17.8 for `(·)◦` — see the note below | the `d_X` and `0_X` majorants, and the `X`-clause of `≽ᵃ` | ✗ zero lemmas; but **the definition is not missing** — see below |
 | `abs_R_bound` (p. 430) | bounding a majorant | ✗ stated, sorried |
 
 `eq_R_refl` and `eq_R_sym` are proved; `substF_nat` and `eqx_pu` in `MetricSpaces.lean` are
 proved. Note `eqx_refl` needs the *premise* `ax_refl`, not `eq_R_refl` — the names mislead.
+
+### `(·)◦` is SEMANTIC. Checked against the book 2026-09-02; get this right.
+
+Kohlenbach **Definition 17.7**: for `x ∈ [0,∞)`, `(x)◦(n) := j(2k₀, 2^{n+1} − 1)` with
+`k₀ := max{k : k/2^{n+1} ≤ x}`. He states the domain caveat himself — *"[0,∞) refers to the
+'real' space of all positive reals, i.e. not to the sets of representatives"*. So `(·)◦` maps
+an **actual real** to its canonical `ℕ^ℕ` representative. It is a Lean-level function, used to
+*interpret* the constants in the model: `[dX]_M := λ x,y ∈ X.(d(x,y))◦` (p. 430). There is no
+object-level `Term` for it and there should not be one — a `Term F Γ (realTy ι →ₜ Ty.nat)` is
+the wrong type and the wrong side of the interpretation.
+
+**But `Term.round_nat` is `(·)◦` restricted to ℕ, and is correct as written.** At p. 430
+Kohlenbach writes `(·)◦ : ℕ → ℕ^ℕ` "here denotes the restriction", with
+`(x⁰)◦(n) = j(x·2^{n+2}, 2^{n+1} − 1)` — exactly `round_nat`'s body. (For `x ∈ ℕ`,
+`k₀ = x·2^{n+1}`, so `2k₀ = x·2^{n+2}`.) The restriction *is* the embedding `ℕ → ℝ`; calling it
+either name is right, and the section header in `RealNumbers.lean` is not a mislabelling.
+
+A second source (Leuştean, *Logical metatheorems*, §4, eq. 4.4 and Lemma 4.0.6) states the
+point in so many words: *"we need a **semantic operator** which for any real number
+`x ∈ [0,∞)` selects out of all the representatives `f : ℕ → ℕ` of `x` a unique representative
+`(x)◦`"*. Same definition, same numbering, cited as [95, Lemma 17.8].
+
+An earlier version of this file claimed `(·)◦` was "undefined, not merely unproved" because
+`round_nat` had the wrong type. That was wrong on both counts, and wrong in the direction of
+making the work look bigger. What is actually missing is **Lemma 17.8** (six parts:
+representative, `≤`-monotone in both `≤R` and `≤₁`, pointwise monotone, `x ≤ y → (y)◦ s-maj₁ (x)◦`,
+`x ∈ [0,b] → (x)◦ ≤₁ M(b)`, `M(b)` monotone) plus `M(b) := λn. j(b·2^{n+2}, 2^{n+1} − 1)`. Parts
+2–6 are the ones the majorants consume; part 1 is where the ℝ layer is touched.
+
+**Consequence for scoping, and it is favourable.** Because `(·)◦` takes a genuine
+`x ∈ [0,∞)`, its domain is Lean's `ℝ` (mathlib), not the object-level encoded reals. So
+Lemma 17.8 parts 2–6 — the parts the majorants actually consume — are statements about
+mathlib reals and `ℕ → ℕ` functions, provable **without any of `RealNumbers.lean`'s 18
+ordered-field sorries**. Only part 1 ("`(x)◦` is a representative of `x`") crosses between
+mathlib `ℝ` and the object-level representation, and even that is a Lean lemma about
+`Ty.interpret`-level data, not a `Derivable`. Treat this as a reading of the sources rather
+than a measured claim until part 1 is actually attempted.
+
+**`cauchyfy` is `f^b`** (Leuştean eq. 4.3): `f^b(n) := f(n)` if `∀k<n |f(k+1) −Q f(k)|Q <Q 2^{-k-1}`,
+else `f(k)` for the least bad `k`. That is precisely the flag/value invariant `cauchy_inv`
+proves, and `cauchyState_cauchy` is "`f^b` always satisfies (4.2)". Both are already done, so
+the hat-construction side of the semantic bridge is not new work.
+
+Also worth having when `[0,1]`-valued data appears (W-hyperbolic spaces): Kohlenbach Lemma
+4.25 / Leuştean 4.0.7, the truncation `λ̃ := λn.j(2k₀, 2^{n+2} − 1)` onto `[0,1]`, with
+`λ̃ ≤₁ M := λn.j(2^{n+3}, 2^{n+2} − 1)`. Not needed for plain metric spaces.
 
 **NOT needed (14 of the 18 `RealNumbers.lean` sorries):** `add_comm_R`, `add_assoc_R`,
 `add_zero_R`, `add_neg_R`, `mul_comm_R`, `mul_assoc_R`, `mul_one_R`, `distrib_R`,
