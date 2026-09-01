@@ -31,7 +31,7 @@ package is what makes ℝ *an ordered field*; the metric-space metatheorem does 
 | `eq_R_trans` | `admissibleEqX.eqx_sym`/`eqx_trans` | ✗ Class C |
 | `add_eq_zero_R` | `eqx_trans` (with `ax_triangle`) | ✗ Class C |
 | `le_zero_eq_zero_R` | `eqx_trans` | ✗ Class C |
-| rounding theory for `(·)∘` — `(n)ℝ ≥ℝ (x)∘ ↔ n ≤ x`, `x ≤ y → (x)∘ ≼₁ (y)∘` (Kohlenbach Lem. 17.8) | the `d_X` and `0_X` majorants, and the `X`-clause of `≽ᵃ` | ✗ `round_nat` is defined, **zero lemmas** |
+| rounding theory for `(·)∘` — `(n)ℝ ≥ℝ (x)∘ ↔ n ≤ x`, `x ≤ y → (x)∘ ≼₁ (y)∘` (Kohlenbach Lem. 17.8) | the `d_X` and `0_X` majorants, and the `X`-clause of `≽ᵃ` | ✗ **worse than this table first said.** `Term.round_nat` is *not* the rounding operator: its type is `nat →ₜ realTy` and its own docstring says "embeds ℕ into ℝ", i.e. it is the embedding `(·)ℝ`. The section header above it mislabels it. Nothing of type `realTy ι →ₜ Ty.nat` exists in the file, so the ℝ→ℕ direction is **undefined, not merely unproved** |
 | `abs_R_bound` (p. 430) | bounding a majorant | ✗ stated, sorried |
 
 `eq_R_refl` and `eq_R_sym` are proved; `substF_nat` and `eqx_pu` in `MetricSpaces.lean` are
