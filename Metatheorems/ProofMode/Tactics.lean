@@ -366,9 +366,16 @@ private def evalBoolCheck (e : Expr) : TacticM (Option Bool) := do
   | .const ``Bool.false _ => return some false
   | _ => return none
 
-/-- The `SeqD` goal, split into its arguments: `ι, names, F, EqX, a, Premises, Γ, Δ, B`. -/
+/-- The `SeqD` goal, split into its arguments: `ι, names, F, EqX, a, Premises, Γ, Δ, B`.
+
+`consumeMData` is load-bearing. Lean's `have`/`obtain` leave the target wrapped in an `mdata`
+node, and without stripping it `isAppOf ``SeqD` is false — so every proof-mode tactic used
+after a plain `have` failed with "the goal is not a proof-mode sequent", even though the goal
+was displayed as a perfectly good sequent box (the delaborator looks through `mdata`, so the
+display gave no hint). Measured 2026-09-01: `ctor=app, nargs=9` before a `have`, `ctor=mdata,
+nargs=0` after. -/
 def seqDGoalArgs (who : String) : TacticM (Array Expr) := do
-  let ty ← instantiateMVars (← (← getMainGoal).getType)
+  let ty := (← instantiateMVars (← (← getMainGoal).getType)).consumeMData
   let args := ty.getAppArgs
   unless ty.isAppOf ``SeqD && args.size == 9 do
     throwError "{who}: the goal is not a proof-mode sequent{indentExpr ty}"
@@ -409,7 +416,8 @@ next to a term from the outer context, the latter then weakening by coercion.
 
 Theorems that are not applications, or whose context implicit is not called `Γ`, fall back to
 plain elaboration against the expected type. -/
-def elabRuleInCtx (eStx : TSyntax `term) (Γ expected : Expr) : TacticM Expr := do
+def elabRuleInCtx (eStx : TSyntax `term) (Γ expected : Expr) : TacticM Expr :=
+    withMainContext do
   let bare := unparen eStx.raw
   if bare.getKind == ``Lean.Parser.Term.app then
     let ΓStx ← Lean.Elab.Term.exprToSyntax Γ
@@ -438,7 +446,7 @@ bound, so no enumeration of smuggling routes is needed. R4's attempt C reached t
 term through an *instantiation*, never touching an `∃`, which is exactly why the check has
 to live here rather than at `∃`-introduction. -/
 private def elabSurfaceTerm (who : String) (ι F Γ ρ : Expr) (tStx : TSyntax `term) :
-    TacticM Expr := do
+    TacticM Expr := withMainContext do
   let t ← elabTerm tStx (some (mkAppN (.const ``Term []) #[ι, F, Γ, ρ]))
   if mentionsPrec (← instantiateMVars t) then
     throwError "{who}: the term applies the primitive recursor directly.\n\
@@ -484,7 +492,7 @@ recursor ban applies to it. -/
 macro "prefl" : tactic => `(tactic| exact pm_refl)
 macro "psym" : tactic => `(tactic| refine pm_sym ?_)
 
-elab "ptrans " tStx:term : tactic => do
+elab "ptrans " tStx:term : tactic => withMainContext do
   let args ← seqDGoalArgs "ptrans"
   let target ← whnfD args[8]!
   let targs := target.getAppArgs
@@ -526,7 +534,7 @@ private def exGoalArgs (who : String) : TacticM (Array Expr) := do
   return targs
 
 /-- `pexists t` supplies a witness for an `∃` goal, subject to the surface-recursor ban. -/
-elab "pexists " tStx:term : tactic => do
+elab "pexists " tStx:term : tactic => withMainContext do
   let g ← exGoalArgs "pexists"
   let _ ← elabSurfaceTerm "pexists" g[0]! g[1]! g[2]! g[3]! tStx
   evalTactic (← `(tactic| refine pm_exI $tStx ?_))
@@ -546,7 +554,7 @@ headline position — the check itself is the same, because D-2 puts the ban on 
 language rather than on headline positions specifically.
 
 Like `pby_contra`, the check runs *before* anything is applied to the goal. -/
-elab "pbound " tStx:term : tactic => do
+elab "pbound " tStx:term : tactic => withMainContext do
   let g ← exGoalArgs "pbound"
   let _ ← elabSurfaceTerm "pbound" g[0]! g[1]! g[2]! g[3]! tStx
   evalTactic (← `(tactic| refine pm_bound $tStx ?_))
@@ -569,7 +577,7 @@ it retried against the goal's own formula — which is what gives a side conditi
 
 The order matters: pinning the formula first would force unification through the goal on
 every call, and on a large statement that is where it diverges. -/
-elab "pthm " eStx:term : tactic => do
+elab "pthm " eStx:term : tactic => withMainContext do
   let args ← seqDGoalArgs "pthm"
   let e ← try
       Lean.Elab.Term.withoutErrToSorry (elabRuleInCtx eStx args[6]! (← derivableInGoal args))
@@ -615,7 +623,7 @@ macro "papply " h:ident " in " k:ident " with " m:ident : tactic =>
 
 /-- `papplym e` applies a *kernel theorem* to the goal, leaving its antecedents as goals —
 the escape hatch's `apply`, next to `pthm`'s `exact`. -/
-elab "papplym " eStx:term : tactic => do
+elab "papplym " eStx:term : tactic => withMainContext do
   let args ← seqDGoalArgs "papplym"
   let goalF := args[8]!
   let e ← elabRuleInCtx eStx args[6]! (← derivableInGoal args)
@@ -642,7 +650,7 @@ elab "papplym " eStx:term : tactic => do
 
 /-- `papplym e in h with k` applies a kernel theorem to a hypothesis. Like `pthm`, the
 theorem is elaborated in the goal's context, so it can mention `x₀`. -/
-elab "papplym " eStx:term " in " h:ident " with " k:ident : tactic => do
+elab "papplym " eStx:term " in " h:ident " with " k:ident : tactic => withMainContext do
   let args ← seqDGoalArgs "papplym"
   let e ← elabRuleInCtx eStx args[6]! (← derivableInGoal args)
   let eS ← Lean.Elab.Term.exprToSyntax (← instantiateMVars e)
@@ -663,7 +671,7 @@ macro "pcontradiction " h:ident : tactic => `(tactic| (pexfalso; pexact $h))
 
 /-- `pclassic A with h k` splits on `A ∨ᶠ ¬ᶠA`. Refused — before anything is applied to the
 goal — unless LEM is available. -/
-elab "pclassic " A:term " with " h:ident ppSpace k:ident : tactic => do
+elab "pclassic " A:term " with " h:ident ppSpace k:ident : tactic => withMainContext do
   let args ← seqDGoalArgs "pclassic"
   if (← evalBoolCheck (mkAppN (.const ``Allowed.lem []) #[args[4]!])) == some false then
     throwError "pclassic: excluded middle is not available here — \
@@ -786,7 +794,7 @@ The formula is elaborated **once**, against the goal's context, and the resultin
 is handed to `pm_cut` — not the surface syntax again. Re-elaborating it as a named argument
 would leave `pm_cut`'s own `Γ` a metavariable at the moment the formula is processed, and an
 `xₖ` token reads its de Bruijn index off exactly that context. -/
-elab "phave " h:ident " : " AStx:term : tactic => do
+elab "phave " h:ident " : " AStx:term : tactic => withMainContext do
   let args ← seqDGoalArgs "phave"
   let A ← instantiateMVars
     (← elabTerm AStx (some (mkAppN (.const ``Formula []) #[args[0]!, args[2]!, args[6]!])))
@@ -802,7 +810,7 @@ elab "phave " h:ident " : " AStx:term : tactic => do
 The theorem's context is pinned to the goal's, exactly as `pthm` does it: a lemma stated over
 a parameter in the *outer* context is usable under binders, the parameter weakening by
 coercion. -/
-elab "pfrom " h:ident " := " eStx:term : tactic => do
+elab "pfrom " h:ident " := " eStx:term : tactic => withMainContext do
   let args ← seqDGoalArgs "pfrom"
   let e ← elabRuleInCtx eStx args[6]! (← derivableInGoal args)
   let eStx' ← Lean.Elab.Term.exprToSyntax e
@@ -854,7 +862,7 @@ The instantiation term is a surface term, so the recursor ban applies. This is t
 R4's attempt C used: a `∀`-premise instantiated at a hand-written iterating term contributes
 that term to the Dialectica challenge side, and thence to the extracted bound, without ever
 introducing an `∃` for a headline-scoped linter to notice. -/
-elab "pinst " h:ident ppSpace tStx:term " with " k:ident : tactic => do
+elab "pinst " h:ident ppSpace tStx:term " with " k:ident : tactic => withMainContext do
   let A ← whnfD (← hypFormula "pinst" h.getId.toString)
   let aargs := A.getAppArgs
   unless A.isAppOf ``Formula.all && aargs.size == 5 do

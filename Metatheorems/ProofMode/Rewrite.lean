@@ -303,7 +303,7 @@ private def prwAtCore (who : String) (occ : Occ) (ρ s t : Expr) (h : Ident) (n 
 /-- `prw e` rewrites the goal with the closed equation `e : s =₀ t`, on both sides, the way
 `rw` does; `prw e at n` rewrites only the `n`-th occurrence, numbered left to right across
 the goal. Available in any hypothesis context, since a closed equation needs no premise. -/
-elab "prw " eStx:term occ:(occSel)? : tactic => do
+elab "prw " eStx:term occ:(occSel)? : tactic => withMainContext do
   -- The rule is elaborated against the *goal's* context, not in a vacuum. Without that,
   -- nothing pins the rule's `Γ`, and a variable like `x₀` in its arguments has no context to
   -- resolve against — while a term from the outer context needs the weakening coercion.
@@ -333,7 +333,7 @@ is a **closed** derivation, obtained from QF-ER at `I_comb`, and rewriting by a 
 that theorem applied to it. The rest of the context can be anything at all, including
 non-quantifier-free hypotheses like an induction hypothesis. The only requirement is that
 `h`'s own formula is quantifier-free and ∨-free, which is exactly what QF-ER asks. -/
-elab "prwby " h:ident occ:(occSel)? : tactic => do
+elab "prwby " h:ident occ:(occSel)? : tactic => withMainContext do
   let args ← seqDGoalArgs "prwby"
   let some hyps ← whnfListLit? args[7]! |
     throwError "prwby: the hypothesis context is not a literal list"
@@ -353,7 +353,8 @@ elab "prwby " h:ident occ:(occSel)? : tactic => do
 /-- `prw e in h with k` rewrites *inside* the equational hypothesis `h`, naming the result
 `k`. The goal-directed `prw` proves `L =₀ L[s:=t]` and chains it onto the goal; this proves
 the same congruence and threads the hypothesis between the two sides' copies of it. -/
-elab "prw " eStx:term " in " h:ident " with " n:ident occ:(occSel)? : tactic => do
+elab "prw " eStx:term " in " h:ident " with " n:ident occ:(occSel)? : tactic =>
+    withMainContext do
   let args ← seqDGoalArgs "prw"
   let e ← elabRuleInCtx eStx args[6]! (← derivableInGoal args)
   let ety ← instantiateMVars (← inferType e)
@@ -366,7 +367,8 @@ elab "prw " eStx:term " in " h:ident " with " n:ident occ:(occSel)? : tactic => 
     `(pm_have (qfer_no_premise_at_nf (σ := Ty.nat) $eS (r := $r) (by prw_norm) (by prw_norm)))
 
 /-- `prwby h in k with m` rewrites inside the hypothesis `k` using the equation `h`. -/
-elab "prwby " h:ident " in " k:ident " with " n:ident occ:(occSel)? : tactic => do
+elab "prwby " h:ident " in " k:ident " with " n:ident occ:(occSel)? : tactic =>
+    withMainContext do
   let args ← seqDGoalArgs "prwby"
   let some hyps ← whnfListLit? args[7]! |
     throwError "prwby: the hypothesis context is not a literal list"
