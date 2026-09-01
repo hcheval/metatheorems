@@ -126,6 +126,33 @@ project.**
 The 19 axioms now take `(adm : AdmissibleEqX EqX)`, as every ℚ theorem already does. Nothing
 else about any statement changed.
 
+### 0.65 The ℚ layer as of 2026-09-01 (end of the `approx-r` session)
+
+The four items §0.7 lists as step 1 are **done**, plus three that were not on the list:
+
+| lemma | statement |
+|---|---|
+| `le_Q_zero_parts` / `le_Q_zero_of_parts` | `0 ≤_ℚ p` ⟺ `negN p =₀ 0` |
+| `addQ_negN_zero` | the negative part of a sum of non-negatives vanishes |
+| `le_Q_zero_add`, `lt_Q_zero_add_le` | `≤`+`≤` and `<`+`≤` at `0_ℚ` |
+| `le_Q_to_zero_sub`, `le_Q_of_zero_sub`, `le_Q_zero_congr` | `≤_ℚ` in difference form |
+| `le_Q_add`, `sub_Q_add_split`, `le_Q_add_both` | additive monotonicity, one- and two-sided |
+| **`lt_le_Q_add`** | **the mixed `<`/`≤` addition lemma** |
+| `le_Q_trans`, `lt_le_Q_trans`, `le_lt_Q_trans` | the three transitivity combinations |
+| `monus_add_self`, `monus_le_of_eq_add`, `monus_le_trans`, `add_le_mono` | ℕ order in `monus` form |
+| `one_le_exp2`, **`exp2_ge_self`** | `1 ≤ 2^n`, `n ≤ 2^n` |
+| **`le_Q_of_cross`** | `≤_ℚ` from an ℕ inequality between signed cross products |
+| **`pow2neg_rat_den_le`** | `0 <_ℚ q →ᶠ ⟨2^{-rat_den q}⟩_ℚ ≤_ℚ q` — the Archimedean index |
+| `rat_num_add_Q_le`, **`abs_Q_triangle`** | `\|a +_ℚ b\|_ℚ ≤_ℚ \|a\|_ℚ +_ℚ \|b\|_ℚ` |
+
+`le_Q_of_cross` is the one to remember: it is the `≤_ℚ` counterpart of `eq_Q_of_signed_cross`,
+and it turns a ℚ order goal into ordinary ℕ arithmetic with no `sub_Q` in it. `abs_Q_triangle`
+and `pow2neg_rat_den_le` are both two-thirds bookkeeping on top of it.
+
+The ℕ order lemmas sit in `RationalNumbers.lean` rather than `Arithmetic.lean`, where they
+belong by subject: `Arithmetic.lean` is below `ProofMode` in the import graph, and in Hilbert
+style they are a page each.
+
 ### 0.7 Revised work order
 
 1. `abs_Q_triangle`, `le_Q_trans`, `le_Q_add`, and the mixed `<`/`≤` addition lemma (§3.2 plus
@@ -185,10 +212,12 @@ and the `≤_ℚ` toolkit, everything in the *witness* half of the lemma is avai
 
 **Still missing, all of it estimate work:**
 
-1. `abs_Q_triangle` and the **reverse** triangle inequality `| |a| − |b| | ≤_ℚ |a − b|` — the
-   latter is what makes `A = |D|` Cauchy, i.e. what licenses `cauchyfy_id` on `A`. Neither was
-   anticipated as a pair; §0.7 lists only the forward one. `le_Q_of_cross` reduces the forward
-   one to `num(a+b) ≤ num a·den b + num b·den a`, an ℕ statement.
+1. ~~`abs_Q_triangle`~~ — **proved 2026-09-01**, via `le_Q_of_cross` + `rat_num_add_Q_le`
+   (`num(a+b) ≤ num a·den b + num b·den a`, the only place the sign cases are taken). What
+   remains here is the **reverse** triangle inequality `| |a| − |b| | ≤_ℚ |a − b|`, which is
+   what makes `A = |D|` Cauchy, i.e. what licenses `cauchyfy_id` on `A`; §0.7 did not list it.
+   The usual route needs `z ≤_ℚ |z|`, `−|z| ≤_ℚ z` and `(−c ≤ z ∧ z ≤ c) → |z| ≤ c`, none of
+   which exists.
 2. The telescoping induction of §0.5 item 3, in the refined form that keeps the `k`-th step's
    slack out of the sum.
 3. `cauchyfy_const` for an *arbitrary* constant sequence (only `zero_R`/`one_R` are done), and

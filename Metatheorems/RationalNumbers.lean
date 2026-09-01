@@ -12816,6 +12816,138 @@ def pow2neg_rat_den_le (q : Term F Γ Ty.nat) :
   papplym (le_Q_of_cross adm (.app Term.pow2neg_Q (.app Term.rat_den q)) q)
   pexact hle
 
+-- ── The triangle inequality ────────────────────────────────────────────────
+
+/-- **`num(a +_ℚ b) ≤ num a · den b + num b · den a`** — the whole ℕ content of the triangle
+inequality, and the only place the sign cases are taken. `addQ_signed` says
+`posN(a+b) + β =₀ negN(a+b) + α` with `α`, `β` the positive and negative cross sums, and
+`posN(a+b) · negN(a+b) =₀ 0` kills one of the two; in either branch the surviving part is
+bounded by `α + β`, which is the claim. -/
+def rat_num_add_Q_le (a b : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.eq0 (Term.app2 Term.monus
+        (.app Term.rat_num (Term.app2 Term.add_Q a b))
+        (Term.app2 Term.add
+          (Term.app2 Term.mul (.app Term.rat_num a) (.app Term.rat_den b))
+          (Term.app2 Term.mul (.app Term.rat_num b) (.app Term.rat_den a)))) .zero) := by
+  let P : Term F Γ Ty.nat := posN (Term.app2 Term.add_Q a b)
+  let N : Term F Γ Ty.nat := negN (Term.app2 Term.add_Q a b)
+  let α : Term F Γ Ty.nat :=
+    Term.app2 Term.add
+      (Term.app2 Term.mul (posN a) (.app Term.rat_den b))
+      (Term.app2 Term.mul (posN b) (.app Term.rat_den a))
+  let β : Term F Γ Ty.nat :=
+    Term.app2 Term.add
+      (Term.app2 Term.mul (negN a) (.app Term.rat_den b))
+      (Term.app2 Term.mul (negN b) (.app Term.rat_den a))
+  pmode
+  -- put both sides in the signed-parts language
+  prw (Derivable.mp (posN_add_negN adm (Term.app2 Term.add_Q a b)) Derivable.sym0)
+  prw (Derivable.mp (posN_add_negN adm a) Derivable.sym0)
+  prw (Derivable.mp (posN_add_negN adm b) Derivable.sym0)
+  prw (add_mul adm (posN a) (negN a) (.app Term.rat_den b))
+  prw (add_mul adm (posN b) (negN b) (.app Term.rat_den a))
+  prw (add_swap4_nat adm
+    (Term.app2 Term.mul (posN a) (.app Term.rat_den b))
+    (Term.app2 Term.mul (negN a) (.app Term.rat_den b))
+    (Term.app2 Term.mul (posN b) (.app Term.rat_den a))
+    (Term.app2 Term.mul (negN b) (.app Term.rat_den a)))
+  -- goal: `(P + N) ∸ (α + β) =₀ 0`
+  pfrom hid := addQ_signed adm a b
+  pfrom hcase := Derivable.mp (posN_mul_negN adm (Term.app2 Term.add_Q a b))
+    (Derivable.mp (mul_eq_zero_iff adm P N) .and_weak)
+  pcases hcase with hP | hN
+  · -- the positive part vanishes: `β =₀ N + α`, so `N ≤ β ≤ α + β`
+    prwby hP in hid with hid1
+    prw (add_zero_l adm β) in hid1 with hid2
+    prwby hP
+    prw (add_zero_l adm N)
+    phave hM : Formula.eq0 (Term.app2 Term.add α β)
+        (Term.app2 Term.add (Term.app2 Term.add α α) N)
+    · prwby hid2
+      pthm (qtrans (add_congr_r α (add_comm adm N α))
+        (Derivable.mp (add_assoc adm α α N) Derivable.sym0))
+    papplym (monus_le_of_eq_add adm N (Term.app2 Term.add α β)
+      (Term.app2 Term.add α α))
+    pexact hM
+  · -- the negative part vanishes: `P + β =₀ α`, so `P ≤ α ≤ α + β`
+    prwby hN in hid with hid1
+    prw (add_zero_l adm α) in hid1 with hid2
+    prwby hN
+    prw (add_zero_r adm P)
+    phave hM : Formula.eq0 (Term.app2 Term.add α β)
+        (Term.app2 Term.add (Term.app2 Term.add β β) P)
+    · psym in hid2 with hid3
+      prwby hid3
+      pthm (qtrans (add_assoc adm P β β)
+        (add_comm adm P (Term.app2 Term.add β β)))
+    papplym (monus_le_of_eq_add adm P (Term.app2 Term.add α β)
+      (Term.app2 Term.add β β))
+    pexact hM
+
+/-- **The triangle inequality at ℚ**: `|a +_ℚ b|_ℚ ≤_ℚ |a|_ℚ +_ℚ |b|_ℚ`.
+
+Both sides have the same denominator `den a · den b`, so `le_Q_of_cross` cancels it with
+`monus_mul_distrib` and the whole statement is `rat_num_add_Q_le`. -/
+def abs_Q_triangle (a b : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (le_Q (.app Term.abs_Q (Term.app2 Term.add_Q a b))
+        (Term.app2 Term.add_Q (.app Term.abs_Q a) (.app Term.abs_Q b))) := by
+  let A : Term F Γ Ty.nat := .app Term.abs_Q a
+  let B : Term F Γ Ty.nat := .app Term.abs_Q b
+  let Dab : Term F Γ Ty.nat :=
+    Term.app2 Term.mul (.app Term.rat_den a) (.app Term.rat_den b)
+  -- `|a| +_ℚ |b|` is a sum of two non-negatives, so its parts are computable
+  let hnegy : Derivable F EqX al Premises
+      (Formula.eq0 (negN (Term.app2 Term.add_Q A B)) .zero) :=
+    Derivable.mp (negN_abs_Q adm b)
+      (Derivable.mp (negN_abs_Q adm a) (addQ_negN_zero adm A B))
+  let hposy : Derivable F EqX al Premises
+      (Formula.eq0 (posN (Term.app2 Term.add_Q A B))
+        (Term.app2 Term.add
+          (Term.app2 Term.mul (.app Term.rat_num a) (.app Term.rat_den b))
+          (Term.app2 Term.mul (.app Term.rat_num b) (.app Term.rat_den a)))) := by
+    pmode
+    pfrom hs := Derivable.mp (negN_abs_Q adm b)
+      (Derivable.mp (negN_abs_Q adm a) (addQ_signed_nonneg adm A B))
+    prw hnegy in hs with h1
+    prw (add_zero_l adm (Term.app2 Term.add
+      (Term.app2 Term.mul (posN A) (.app Term.rat_den B))
+      (Term.app2 Term.mul (posN B) (.app Term.rat_den A)))) in h1 with h2
+    prw (posN_abs_Q adm a) in h2 with h3
+    prw (posN_abs_Q adm b) in h3 with h4
+    prw (rat_den_abs_Q adm a) in h4 with h5
+    prw (rat_den_abs_Q adm b) in h5 with h6
+    pexact h6
+  pmode
+  papplym (le_Q_of_cross adm (.app Term.abs_Q (Term.app2 Term.add_Q a b))
+    (Term.app2 Term.add_Q A B))
+  prw hnegy
+  prw hposy
+  prw (posN_abs_Q adm (Term.app2 Term.add_Q a b))
+  prw (negN_abs_Q adm (Term.app2 Term.add_Q a b))
+  -- both denominators are `den a · den b`
+  prw (rat_den_abs_Q adm (Term.app2 Term.add_Q a b))
+  prw (rat_den_add_Q adm a b)
+  prw (rat_den_add_Q adm A B)
+  prw (rat_den_abs_Q adm a)
+  prw (rat_den_abs_Q adm b)
+  prw (mul_zero_l adm Dab)
+  prw (add_zero_l adm (Term.app2 Term.mul
+    (.app Term.rat_num (Term.app2 Term.add_Q a b)) Dab))
+  prw (add_zero_r adm (Term.app2 Term.mul
+    (Term.app2 Term.add
+      (Term.app2 Term.mul (.app Term.rat_num a) (.app Term.rat_den b))
+      (Term.app2 Term.mul (.app Term.rat_num b) (.app Term.rat_den a))) Dab))
+  prw (Derivable.mp (monus_mul_distrib adm
+    (.app Term.rat_num (Term.app2 Term.add_Q a b))
+    (Term.app2 Term.add
+      (Term.app2 Term.mul (.app Term.rat_num a) (.app Term.rat_den b))
+      (Term.app2 Term.mul (.app Term.rat_num b) (.app Term.rat_den a)))
+    Dab) Derivable.sym0)
+  prw (rat_num_add_Q_le adm a b)
+  pthm (mul_zero_l adm Dab)
+
 #print axioms le_Q_trans
 #print axioms lt_le_Q_add
 #print axioms le_Q_add_both
@@ -12824,6 +12956,8 @@ def pow2neg_rat_den_le (q : Term F Γ Ty.nat) :
 #print axioms exp2_ge_self
 #print axioms le_Q_of_cross
 #print axioms pow2neg_rat_den_le
+#print axioms rat_num_add_Q_le
+#print axioms abs_Q_triangle
 
 end RationalOrderedField
 
