@@ -138,6 +138,69 @@ else about any statement changed.
 6. `archimedean_R` last; it is the only one that is genuinely self-contained
    (`round_nat` + the §1 majorization argument) and could be done at any time.
 
+### 0.8 `approx_R` (Kohlenbach Lemma 4.2) — worked out, 2026-09-01
+
+Not proved. But the arithmetic is settled and one missing ingredient that §0.7 does not list
+has been built. The finding that matters: **`approx_R` as stated needs an Archimedean modulus,
+because it is stated with `<_ℝ` rather than `≤_ℝ`.**
+
+**What the goal reduces to.** With `c := λn. f̂(k)` and `D := f −_ℝ c`, `A := |D|_ℝ`, and
+`B := ⟨2^{-k}⟩_ℝ`:
+
+| step | value |
+|---|---|
+| `D(n)` | `f̂(n+1) −_ℚ f̂(k)` (`add_R` shifts by 1; `ĉ` is the constant) |
+| `D` is Cauchy | `\|D(n) − D(n+1)\| = \|f̂(n+1) − f̂(n+2)\| < 2^{-(n+2)} < 2^{-(n+1)}`, so `D̂ = D` |
+| `A(n)` | `\|D(n)\|_ℚ`, and `A` is Cauchy too, so `Â = A` |
+| `B̂(n+1)` | `2^{-k}` |
+
+`lt_R A B` is `∃n. B̂(n+1) −_ℚ Â(n+1) ≥_ℚ 2^{-n}`, so the goal is
+
+    ∃n.  2^{-k} −_ℚ |f̂(n+2) −_ℚ f̂(k)|  ≥_ℚ  2^{-n}.
+
+**The crude telescoping bound is short by a factor of 4, at every `n`.** Summing
+`cauchyState_cauchy` from `k` to `n+1` gives `|f̂(n+2) − f̂(k)| < 2^{-k} − 2^{-(n+2)}`, i.e. a
+margin of `2^{-(n+2)}` where `2^{-n}` is wanted. Enlarging `n` does not help: both sides shrink
+together. This is the same tightness as §0.5, and no rearrangement of the telescope fixes it.
+
+**The witness must therefore depend on `f`, and it does — through the slack at index `k`.**
+Let `d := 2^{-(k+1)} −_ℚ |f̂(k) −_ℚ f̂(k+1)|`, which is positive *for every `f`* by
+`cauchyState_cauchy` (the Cauchy check is strict). Keeping that one step's slack out of the
+telescope,
+
+    |f̂(n+2) − f̂(k)|  <  2^{-k} − d − 2^{-(n+2)},
+
+so any `n` with `2^{-n} ≤_ℚ d` (and `n ≥ k`) works. Hence
+
+    **witness  n := max(k, rat_den d)**,
+
+a closed term of the object language — `Derivable`'s `∃`-introduction takes an arbitrary
+witness term, so this is expressible.
+
+**Proved on 2026-09-01, and it is the piece §0.7 omits:**
+`pow2neg_rat_den_le : 0 <_ℚ q →ᶠ ⟨2^{-rat_den q}⟩_ℚ ≤_ℚ q`. A positive rational's own
+denominator field is an index at which the dyadic scale has already fallen below it
+(`q = p/D` with `p ≥ 1`, and `D ≤ 2^D ≤ p·2^D`). With it, `le_Q_of_cross`, the ℕ order lemmas,
+and the `≤_ℚ` toolkit, everything in the *witness* half of the lemma is available.
+
+**Still missing, all of it estimate work:**
+
+1. `abs_Q_triangle` and the **reverse** triangle inequality `| |a| − |b| | ≤_ℚ |a − b|` — the
+   latter is what makes `A = |D|` Cauchy, i.e. what licenses `cauchyfy_id` on `A`. Neither was
+   anticipated as a pair; §0.7 lists only the forward one. `le_Q_of_cross` reduces the forward
+   one to `num(a+b) ≤ num a·den b + num b·den a`, an ℕ statement.
+2. The telescoping induction of §0.5 item 3, in the refined form that keeps the `k`-th step's
+   slack out of the sum.
+3. `cauchyfy_const` for an *arbitrary* constant sequence (only `zero_R`/`one_R` are done), and
+   the `add_R`/`sub_R`/`abs_R` unfolding lemmas, plus `cauchyfy_id` applied to `D` and to `A`.
+4. Assembly, including `max` case analysis to get `n ≥ k`.
+
+**One statement-level observation.** With `le_R` in place of `lt_R` the lemma is Π₁⁰ and needs
+*no* witness at all: `¬∃n(…)` follows from the crude bound alone, since the difference is
+negative and `2^{-n}` is positive. The entire Archimedean-modulus content of `approx_R` comes
+from the `<_ℝ` spelling. Worth checking against Kohlenbach p. 80 before investing in item 2:
+if the book says `≤_ℝ`, the lemma is a fraction of the work and items 1–3 shrink accordingly.
+
 ---
 
 *Original note, 2026-08-31, follows. §2's caveat is discharged (§0.1); §4's Class A and Class D

@@ -1102,7 +1102,17 @@ def const_R {Γ : Ctx ι} (q : Term F Γ Ty.nat) : Term F Γ (realTy ι) :=
 
     This is the workhorse for the tightness estimates that block Class C — it is what
     lets a proof move between a real and a rational approximation of it at a chosen
-    index, which is exactly what the five-term split needs. -/
+    index, which is exactly what the five-term split needs.
+
+    **Worked out 2026-09-01; see `REALS_PLAN.md` §0.8.** The goal reduces to
+    `∃n. 2^{-k} −ℚ |f̂(n+2) −ℚ f̂(k)| ≥ℚ 2^{-n}`, and the crude telescoping bound falls short
+    by a factor of 4 *at every `n`*. The witness has to be `n := max(k, rat_den d)` with
+    `d := 2^{-(k+1)} −ℚ |f̂(k) −ℚ f̂(k+1)|` — the Cauchy slack at index `k`, positive for
+    every `f` because `cauchyState_cauchy` is strict. `pow2neg_rat_den_le` (proved) is the
+    Archimedean step that makes that witness work; what is still missing is the triangle
+    inequality (forward *and* reverse), the refined telescoping induction, and
+    `cauchyfy_const` at an arbitrary constant. Note that with `le_R` in place of `lt_R` the
+    statement is Π₁⁰ and needs no witness at all. -/
 def approx_R :
     Derivable F EqX al Premises (Γ := Γ)
       (Formula.all rTy (Formula.all Ty.nat
