@@ -31,7 +31,7 @@ package is what makes ℝ *an ordered field*; the metric-space metatheorem does 
 | `eq_R_trans` | `admissibleEqX.eqx_sym`/`eqx_trans` | ✗ Class C |
 | `add_eq_zero_R` | `eqx_trans` (with `ax_triangle`) | ✗ Class C |
 | `le_zero_eq_zero_R` | `eqx_trans` | ✗ Class C |
-| Lemma 17.8 for `(·)◦` — see the note below | the `d_X` and `0_X` majorants, and the `X`-clause of `≽ᵃ` | ✗ zero lemmas; but **the definition is not missing** — see below |
+| Lemma 17.8 for `(·)◦` — see the note below | the `d_X` and `0_X` majorants, and the `X`-clause of `≽ᵃ` | 🔶 **parts (2),(3),(5),(6) proved** in `Rounding.lean` 2026-09-02, zero sorry. (1) is the ℝ↔code bridge, still open; (4) blocked on §2.5 |
 | `abs_R_bound` (p. 430) | bounding a majorant | ✗ stated, sorried |
 
 `eq_R_refl` and `eq_R_sym` are proved; `substF_nat` and `eqx_pu` in `MetricSpaces.lean` are
@@ -201,9 +201,12 @@ replaces it is the document's own per-constant obligations (`0`, `S`, `Π`, `Σ`
    measured. It also brings products to `Ty`, which independently allows deleting ℚ's Cantor
    pairing layer (`triag` 289 uses, `inv_triag` 207, `pair` 176, `fst_pair` 134, `snd_pair`
    108) — a second payoff, and a separate optional job.
-2. **Rounding theory for `(·)∘`** — `round_nat` exists with no lemmas; it is needed by the
-   `X`-clause of `≽ᵃ`, by `0_X`, and by `d_X`, and nothing else is blocked on ℝ's field
-   structure.
+2. ~~**Rounding theory for `(·)∘`**~~ — **mostly done 2026-09-02**, in `Rounding.lean`.
+   `(·)◦` is defined semantically on Mathlib `ℝ` (`roundR`), with `Mmaj` and the pointwise
+   order `≤₁`, and Lemma 17.8 (2),(3),(5),(6) are proved with zero sorry. The prediction that
+   this needs none of `RealNumbers.lean`'s open goals held: the file imports only
+   `Metatheorems.Semantics`. Remaining: part (1), the ℝ↔code bridge — it needs a Lean-level
+   "meaning of a `ℚ` code" function, which does not exist yet — and part (4), blocked on §2.5.
 3. ~~**The metric `base` relation + `bezemRel`**~~ — **partly done 2026-09-02, then blocked.**
    `bezemAbstract` (`Majorizability.lean`) now builds the structural half of
    `AbstractMajorizability` from any base relation: all seven structural fields hold by

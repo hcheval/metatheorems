@@ -11,6 +11,7 @@ import Metatheorems.Dialectica.Syntactic
 import Metatheorems.RationalNumbers
 import Metatheorems.SyntacticMetatheorem
 import Metatheorems.RealNumbers
+import Metatheorems.Rounding
 import Metatheorems.ProofMode.Packing
 import Metatheorems.ProofMode.Display
 import Metatheorems.ProofMode.Tactics
