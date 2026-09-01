@@ -100,7 +100,12 @@ inductive Derivable {ι : Type} (F : ι → Ty ι)
     (Premises : PremiseSet F) :
     {Γ : Ctx ι} → Formula F Γ → Type where
   -- Premises (theory axioms)
-  | premise       : A.isPurelyUniversal = true ∧ Premises ⟨_, A⟩ → Derivable F EqX allowed Premises A
+  -- No condition on `A` here. The kernel does not care what shape a premise has; only
+  -- `negTrans_sound` does, and it asks for it itself (as NT-stability, which is weaker than
+  -- purely-universal). This constructor used to carry
+  -- `A.isPurelyUniversal = true ∧ Premises ⟨_, A⟩`; of the five sites that matched on it,
+  -- exactly one read the first component.
+  | premise       : Premises ⟨_, A⟩ → Derivable F EqX allowed Premises A
   -- Propositional axioms (§9.1)
   | or_contract  : Derivable F EqX allowed Premises (A ∨ᶠ A →ᶠ A)
   | and_contract : Derivable F EqX allowed Premises (A →ᶠ A ∧ᶠ A)
@@ -231,7 +236,7 @@ def Derivable.castAllowed {ι : Type} {F : ι → Ty ι}
     {Γ : Ctx ι} {A : Formula F Γ}
     (h : Derivable F EqX a₁ Premises A) : Derivable F EqX a₂ Premises A :=
   match h with
-  | .premise ⟨hpu, hp⟩ => .premise ⟨hpu, hp⟩
+  | .premise hp => .premise hp
   | .or_contract  => .or_contract
   | .and_contract => .and_contract
   | .or_weak      => .or_weak

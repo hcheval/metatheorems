@@ -964,6 +964,37 @@ variable {ι : Type} {F : ι → Ty ι}
     {Premises : PremiseSet F}
     (adm : AdmissibleEqX EqX)
 
+/-- **NT-stability of a premise set**: every premise implies its own negative translation.
+
+This is the condition `negTrans_sound` actually needs, and the *only* thing anything ever
+needed `isPurelyUniversal` on `Derivable.premise` for. It is strictly weaker than "every
+premise is purely universal" — `negTrans_iff_imp_pu` shows an implication between two PU
+formulas is NT-stable while not itself being PU. -/
+abbrev NTStable {ι : Type} {F : ι → Ty ι}
+    (EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ)
+    (Premises : PremiseSet F) : Prop :=
+  ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
+    Nonempty (Derivable F EqX Allowed.nt_target Premises (B →ᶠ Bᴺᵀ))
+
+/-- The `Type`-valued form: a premise set that supplies an actual derivation, not just its
+existence. `negTrans_sound` takes this, since it is building a term. -/
+abbrev NTStableD {ι : Type} {F : ι → Ty ι}
+    (EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ)
+    (Premises : PremiseSet F) : Type :=
+  ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
+    Derivable F EqX Allowed.nt_target Premises (B →ᶠ Bᴺᵀ)
+
+/-- A purely-universal premise set is NT-stable — the old hypothesis, recovered as a lemma
+rather than baked into the kernel. -/
+def ntStable_of_pu (adm : AdmissibleEqX EqX) {Premises : PremiseSet F}
+    (pu : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → B.isPurelyUniversal = true) :
+    NTStableD EqX Premises :=
+  fun _ B hp => (negTrans_iff_pu adm B (pu _ B hp)).1
+
+-- A section variable, not a `def` parameter: `negTrans_sound` is recursive, and this is how
+-- Lean re-applies it at each recursive occurrence (the same mechanism `adm` relies on).
+variable (nts : NTStableD EqX Premises)
+
 /-- **NT Soundness Theorem** (Lemma lem:negative-eliminates-lem in nd.tex).
 
     If `A` is classically derivable (in WE-HA^{ω,X} + LEM + QF-AC),
@@ -975,9 +1006,9 @@ variable {ι : Type} {F : ι → Ty ι}
 def negTrans_sound {Γ : Ctx ι} {A : Formula F Γ}
     (h : Derivable F EqX Allowed.classical Premises A) : Derivable F EqX Allowed.nt_target Premises Aᴺᵀ :=
   match h with
-  -- Premises: since premises are PU (by the constructor), A ↔ NT(A) by negTrans_iff_pu.
-  | .premise ⟨hpu, hp⟩ =>
-      Derivable.mp (.premise (And.intro hpu hp)) (negTrans_iff_pu (Premises := Premises) adm _ hpu).1
+  -- Premises: NT-stability is exactly what this case needs, and it is now supplied by the
+  -- caller instead of being carried on the constructor.
+  | .premise hp => Derivable.mp (.premise hp) (nts _ _ hp)
   -- Simple propositional axioms: wrap in ¬¬ via dnn_intro
   | .or_contract  => .mp .or_contract  dnn_intro
   | .and_contract => .mp .and_contract dnn_intro

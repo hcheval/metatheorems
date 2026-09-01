@@ -36,6 +36,7 @@ def nd_soundness
     (eqxi : EqXInterp X F si EqX)
     (adm : AdmissibleEqX EqX)
     {Premises : PremiseSet F}
+    (nts : NTStableD EqX Premises)
     (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
       ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
     {Γ : Ctx ι} {A : Formula F Γ}
@@ -43,7 +44,7 @@ def nd_soundness
     (env : Ctx.interpret X Γ)
     : dialecticaRealizerCtx si Aᴺᵀ env :=
   dialectica_soundness_ctx si eqxi premise_realizer Aᴺᵀ env
-    ((negTrans_sound adm h).castAllowed (by constructor <;> decide))
+    ((negTrans_sound adm nts h).castAllowed (by constructor <;> decide))
 
 /-- Closed-formula variant: the realizer lives at the empty environment. -/
 def nd_soundness_closed
@@ -53,12 +54,13 @@ def nd_soundness_closed
     (eqxi : EqXInterp X F si EqX)
     (adm : AdmissibleEqX EqX)
     {Premises : PremiseSet F}
+    (nts : NTStableD EqX Premises)
     (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
       ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
     {A : Formula F ([] : Ctx ι)}
     (h : @Derivable ι F EqX Allowed.classical Premises [] A)
     : dialecticaRealizer si Aᴺᵀ :=
-  nd_soundness si eqxi adm premise_realizer h ()
+  nd_soundness si eqxi adm nts premise_realizer h ()
 #print axioms nd_soundness 
 
 end Metatheorems

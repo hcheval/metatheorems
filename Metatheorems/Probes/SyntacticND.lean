@@ -11,11 +11,12 @@ def syntactic_nd_soundness
     (eqxi : EqXInterp X F si EqX)
     (adm : AdmissibleEqX EqX)
     {Premises : PremiseSet F}
+    (nts : NTStableD EqX Premises)
     (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B)
     {Γ : Ctx ι} {A : Formula F Γ}
     (h : @Derivable ι F EqX Allowed.classical Premises Γ A) :
     SRealizer si Aᴺᵀ :=
   syntactic_soundness eqxi spremise
-    ((negTrans_sound adm h).castAllowed (by constructor <;> decide))
+    ((negTrans_sound adm nts h).castAllowed (by constructor <;> decide))
 
 end Metatheorems

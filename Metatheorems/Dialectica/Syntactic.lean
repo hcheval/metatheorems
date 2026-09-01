@@ -956,7 +956,7 @@ def syntactic_soundness (eqxi : EqXInterp X F si EqX)
     (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B) :
     {Γ : Ctx ι} → {A : Formula F Γ} →
     @Derivable ι F EqX Allowed.extended Premises Γ A → SRealizer si A
-  | _, _, .premise ⟨_, hp⟩ => spremise _ _ hp
+  | _, _, .premise hp      => spremise _ _ hp
   | _, _, .or_contract     => sOrContract
   | _, _, .and_contract    => sAndContract
   | _, _, .or_weak         => sOrWeak

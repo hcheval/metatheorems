@@ -303,6 +303,7 @@ def general_metatheorem_classical
     (adm : AdmissibleEqX EqX)
     (mj : Majorizability si)
     {Premises : PremiseSet F}
+    (nts : NTStableD EqX Premises)
     (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
       ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
     {ρ : Ty ι}
@@ -317,7 +318,7 @@ def general_metatheorem_classical
         (∀ u : Nat, u ≤ Φ x_star → Formula.interpret si B₀ (u, (x, ()))) →
         ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret si C₀ (v, (x, ())) } := by
   -- Step 1: Apply ND-interpretation (NT + Dialectica)
-  let r := nd_soundness_closed si eqxi adm premise_realizer prf
+  let r := nd_soundness_closed si eqxi adm nts premise_realizer prf
   let w := r.val
   let h := r.property
   -- h : ∀ y, dialecticaMatrix si NT(∀x(∀u B₀ → ∃v C₀)) () w y

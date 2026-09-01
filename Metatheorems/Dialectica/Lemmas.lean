@@ -649,7 +649,7 @@ def dialectica_soundness_ctx' {Γ : Ctx ι} {A : Formula F Γ}
     ∀ env : Ctx.interpret X Γ, dialecticaRealizerCtx si A env :=
   match h with
   -- Premises
-  | .premise ⟨_, hp⟩ => premise_realizer _ _ hp
+  | .premise hp => premise_realizer _ _ hp
   -- Base constructors
   | .or_contract   => fun env => dialectica_or_contract si env
   | .and_contract  => fun env => dialectica_and_contract si env
