@@ -7,6 +7,11 @@ import Metatheorems.Derivable
 import Metatheorems.PropositionalLemmas
 import Metatheorems.PureFOLLemmas
 import Metatheorems.Arithmetic
+-- `negTrans_iff_imp_pu` below is proved as a proof-mode script. That is the only reason this
+-- file depends on the tactic layer; `ProofMode.Tactics` sits over `PureFOLLemmas` only, so
+-- the dependency is acyclic (`ProofMode.MCT` reaches `NegTrans` through `MCTStatement`, but
+-- `ProofMode.Tactics` reaches nothing here).
+import Metatheorems.ProofMode.Tactics
 
 
 namespace Metatheorems
@@ -315,6 +320,86 @@ def negTrans_iff_pu {ι : Type} {F : ι → Ty ι}
     let ⟨ih_fwd, ih_bwd⟩ := negTrans_iff_pu adm B hpu
     ⟨Derivable.syllogism (forall_map ih_fwd) dnn_intro,
      Derivable.syllogism nn_all_nn (forall_map ih_bwd)⟩
+
+section ImpPU
+open ProofMode
+
+/-- For purely universal `A`, `⊢ A → Aₙₜ` and `⊢ Aₙₜ → A`.
+
+Sharper than `negTrans_iff_pu`, which only relates `A` to `¬¬Aₙₜ`. The backward direction is
+`negTrans_iff_pu`'s backward direction under a `∀`; the forward direction is the induction
+that `negTrans_iff_pu` does not state on its own. Intuitionistic: the only non-structural
+ingredient is `qf_double_neg_elim`, inherited through `negTrans_iff_pu`. -/
+def kurodaInner_iff_pu {ι : Type} {F : ι → Ty ι}
+    {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
+    (adm : AdmissibleEqX EqX)
+    {a : Allowed} {Premises : PremiseSet F}
+    {Γ : Ctx ι} (A : Formula F Γ) (hpu : A.isPurelyUniversal = true) :
+    Derivable F EqX a Premises (A →ᶠ A.kurodaInner) ×
+    Derivable F EqX a Premises (A.kurodaInner →ᶠ A) :=
+  match A, hpu with
+  | .bot, _ => ⟨I_comb, I_comb⟩
+  | .eq0 .., _ => ⟨I_comb, I_comb⟩
+  | .and A B, hpu => by
+    have hqf : (A.and B).isQF = true := hpu
+    rw [kurodaInner_qf _ hqf]; exact ⟨I_comb, I_comb⟩
+  | .or A B, hpu => by
+    have hqf : (A.or B).isQF = true := hpu
+    rw [kurodaInner_qf _ hqf]; exact ⟨I_comb, I_comb⟩
+  | .imp A B, hpu => by
+    have hqf : (A.imp B).isQF = true := hpu
+    rw [kurodaInner_qf _ hqf]; exact ⟨I_comb, I_comb⟩
+  | .ex .., hpu => absurd hpu (by simp [Formula.isPurelyUniversal, Formula.isQF])
+  | .all ρ B, hpu =>
+    ⟨forall_map (.syllogism (kurodaInner_iff_pu adm B hpu).1 dnn_intro),
+     forall_map (negTrans_iff_pu adm B hpu).2⟩
+
+/-- **Negative-translation stability transfers to implications between purely universal
+formulas**, which are themselves *not* purely universal: `A →ᶠ B` has an `all` inside an
+`imp`, so `isPurelyUniversal (A →ᶠ B)` is `isQF (A →ᶠ B) = false` as soon as either side has
+a quantifier.
+
+`(A →ᶠ B)ᴺᵀ = ¬¬(Aₙₜ →ᶠ Bₙₜ)` because `kurodaInner` distributes over `→ᶠ`.
+
+* Forward: from `A → B`, precompose with `Aₙₜ → A` and postcompose with `B → Bₙₜ` to get
+  `Aₙₜ → Bₙₜ`, then `dnn_intro`.
+* Backward: from `¬¬(Aₙₜ → Bₙₜ)` and `A`, push `A` to `Aₙₜ`, extract `¬¬Bₙₜ`, and collapse it
+  with `negTrans_iff_pu`'s backward direction (`Bᴺᵀ = ¬¬Bₙₜ`).
+
+No `Allowed` flag is used: this holds in the same system `negTrans_iff_pu` does, for every
+`a`. The classical strength is entirely in `qf_double_neg_elim`, which is available for
+quantifier-free matrices already. -/
+def negTrans_iff_imp_pu {ι : Type} {F : ι → Ty ι}
+    {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
+    (adm : AdmissibleEqX EqX)
+    {a : Allowed} {Premises : PremiseSet F}
+    {Γ : Ctx ι} (A B : Formula F Γ)
+    (hA : A.isPurelyUniversal = true) (hB : B.isPurelyUniversal = true) :
+    Derivable F EqX a Premises ((A →ᶠ B) →ᶠ (A →ᶠ B)ᴺᵀ) ×
+    Derivable F EqX a Premises ((A →ᶠ B)ᴺᵀ →ᶠ (A →ᶠ B)) := by
+  refine ⟨?_, ?_⟩
+  · show Derivable F EqX a Premises ((A →ᶠ B) →ᶠ ¬ᶠ¬ᶠ(A.kurodaInner →ᶠ B.kurodaInner))
+    pmode
+    pintro hab n
+    papply n
+    pintro ha
+    papplym (kurodaInner_iff_pu adm A hA).2 in ha with ha'
+    papply hab in ha' with hb
+    papplym (kurodaInner_iff_pu adm B hB).1 in hb with hb'
+    pexact hb'
+  · show Derivable F EqX a Premises (¬ᶠ¬ᶠ(A.kurodaInner →ᶠ B.kurodaInner) →ᶠ (A →ᶠ B))
+    pmode
+    pintro hn ha
+    papplym (negTrans_iff_pu adm B hB).2
+    pintro nb
+    papply hn
+    pintro f
+    papplym (kurodaInner_iff_pu adm A hA).1 in ha with ha'
+    papply f in ha' with hb
+    papply nb in hb with bot
+    pexact bot
+
+end ImpPU
 
 -- ============================================================================
 -- Per-axiom/rule soundness definitions
@@ -992,5 +1077,9 @@ def negTrans_sound {Γ : Ctx ι} {A : Formula F Γ}
   | .ip h ..               => absurd h (by decide)
 
 end NegTransSound
+
+#print axioms kurodaInner_iff_pu
+#print axioms negTrans_iff_imp_pu
+#print axioms negTrans_sound
 
 end Metatheorems
