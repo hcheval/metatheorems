@@ -749,13 +749,8 @@ variable {Γ : Ctx ι}
 
 -- ── Additive group ──────────────────────────────────────────────────────────
 
-/-- ⊢ ∀f,g : ℝ. f +_ℝ g =_ℝ g +_ℝ f -/
-def add_comm_R :
-    Derivable F al Premises (Γ := Γ)
-      (Formula.all rTy (Formula.all rTy
-        (eq_R (Term.app2 Term.add_R (.var (.vs .vz)) (.var .vz))
-              (Term.app2 Term.add_R (.var .vz) (.var (.vs .vz)))))) :=
-  sorry
+-- `add_comm_R` is PROVED, further down the file, next to `add_zero_R`: it uses `canorm`,
+-- which is defined below (it folds in the `cauchyfy`-state simp lemmas).
 
 -- `add_assoc_R` and `add_zero_R` are PROVED, but further down the file: both rest on
 -- `cauchyfy_cauchy` / `cauchyfy_two_step`, which are stated after the order axioms. See
@@ -1762,6 +1757,71 @@ def add_zero_R :
         (eq_R (Term.app2 Term.add_R (.var .vz) Term.zero_R)
               (.var .vz))) :=
   univ_gen (add_zero_R_core (.var .vz))
+
+/-- `u =_ℝ v` for any `u`, `v` whose cauchyfications are the two orders of one sum.
+
+**There is no estimate here at all, and no `cauchyfy` congruence either.** REALS_PLAN §0.2
+declared `add_comm_R` blocked on an `eq_Q`-level congruence for `cauchyfy` — pointwise
+`f k =ℚ g k` ⟹ `f̂ n =ℚ ĝ n` — on the ground that `add_Q` does not commute on the nose. That
+diagnosis is right about ℚ and wrong about where the outer `cauchyfy` sits: `add_R f g` is
+*provably Cauchy* (`add_R_check`), so `cauchyfy_add_R` evaluates that cauchyfication on
+**both** sides before the two are ever compared. What is left is
+`|(A +ℚ B) −ℚ (B +ℚ A)| <ℚ 2^{-n}`, and `add_Q_comm_inst` makes the difference `eq_Q`-zero.
+
+The general congruence is still needed — by `mul_comm_R`, where no `mul_R_check` exists — but
+not by this. -/
+private def add_comm_R_gen (f g u v : Term F Γ (realTy ι))
+    (hu : Derivable F al Premises (Γ := Ty.nat :: Γ)
+      (Formula.eq0
+        (Term.app2 Term.cauchyfy u.weaken (.app .succ (.var .vz)))
+        (Term.app2 Term.add_Q
+          (Term.app2 Term.cauchyfy f.weaken (.app .succ (.app .succ (.var .vz))))
+          (Term.app2 Term.cauchyfy g.weaken (.app .succ (.app .succ (.var .vz)))))))
+    (hv : Derivable F al Premises (Γ := Ty.nat :: Γ)
+      (Formula.eq0
+        (Term.app2 Term.cauchyfy v.weaken (.app .succ (.var .vz)))
+        (Term.app2 Term.add_Q
+          (Term.app2 Term.cauchyfy g.weaken (.app .succ (.app .succ (.var .vz))))
+          (Term.app2 Term.cauchyfy f.weaken (.app .succ (.app .succ (.var .vz))))))) :
+    Derivable F al Premises (eq_R u v) := by
+  let s1 : Term F (Ty.nat :: Γ) Ty.nat := .app .succ (.var .vz)
+  let s2 : Term F (Ty.nat :: Γ) Ty.nat := .app .succ s1
+  let A  : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.cauchyfy f.weaken s2
+  let B  : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.cauchyfy g.weaken s2
+  let X  : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.add_Q A B
+  let Y  : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.add_Q B A
+  let P  : Term F (Ty.nat :: Γ) Ty.nat := .app Term.pow2neg_Q (.var .vz)
+  pmode
+  pforall
+  canorm
+  prw hu
+  prw hv
+  papplym (lt_Q_congr Term.zero_Q P (.app Term.abs_Q (Term.app2 Term.sub_Q X Y)) P
+    (eqQsym (eqQtrans
+      (abs_Q_congr (sub_Q_congr (add_Q_comm_inst A B) (eq_Q_refl_inst Y)))
+      (abs_Q_sub_self Y)))
+    (eq_Q_refl_inst P))
+  pthm (zero_lt_pow2neg_Q (.var .vz))
+
+/-- `f +_ℝ g =_ℝ g +_ℝ f`, at explicit reals. -/
+def add_comm_R_core (f g : Term F Γ (realTy ι)) :
+    Derivable F al Premises
+      (eq_R (Term.app2 Term.add_R f g) (Term.app2 Term.add_R g f)) :=
+  add_comm_R_gen f g (Term.app2 Term.add_R f g) (Term.app2 Term.add_R g f)
+    (by
+      rw [add_R_app_weaken]
+      exact cauchyfy_add_R f.weaken g.weaken (.app .succ (.var .vz)))
+    (by
+      rw [add_R_app_weaken]
+      exact cauchyfy_add_R g.weaken f.weaken (.app .succ (.var .vz)))
+
+/-- ⊢ ∀f,g : ℝ. f +_ℝ g =_ℝ g +_ℝ f -/
+def add_comm_R :
+    Derivable F al Premises (Γ := Γ)
+      (Formula.all rTy (Formula.all rTy
+        (eq_R (Term.app2 Term.add_R (.var (.vs .vz)) (.var .vz))
+              (Term.app2 Term.add_R (.var .vz) (.var (.vs .vz)))))) :=
+  univ_gen (univ_gen (add_comm_R_core (.var (.vs .vz)) (.var .vz)))
 
 /-- `u =_ℝ v` for any `u`, `v` whose cauchyfications are the two bracketings of `f + g + h`.
 
@@ -3149,6 +3209,8 @@ end OrderedFieldAxioms
 #print axioms eq_R_sym
 #print axioms eq_R_trans
 #print axioms add_eq_zero_R
+#print axioms add_comm_R
+#print axioms add_comm_R_core
 #print axioms add_zero_R
 #print axioms add_zero_R_core
 #print axioms add_assoc_R
