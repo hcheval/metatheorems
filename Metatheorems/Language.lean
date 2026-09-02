@@ -311,35 +311,9 @@ def wrapEx : (ρs : List (Ty ι)) → Formula F (ρs ++ Γ) → Formula F Γ
 
 end Formula
 
--- ============================================================================
--- Higher-type equality (Definition 2.2.3 / 2.3.3)
--- ============================================================================
-
-/-- Higher-type equality at type ρ (Definition 2.2.3 / Definition 2.3.3).
-
-For terms s, t of type ρ = ρ₁ → ... → ρₖ → ρ₀ (where ρ₀ is ground):
-  s =_ρ t  :≡  ∀x₁^ρ₁. ... ∀xₖ^ρₖ. (s x₁ ... xₖ =_{ρ₀} t x₁ ... xₖ)
-
-At ground type 0, this is s =₀ t.
-At base type X_i, this uses the supplied predicate `EqX i s t`.
-The document requires `EqX i` to be a purely universal formula (so that
-it is trivially Dialectica-realized); the predicate itself is a parameter
-of the proof system, not an axiom. -/
-def eqAtType {ι : Type} {F : ι → Ty ι}
-    (EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ)
-    {Γ : Ctx ι} :
-    (ρ : Ty ι) → Term F Γ ρ → Term F Γ ρ → Formula F Γ
-  | Ty.nat,      s, t => Formula.eq0 s t
-  | Ty.base i,   s, t => EqX i s t
-  -- all inhabitants of `unit` are equal, so this is trivially true
-  | Ty.unit,     _, _ => Formula.eq0 Term.zero Term.zero
-  | Ty.prod ρ τ, s, t =>
-      Formula.and (eqAtType EqX ρ (Term.fst s) (Term.fst t))
-        (eqAtType EqX τ (Term.snd s) (Term.snd t))
-  | Ty.arr ρ τ,  s, t =>
-      -- ∀x^ρ. (s x =_τ t x)
-      Formula.all ρ (eqAtType EqX τ
-        (Term.app s.weaken (.var .vz))
-        (Term.app t.weaken (.var .vz)))
+-- `eqAtType` moved to `Metatheorems/EqAtType.lean`. Base-type equality is now *defined* as
+-- `d_i(s,t) =ℝ 0ℝ`, so it depends on the ℚ/ℝ term layer, which depends on `Formula` — this
+-- file. It was the last declaration here and had no dependants inside it, so the split is
+-- clean. See ARCHITECTURE.md.
 
 end Metatheorems
