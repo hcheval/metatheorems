@@ -117,6 +117,14 @@ structure AbstractMajorizability {ι : Type} {X : ι → Type} {F : ι → Ty ι
   /-- Majorant for zero elements (0_{X_i}). -/
   zeroX_maj : ∀ (i : ι), ∃ z_star : ℕ → Nat,
     ∀ n ≥ N, maj (.base i) (z_star n) (si.zeroInterp i)
+  /-- Majorant for the distance `d_{X_i}` carried by every base type.
+
+      For a metric space with reference point `a` and `base i n x := d(a,x) ≤ n`, this is the
+      usual `λn₁ n₂. (n₁ + n₂)◦` — a bound on `d(x,y)` given bounds on `d(a,x)`, `d(a,y)`,
+      by the triangle inequality. -/
+  dist_maj : ∀ (i : ι),
+    ∃ d_star : ℕ → Ty.interpret X (Ty.base i →ₜ Ty.base i →ₜ realTy ι).hat,
+    ∀ n ≥ N, maj (Ty.base i →ₜ Ty.base i →ₜ realTy ι) (d_star n) (si.distInterp i)
 
 -- ============================================================================
 -- Hat-context lookup and majorizable environments
@@ -257,6 +265,10 @@ theorem all_terms_majorizable {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     obtain ⟨z_star, hz⟩ := am.zeroX_maj i
     exact ⟨fun n _ => z_star n,
       fun n hn => ⟨fun _ _ _ => hz n hn, fun _ _ _ => am.maj_selfMaj (hz n hn)⟩⟩
+  | dist i =>
+    obtain ⟨d_star, hd⟩ := am.dist_maj i
+    exact ⟨fun n _ => d_star n,
+      fun n hn => ⟨fun _ _ _ => hd n hn, fun _ _ _ => am.maj_selfMaj (hd n hn)⟩⟩
   | unitI =>
     exact ⟨fun _ _ => (),
       fun _ _ => ⟨fun _ _ _ => am.unit_maj, fun _ _ _ => am.maj_selfMaj am.unit_maj⟩⟩
@@ -348,7 +360,11 @@ def bezemAbstract (si : SpaceInterp X F) (base : (i : ι) → Nat → X i → Pr
     (func_maj : ∀ (f : ι), ∃ f_star : ℕ → Ty.interpret X (F f).hat,
       ∀ n ≥ N, bezemMaj base (F f) (f_star n) (si.funcInterp f))
     (zeroX_maj : ∀ (i : ι), ∃ z_star : ℕ → Nat,
-      ∀ n ≥ N, bezemMaj base (.base i) (z_star n) (si.zeroInterp i)) :
+      ∀ n ≥ N, bezemMaj base (.base i) (z_star n) (si.zeroInterp i))
+    (dist_maj : ∀ (i : ι),
+      ∃ d_star : ℕ → Ty.interpret X (Ty.base i →ₜ Ty.base i →ₜ realTy ι).hat,
+      ∀ n ≥ N, bezemMaj base (Ty.base i →ₜ Ty.base i →ₜ realTy ι) (d_star n)
+        (si.distInterp i)) :
     AbstractMajorizability si where
   maj := bezemMaj base
   nat_order _ _ h := h
@@ -372,6 +388,7 @@ def bezemAbstract (si : SpaceInterp X F) (base : (i : ι) → Nat → X i → Pr
   prec_maj := prec_maj
   func_maj := func_maj
   zeroX_maj := zeroX_maj
+  dist_maj := dist_maj
 
 /-! ### The two ℕ constants are majorizable for *any* base relation
 
@@ -515,8 +532,8 @@ theorem bezem_prec_maj {base : (i : ι) → Nat → X i → Prop} (hbase : BaseM
 /-- `bezemAbstract` and `bezemRel` agree, so a space built the per-constant way still feeds
 anything stated against `MajorizabilityRel`. -/
 theorem bezemAbstract_toRel_maj (si : SpaceInterp X F) (base : (i : ι) → Nat → X i → Prop)
-    {N hz hs hp hf hx} :
-    (bezemAbstract si base N hz hs hp hf hx).toRel.maj = (bezemRel si base).maj := rfl
+    {N hz hs hp hf hx hd} :
+    (bezemAbstract si base N hz hs hp hf hx hd).toRel.maj = (bezemRel si base).maj := rfl
 
 end BezemAbstract
 

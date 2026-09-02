@@ -87,6 +87,13 @@ inductive Term {ι : Type} (F : ι → Ty ι) : Ctx ι → Ty ι → Type where
   | func  : (f : ι) → Term F Γ (F f)
   /-- Zero element 0_{X_i} for base type X_i. -/
   | zeroX : (i : ι) → Term F Γ (Ty.base i)
+  /-- The distance `d_{X_i} : X_i → X_i → ℝ` carried by every base type.
+
+      Structural rather than a function constant in `F`, because equality at a base type is
+      *defined* as `d_i(s,t) =ℝ 0ℝ` — so `eqAtType` must be able to name it without going
+      through a signature. The pseudometric axioms for it are constructors of `Derivable`,
+      and every model owes a `distInterp` satisfying them. See ARCHITECTURE.md. -/
+  | dist  : (i : ι) → Term F Γ (Ty.base i →ₜ Ty.base i →ₜ realTy ι)
   /-- The inhabitant of the unit type. -/
   | unitI : Term F Γ Ty.unit
   /-- Pairing. -/
@@ -154,6 +161,7 @@ def rename (r : Renaming Γ Δ) : Term F Γ τ → Term F Δ τ
   | .prec ρ'       => .prec ρ'
   | .func f        => .func f
   | .zeroX i       => .zeroX i
+  | .dist i        => .dist i
   | .unitI         => .unitI
   | .mkPair a b    => .mkPair (rename r a) (rename r b)
   | .fst p         => .fst (rename r p)

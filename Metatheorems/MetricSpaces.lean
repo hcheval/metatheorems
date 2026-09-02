@@ -135,6 +135,10 @@ def MetricSpaceInterp.toSpaceInterp (m : MetricSpaceInterp) :
     SpaceInterp (fun () => m.carrier) MetricSpace.F where
   funcInterp := fun () => fun x y => m.metric x y
   zeroInterp := fun () => m.zero
+  -- `d_X` is now the structural `Term.dist ()` rather than the function constant `F ()`.
+  -- Both are interpreted by the same metric; `MetricSpace.F` is left in place for now and
+  -- becomes free for a second constant (e.g. W-hyperbolic's `W`).
+  distInterp := fun () => fun x y => m.metric x y
 
 -- ============================================================================
 -- Lemma 17.8(4): `≤` on reals gives strong majorization of the codes
@@ -322,6 +326,9 @@ noncomputable def MetricModel.abstractMajorizability (M : MetricModel) :
     (fun ρ => bezem_prec_maj M.base_mono 0 ρ)
     (fun () => M.func_maj 0)
     (fun () => M.zeroX_maj 0)
+    -- `dist ()` has the same type as `F ()` and the same interpretation, so the majorant
+    -- for `d_X` serves both.
+    (fun () => M.func_maj 0)
 
 -- ============================================================================
 -- The metric-space metatheorem

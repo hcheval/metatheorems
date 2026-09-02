@@ -72,6 +72,11 @@ structure SpaceInterp {ι : Type} (X : ι → Type) (F : ι → Ty ι) where
   funcInterp : (f : ι) → Ty.interpret X (F f)
   /-- Interpretation of zero elements 0_{X_i}. -/
   zeroInterp : (i : ι) → X i
+  /-- Interpretation of the distance `d_{X_i}` carried by every base type.
+
+      The pseudometric axioms are constructors of `Derivable`, so soundness owes their
+      truth here; see `Metatheorems/EqAtType.lean` and ARCHITECTURE.md. -/
+  distInterp : (i : ι) → X i → X i → (Nat → Nat)
 
 /-- Evaluate a term in the model S^{ω,X}.
 
@@ -95,6 +100,7 @@ def Term.interpret {ι : Type} {X : ι → Type} {F : ι → Ty ι}
   | _, _, .prec _,      _   => fun y z n => Nat.rec y (fun n ih => z ih n) n
   | _, _, .func f,      _   => si.funcInterp f
   | _, _, .zeroX i,     _   => si.zeroInterp i
+  | _, _, .dist i,      _   => si.distInterp i
   | _, _, .unitI,       _   => ()
   | _, _, .mkPair a b,  env => (Term.interpret si a env, Term.interpret si b env)
   | _, _, .fst pr,      env => (Term.interpret si pr env).1
@@ -152,7 +158,7 @@ lemma Term.interpret_rename_gen {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     exact ih (Renaming.ext r) (x, env_Δ) (x, env_Γ) (fun v => by cases v with
       | vz => rfl
       | vs w => exact h w)
-  | zero | succ | prec | func | zeroX | unitI => rfl
+  | zero | succ | prec | func | zeroX | dist | unitI => rfl
   | mkPair _ _ ih₁ ih₂ =>
     simp only [Term.rename, Term.interpret, ih₁ r env_Δ env_Γ h, ih₂ r env_Δ env_Γ h]
   | fst _ ih => simp only [Term.rename, Term.interpret, ih r env_Δ env_Γ h]
@@ -232,6 +238,7 @@ lemma Term.interpret_substF {ι : Type} {X : ι → Type} {F : ι → Ty ι}
   | prec _ => simp [Term.subst, Term.interpret]
   | func _ => simp [Term.subst, Term.interpret]
   | zeroX _ => simp [Term.subst, Term.interpret]
+  | dist _ => simp [Term.subst, Term.interpret]
   | unitI => simp [Term.subst, Term.interpret]
   | mkPair _ _ ih₁ ih₂ => simp [Term.subst, Term.interpret, ih₁, ih₂]
   | fst _ ih => simp [Term.subst, Term.interpret, ih]
