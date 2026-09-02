@@ -103,20 +103,31 @@ construct is a `sorry` moved into a binder.*
 
 ### This pattern has now appeared three times
 
-Verified 2026-09-02: **nothing in the project constructs an `EqXInterp`.** It occurs only as
-the hypothesis `eqxi`. `spremise` likewise. So `metric_metatheorem`'s three hypotheses are all
-unconstructed, and the metatheorem is "applicable" in a sense never demonstrated.
+Verified 2026-09-02 (morning): **nothing in the project constructed an `EqXInterp`.** It
+occurred only as the hypothesis `eqxi`. `spremise` likewise.
 
 Worse, `EqXInterp.extract` requires a realizer of `EqX i s t` to yield
 `Term.interpret si s env = Term.interpret si t env` — **Lean equality of the interpretations**.
 For the metric model that is `d(x,y) = 0 → x = y`, i.e. **separation**, which a pseudometric
-does not satisfy. `MetricSpaces.lean` calls itself a pseudometric in four places and
-`MetricModel` has no separation field.
+does not satisfy. `MetricSpaces.lean` called itself a pseudometric in four places and
+`MetricModel` had no separation field.
 
-Probable resolution (**unverified — check against the document before acting**): the docs are
-wrong, not the code. Kohlenbach's models *are* metric spaces; the axioms are refl/sym/triangle
-because `=_X` is *defined* as `d=0`, which in a genuine metric space already is equality. So
-`MetricModel` should carry `d x y = 0 ↔ x = y`.
+**Resolved 2026-09-02 (afternoon), as predicted.** The docs were wrong, not the code: the
+*theory* is a pseudometric one and the *models* are genuine metric spaces. `MetricModel` now
+carries `d_eq_zero : ∀ x y, d x y = 0 → x = y`, its docstring says why the two differ (weaker
+axioms ⇒ derivations apply to more structures; `extract` needs separation), and the header
+comment no longer calls the model a pseudometric. **Do not add separation to `Derivable`.**
+
+`MetricModel.eqXInterp` now exists and both metric metatheorems discharge `eqxi` internally,
+so all three of `metric_metatheorem`'s unconstructed hypotheses are gone. The price is
+explicit: four of `EqXInterp`'s nine fields are proved (the structural ones — the witness type
+is `ℕ → Unit`), and **five are `sorry`**, so both metric metatheorems now depend on `sorryAx`.
+All five stall on the *same* missing piece, and it is not a metric fact: an **evaluation
+bridge** from object-level ℚ terms to `Rounding.qval`, i.e. the value of
+`lt_Q_dec (abs_Q (sub_Q (cauchyfy f (n+1)) (cauchyfy g (n+1)))) (pow2neg_Q n)` in the standard
+model. `QVal.lean`'s own header declines exactly this ("a separate bridge … not attempted
+here"). The obvious alternative — a soundness theorem for `Derivable` — is **circular**: its
+`dist_comm`/`dist_tri` cases *are* two of the five fields.
 
 ---
 
@@ -509,7 +520,8 @@ without quotienting first.
 | 2 | move `eqx_refl/sym/trans` into `Derivable` (§8) | ~30 lines + 12 cases | unblocks the two `sorry`s; supersedes §5 |
 | 3 | `eqx_sym`, `eqx_trans` semantically | small | §8's dividend removes the hard object-level ℝ work |
 | 4 | `spremise` via `srealizer_of_pu` | small | see below |
-| 5 | construct `EqXInterp` for `MetricModel` (§3) | unknown | may need a separation field first |
+| 5 | construct `EqXInterp` for `MetricModel` (§3) | **done, 4/9 fields** | separation added; the other 5 need the `qval` evaluation bridge (§3) |
+| 5b | the `qval` ↔ `Term.interpret` evaluation bridge | unknown, probably large | unblocks 5 of `EqXInterp`'s 9 fields, and would give `Derivable` soundness |
 | 6 | `Derivable.weakenPremises` | one recursion | makes axiom-only extensions free (§6) |
 | 7 | schema-parameterise `MetricSpaces.lean` (§6) | ~450 lines today | cheapest now; makes `extends` free |
 | 8 | the 16 `RealNumbers.lean` sorries | the real remaining work | `REALS_PLAN.md` |

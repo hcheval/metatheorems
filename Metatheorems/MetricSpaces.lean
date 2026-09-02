@@ -22,15 +22,19 @@ Following §5.1 (Definition 5.1.2) of the reference document:
 * One function constant `d_X : X → X → ℝ` (the metric)
 * Zero element `0_X : X` (a distinguished point)
 * Equality at type X: `x =_X y ≡ d_X(x,y) =_ℝ 0_ℝ`
-* Axioms: reflexivity, symmetry, triangle inequality (pseudo-metric)
+* Axioms: reflexivity, symmetry, triangle inequality — a **pseudometric theory**
+
+The theory is a pseudometric one and the intended **models are genuine metric spaces**
+(`MetricModel.d_eq_zero`). That gap is deliberate, not an oversight: weaker axioms mean the
+derivations apply to more structures, while `EqXInterp.extract` needs separation on the model
+side. See `MetricModel`'s docstring.
 
 ## Main Definitions
 
 * `MetricSpace.ι` — the index type `Unit`
-* `MetricSpace.F` — the function constant types
-* `MetricSpace.EqX` — equality at type X via d
-* `MetricSpace.Premises` — the pseudo-metric axioms
-* `MetricSpace.admissibleEqX` — EqX is admissible
+* `MetricSpace.F` — the function constant types (there are none; `F () = Ty.unit`)
+* `MetricSpace.Premises` — empty: the three axioms are `Derivable` constructors
+* `MetricModel` — a separated model, with `abstractMajorizability` and `eqXInterp`
 -/
 
 open Formula
@@ -210,14 +214,27 @@ theorem roundR_smaj_of_le {ι : Type} {X : ι → Type}
 one has to know the codes came from actual reals. Kohlenbach builds the model the other way
 round — `[dX]_M := λx,y ∈ X.(d(x,y))◦` (p. 430) — so we do too.
 
-Axioms are passed explicitly rather than via a `PseudoMetricSpace` instance, matching the
-project's `AdmissibleEqX` precedent. Note this is a **pseudo**metric: the document's premises
-are `ax_refl`/`ax_sym`/`ax_triangle` with no separation axiom, and `EqX` is
-`d(x,y) =ℝ 0` precisely because points at distance 0 are to be identified. -/
+Axioms are passed explicitly rather than via a `MetricSpace` instance, matching the project's
+precedent for structures of this kind.
+
+**The theory is a pseudometric; the model is a genuine metric space.** The two are
+deliberately not the same, and the asymmetry is the point:
+
+* the *theory*'s axioms are `dist_self`/`dist_comm`/`dist_tri` — reflexivity, symmetry,
+  triangle — with **no separation**. Keeping the theory weak is what makes every derivation
+  in it apply to more structures, so nothing here should ever add separation to `Derivable`;
+* the *models* are the separated ones. `EqXInterp.extract` has to turn a Dialectica realizer
+  of `d(x,y) =ℝ 0ℝ` into **Lean equality** `x = y` of the interpretations, and only
+  separation gives that. A pseudometric model would satisfy every axiom of the theory and
+  still fail `extract`.
+
+So `d_eq_zero` below is a *model* condition with no object-level counterpart, exactly as
+Kohlenbach's `A^ω[X,d]` is interpreted in genuine metric spaces while its axioms are the
+pseudometric ones. -/
 structure MetricModel where
   /-- The carrier. -/
   carrier : Type
-  /-- The genuine real-valued (pseudo)metric. -/
+  /-- The genuine real-valued metric. -/
   d : carrier → carrier → ℝ
   /-- Distances are non-negative. Needed for `(·)◦`, whose domain is `[0,∞)`. -/
   d_nonneg : ∀ x y, 0 ≤ d x y
@@ -227,6 +244,14 @@ structure MetricModel where
   d_comm : ∀ x y, d x y = d y x
   /-- `ax_triangle`. -/
   d_triangle : ∀ x y z, d x z ≤ d x y + d y z
+  /-- **Separation** — the model is a genuine metric space, not merely a pseudometric.
+
+      This has **no object-level counterpart**: the theory deliberately stops at
+      reflexivity/symmetry/triangle, so that derivations in it apply to pseudometric
+      structures too. It is asked of the *model* because `EqXInterp.extract` must produce
+      Lean equality `x = y` from a realizer of `d(x,y) =ℝ 0ℝ`, and nothing weaker than
+      separation delivers that. See the structure docstring. -/
+  d_eq_zero : ∀ x y, d x y = 0 → x = y
   /-- The distinguished point `0_X`. -/
   zeroX : carrier
   /-- The reference point `a` of Definition 17.50. Majorants depend on it; the *domains* of
@@ -360,6 +385,87 @@ noncomputable def MetricModel.abstractMajorizability (M : MetricModel) :
     (fun () => M.dist_maj 0)
 
 -- ============================================================================
+-- The equality interpretation
+-- ============================================================================
+
+/-! ### `EqXInterp` for a metric model — four fields of nine, and why the other five stall
+
+`EqXInterp` is the last hypothesis of the two metric metatheorems that nothing constructed.
+`MetricModel.eqXInterp` below constructs it, and is honest about what it cannot yet prove.
+
+**The four structural fields are free.** `eqAtType (.base ()) s t` is `eq_R (d s t) 0ℝ`, a
+`Formula.all Ty.nat (Formula.eq0 _ _)`, so `wTy` of it is `nat →ₜ unit` and `cTy` is
+`nat ×ₜ unit`. The witness type is therefore `ℕ → Unit`: a subsingleton, canonically
+inhabited, and syntactically realized by `λn.⋆`. Nothing about the model enters.
+
+**The five semantic fields all stall on one missing piece, and it is not a metric fact.**
+`realize`, `extract`, `realizeTerm_sound`, `dist_comm_holds` and `dist_tri_holds` each ask for
+`Formula.interpret M.si (eq_R … ) env` or the `le_R_pu` analogue — that is, for the *value*
+of the object-level decision term
+
+    lt_Q_dec (abs_Q (sub_Q (cauchyfy f (n+1)) (cauchyfy g (n+1)))) (pow2neg_Q n)
+
+in the standard model. Every ingredient of that term is a `Term`-level `prec` recursion
+(`div2`, `inv_triag`, `lt_Q_dec`, …), and **nothing in the project evaluates one**.
+`QVal.lean` says so in as many words: it defines `qval : ℕ → ℚ`, proves
+`qval_roundR`/`qval_roundR_dist_le`/`roundR_cauchy` — everything needed *about rationals* —
+and then states that connecting `qval` to `Term.interpret` of `Term.rat_num`/`Term.lt_Q_dec`
+"is a separate bridge … and is not attempted here".
+
+So the missing lemma is the **evaluation bridge**, of which the load-bearing instance is
+
+```lean
+theorem interpret_lt_Q_dec (si : SpaceInterp X F) (a b : Term F Γ Ty.nat) (env) :
+    Term.interpret si (Term.app2 Term.lt_Q_dec a b) env = 0
+      ↔ Rounding.qval (Term.interpret si a env) < Rounding.qval (Term.interpret si b env)
+```
+
+together with its companions for `abs_Q`, `sub_Q`, `pow2neg_Q`, `add_Q` and `cauchyfy`
+(`Term.interpret si (Term.app2 Term.cauchyfy f n) env = …`). *With* that bridge the five
+fields are short: `dist_comm_holds` is `M.d_comm` (the two sides then have **literally the
+same** interpretation, so `qval` reflexivity finishes it), `dist_tri_holds` is `M.d_triangle`
+plus `Rounding.qval_roundR_dist_le`, and `realize`/`extract`/`realizeTerm_sound` are
+`M.d_self` and `M.d_eq_zero` plus `Rounding.qval_roundR`.
+
+The alternative route — a soundness theorem `Derivable … A → ∀ env, Formula.interpret si A env`,
+which would let the object-level `lt_Q_abs_sub_self` discharge `dist_comm_holds` — is
+**circular**: soundness's `dist_comm`/`dist_tri` cases are *exactly* these two fields. There
+is no soundness theorem in the project, and this is why writing one would not be free.
+
+No `EqXInterp` field is weakened; the five stalled ones carry a `sorry`. See the report and
+`ARCHITECTURE.md` §3. -/
+
+/-- The `EqXInterp` a metric model induces.
+
+Four fields are proved outright; five are `sorry`, all on the same missing evaluation bridge
+from object-level ℚ terms to `Rounding.qval`. See the note above for the precise statement of
+what is missing and for what each field costs once it exists. -/
+noncomputable def MetricModel.eqXInterp (M : MetricModel) :
+    EqXInterp (fun () => M.carrier) MetricSpace.F M.si where
+  -- `wTy (eq_R _ _) = nat →ₜ unit`, so the witness type is `ℕ → Unit`.
+  witnessSubsingleton := fun _ _ _ _ => ⟨fun _ _ => funext fun _ => rfl⟩
+  witnessDefault := fun i _ s t => dialecticaDefaultWitness M.si (eqAtType (Ty.base i) s t)
+  counterDefault := fun i _ s t => dialecticaDefaultCounter M.si (eqAtType (Ty.base i) s t)
+  -- MISSING: `interpret_lt_Q_dec` &c. Then: `M.d_self` gives `M.d x x = 0`, and
+  -- `Rounding.qval_roundR` turns `(0)◦` into the constant-zero rational sequence.
+  realize := sorry
+  -- MISSING: the same bridge, read the other way, plus `M.d_eq_zero` (separation) to turn
+  -- `M.d x y = 0` into `x = y`. Separation is now available (`MetricModel.d_eq_zero`); the
+  -- bridge is not.
+  extract := sorry
+  -- MISSING: as `realize` — the realizing term `λn.⋆` carries no information, so this field
+  -- is exactly the model fact `realize` needs.
+  realizeTerm := fun _ _ _ _ => Term.lam Term.unitI
+  realizeTerm_sound := sorry
+  -- MISSING: `M.d_comm` makes the two sides interpret to the *same* `ℕ → ℕ`, so all that is
+  -- owed is `|q −ℚ q| <ℚ 2^{-n}` in the model — the semantic counterpart of the proved
+  -- object-level `lt_Q_abs_sub_self`. Needs the bridge.
+  dist_comm_holds := sorry
+  -- MISSING: `M.d_triangle` plus `Rounding.qval_roundR_dist_le` to control the rounding error
+  -- of `(·)◦` on the three distances. Needs the bridge.
+  dist_tri_holds := sorry
+
+-- ============================================================================
 -- The metric-space metatheorem
 -- ============================================================================
 
@@ -377,16 +483,19 @@ constructors of `Derivable`, not assumptions — so the premise-realizer obligat
 and is discharged inline. One of the three unconstructed hypotheses this theorem used to
 carry has therefore ceased to exist rather than been satisfied.
 
-`eqxi` remains, and it is the honest one: that the model interprets base-type equality
-correctly, and that its `distInterp` really is a pseudometric. Nothing in the project
-constructs an `EqXInterp` yet.
+**`eqxi` is gone too, as of the `dist_nonneg` session**: it is discharged internally with
+`MetricModel.eqXInterp`. That is the honest state, and it comes at a price stated loudly
+here — **`MetricModel.eqXInterp` has five `sorry`-ed fields**, so this theorem now depends on
+`sorryAx` where before it merely *assumed* an `EqXInterp` nobody could build. Nothing was
+lost: re-abstracting a hypothesis with exactly one intended inhabitant is a `sorry` moved into
+a binder (ARCHITECTURE.md §3). The five fields all wait on one missing evaluation bridge; see
+the note above `MetricModel.eqXInterp`.
 
 Historical note, kept because it is the shape of a mistake worth not repeating: `spremise`
 was where `MetricModel`'s `d_self`/`d_comm`/`d_triangle` were *going* to be consumed. They
 are consumed by `EqXInterp` now instead, on the semantic side, which is cheaper — the
 obligation is real-number arithmetic in Mathlib `ℝ` rather than object-level ℝ codes. -/
 theorem MetricModel.metric_metatheorem (M : MetricModel)
-    (eqxi : EqXInterp (fun () => M.carrier) MetricSpace.F M.si)
     {ρ : Ty MetricSpace.ι} {B₀ C₀ : Formula MetricSpace.F [Ty.nat, ρ]}
     (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
     (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
@@ -399,7 +508,7 @@ theorem MetricModel.metric_metatheorem (M : MetricModel)
         M.abstractMajorizability.toRel.maj ρ x_star x →
         (∀ u : Nat, u ≤ Φ x_star → Formula.interpret M.si B₀ (u, (x, ()))) →
         ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret M.si C₀ (v, (x, ())) :=
-  syntactic_general_metatheorem eqxi (fun _ _ h => h.elim) M.abstractMajorizability
+  syntactic_general_metatheorem M.eqXInterp (fun _ _ h => h.elim) M.abstractMajorizability
     hB_qf hB_vf hC_qf hC_vf prf
 
 /-- Every metric-space premise is purely universal — **vacuously**, since there are no
@@ -486,10 +595,14 @@ defined rather than parameterised, and its equivalence properties are theorems
 (`BaseEquality.lean`) or constructors (`Derivable.dist_self`/`dist_comm`/`dist_tri`).
 
 `spremise` and `nts` are likewise gone: `MetricSpace.Premises` is empty, so both are vacuous
-and are supplied inline. Of the three unconstructed hypotheses this theorem carried this
-morning, two have ceased to exist; only `eqxi` remains. -/
+and are supplied inline.
+
+**And `eqxi` is now discharged rather than assumed**, by `MetricModel.eqXInterp` — so all
+three of the hypotheses this theorem once carried have gone. Read the loud caveat on
+`MetricModel.metric_metatheorem`: `eqXInterp` has five `sorry`-ed fields, so this theorem
+depends on `sorryAx`. That is the truthful accounting of what instantiating to metric spaces
+still owes, and it was previously hidden inside the `eqxi` binder. -/
 theorem MetricModel.metric_metatheorem_classical (M : MetricModel)
-    (eqxi : EqXInterp (fun () => M.carrier) MetricSpace.F M.si)
     {ρ : Ty MetricSpace.ι} {B₀ C₀ : Formula MetricSpace.F [Ty.nat, ρ]}
     (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
     (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
@@ -502,8 +615,22 @@ theorem MetricModel.metric_metatheorem_classical (M : MetricModel)
         M.abstractMajorizability.toRel.maj ρ x_star x →
         (∀ u : Nat, u ≤ Φ x_star → Formula.interpret M.si B₀ (u, (x, ()))) →
         ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret M.si C₀ (v, (x, ())) :=
-  syntactic_general_metatheorem_classical eqxi
+  syntactic_general_metatheorem_classical M.eqXInterp
     (ntStable_of_pu MetricSpace.premises_pu) (fun _ _ h => h.elim)
     M.abstractMajorizability hB_qf hB_vf hC_qf hC_vf prf
+
+-- ============================================================================
+-- Axiom hygiene
+-- ============================================================================
+-- The majorizability side is clean; the two metatheorems are not, and the `sorryAx` is
+-- `MetricModel.eqXInterp`'s five stalled fields — nothing else. Keeping these prints here is
+-- what makes that visible rather than buried.
+
+#print axioms MetricModel.abstractMajorizability
+#print axioms MetricModel.dist_maj
+#print axioms MetricModel.zeroX_maj
+#print axioms MetricModel.eqXInterp
+#print axioms MetricModel.metric_metatheorem
+#print axioms MetricModel.metric_metatheorem_classical
 
 end Metatheorems

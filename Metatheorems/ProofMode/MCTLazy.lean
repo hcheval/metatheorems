@@ -228,5 +228,7 @@ theorem mct_bound_p1 (si : SpaceInterp X F) (eqxi : EqXInterp X F si)
 
 end Extraction
 
+#print axioms mct_p1
+
 end ProofMode
 end Metatheorems
