@@ -152,4 +152,12 @@ def degree : Ty ι → Nat
 
 end Ty
 
+/-- The type of real numbers: type level 1 = ℕ → ℕ.
+    A real `x : realTy ι` is a function where `x(n)` encodes a rational approximation of the
+    real value to within `2^{-n}`.
+
+    Lives here rather than in `RationalNumbers.lean` because `Term.dist` mentions it, and
+    `Term` is below the ℚ layer. It is a pure `Ty` abbreviation, so nothing comes with it. -/
+abbrev realTy (ι : Type) : Ty ι := Ty.nat →ₜ Ty.nat
+
 end Metatheorems

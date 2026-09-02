@@ -26,10 +26,7 @@ Rational numbers are encoded as natural numbers via Cantor pairing of
 
 open Formula
 
-/-- The type of real numbers: type level 1 = ℕ → ℕ.
-    A real `x : ℝₜ` is a function where `x(n)` encodes a rational
-    approximation of the real value to within 2^{-n}. -/
-abbrev realTy (ι : Type) : Ty ι := Ty.nat →ₜ Ty.nat
+-- `realTy` moved to `TypeSystem.lean` — `Term.dist` mentions it, and `Term` is below here.
 
 variable {ι : Type} {F : ι → Ty ι}
 
