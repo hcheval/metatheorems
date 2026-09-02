@@ -12,6 +12,7 @@ import Metatheorems.RationalNumbers
 import Metatheorems.SyntacticMetatheorem
 import Metatheorems.RealNumbers
 import Metatheorems.Rounding
+import Metatheorems.MetricSpaces
 import Metatheorems.QVal
 import Metatheorems.ProofMode.Packing
 import Metatheorems.ProofMode.Display

@@ -6,6 +6,8 @@ Authors: Horatiu
 import Metatheorems.Semantics
 import Metatheorems.Derivable
 import Metatheorems.RealNumbers
+import Metatheorems.Rounding
+import Metatheorems.Majorizability
 
 namespace Metatheorems
 
@@ -132,6 +134,39 @@ def MetricSpaceInterp.toSpaceInterp (m : MetricSpaceInterp) :
     SpaceInterp (fun () => m.carrier) MetricSpace.F where
   funcInterp := fun () => fun x y => m.metric x y
   zeroInterp := fun () => m.zero
+
+-- ============================================================================
+-- Lemma 17.8(4): `≤` on reals gives strong majorization of the codes
+-- ============================================================================
+
+/-! `Rounding.lean` proves Lemma 17.8 parts (2),(3),(5),(6); part (4) was blocked there
+because it mentions `s-maj₁`, which lives in `StrongMajorizability.lean`. With the two-clause
+`bezemMaj` (2026-09-02) it is a corollary of (2) and (3): at type `1 = nat →ₜ nat` the
+relation unfolds to a *pair* of monotonicity statements, and (3) discharges the
+self-majorization one outright. -/
+
+open Rounding in
+/-- **Lemma 17.8(4)**: if `0 ≤ x ≤ y` then `(y)◦` strongly majorizes `(x)◦` at type `1`.
+
+The first conjunct chains 17.8(2) (`(x)◦ ≤₁ (y)◦`) with 17.8(3) (`(y)◦` monotone in the
+precision index); the second conjunct *is* 17.8(3).
+
+`_hx` is unused: only `0 ≤ y` is needed, since `roundR_le₁_of_le` rests on `Nat.floor_mono`,
+which does not care about sign. The hypothesis is kept because the book states 17.8 for
+`x, y ∈ [0,∞)` and callers will have it anyway. -/
+theorem roundR_smaj_of_le {ι : Type} {X : ι → Type}
+    {base : (i : ι) → Nat → X i → Prop} {x y : ℝ}
+    (_hx : 0 ≤ x) (hy : 0 ≤ y) (hxy : x ≤ y) :
+    bezemMaj (X := X) base (Ty.nat →ₜ Ty.nat) (roundR y) (roundR x) := by
+  have hmono : ∀ (a : ℝ), 0 ≤ a → Monotone (roundR a) :=
+    fun a ha => monotone_nat_of_le_succ (roundR_mono ha)
+  refine ⟨?_, ?_⟩
+  · -- majorization: (y)◦(n*) ≥ (x)◦(n) whenever n* ≥ n
+    intro n_star n h
+    exact Nat.le_trans (roundR_le₁_of_le hxy n) (hmono y hy h)
+  · -- self-majorization: (y)◦ is monotone in the precision index
+    intro n_star n h
+    exact hmono y hy h
 
 -- ============================================================================
 -- AdmissibleEqX for the metric space EqX
