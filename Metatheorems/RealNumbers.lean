@@ -761,14 +761,8 @@ def add_comm_R :
 -- `cauchyfy_cauchy` / `cauchyfy_two_step`, which are stated after the order axioms. See
 -- "The additive axioms `cauchyfy_cauchy` alone settles" below.
 
-/-- ⊢ ∀f : ℝ. f +_ℝ neg_R(f) =_ℝ 0_ℝ -/
-def add_neg_R :
-    Derivable F al Premises (Γ := Γ)
-      (Formula.all rTy
-        (eq_R (Term.app2 Term.add_R (.var .vz)
-                (.app Term.neg_R (.var .vz)))
-              Term.zero_R)) :=
-  sorry
+-- `add_neg_R` is PROVED, further down: it needs `cauchyfy_neg`, which is an induction on
+-- the `cauchyfy` recursion and so sits with the rest of that theory.
 
 -- ── Multiplicative monoid ───────────────────────────────────────────────────
 
@@ -2148,6 +2142,310 @@ def pow2neg_triple_bound (n : Term F Γ Ty.nat) :
       (eq_Q_refl_inst p0))
     pthm (le_Q_refl p0)
 
+-- ── `cauchyfy` commutes with negation, and `add_neg_R` ──────────────────────
+--
+-- `add_zero_R` and `add_assoc_R` above needed no new `cauchyfy` theory, because `add_R`'s
+-- own `cauchyfy_add_R` already says everything about the composite. **`add_neg_R` does**,
+-- and this is the one place in the additive package where that bites:
+-- `neg_R f = λn. neg_Q (f n)` applies to the *raw* `f`, not to `f̂`, so nothing yet relates
+-- `(neg_R f)^` to `f̂` — and `f` is an arbitrary `ℕ → ℕ`, so `neg_R f` is not Cauchy and
+-- `cauchyfy_id` does not apply either.
+--
+-- What makes it work is that the two recursions run in *lockstep*, on the nose:
+--
+--     state(neg_R f, n)  =₀  pair( neg_Q (fst_pair (state(f, n))), snd_pair (state(f, n)) )
+--
+-- — same flag, negated value, at *every* index. The value half is immediate; the flag half
+-- is the content, because the Cauchy check is taken on the raw sequences and
+-- `|neg_Q a −ℚ neg_Q b|` is only `eq_Q`-equal to `|a −ℚ b|`, not `=₀`-equal. So the flags
+-- agree only because `lt_Q_dec`'s *decision* is `eq_Q`-invariant, which is what
+-- `sg_bar_congr_iff` below is for: it turns the two-way implication `lt_Q_congr` supplies
+-- into the `=₀` equality of `sg_bar` values that `cauchyState_advance` / `cauchyState_trip`
+-- demand.
+--
+-- (This is the same machinery `add_comm_R` / `mul_comm_R` are blocked on — see REALS_PLAN
+-- §0.2 — but only in the special case where the two sequences are related by a *fixed*
+-- ℚ-operation, so the induction needs no object-level hypothesis beyond its own IH.)
+
+/-- `sg_bar u =₀ sg_bar v` whenever `u` and `v` vanish together.
+
+The bridge from "`lt_Q` is `eq_Q`-invariant" (an equivalence of *formulas*, which is all
+`lt_Q_congr` gives) to "the flag bits are equal" (an `=₀` fact about `lt_Q_dec`, which is what
+the `cauchyfy` recursion branches on). Note `sg_bar` is the *complement* indicator here —
+`sg_bar 0 =₀ S0`, `sg_bar (S n) =₀ 0` — which is why the case split reads the way it does. -/
+private def sg_bar_congr_iff (u v : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      ((Formula.eq0 u Term.zero →ᶠ Formula.eq0 v Term.zero)
+        ∧ᶠ (Formula.eq0 v Term.zero →ᶠ Formula.eq0 u Term.zero) →ᶠ
+       Formula.eq0 (.app Term.sg_bar u) (.app Term.sg_bar v)) := by
+  pmode
+  pintro h
+  pdestruct h with h1 h2
+  pfrom hcu := sg_bar_cases u
+  pcases hcu with hu1 | hu0
+  · -- `sg_bar u = S0`, i.e. `u = 0`; carry it across to `v` and back up
+    papplym (sg_bar_eq_S0_implies_zero u) in hu1 with huz
+    phave hv1 : Formula.eq0 (.app Term.sg_bar v) (.app .succ .zero)
+    · phave hvz : Formula.eq0 v Term.zero
+      · papply h1
+        pexact huz
+      prwby hvz
+      pthm sg_bar_zero
+    prwby hu1
+    prwby hv1
+    prefl
+  · -- `sg_bar u = 0`, i.e. `u ≠ 0`; likewise
+    pfrom hiu := sg_bar_eq_zero_iff u
+    pdestruct hiu with hiuF _hiuB
+    phave hunz : ¬ᶠ(Formula.eq0 u Term.zero)
+    · papply hiuF
+      pexact hu0
+    phave hv0 : Formula.eq0 (.app Term.sg_bar v) Term.zero
+    · pfrom hiv := sg_bar_eq_zero_iff v
+      pdestruct hiv with _hivF hivB
+      papply hivB
+      pintro hvz
+      papply hunz
+      papply h2
+      pexact hvz
+    prwby hu0
+    prwby hv0
+    prefl
+
+/-- `neg_R(f)(x) =₀ neg_Q(f x)` — the two beta steps of `neg_R`. -/
+def neg_R_apply (f : Term F Γ (realTy ι)) (x : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (Formula.eq0 (Term.app2 Term.neg_R f x) (.app Term.neg_Q (.app f x))) :=
+  lam2_correct_nf
+    (.app Term.neg_Q (.app (.var (.vs .vz)) (.var .vz)))
+    f x
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.Subst.ext,
+          subst_subst0_map_weaken, closed_subst])
+
+private theorem neg_R_weaken {Δ : Ctx ι} {ρ : Ty ι} :
+    (Term.neg_R : Term F Δ _).weaken (σ := ρ) = Term.neg_R := by
+  rw [Term.weaken, Term.rename_eq_subst]; exact neg_R_closed_subst _
+
+private theorem neg_R_app_weaken {Δ : Ctx ι} {ρ : Ty ι} (f : Term F Δ (realTy ι)) :
+    (Term.app Term.neg_R f).weaken (σ := ρ) = Term.app Term.neg_R f.weaken := by
+  show Term.app (Term.weaken Term.neg_R) f.weaken = _
+  rw [neg_R_weaken]
+
+/-- Congruence under `neg_Q`, at the level of `=₀`. -/
+private def neg_Q_nat {s t : Term F Γ Ty.nat}
+    (h : Derivable F al Premises (Formula.eq0 s t)) :
+    Derivable F al Premises
+      (Formula.eq0 (.app Term.neg_Q s) (.app Term.neg_Q t)) :=
+  qfer_no_premise_nat_nf h (r := .app Term.neg_Q (.var .vz))
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, closed_subst])
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, closed_subst])
+
+/-- Congruence for `pair` in its first argument, at the level of `=₀`. -/
+private def pair_l_nat (c : Term F Γ Ty.nat) {s t : Term F Γ Ty.nat}
+    (h : Derivable F al Premises (Formula.eq0 s t)) :
+    Derivable F al Premises
+      (Formula.eq0 (Term.app2 Term.pair s c) (Term.app2 Term.pair t c)) :=
+  qfer_no_premise_nat_nf h (r := Term.app2 Term.pair (.var .vz) c.weaken)
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+          subst_subst0_map_weaken, closed_subst])
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+          subst_subst0_map_weaken, closed_subst])
+
+/-- The Cauchy checks of `f` and of `neg_R f` agree *as bits*. The two checked quantities are
+only `eq_Q`-equal — `|neg_Q a −ℚ neg_Q b|ℚ` is `|b −ℚ a|ℚ` re-encoded — so this is exactly
+where `sg_bar_congr_iff` is spent. -/
+private def neg_check_sg (f : Term F Γ (realTy ι)) (n : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (Formula.eq0
+        (.app Term.sg_bar (Term.cauchy_check_at (.app Term.neg_R f) n))
+        (.app Term.sg_bar (Term.cauchy_check_at f n))) := by
+  let A : Term F Γ Ty.nat := .app Term.abs_Q (Term.app2 Term.sub_Q
+    (Term.app2 Term.neg_R f n) (Term.app2 Term.neg_R f (.app .succ n)))
+  let B : Term F Γ Ty.nat := .app Term.abs_Q (Term.app2 Term.sub_Q
+    (.app f n) (.app f (.app .succ n)))
+  let P : Term F Γ Ty.nat := .app Term.pow2neg_Q (.app .succ n)
+  have hAB : Derivable F al Premises (eq_Q A B) := by
+    pmode
+    prw (neg_R_apply f n)
+    prw (neg_R_apply f (.app .succ n))
+    pthm (eqQtrans (abs_Q_congr (sub_Q_neg_neg (.app f n) (.app f (.app .succ n))))
+      (abs_diff_Q_comm (.app f (.app .succ n)) (.app f n)))
+  pmode
+  papplym (sg_bar_congr_iff (Term.app2 Term.lt_Q_dec A P) (Term.app2 Term.lt_Q_dec B P))
+  psplit
+  · pthm (lt_Q_congr A P B P hAB (eq_Q_refl_inst P))
+  · pthm (lt_Q_congr B P A P (eqQsym hAB) (eq_Q_refl_inst P))
+
+-- The lockstep claim is written out at both of its occurrences rather than given a name.
+-- `canorm` normalises substitutions with `simp only`, which does not unfold a named
+-- `Formula` definition, so a `negF` abbreviation would hide the whole statement from the
+-- induction's own bookkeeping — the same reason the file has no `cVal`/`cFlag` wrappers.
+
+/-- The lockstep claim at an explicit index. -/
+abbrev negAt (f : Term F Γ (realTy ι)) (s : Term F Γ Ty.nat) : Formula F Γ :=
+  Formula.eq0 (Term.cauchyState (.app Term.neg_R f) s)
+    (Term.app2 Term.pair
+      (.app Term.neg_Q (.app Term.fst_pair (Term.cauchyState f s)))
+      (.app Term.snd_pair (Term.cauchyState f s)))
+
+private theorem negF_subst0 (f : Term F Γ (realTy ι)) (s : Term F Γ Ty.nat) :
+    (Formula.eq0 (Term.cauchyState (.app Term.neg_R f.weaken) (.var .vz))
+        (Term.app2 Term.pair
+          (.app Term.neg_Q (.app Term.fst_pair (Term.cauchyState f.weaken (.var .vz))))
+          (.app Term.snd_pair (Term.cauchyState f.weaken (.var .vz))))).subst0 s
+      = negAt f s := by
+  simp only [negAt, Formula.subst0, Formula.substF, Term.subst, Term.subst0_map,
+    Term.app2, cauchyState_subst, neg_R_closed_subst, subst_subst0_map_weaken, closed_subst]
+
+/-- **`cauchyfy` and negation run in lockstep.** At every index the negated sequence's state
+is the original's with the value negated and the flag copied verbatim.
+
+Three cases, exactly as in `cauchy_inv`: the flag was already set (both freeze), the flag is
+clear and the check passes (both advance, to `neg_Q (f (n+1))` and `f (n+1)`), or the flag is
+clear and the check fails (both trip, freezing the values they already hold). The checks agree
+by `neg_check_sg`, which is the only step that is not bookkeeping. -/
+def cauchyState_neg (f : Term F Γ (realTy ι)) :
+    Derivable F al Premises
+      (Formula.all Ty.nat
+        (Formula.eq0 (Term.cauchyState (.app Term.neg_R f.weaken) (.var .vz))
+          (Term.app2 Term.pair
+            (.app Term.neg_Q (.app Term.fst_pair (Term.cauchyState f.weaken (.var .vz))))
+            (.app Term.snd_pair (Term.cauchyState f.weaken (.var .vz)))))) := by
+  let fw : Term F (Ty.nat :: Γ) (realTy ι) := f.weaken
+  let gw : Term F (Ty.nat :: Γ) (realTy ι) := .app Term.neg_R fw
+  let nv : Term F (Ty.nat :: Γ) Ty.nat := .var .vz
+  let V : Term F (Ty.nat :: Γ) Ty.nat := .app Term.fst_pair (Term.cauchyState fw nv)
+  let Φ : Term F (Ty.nat :: Γ) Ty.nat := .app Term.snd_pair (Term.cauchyState fw nv)
+  pmode
+  pinduction
+  · -- base: both states are their bases, and `neg_R f 0 =₀ neg_Q (f 0)`
+    canorm
+    prw (cVal_zero f)
+    prw (cFlag_zero f)
+    pthm (qtrans (cauchyState_zero (.app Term.neg_R f))
+      (pair_l_nat Term.zero (neg_R_apply f Term.zero)))
+  · pforall
+    pintro ih
+    canorm
+    pfrom hinv := cauchy_inv_at fw nv
+    pcases hinv with hL | hR
+    · pdestruct hL with h0 _hv
+      phave hsnd0 : Formula.eq0 (.app Term.snd_pair (Term.cauchyState gw nv)) Term.zero
+      · prwby ih
+        prw (snd_pair_pair (.app Term.neg_Q V) Φ)
+        pexact h0
+      pfrom hsg := sg_bar_cases (Term.cauchy_check_at fw nv)
+      pcases hsg with hs1 | hs0
+      · -- the check passes: both advance
+        phave hsgn : Formula.eq0
+            (.app Term.sg_bar (Term.cauchy_check_at gw nv)) (.app .succ .zero)
+        · prw (neg_check_sg fw nv)
+          pexact hs1
+        pconj hsnd0 hsgn with hbn
+        papplym (cauchyState_advance gw nv) in hbn with hgn
+        pconj h0 hs1 with hbf
+        papplym (cauchyState_advance fw nv) in hbf with hfn
+        prwby hgn
+        prwby hfn
+        prw (fst_pair_pair (.app fw (.app .succ nv)) Term.zero)
+        prw (snd_pair_pair (.app fw (.app .succ nv)) Term.zero)
+        prw (neg_R_apply fw (.app .succ nv))
+        prefl
+      · -- the check fails: both trip, and both values freeze where they are
+        phave hsgn : Formula.eq0
+            (.app Term.sg_bar (Term.cauchy_check_at gw nv)) Term.zero
+        · prw (neg_check_sg fw nv)
+          pexact hs0
+        pconj hsnd0 hsgn with hbn
+        papplym (cauchyState_trip gw nv) in hbn with hgn
+        pconj h0 hs0 with hbf
+        papplym (cauchyState_trip fw nv) in hbf with hfn
+        prwby hgn
+        prwby hfn
+        prw (fst_pair_pair V (.app .succ Term.zero))
+        prw (snd_pair_pair V (.app .succ Term.zero))
+        prwby ih
+        prw (fst_pair_pair (.app Term.neg_Q V) Φ)
+        prefl
+    · -- already tripped: both states freeze
+      phave hsnd1 : Formula.eq0
+          (.app Term.snd_pair (Term.cauchyState gw nv)) (.app .succ .zero)
+      · prwby ih
+        prw (snd_pair_pair (.app Term.neg_Q V) Φ)
+        pexact hR
+      papplym (cauchyState_frozen gw nv) in hsnd1 with hgn
+      papplym (cauchyState_frozen fw nv) in hR with hfn
+      prwby hgn
+      prwby hfn
+      pexact ih
+
+/-- The lockstep claim at an explicit index. -/
+def cauchyState_neg_at (f : Term F Γ (realTy ι)) (s : Term F Γ Ty.nat) :
+    Derivable F al Premises (negAt f s) :=
+  negF_subst0 f s ▸ Derivable.mp (cauchyState_neg f) (.forall_ax s)
+
+/-- **`(neg_R f)^(k) =₀ neg_Q (f̂(k))`** — cauchyfication commutes with negation, on the nose.
+-/
+def cauchyfy_neg (f : Term F Γ (realTy ι)) (k : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (Formula.eq0 (Term.app2 Term.cauchyfy (.app Term.neg_R f) k)
+        (.app Term.neg_Q (Term.app2 Term.cauchyfy f k))) :=
+  qtrans (cauchyfy_unfold (.app Term.neg_R f) k)
+    (qtrans (fst_pair_congr (cauchyState_neg_at f k))
+      (qtrans (fst_pair_pair
+          (.app Term.neg_Q (.app Term.fst_pair (Term.cauchyState f k)))
+          (.app Term.snd_pair (Term.cauchyState f k)))
+        (neg_Q_nat (Derivable.mp (cauchyfy_unfold f k) Derivable.sym0))))
+
+/-- `u =_ℝ 0_ℝ` for any `u` whose cauchyfication is `f̂(·+2) +ℚ (−ℚ f̂(·+2))`.
+
+Once `cauchyfy_neg` has put the sum in that shape there is no estimate left at all: the sum is
+`eq_Q`-zero outright, and `0_ℚ <ℚ 2^{-n}`. -/
+private def add_neg_R_gen (f u : Term F Γ (realTy ι))
+    (hu : Derivable F al Premises (Γ := Ty.nat :: Γ)
+      (Formula.eq0
+        (Term.app2 Term.cauchyfy u.weaken (.app .succ (.var .vz)))
+        (Term.app2 Term.add_Q
+          (Term.app2 Term.cauchyfy f.weaken (.app .succ (.app .succ (.var .vz))))
+          (.app Term.neg_Q (Term.app2 Term.cauchyfy f.weaken
+            (.app .succ (.app .succ (.var .vz)))))))) :
+    Derivable F al Premises (eq_R u Term.zero_R) := by
+  let s1 : Term F (Ty.nat :: Γ) Ty.nat := .app .succ (.var .vz)
+  let s2 : Term F (Ty.nat :: Γ) Ty.nat := .app .succ s1
+  let A2 : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.cauchyfy f.weaken s2
+  let S  : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.add_Q A2 (.app Term.neg_Q A2)
+  let P  : Term F (Ty.nat :: Γ) Ty.nat := .app Term.pow2neg_Q (.var .vz)
+  pmode
+  pforall
+  canorm
+  prw hu
+  prw (cauchyfy_zero_R s1)
+  papplym (lt_Q_congr Term.zero_Q P
+    (.app Term.abs_Q (Term.app2 Term.sub_Q S Term.zero_Q)) P
+    (eqQsym (eqQtrans (abs_Q_congr (eqQtrans (sub_Q_zero_Q S) (add_Q_neg_inst A2)))
+      abs_Q_zero_Q))
+    (eq_Q_refl_inst P))
+  pthm (zero_lt_pow2neg_Q (.var .vz))
+
+/-- `f +_ℝ neg_R(f) =_ℝ 0_ℝ`, at an explicit real. -/
+def add_neg_R_core (f : Term F Γ (realTy ι)) :
+    Derivable F al Premises
+      (eq_R (Term.app2 Term.add_R f (.app Term.neg_R f)) Term.zero_R) :=
+  add_neg_R_gen f (Term.app2 Term.add_R f (.app Term.neg_R f)) (by
+    rw [add_R_app_weaken, neg_R_app_weaken]
+    exact qtrans
+      (cauchyfy_add_R f.weaken (.app Term.neg_R f.weaken) (.app .succ (.var .vz)))
+      (addQ_r_nat _ (cauchyfy_neg f.weaken (.app .succ (.app .succ (.var .vz))))))
+
+/-- ⊢ ∀f : ℝ. f +_ℝ neg_R(f) =_ℝ 0_ℝ -/
+def add_neg_R :
+    Derivable F al Premises (Γ := Γ)
+      (Formula.all rTy
+        (eq_R (Term.app2 Term.add_R (.var .vz)
+                (.app Term.neg_R (.var .vz)))
+              Term.zero_R)) :=
+  univ_gen (add_neg_R_core (.var .vz))
+
 -- ── Properties needed for metric space transitivity ─────────────────────────
 
 /-- ⊢ ∀f,g : ℝ. f =_ℝ 0 ∧ g =_ℝ 0 → f +_ℝ g =_ℝ 0 -/
@@ -2547,6 +2845,10 @@ end OrderedFieldAxioms
 #print axioms add_zero_R_core
 #print axioms add_assoc_R
 #print axioms add_assoc_R_core
+#print axioms add_neg_R
+#print axioms add_neg_R_core
+#print axioms cauchyState_neg
+#print axioms cauchyfy_neg
 #print axioms cauchyfy_add_R
 #print axioms cauchy_pair_step
 #print axioms eqR_tail
