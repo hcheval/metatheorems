@@ -163,6 +163,12 @@ logged as an assumption.
   - Does `prenexify` (proved, commit 89d0480) compose with a Markov ¬¬-elimination on
     `∃u∃v(B₀→C₀)` to land the input in `Allowed.extended`? Nothing in the repo does this.
     This is the smallest artifact that would restore the lazy-classical-input claim.
+
+    **Still open as of 2026-09-02, and still nothing in the repo does it** — `prenexify` has
+    zero call sites. Flagged here because this open question was lost in transmission: for
+    several weeks CLAUDE.md rendered R1's "unfinishable *as stated*" as an unqualified "do not
+    wander into it", dropping both the qualifier and the route back that this very bullet
+    names. R1 was right; the summary was not. Fixed in CLAUDE.md and at the `sorry` site.
   - Does the same one-exponential lift appear for Groetsch, or is it specific to the
     `∀(∀→∃)` shape? Unprobed; bears on R7.
   - The finding is about the *interaction* of ¬¬ with meta-level (approach b) extraction. It

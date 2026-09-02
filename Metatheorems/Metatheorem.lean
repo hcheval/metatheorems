@@ -334,10 +334,25 @@ def general_metatheorem_classical
   -- Unfold h through the ¬¬ layers using Classical.not_not
   have hUV : ∀ x : Ty.interpret X ρ,
       Formula.interpret si B₀ (U x, (x, ())) → Formula.interpret si C₀ (V x, (x, ())) := by
-    -- Need to construct a counter for h that embeds x at the ∀ρ position,
-    -- peel ¬¬ layers with Classical.not_not, then apply QF∨-free matrix reduction.
-    -- The witnesses U, V extracted here may differ from those used for Φ;
-    -- this requires careful counter construction matching the witness extraction.
+    -- **THIS SKELETON IS THE WRONG ROUTE. Do not try to finish it here.** (2026-09-02)
+    --
+    -- Everything above takes the *direct* ND interpretation of `∀x(∀u B₀ → ∃v C₀)`, which
+    -- CLAUDE.md note 2 says explicitly not to do: it produces entangled witness/counter
+    -- types, and FEASIBILITY R1 confirmed mechanically that the default challenge fed to
+    -- `imp_w`/`U`/`V` above ignores its argument, so those `U, V` are sound only against one
+    -- junk challenge. R1's conclusion was "the entry point must change", NOT that the
+    -- theorem is unprovable.
+    --
+    -- The prescribed route, per note 2 and R1's "route back (prenexify → Markov →
+    -- extended)":
+    --   1. `prenexify` under `∀x` (via `forall_map`) — PROVED at line 155, clean axioms,
+    --      and currently called from nowhere. It is the LEM-using step, i.e. the hard part.
+    --   2. `negTrans_sound` on the prenexified `∀x ∃u∃v(B₀' → C₀')`.
+    --   3. Dialectica: the matrix is now an implication between two QF formulas, so its
+    --      witness/counter types are singletons and `dialecticaMatrix_iff_interpFormula`
+    --      reduces it.
+    -- Unverified: the `∃u∃v` under NT's `¬¬` needs Markov (available in the extended
+    -- system). R1 calls this "a fresh probe, not a fix" and that is still right.
     sorry
   -- Step 4: Construct Φ (same as extended version)
   exact ⟨fun x_star =>
