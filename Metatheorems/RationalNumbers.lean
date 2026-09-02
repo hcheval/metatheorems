@@ -13169,6 +13169,29 @@ def abs_Q_sub_triangle (a b c : Term F Γ Ty.nat) :
       (eqQsym adm h1)
       (add_Q_comm_inst adm (.app Term.abs_Q bc) (.app Term.abs_Q ab)))
 
+/-- The triangle inequality for a difference of *sums*: `|(A+B) −ℚ (a+b)| ≤ℚ |A−a| +ℚ |B−b|`.
+This is what makes a sum of two Cauchy sequences Cauchy. -/
+def abs_Q_sub_add_split (a b A B : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (le_Q (.app Term.abs_Q (Term.app2 Term.sub_Q
+              (Term.app2 Term.add_Q A B) (Term.app2 Term.add_Q a b)))
+        (Term.app2 Term.add_Q
+          (.app Term.abs_Q (Term.app2 Term.sub_Q A a))
+          (.app Term.abs_Q (Term.app2 Term.sub_Q B b)))) :=
+  Derivable.mp (abs_Q_triangle adm (Term.app2 Term.sub_Q A a) (Term.app2 Term.sub_Q B b))
+    (le_Q_congr adm
+      (.app Term.abs_Q (Term.app2 Term.add_Q
+        (Term.app2 Term.sub_Q A a) (Term.app2 Term.sub_Q B b)))
+      (Term.app2 Term.add_Q (.app Term.abs_Q (Term.app2 Term.sub_Q A a))
+        (.app Term.abs_Q (Term.app2 Term.sub_Q B b)))
+      (.app Term.abs_Q (Term.app2 Term.sub_Q
+        (Term.app2 Term.add_Q A B) (Term.app2 Term.add_Q a b)))
+      (Term.app2 Term.add_Q (.app Term.abs_Q (Term.app2 Term.sub_Q A a))
+        (.app Term.abs_Q (Term.app2 Term.sub_Q B b)))
+      (eqQsym adm (abs_Q_congr adm (sub_Q_add_split adm a b A B)))
+      (eq_Q_refl_inst adm _))
+
+#print axioms abs_Q_sub_add_split
 #print axioms eq_Q_imp_le_Q
 #print axioms le_Q_or_lt_Q
 #print axioms pow2neg_Q_le_add

@@ -16,6 +16,64 @@ below was never checked.
 **Proved (4/19), `#print axioms` = `[propext, Quot.sound]` in-file:**
 `eq_R_refl`, `eq_R_sym`, `lt_irrefl_R`, `zero_lt_one_R`.
 
+### 0.05 Class C, 2026-09-02: `eq_R_trans` and `add_eq_zero_R` are proved
+
+Both `#print axioms`-clean (`[propext, Quot.sound]`). `RealNumbers.lean` is at **16** sorries.
+Three corrections to §0.5 and §0.8 below, in decreasing order of importance.
+
+**(a) §0.5's refined five-term split does not close either.** Its display drops one of the two
+middle terms: routing `f̂(m) → ĝ(m) → ĥ(m)` costs `2^{-(m-1)} + 2^{-(m-1)} = 2^{-(m-2)}`, not
+`2^{-(m-1)}`. Redone honestly the sum is `2^{-n} + 2^{-(m-1)}` — over, for every `m`, exactly
+as the crude bound is. **No finite split closes**, because the semantic proof spends
+`|f̂(p) − F| < 2^{-p}` *strictly*, and strictness at a limit is not available at any finite
+index.
+
+**What works instead** (`RealNumbers.lean`, `cauchy_pair_step` → `eqR_tail` → `eqR_le` →
+`eqR_strict`): prove the non-strict `≤` first and spend one extra strict step on top of it.
+
+| step | statement |
+|---|---|
+| `cauchy_pair_step` | `X_q <ℚ 2^{-q} +ℚ X_{q+1}` — two strict `cauchyfy` steps, `2^{-(q+1)}` each |
+| `eqR_tail` | `∀k ∀p. X_{p+1} <ℚ 2^{-p} +ℚ 2^{-(p+k)}` — induction on `k`, one round per step |
+| `eqR_le` | `∀p. X_{p+1} ≤ℚ 2^{-p}` — Archimedean squeeze over all `k` |
+| `eqR_strict` | `∀n. X_{n+1} <ℚ 2^{-n}` — one more strict step on top of the `≤` |
+
+`eqR_le` is the whole trick: `<` for every `k` gives `≤`, and `eqR_strict` buys the `<` back
+with a *fresh* strict step that was not spent in the telescope. `pow2neg_rat_den_le` supplies
+the index for the squeeze, and needs `pow2neg_Q_le_add_r` (new) to be usable.
+
+The telescoping estimate §0.5 item 3 asks for was **not** built. `eqR_tail` is the same
+induction in a form that never mentions `f̂(p) − f̂(p+k)`: it carries the *whole* estimate
+`X_{p+1} <ℚ 2^{-p} + 2^{-(p+k)}` through the induction, so no separate sum lemma is needed.
+
+**(b) The reverse triangle inequality was not needed.** HANDOFF and §0.8 item 1 both name
+`| |a| −ℚ |b| | ≤ℚ |a −ℚ b|` as the load-bearing missing piece for Class C. It is not: nothing
+in `eq_R_trans` or `add_eq_zero_R` uses it. It is still missing, and still needed by
+`approx_R` (to license `cauchyfy_id` on `A := |D|`). Do not budget it against Class C.
+
+**(c) `le_zero_eq_zero_R` is FALSE as stated** and is left sorried with a counterexample in
+its doc comment. `f ≤_ℝ g ∧ g =_ℝ 0 → f =_ℝ 0` fails at `f := λn.⟨−1⟩_ℚ`, `g := 0_ℝ`: nothing
+bounds `f` from *below*. The statement `MetricSpaces.admissibleEqX.eqx_trans` needs carries
+`0_ℝ ≤_ℝ f` as a third hypothesis, and that in turn has to be derived from the pseudo-metric
+premises (`0 =_ℝ d(x,x) ≤_ℝ d(x,y) +_ℝ d(y,x)`). That is a metric-layer design decision, not
+an estimate.
+
+**New in `RationalNumbers.lean`** (all `[propext, Quot.sound]`): `lt_Q_add_inst`,
+`lt_Q_add_l`, `le_Q_add_l`, `lt_Q_add_both`, `add_Q_sub_cancel`, **`eq_Q_imp_le_Q`**,
+`lt_Q_trichotomy_inst`, **`le_Q_or_lt_Q`**, `pow2neg_Q_lt_succ`, `pow2neg_Q_le_succ`,
+`pow2neg_Q_le_add(_all,_r)`, **`abs_Q_sub_triangle`**, `abs_Q_sub_add_split`, and the
+`q_ord_norm` / `q_cons_norm` substitution normalisers.
+
+`eq_Q_imp_le_Q` is the one to remember: without it `lt_Q_trichotomy` cannot be used to *prove*
+a `≤_ℚ` at all — its middle case hands you an `eq_Q` and there was no way to spend it. It has
+to go through the private hypothesis-level `eq_Q` calculus (`eqQhtrans`/`eqQhconst`/
+`addQl_imp`), which is why it lives in `RationalNumbers.lean` and not above it.
+
+**One cost note.** `prw` must not be pointed at a goal containing `Term.add_R`: the QF-ER
+normal forms it discharges by `rfl` push a substitution through that constant, and it times
+out on heartbeats. `add_eq_zero_R_gen` takes the sum as an abstract Lean-level parameter `u`
+for exactly this reason. This is the CLAUDE.md build-cost pathology in a new place.
+
 ### 0.1 The `prw` arrow-type probe passed — with one limit
 
 `Metatheorems/Probes/RwArrow.lean` (in the build) exercises `prw` at pattern type
