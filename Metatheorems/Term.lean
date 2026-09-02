@@ -14,12 +14,16 @@ namespace Metatheorems
 Following Chapter 2 (Definition 2.3.1) of the reference document, we define the
 intrinsically typed terms of Weakly Extensional Heyting Arithmetic over T^X.
 
-The term language includes the primitive constants 0, S, Π (projector),
-Σ (combinator), and R (recursor), plus application and lambda abstraction.
+The primitive constants are `0`, `S`, `R` (recursor), the space constants `0_X` and `f_χ`,
+and the unit/product constructors, plus application and **lambda abstraction**.
 
-Lambda abstraction is a primitive term constructor (not compiled to S/K
-combinators). Beta reduction `(λx.t) u =_τ t[u/x]` is an axiom in the
-proof system (`Derivable.beta_eq`).
+**There are no `Π` and `Σ` combinators.** An earlier version of this docstring claimed there
+were — that was stale, left over from when combinatory compilation (Def. 2.3.19) was the plan.
+Lambda is a primitive constructor instead, and beta reduction `(λx.t) u =_τ t[u/x]` is an
+axiom of the proof system (`Derivable.beta_eq`) rather than a consequence of combinator
+axioms. So the combinatory sublanguage the reference document works in **does not exist here**;
+see the design-table entry in `CLAUDE.md` for what that costs and why it was still the right
+call.
 
 ## Main Definitions
 
