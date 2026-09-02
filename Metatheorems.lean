@@ -11,6 +11,7 @@ import Metatheorems.Dialectica.Syntactic
 import Metatheorems.RationalNumbers
 import Metatheorems.SyntacticMetatheorem
 import Metatheorems.RealNumbers
+import Metatheorems.BaseEquality
 import Metatheorems.Rounding
 import Metatheorems.MetricSpaces
 import Metatheorems.QVal

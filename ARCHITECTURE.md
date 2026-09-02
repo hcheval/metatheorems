@@ -402,6 +402,31 @@ touch.
 
 ---
 
+## 9b. Known debts from the `Term.dist` refactor (2026-09-02)
+
+Recorded so they read as *debts*, not as design.
+
+**The `eqBaseFree` `autoParam` is duct tape.** `eqAtType_sym`/`eqAtType_trans` and
+`lam2_correct`/`lam3_correct` (+ their `_nf` wrappers) carry
+`(hbf : ρ.eqBaseFree = true := by rfl)`. It works — the base case becomes unreachable, and
+because `τ` is concrete at every ℚ/ℝ call site Lean fills the proof, so **all ~164 call sites
+were untouched**. But it is a side condition threaded for a *layering* reason, not a
+mathematical one, and a reader meeting `hbf` has no local way to see why. Options when
+polishing: fold the base-free restriction into a separate namespace; or, if the layering is
+ever reorganised so `eq_R` symmetry/transitivity land below `Arithmetic.lean`, delete it
+entirely. Do not treat its presence as meaningful.
+
+**Two distances in the metric model.** `MetricSpace.ax_refl`/`ax_sym`/`ax_triangle` still
+speak about `d_X = Term.func ()` while `eqAtType` uses the structural `Term.dist ()`. They
+get the same interpretation in `MetricModel` but nothing *relates* them. Stage 6 drops the
+premise-level one; until then, do not assume a fact about one transfers to the other.
+
+**`EqXInterp` grew four fields.** `dist_comm_realize`, `dist_tri_realize`,
+`dist_comm_term`, `dist_comm_term_sound`, `dist_tri_term`, `dist_tri_term_sound` — soundness
+owes the model's `distInterp` being a pseudometric, since `dist_comm`/`dist_tri` are
+constructors and are *not* of the shape `eqAtType (.base i) s t`. Costless today because
+nothing constructs an `EqXInterp`, but it widens what instantiating a metric model will cost.
+
 ## 10. Scope decisions
 
 - **`general_metatheorem` may narrow to theories whose base types are pointed pseudometric
