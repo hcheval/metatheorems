@@ -372,6 +372,38 @@ theorem MetricSpace.premises_pu :
   · exact MetricSpace.ax_sym_pu
   · exact MetricSpace.ax_triangle_pu
 
+-- ============================================================================
+-- AdmissibleEqX for the metric space EqX
+-- ============================================================================
+
+-- substF_nat: follows from eq_R_substF (proved in RealNumbers)
+-- eqx_pu:     eq_R is Π₁⁰ by construction (Formula.all over eq0)
+-- eqx_refl/sym/trans: derivable from the metric axioms in `MetricSpace.Premises`.
+--
+-- These are the *whole* of what "instantiating the metric case" means on the equality
+-- side, and they are not ℝ-arithmetic debts. `EqX () s t ≡ d(s,t) =ℝ 0ℝ`, so:
+--
+--   eqx_refl  ← `ax_refl` instantiated at `t`.
+--   eqx_sym   ← `ax_sym` + an `eq_R` congruence.
+--   eqx_trans ← `ax_triangle` + `add_eq_zero_R` (proved) + `le_zero_eq_zero_R` with its
+--               missing non-negativity hypothesis. Non-negativity of `d` is itself
+--               derivable — `0 =ℝ d(x,x) ≤ℝ d(x,y) + d(y,x) =ℝ 2·d(x,y)` by ax_refl,
+--               ax_triangle and ax_sym — modulo an ℝ lemma `0 ≤ℝ f + f → 0 ≤ℝ f`.
+--
+-- Before the `Premises` parameter was added to `AdmissibleEqX` these fields quantified
+-- over *every* premise set, including the empty one, and were therefore unsatisfiable:
+-- `d_X` is an uninterpreted constant, so `metric x y = fun _ => 1` refutes `d(t,t) =ℝ 0ℝ`.
+-- The three `sorry`s below now stand for unfinished work rather than for a false claim.
+
+def MetricSpace.admissibleEqX : AdmissibleEqX MetricSpace.EqX MetricSpace.Premises where
+  substF_nat := fun {_ _} () u v σ => by
+    simp only [MetricSpace.EqX, eq_R_substF, Term.subst, Term.app2,
+      zero_R_closed_subst]
+  eqx_refl := sorry
+  eqx_sym := sorry
+  eqx_trans := sorry
+  eqx_pu := fun () {_} _ _ => eq_R_isPurelyUniversal _ _
+
 /-- **The metric-space metatheorem, from a classical proof.**
 
 `MetricModel.metric_metatheorem` takes an `Allowed.extended` derivation; this one takes a
@@ -382,13 +414,17 @@ This is the combination that `general_metatheorem_classical` cannot deliver: tha
 asks for a `Majorizability`, i.e. a total majorizer on every semantic value, and a metric
 model supplies only an `AbstractMajorizability` (`MetricModel.abstractMajorizability`).
 
-`adm` is a parameter rather than `MetricSpace.admissibleEqX` because the latter is still
-`sorry`-ed on `eqx_refl`/`eqx_sym`/`eqx_trans`, which wait on the ℝ ordered-field axioms.
-`nts` is *not* a parameter: the premises are purely universal, so `ntStable_of_pu` supplies
-it. -/
+**`adm` is discharged here, not assumed.** `AdmissibleEqX` is a hypothesis of the *general*
+metatheorem precisely because `EqX` is abstract there; supplying it is part of what
+instantiating to metric spaces consists of, alongside `eqxi` and `spremise`. Taking it back
+as a parameter would make this theorem a second abstract metatheorem rather than an
+instantiation, and would hide `MetricSpace.admissibleEqX`'s three open fields inside a
+binder. So this theorem currently depends on `sorryAx`, visibly and in one place.
+
+`nts` is likewise not a parameter: the premises are purely universal, so `ntStable_of_pu`
+supplies it. -/
 theorem MetricModel.metric_metatheorem_classical (M : MetricModel)
     (eqxi : EqXInterp (fun () => M.carrier) MetricSpace.F M.si MetricSpace.EqX)
-    (adm : AdmissibleEqX MetricSpace.EqX)
     (spremise : ∀ (Γ' : Ctx MetricSpace.ι) (B : Formula MetricSpace.F Γ'),
       MetricSpace.Premises ⟨Γ', B⟩ → SRealizer M.si B)
     {ρ : Ty MetricSpace.ι} {B₀ C₀ : Formula MetricSpace.F [Ty.nat, ρ]}
@@ -403,25 +439,8 @@ theorem MetricModel.metric_metatheorem_classical (M : MetricModel)
         M.abstractMajorizability.toRel.maj ρ x_star x →
         (∀ u : Nat, u ≤ Φ x_star → Formula.interpret M.si B₀ (u, (x, ()))) →
         ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret M.si C₀ (v, (x, ())) :=
-  syntactic_general_metatheorem_classical eqxi adm
-    (ntStable_of_pu adm MetricSpace.premises_pu) spremise M.abstractMajorizability
-    hB_qf hB_vf hC_qf hC_vf prf
-
--- ============================================================================
--- AdmissibleEqX for the metric space EqX
--- ============================================================================
-
--- substF_nat: follows from eq_R_substF (proved in RealNumbers)
--- eqx_pu:     eq_R is Π₁⁰ by construction (Formula.all over eq0)
--- eqx_refl/sym/trans: require ordered field axioms (sorry'd in RealNumbers)
-
-def MetricSpace.admissibleEqX : AdmissibleEqX MetricSpace.EqX where
-  substF_nat := fun {_ _} () u v σ => by
-    simp only [MetricSpace.EqX, eq_R_substF, Term.subst, Term.app2,
-      zero_R_closed_subst]
-  eqx_refl := sorry
-  eqx_sym := sorry
-  eqx_trans := sorry
-  eqx_pu := fun () {_} _ _ => eq_R_isPurelyUniversal _ _
+  syntactic_general_metatheorem_classical eqxi MetricSpace.admissibleEqX
+    (ntStable_of_pu MetricSpace.admissibleEqX MetricSpace.premises_pu) spremise
+    M.abstractMajorizability hB_qf hB_vf hC_qf hC_vf prf
 
 end Metatheorems

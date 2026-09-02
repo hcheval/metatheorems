@@ -362,7 +362,7 @@ def Term.round_nat {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ realTy ι) :=
 variable {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) →
     Term F Γ (Ty.base i) → Formula F Γ}
   {al : Allowed} {Premises : PremiseSet F}
-  (adm : AdmissibleEqX EqX)
+  (adm : AdmissibleEqX EqX Premises)
 
 -- Notation: real-typed variables in context
 private abbrev rTy := realTy ι

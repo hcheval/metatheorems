@@ -382,8 +382,8 @@ Factored out so that both the semantic (`general_metatheorem_classical`) and the
 def classical_to_prenex_extended
     {ι : Type} {F : ι → Ty ι}
     {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
-    (adm : AdmissibleEqX EqX)
     {Premises : PremiseSet F}
+    (adm : AdmissibleEqX EqX Premises)
     (nts : NTStableD EqX Premises)
     {ρ : Ty ι}
     {B₀ C₀ : Formula F [Ty.nat, ρ]}
@@ -466,9 +466,9 @@ def general_metatheorem_classical
     (si : SpaceInterp X F)
     {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
     (eqxi : EqXInterp X F si EqX)
-    (adm : AdmissibleEqX EqX)
-    (mj : Majorizability si)
     {Premises : PremiseSet F}
+    (adm : AdmissibleEqX EqX Premises)
+    (mj : Majorizability si)
     (nts : NTStableD EqX Premises)
     (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
       ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)

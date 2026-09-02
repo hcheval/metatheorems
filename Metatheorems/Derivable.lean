@@ -281,25 +281,38 @@ def Derivable.castAllowed {ι : Type} {F : ι → Ty ι}
     Fields are polymorphic in `allowed` because the proofs use only base
     constructors, which are available in every system.
 
-    For `ι = Empty` (pure WE-HA^ω), this is trivially satisfiable.
-    For concrete metric-space EqX (e.g. `d(x,y) =_ℝ 0`), all conditions hold. -/
+    **They are NOT polymorphic in `Premises`, and must not be.** `EqX` at a base
+    type is in general an equivalence relation only *because of the theory's own
+    axioms*: for the metric-space instantiation `EqX () s t ≡ d(s,t) =ℝ 0ℝ`, and
+    `⊢ d(t,t) =ℝ 0ℝ` holds only relative to the premise `ax_refl`. `d_X` is an
+    uninterpreted function constant, so with `Premises = fun _ => False` the
+    interpretation `metric x y = fun _ => 1` refutes it. A `Premises`-polymorphic
+    `eqx_refl` is therefore not a strong hypothesis but an unsatisfiable one, and
+    the metric instantiation could never have discharged it.
+
+    So `Premises` is a *parameter*: an `AdmissibleEqX EqX Premises` says EqX is an
+    equivalence relation **in the theory axiomatised by `Premises`**.
+
+    For `ι = Empty` (pure WE-HA^ω) this is trivially satisfiable at any `Premises`,
+    the fields being vacuous. -/
 structure AdmissibleEqX {ι : Type} {F : ι → Ty ι}
     (EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) →
-           Term F Γ (Ty.base i) → Formula F Γ) where
+           Term F Γ (Ty.base i) → Formula F Γ)
+    (Premises : PremiseSet F) where
   /-- EqX commutes with substitution (naturality). -/
   substF_nat : ∀ {Γ Δ : Ctx ι} {i : ι} (u v : Term F Γ (Ty.base i))
       (σ : Term.Subst F Γ Δ),
       (EqX i u v).substF σ = EqX i (u.subst σ) (v.subst σ)
   /-- Reflexivity: ⊢ EqX i t t. -/
-  eqx_refl : ∀ {a : Allowed} {Premises : PremiseSet F}
+  eqx_refl : ∀ {a : Allowed}
       {Γ : Ctx ι} {i : ι} (t : Term F Γ (Ty.base i)),
       Derivable F EqX a Premises (EqX i t t)
   /-- Symmetry: ⊢ EqX i s t → EqX i t s. -/
-  eqx_sym : ∀ {a : Allowed} {Premises : PremiseSet F}
+  eqx_sym : ∀ {a : Allowed}
       {Γ : Ctx ι} {i : ι} {s t : Term F Γ (Ty.base i)},
       Derivable F EqX a Premises (EqX i s t →ᶠ EqX i t s)
   /-- Transitivity: ⊢ EqX i s t ∧ EqX i t u → EqX i s u. -/
-  eqx_trans : ∀ {a : Allowed} {Premises : PremiseSet F}
+  eqx_trans : ∀ {a : Allowed}
       {Γ : Ctx ι} {i : ι} {s t u : Term F Γ (Ty.base i)},
       Derivable F EqX a Premises (EqX i s t ∧ᶠ EqX i t u →ᶠ EqX i s u)
   /-- EqX at base types is purely universal (∀-nesting around QF core).

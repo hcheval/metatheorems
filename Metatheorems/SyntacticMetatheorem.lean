@@ -96,7 +96,7 @@ its matrix to the formula's interpretation **for every** counter. That is precis
 property the unprenexified route lacks. -/
 theorem syntactic_general_metatheorem_classical
     (eqxi : EqXInterp X F si EqX)
-    (adm : AdmissibleEqX EqX)
+    (adm : AdmissibleEqX EqX Premises)
     (nts : NTStableD EqX Premises)
     (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B)
     (am : AbstractMajorizability si)

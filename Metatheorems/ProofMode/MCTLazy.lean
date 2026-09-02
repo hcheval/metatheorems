@@ -50,7 +50,7 @@ variable {ι : Type} {F : ι → Ty ι}
 /-- **The body of the statement**, proved lazily: `(∀u B₀ u) → ∃n (a n = a (n + g n))`.
 
 `hmk` is what makes the reductio legal — `pby_contra` is the Markov rule and says so. -/
-def mct_lazy_body (adm : AdmissibleEqX EqX) (hmk : al.markov = true)
+def mct_lazy_body (adm : AdmissibleEqX EqX Premises) (hmk : al.markov = true)
     (a g : Term F Γ (Ty.nat →ₜ Ty.nat)) (K : Term F Γ Ty.nat) :
     Derivable F EqX al Premises (Γ := Γ)
       (Formula.all Ty.nat
@@ -175,7 +175,7 @@ def mct_lazy_body (adm : AdmissibleEqX EqX) (hmk : al.markov = true)
 /-- **A3 — ℕ-MCT, proof p₁.** The lazy derivation of `mctStatement`.
 
 Same statement, same encoding, same shared lemmas as `mct_p2`; a different tree. -/
-def mct_p1 (adm : AdmissibleEqX EqX) (hmk : al.markov = true) :
+def mct_p1 (adm : AdmissibleEqX EqX Premises) (hmk : al.markov = true) :
     Derivable F EqX al Premises (Γ := []) mctStatement := by
   pmode
   pforall
@@ -200,7 +200,7 @@ The result type is written out rather than inferred: inferring it means normalis
 Dialectica interpretation of the whole derivation, and this one is large enough that the
 elaborator does not get there. -/
 def mct_extract_p1 (si : SpaceInterp X F) (eqxi : EqXInterp X F si EqX)
-    (adm : AdmissibleEqX EqX)
+    (adm : AdmissibleEqX EqX Premises)
     (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
       ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env) :
     { UV : (Ty.interpret X (mctTy ι) → Nat) × (Ty.interpret X (mctTy ι) → Nat) //
@@ -211,7 +211,7 @@ def mct_extract_p1 (si : SpaceInterp X F) (eqxi : EqXInterp X F si EqX)
 
 /-- The bound p₁ gives, from majorants for its `U` and `V`. -/
 theorem mct_bound_p1 (si : SpaceInterp X F) (eqxi : EqXInterp X F si EqX)
-    (adm : AdmissibleEqX EqX) (mj : MajorizabilityRel si)
+    (adm : AdmissibleEqX EqX Premises) (mj : MajorizabilityRel si)
     (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
       ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
     (U_star V_star : Ty.interpret X (mctTy ι →ₜ Ty.nat).hat)

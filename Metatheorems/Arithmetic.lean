@@ -45,7 +45,7 @@ open Formula
 
 variable {ι : Type} {F : ι → Ty ι}
     {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
-    {al : Allowed} {Premises : PremiseSet F} (adm : AdmissibleEqX EqX)
+    {al : Allowed} {Premises : PremiseSet F} (adm : AdmissibleEqX EqX Premises)
 
 -- Private combinators used throughout (same as NegTrans.lean private defs)
 private def self_imp_h {Γ : Ctx ι} {A : Formula F Γ} :
@@ -256,7 +256,7 @@ private theorem app_weaken_vz_subst0 (t : Term F Γ (ρ →ₜ σ')) (u : Term F
 
 /-- eqAtType commutes with general substitution (naturality).
     At base types, this requires EqX to commute with substitution (sorry). -/
-private theorem eqAtType_substF (adm : AdmissibleEqX EqX) {τ : Ty ι} {Γ Δ : Ctx ι}
+private theorem eqAtType_substF (adm : AdmissibleEqX EqX Premises) {τ : Ty ι} {Γ Δ : Ctx ι}
     (u v : Term F Γ τ) (σ : Term.Subst F Γ Δ) :
     (eqAtType EqX τ u v).substF σ = eqAtType EqX τ (u.subst σ) (v.subst σ) := by
   induction τ generalizing Γ Δ σ with
@@ -273,7 +273,7 @@ private theorem eqAtType_substF (adm : AdmissibleEqX EqX) {τ : Ty ι} {Γ Δ : 
     simp only [Term.subst, Term.Subst.ext, weaken_subst_ext_h]
 
 /-- eqAtType commutes with single-variable substitution. -/
-private theorem eqAtType_subst0 (adm : AdmissibleEqX EqX) {τ : Ty ι} {ρ : Ty ι} {Γ : Ctx ι}
+private theorem eqAtType_subst0 (adm : AdmissibleEqX EqX Premises) {τ : Ty ι} {ρ : Ty ι} {Γ : Ctx ι}
     (u v : Term F (ρ :: Γ) τ) (s : Term F Γ ρ) :
     (eqAtType EqX τ u v).subst0 s = eqAtType EqX τ (u.subst0 s) (v.subst0 s) :=
   eqAtType_substF adm u v (Term.subst0_map s)
@@ -345,7 +345,7 @@ def univ_gen {Γ : Ctx ι} {ρ : Ty ι} {A : Formula F (ρ :: Γ)}
     Second level: lam_correct body (s₂.weaken) in context ρ₂ :: Γ,
     then universalize over ρ₂ and instantiate at s₁. -/
 def Term.lam2_correct {ρ₂ ρ₁ τ : Ty ι} {Γ : Ctx ι}
-    (adm : AdmissibleEqX EqX)
+    (adm : AdmissibleEqX EqX Premises)
     (body : Term F (ρ₁ :: ρ₂ :: Γ) τ) (s₁ : Term F Γ ρ₂) (s₂ : Term F Γ ρ₁) :
     Derivable F EqX al Premises (eqAtType EqX τ
       (Term.app2 (Term.lam (Term.lam body)) s₁ s₂)
@@ -392,7 +392,7 @@ def Term.lam2_correct {ρ₂ ρ₁ τ : Ty ι} {Γ : Ctx ι}
 /-- lam2_correct with explicit normal form: gives
     app2 (lam (lam body)) s₁ s₂ =_τ target
     when `(body.subst0 (s₂.weaken)).subst0 s₁ = target`. -/
-def lam2_correct_nf (adm : AdmissibleEqX EqX) {ρ₂ ρ₁ τ : Ty ι} {Γ : Ctx ι}
+def lam2_correct_nf (adm : AdmissibleEqX EqX Premises) {ρ₂ ρ₁ τ : Ty ι} {Γ : Ctx ι}
     (body : Term F (ρ₁ :: ρ₂ :: Γ) τ) (s₁ : Term F Γ ρ₂) (s₂ : Term F Γ ρ₁)
     {target : Term F Γ τ} (hnf : (body.subst0 (s₂.weaken)).subst0 s₁ = target) :
     Derivable F EqX al Premises (eqAtType EqX τ (Term.app2 (Term.lam (Term.lam body)) s₁ s₂) target) :=
@@ -404,7 +404,7 @@ def lam2_correct_nf (adm : AdmissibleEqX EqX) {ρ₂ ρ₁ τ : Ty ι} {Γ : Ctx
     `(lam (lam (lam body))) s₁ s₂ s₃ =_τ NF`
     where NF = `((body.subst0 (s₃.weaken.weaken)).subst0 (s₂.weaken)).subst0 s₁`. -/
 def Term.lam3_correct {ρ₃ ρ₂ ρ₁ τ : Ty ι} {Γ : Ctx ι}
-    (adm : AdmissibleEqX EqX)
+    (adm : AdmissibleEqX EqX Premises)
     (body : Term F (ρ₁ :: ρ₂ :: ρ₃ :: Γ) τ)
     (s₁ : Term F Γ ρ₃) (s₂ : Term F Γ ρ₂) (s₃ : Term F Γ ρ₁) :
     Derivable F EqX al Premises (eqAtType EqX τ
@@ -464,7 +464,7 @@ def Term.lam3_correct {ρ₃ ρ₂ ρ₁ τ : Ty ι} {Γ : Ctx ι}
   .mp (.mp step_c4 (.mp step_b and_intro)) (eqAtType_trans adm)
 
 /-- lam3_correct with explicit normal form. -/
-def lam3_correct_nf (adm : AdmissibleEqX EqX) {ρ₃ ρ₂ ρ₁ τ : Ty ι} {Γ : Ctx ι}
+def lam3_correct_nf (adm : AdmissibleEqX EqX Premises) {ρ₃ ρ₂ ρ₁ τ : Ty ι} {Γ : Ctx ι}
     (body : Term F (ρ₁ :: ρ₂ :: ρ₃ :: Γ) τ)
     (s₁ : Term F Γ ρ₃) (s₂ : Term F Γ ρ₂) (s₃ : Term F Γ ρ₁)
     {target : Term F Γ τ}

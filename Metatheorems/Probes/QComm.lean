@@ -29,7 +29,7 @@ variable {ι : Type} {F : ι → Ty ι}
   {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) →
     Term F Γ (Ty.base i) → Formula F Γ}
   {al : Allowed} {Premises : PremiseSet F} {Γ : Ctx ι}
-  (adm : AdmissibleEqX EqX)
+  (adm : AdmissibleEqX EqX Premises)
 
 /-! ## Chunk 1 — pure congruence plumbing (calibration)
 

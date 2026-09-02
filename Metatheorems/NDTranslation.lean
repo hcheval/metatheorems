@@ -34,8 +34,8 @@ def nd_soundness
     (si : SpaceInterp X F)
     {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
     (eqxi : EqXInterp X F si EqX)
-    (adm : AdmissibleEqX EqX)
     {Premises : PremiseSet F}
+    (adm : AdmissibleEqX EqX Premises)
     (nts : NTStableD EqX Premises)
     (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
       ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
@@ -52,8 +52,8 @@ def nd_soundness_closed
     (si : SpaceInterp X F)
     {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
     (eqxi : EqXInterp X F si EqX)
-    (adm : AdmissibleEqX EqX)
     {Premises : PremiseSet F}
+    (adm : AdmissibleEqX EqX Premises)
     (nts : NTStableD EqX Premises)
     (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
       ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)

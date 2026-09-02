@@ -553,7 +553,7 @@ end ClosedSubst
 variable {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) →
     Term F Γ (Ty.base i) → Formula F Γ}
   {al : Allowed} {Premises : PremiseSet F}
-  (adm : AdmissibleEqX EqX)
+  (adm : AdmissibleEqX EqX Premises)
 
 -- ── Congruence helpers (outside section to avoid Γ capture) ──────────────
 
@@ -5118,7 +5118,7 @@ macro_rules
 Stating the resulting formula once, here, is what keeps the three nested `forall_ax`
 substitutions from being `whnf`'d blindly through `eq_Q_dec` at every use site — which is
 what exhausts the heartbeat budget. Use this rather than chaining `.forall_ax` inline. -/
-def eq_Q_trans_inst (adm : AdmissibleEqX EqX) (x y z : Term F Γ Ty.nat) :
+def eq_Q_trans_inst (adm : AdmissibleEqX EqX Premises) (x y z : Term F Γ Ty.nat) :
     Derivable F EqX al Premises (eq_Q x y ∧ᶠ eq_Q y z →ᶠ eq_Q x z) := by
   have h := Derivable.mp (Derivable.mp (Derivable.mp
     (eq_Q_trans (adm := adm) (al := al) (Premises := Premises) (Γ := Γ))
@@ -5640,7 +5640,7 @@ def add_Q_comm :
 
 /-- `add_Q_comm` instantiated at two explicit terms, with the resulting formula stated.
 See `q_norm` for why the inline `.forall_ax` chain is not affordable. -/
-def add_Q_comm_inst (adm : AdmissibleEqX EqX) (x y : Term F Γ Ty.nat) :
+def add_Q_comm_inst (adm : AdmissibleEqX EqX Premises) (x y : Term F Γ Ty.nat) :
     Derivable F EqX al Premises
       (eq_Q (Term.app2 Term.add_Q x y) (Term.app2 Term.add_Q y x)) := by
   have h := Derivable.mp (Derivable.mp
@@ -6587,7 +6587,7 @@ def mul_Q_comm :
 
 /-- `mul_Q_comm` instantiated at two explicit terms, with the resulting formula stated.
 See `q_norm` for why the inline `.forall_ax` chain is not affordable. -/
-def mul_Q_comm_inst (adm : AdmissibleEqX EqX) (x y : Term F Γ Ty.nat) :
+def mul_Q_comm_inst (adm : AdmissibleEqX EqX Premises) (x y : Term F Γ Ty.nat) :
     Derivable F EqX al Premises
       (eq_Q (Term.app2 Term.mul_Q x y) (Term.app2 Term.mul_Q y x)) := by
   have h := Derivable.mp (Derivable.mp
@@ -7708,7 +7708,7 @@ private def sub_Q_one_zero_unfold :
   .mp (.mp h_congr (.mp h_unfold and_intro)) Derivable.trans0
 
 /-- add_Q(one_Q, zero_Q) =₀ one_Q -/
-private def add_Q_one_zero (adm : AdmissibleEqX EqX) :
+private def add_Q_one_zero (adm : AdmissibleEqX EqX Premises) :
     Derivable F EqX al Premises (Γ := Γ)
       (Formula.eq0 (Term.app2 Term.add_Q Term.one_Q Term.zero_Q) Term.one_Q) :=
   -- add_Q body with var (vs vz) = n₁ (first arg), var vz = n₂ (second arg)
@@ -7865,7 +7865,7 @@ private def add_Q_one_zero (adm : AdmissibleEqX EqX) :
   .mp (.mp h_nf_to_one (.mp h_unfold and_intro)) Derivable.trans0
 
 /-- sub_Q(one_Q, zero_Q) =₀ one_Q -/
-def sub_Q_one_zero (adm : AdmissibleEqX EqX) :
+def sub_Q_one_zero (adm : AdmissibleEqX EqX Premises) :
     Derivable F EqX al Premises (Γ := Γ)
       (Formula.eq0 (Term.app2 Term.sub_Q Term.one_Q Term.zero_Q) Term.one_Q) :=
   .mp (.mp (add_Q_one_zero adm)
@@ -7983,7 +7983,7 @@ private def add_Q_congr_r_nat (u : Term F Γ Ty.nat) {s t : Term F Γ Ty.nat}
     (by qnorm [Term.subst0]) (by qnorm [Term.subst0])
 
 /-- `eq_Q_sym` instantiated at two explicit terms. -/
-def eq_Q_sym_inst (adm : AdmissibleEqX EqX) (x y : Term F Γ Ty.nat) :
+def eq_Q_sym_inst (adm : AdmissibleEqX EqX Premises) (x y : Term F Γ Ty.nat) :
     Derivable F EqX al Premises (eq_Q x y →ᶠ eq_Q y x) := by
   have h := Derivable.mp (Derivable.mp
     (eq_Q_sym (adm := adm) (al := al) (Premises := Premises) (Γ := Γ)) (.forall_ax x))
@@ -10150,7 +10150,7 @@ private def add_Q_right_congr :
 
 /-- `add_Q_right_congr` instantiated at three explicit terms, with the resulting formula
 stated. See `q_norm`. -/
-private def add_Q_right_congr_inst (adm : AdmissibleEqX EqX) (x y z : Term F Γ Ty.nat) :
+private def add_Q_right_congr_inst (adm : AdmissibleEqX EqX Premises) (x y z : Term F Γ Ty.nat) :
     Derivable F EqX al Premises
       (eq_Q y z →ᶠ eq_Q (Term.app2 Term.add_Q x y) (Term.app2 Term.add_Q x z)) := by
   have h := Derivable.mp (Derivable.mp (Derivable.mp
@@ -10633,7 +10633,7 @@ private def mul_Q_right_congr :
 
 /-- `mul_Q_right_congr` instantiated at three explicit terms, with the resulting formula
 stated. See `q_norm`. -/
-private def mul_Q_right_congr_inst (adm : AdmissibleEqX EqX) (x y z : Term F Γ Ty.nat) :
+private def mul_Q_right_congr_inst (adm : AdmissibleEqX EqX Premises) (x y z : Term F Γ Ty.nat) :
     Derivable F EqX al Premises
       (eq_Q y z →ᶠ eq_Q (Term.app2 Term.mul_Q x y) (Term.app2 Term.mul_Q x z)) := by
   have h := Derivable.mp (Derivable.mp (Derivable.mp
@@ -10731,14 +10731,14 @@ def addQl {u v : Term F Γ Ty.nat}
     (eqQtrans adm (addQr adm w h) (add_Q_comm_inst adm w v))
 
 /-- `add_Q_zero` at an explicit term. -/
-def add_Q_zero_inst (adm : AdmissibleEqX EqX) (p : Term F Γ Ty.nat) :
+def add_Q_zero_inst (adm : AdmissibleEqX EqX Premises) (p : Term F Γ Ty.nat) :
     Derivable F EqX al Premises (eq_Q (Term.app2 Term.add_Q p Term.zero_Q) p) := by
   have h := Derivable.mp
     (add_Q_zero (adm := adm) (al := al) (Premises := Premises) (Γ := Γ)) (.forall_ax p)
   q_norm using h
 
 /-- `add_Q_neg` at an explicit term. -/
-def add_Q_neg_inst (adm : AdmissibleEqX EqX) (p : Term F Γ Ty.nat) :
+def add_Q_neg_inst (adm : AdmissibleEqX EqX Premises) (p : Term F Γ Ty.nat) :
     Derivable F EqX al Premises
       (eq_Q (Term.app2 Term.add_Q p (.app Term.neg_Q p)) Term.zero_Q) := by
   have h := Derivable.mp

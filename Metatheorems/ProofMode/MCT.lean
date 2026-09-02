@@ -52,7 +52,7 @@ variable {ι : Type} {F : ι → Ty ι}
 
 `a`, `g` and `K` are separate parameters here; the fusion into the single functional `h` that
 `mctStatement` quantifies over happens only at the end, in `mct_p2`. -/
-def mct_descent (adm : AdmissibleEqX EqX)
+def mct_descent (adm : AdmissibleEqX EqX Premises)
     (a g : Term F Γ (Ty.nat →ₜ Ty.nat)) (K : Term F Γ Ty.nat) :
     Derivable F EqX al Premises (Γ := Γ)
       (Formula.all Ty.nat                                        -- k = x₀
@@ -140,7 +140,7 @@ def mct_descent (adm : AdmissibleEqX EqX)
 
 The descent at `k := K` and `m := 0`; the side condition `a 0 ≤ K` is the premise's second
 conjunct at `u := 0`. -/
-def mct_body (adm : AdmissibleEqX EqX)
+def mct_body (adm : AdmissibleEqX EqX Premises)
     (a g : Term F Γ (Ty.nat →ₜ Ty.nat)) (K : Term F Γ Ty.nat) :
     Derivable F EqX al Premises (Γ := Γ)
       (Formula.all Ty.nat
@@ -166,7 +166,7 @@ def mct_body (adm : AdmissibleEqX EqX)
 `MCTStatement.lean` encodes them: `a := h 0`, `g := h 1`, `K := h 2 0`. Fusing them into one
 parameter is what lets a single majorant cover all three; the proof above never needed to know
 that, which is why it was done over three separate parameters and specialised only here. -/
-def mct_p2 (adm : AdmissibleEqX EqX) :
+def mct_p2 (adm : AdmissibleEqX EqX Premises) :
     Derivable F EqX al Premises (Γ := []) mctStatement := by
   pmode
   pforall
@@ -186,14 +186,14 @@ variable {X : ι → Type}
 /-- **A4, first half.** The two functionals p₂ yields: `U` says where to test the premise,
 `V` is the witness. Both compute — nothing here is `noncomputable`. -/
 def mct_extract_p2 (si : SpaceInterp X F) (eqxi : EqXInterp X F si EqX)
-    (adm : AdmissibleEqX EqX)
+    (adm : AdmissibleEqX EqX Premises)
     (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
       ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env) :=
   mctExtract si eqxi premise_realizer (mct_p2 (al := Allowed.extended) adm)
 
 /-- **A4, second half.** The bound, from that extraction plus majorants for `U` and `V`. -/
 theorem mct_bound_p2 (si : SpaceInterp X F) (eqxi : EqXInterp X F si EqX)
-    (adm : AdmissibleEqX EqX) (mj : MajorizabilityRel si)
+    (adm : AdmissibleEqX EqX Premises) (mj : MajorizabilityRel si)
     (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
       ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
     (U_star V_star : Ty.interpret X (mctTy ι →ₜ Ty.nat).hat)

@@ -9,8 +9,8 @@ def syntactic_nd_soundness
     {si : SpaceInterp X F}
     {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
     (eqxi : EqXInterp X F si EqX)
-    (adm : AdmissibleEqX EqX)
     {Premises : PremiseSet F}
+    (adm : AdmissibleEqX EqX Premises)
     (nts : NTStableD EqX Premises)
     (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B)
     {Γ : Ctx ι} {A : Formula F Γ}

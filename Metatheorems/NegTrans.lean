@@ -294,8 +294,8 @@ private abbrev lift {ι : Type} {F : ι → Ty ι}
     Backward: NT(∀x.B) → ∀x.¬¬B.kurodaInner (nn_all_nn) → ∀x.B (IH backward + forall_map). -/
 def negTrans_iff_pu {ι : Type} {F : ι → Ty ι}
     {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
-    (adm : AdmissibleEqX EqX)
     {a : Allowed} {Premises : PremiseSet F}
+    (adm : AdmissibleEqX EqX Premises)
     {Γ : Ctx ι} (A : Formula F Γ) (hpu : A.isPurelyUniversal = true) :
     Derivable F EqX a Premises (A →ᶠ Aᴺᵀ) ×
     Derivable F EqX a Premises (Aᴺᵀ →ᶠ A) :=
@@ -347,8 +347,8 @@ that `negTrans_iff_pu` does not state on its own. Intuitionistic: the only non-s
 ingredient is `qf_double_neg_elim`, inherited through `negTrans_iff_pu`. -/
 def kurodaInner_iff_pu {ι : Type} {F : ι → Ty ι}
     {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
-    (adm : AdmissibleEqX EqX)
     {a : Allowed} {Premises : PremiseSet F}
+    (adm : AdmissibleEqX EqX Premises)
     {Γ : Ctx ι} (A : Formula F Γ) (hpu : A.isPurelyUniversal = true) :
     Derivable F EqX a Premises (A →ᶠ A.kurodaInner) ×
     Derivable F EqX a Premises (A.kurodaInner →ᶠ A) :=
@@ -392,8 +392,8 @@ No `Allowed` flag is used: this holds in the same system `negTrans_iff_pu` does,
 quantifier-free matrices already. -/
 def negTrans_iff_imp_pu {ι : Type} {F : ι → Ty ι}
     {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
-    (adm : AdmissibleEqX EqX)
     {a : Allowed} {Premises : PremiseSet F}
+    (adm : AdmissibleEqX EqX Premises)
     {Γ : Ctx ι} (A B : Formula F Γ)
     (hA : A.isPurelyUniversal = true) (hB : B.isPurelyUniversal = true) :
     Derivable F EqX a Premises ((A →ᶠ B) →ᶠ (A →ᶠ B)ᴺᵀ) ×
@@ -832,13 +832,13 @@ def negTrans_exist_ax {Γ : Ctx ι} {ρ : Ty ι} {A : Formula F (ρ :: Γ)}
 
 /-- NT of a purely universal axiom: from ⊢ A (axiom), derive ⊢ NT(A)
     using negTrans_iff_pu. -/
-private def negTrans_pu_axiom {a : Allowed} {Premises : PremiseSet F} (adm : AdmissibleEqX EqX) {Γ : Ctx ι}
+private def negTrans_pu_axiom {a : Allowed} {Premises : PremiseSet F} (adm : AdmissibleEqX EqX Premises) {Γ : Ctx ι}
     {A : Formula F Γ} (hpu : A.isPurelyUniversal = true)
     (h : Derivable F EqX a Premises A) : Derivable F EqX a Premises A.negTrans :=
   .mp h (negTrans_iff_pu adm A hpu).1
 
 /-- eqAtType is purely universal (from adm.eqx_pu + induction on ρ). -/
-private theorem eqAtType_isPU (adm : AdmissibleEqX EqX) (ρ : Ty ι)
+private theorem eqAtType_isPU (adm : AdmissibleEqX EqX Premises) (ρ : Ty ι)
     {Γ : Ctx ι} (s t : Term F Γ ρ) :
     (eqAtType EqX ρ s t).isPurelyUniversal = true := by
   induction ρ generalizing Γ with
@@ -850,13 +850,13 @@ private theorem eqAtType_isPU (adm : AdmissibleEqX EqX) (ρ : Ty ι)
     exact ⟨ih_ρ _ _, ih_τ _ _⟩
   | arr ρ τ ih_ρ ih_τ => simp only [eqAtType, Formula.isPurelyUniversal]; exact ih_τ _ _
 
-def negTrans_rec_zero (adm : AdmissibleEqX EqX)
+def negTrans_rec_zero (adm : AdmissibleEqX EqX Premises)
     {Γ : Ctx ι} {ρ : Ty ι}
     {y : Term F Γ ρ} {z : Term F Γ (ρ →ₜ Ty.nat →ₜ ρ)} :
     Derivable F EqX Allowed.nt_target Premises (eqAtType EqX ρ (Term.app3 (Term.prec ρ) y z Term.zero) y).negTrans :=
   negTrans_pu_axiom adm (eqAtType_isPU adm ρ _ _) .rec_zero
 
-def negTrans_rec_succ (adm : AdmissibleEqX EqX)
+def negTrans_rec_succ (adm : AdmissibleEqX EqX Premises)
     {Γ : Ctx ι} {ρ : Ty ι}
     {y : Term F Γ ρ} {z : Term F Γ (ρ →ₜ Ty.nat →ₜ ρ)} {x : Term F Γ Ty.nat} :
     Derivable F EqX Allowed.nt_target Premises (eqAtType EqX ρ
@@ -864,7 +864,7 @@ def negTrans_rec_succ (adm : AdmissibleEqX EqX)
       (Term.app2 z (Term.app3 (Term.prec ρ) y z x) x)).negTrans :=
   negTrans_pu_axiom adm (eqAtType_isPU adm ρ _ _) .rec_succ
 
-def negTrans_beta_eq (adm : AdmissibleEqX EqX)
+def negTrans_beta_eq (adm : AdmissibleEqX EqX Premises)
     {Γ : Ctx ι} {ρ τ : Ty ι}
     {body : Term F (ρ :: Γ) τ} {u : Term F Γ ρ} :
     Derivable F EqX Allowed.nt_target Premises
@@ -877,7 +877,7 @@ def negTrans_beta_eq (adm : AdmissibleEqX EqX)
     From ⊢ A₀ → s =_ρ t (Derivable), derive ⊢ NT(A₀ → r[s] =_σ r[t]).
     Proof: extract A₀ → s=t (by negTrans backward on PU equality),
     apply QF-ER, then lift back via negTrans forward. -/
-def negTrans_qfer {a : Allowed} {Premises : PremiseSet F} (adm : AdmissibleEqX EqX) {Γ : Ctx ι} {ρ σ : Ty ι}
+def negTrans_qfer {a : Allowed} {Premises : PremiseSet F} (adm : AdmissibleEqX EqX Premises) {Γ : Ctx ι} {ρ σ : Ty ι}
     {A₀ : Formula F Γ} {s t : Term F Γ ρ} {r : Term F (ρ :: Γ) σ}
     (hqf : A₀.isQF = true) (hvf : A₀.isVFree = true)
     (h_inner : Derivable F EqX a Premises (A₀ →ᶠ eqAtType EqX ρ s t)) :
@@ -912,7 +912,7 @@ def negTrans_qfer {a : Allowed} {Premises : PremiseSet F} (adm : AdmissibleEqX E
 
     Proof: Markov eliminates ¬¬∃ under ∀, QF-AC gives the choice function,
     then dnn_intro strengthens the conclusion. -/
-def negTrans_qfac (adm : AdmissibleEqX EqX)
+def negTrans_qfac (adm : AdmissibleEqX EqX Premises)
     {Γ : Ctx ι} {ρ τ : Ty ι} {A₀ : Formula F (τ :: ρ :: Γ)}
     (hqf : A₀.isQF = true) (hvf : Formula.isVFree A₀ = true) :
     Derivable F EqX Allowed.nt_target Premises
@@ -966,7 +966,7 @@ section NegTransSound
 variable {ι : Type} {F : ι → Ty ι}
     {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
     {Premises : PremiseSet F}
-    (adm : AdmissibleEqX EqX)
+    (adm : AdmissibleEqX EqX Premises)
 
 /-- **NT-stability of a premise set**: every premise implies its own negative translation.
 
@@ -990,7 +990,7 @@ abbrev NTStableD {ι : Type} {F : ι → Ty ι}
 
 /-- A purely-universal premise set is NT-stable — the old hypothesis, recovered as a lemma
 rather than baked into the kernel. -/
-def ntStable_of_pu (adm : AdmissibleEqX EqX) {Premises : PremiseSet F}
+def ntStable_of_pu {Premises : PremiseSet F} (adm : AdmissibleEqX EqX Premises)
     (pu : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → B.isPurelyUniversal = true) :
     NTStableD EqX Premises :=
   fun _ B hp => (negTrans_iff_pu adm B (pu _ B hp)).1

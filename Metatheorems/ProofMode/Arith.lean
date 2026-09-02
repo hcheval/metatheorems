@@ -164,7 +164,7 @@ Compare `Nat.add_comm` in mathlib — `induction`, then `rw [Nat.add_succ, ih, N
 The remaining differences are `anorm`, which pays for the substitutions `induction` leaves in
 the goal, and the split between `prw` (closed equation) and `prwby` (hypothesis), which is
 forced by QF-ER carrying a premise. -/
-def add_comm (adm : AdmissibleEqX EqX) (x : Term F Γ Ty.nat) :
+def add_comm (adm : AdmissibleEqX EqX Premises) (x : Term F Γ Ty.nat) :
     Derivable F EqX al Premises (Γ := Γ)
       (Formula.all Ty.nat (Formula.eq0 (x +ᵗ x₀) (x₀ +ᵗ x))) := by
   pmode
@@ -185,7 +185,7 @@ def add_comm (adm : AdmissibleEqX EqX) (x : Term F Γ Ty.nat) :
 
 /-- Occurrence selection. `x + 0` occurs twice here — once inside the left side, once as the
 whole right side — and they are numbered left to right across the goal. -/
-def add_zero_twice (adm : AdmissibleEqX EqX) (x : Term F Γ Ty.nat) :
+def add_zero_twice (adm : AdmissibleEqX EqX Premises) (x : Term F Γ Ty.nat) :
     Derivable F EqX al Premises (Γ := Γ)
       (Formula.eq0 ((x +ᵗ Term.zero) +ᵗ Term.zero) (x +ᵗ Term.zero)) := by
   pmode
@@ -197,7 +197,7 @@ def add_zero_twice (adm : AdmissibleEqX EqX) (x : Term F Γ Ty.nat) :
 /-- **Rung 2** — associativity. Three variables and a nested context, so the rewrite rules
 mention both an outer term and the bound variable in the same argument list.
 Compare `Metatheorems.add_assoc`. -/
-def add_assoc (adm : AdmissibleEqX EqX) (x y : Term F Γ Ty.nat) :
+def add_assoc (adm : AdmissibleEqX EqX Premises) (x y : Term F Γ Ty.nat) :
     Derivable F EqX al Premises (Γ := Γ)
       (Formula.all Ty.nat (Formula.eq0 ((x +ᵗ y) +ᵗ x₀) (x +ᵗ (y +ᵗ x₀)))) := by
   pmode
@@ -216,7 +216,7 @@ def add_assoc (adm : AdmissibleEqX EqX) (x y : Term F Γ Ty.nat) :
     prefl
 
 /-- **Rung 3** — the first monus fact, `0 ∸ y = 0`. Compare `Metatheorems.monus_zero_l`. -/
-def monus_zero_l (adm : AdmissibleEqX EqX) :
+def monus_zero_l (adm : AdmissibleEqX EqX Premises) :
     Derivable F EqX al Premises (Γ := Γ)
       (Formula.all Ty.nat (Formula.eq0 (Term.zero ∸ᵗ x₀) Term.zero)) := by
   pmode
@@ -243,7 +243,7 @@ It is also the first proof whose shape is not "induct and rewrite". It needs a c
 whether each of `y` and `z` is zero — the zero cases contradict `S x ∸ y = 0` — and in the
 successor cases it rewrites *inside* the premises, to expose the successors that
 `monus_succ_l` strips and the induction hypothesis then consumes. -/
-def monus_trans (adm : AdmissibleEqX EqX) :
+def monus_trans (adm : AdmissibleEqX EqX Premises) :
     Derivable F EqX al Premises (Γ := Γ)
       (Formula.all Ty.nat (Formula.all Ty.nat (Formula.all Ty.nat
         ((x₀ ∸ᵗ x₁ =₀ Term.zero) →ᶠ (x₁ ∸ᵗ x₂ =₀ Term.zero) →ᶠ
@@ -326,7 +326,7 @@ each `pforall`, and instantiating a weakened `∀`-hypothesis at a compound term
 substitution `anorm` cannot normalise — see `LADDER.md`. Inside, every use is either at the
 bound variable, where `pspecialize` applies and no substitution appears, or on an unweakened
 hypothesis, where `pinst` does. -/
-def antitone_chain (adm : AdmissibleEqX EqX) (a : Term F Γ (Ty.nat →ₜ Ty.nat)) :
+def antitone_chain (adm : AdmissibleEqX EqX Premises) (a : Term F Γ (Ty.nat →ₜ Ty.nat)) :
     Derivable F EqX al Premises (Γ := Γ)
       (Formula.all Ty.nat (Formula.all Ty.nat
         (Formula.all Ty.nat (Formula.eq0 (a ⬝ (S x₂) ∸ᵗ a ⬝ x₂) Term.zero) →ᶠ
@@ -369,7 +369,7 @@ This is the shape `antitone_chain` was written to avoid: `hmono` is weakened onc
 induction and again by each `pforall`, and it is then instantiated at the compound term
 `m + i` — a substitute-after-rename composite over an *opaque* parameter `a`. Before
 `Term.Subst.cons` this could not be normalised at all. -/
-def antitone_chain_premise_outside (adm : AdmissibleEqX EqX)
+def antitone_chain_premise_outside (adm : AdmissibleEqX EqX Premises)
     (a : Term F Γ (Ty.nat →ₜ Ty.nat)) :
     Derivable F EqX al Premises (Γ := Γ)
       (Formula.all Ty.nat (Formula.eq0 (a ⬝ (S x₀) ∸ᵗ a ⬝ x₀) Term.zero) →ᶠ
@@ -412,7 +412,7 @@ The shape is rung 4's: split on whether `x` is zero, kill the zero branch with
 `succ_ne_zero`, and in the other branch replace `x` by `S (pd x)` so `monus_succ_l` strips a
 successor off both the premise and the goal. What is new is that the *disequality* has to be
 transported down to the predecessor as well, which is what the `phave` below does. -/
-def monus_succ_of_ne (adm : AdmissibleEqX EqX) :
+def monus_succ_of_ne (adm : AdmissibleEqX EqX Premises) :
     Derivable F EqX al Premises (Γ := Γ)
       (Formula.all Ty.nat (Formula.all Ty.nat
         ((x₀ ∸ᵗ x₁ =₀ Term.zero) →ᶠ ¬ᶠ(x₁ =₀ x₀) →ᶠ
@@ -475,7 +475,7 @@ With rung 6a in hand this is two moves — strictness turns `y ≤ x` plus `x �
 `S y ≤ x`, transitivity chains that against `x ≤ S K`, and `monus_succ_l` cancels the
 successors. It is the first rung that is *composed* rather than proved: no induction, no
 rewriting of its own beyond the last cancellation. -/
-def strict_drop (adm : AdmissibleEqX EqX) :
+def strict_drop (adm : AdmissibleEqX EqX Premises) :
     Derivable F EqX al Premises (Γ := Γ)
       (Formula.all Ty.nat (Formula.all Ty.nat (Formula.all Ty.nat
         ((x₂ ∸ᵗ S x₀ =₀ Term.zero) →ᶠ (x₁ ∸ᵗ x₂ =₀ Term.zero) →ᶠ ¬ᶠ(x₂ =₀ x₁) →ᶠ
@@ -514,7 +514,7 @@ a budget, so it needs `≤` to survive a common addend, `y ≤ x + y`, and the o
 fact that turns "`S K ≤ K`" into a contradiction. All three are short inductions. -/
 
 /-- `S x ∸ x = 1`. The contradiction the lazy proof bottoms out in. -/
-def succ_monus_self (adm : AdmissibleEqX EqX) :
+def succ_monus_self (adm : AdmissibleEqX EqX Premises) :
     Derivable F EqX al Premises (Γ := Γ)
       (Formula.all Ty.nat (S x₀ ∸ᵗ x₀ =₀ S Term.zero)) := by
   pmode
@@ -528,7 +528,7 @@ def succ_monus_self (adm : AdmissibleEqX EqX) :
     pexact ih
 
 /-- `y ≤ x + y`. -/
-def monus_add_self_l (adm : AdmissibleEqX EqX) :
+def monus_add_self_l (adm : AdmissibleEqX EqX Premises) :
     Derivable F EqX al Premises (Γ := Γ)
       (Formula.all Ty.nat (Formula.all Ty.nat
         (x₁ ∸ᵗ (x₀ +ᵗ x₁) =₀ Term.zero))) := by
@@ -550,7 +550,7 @@ def monus_add_self_l (adm : AdmissibleEqX EqX) :
     pthm pd_zero
 
 /-- `(x + k) ∸ (y + k) = x ∸ y`: a common addend cancels, so `≤` survives it. -/
-def add_monus_add (adm : AdmissibleEqX EqX) :
+def add_monus_add (adm : AdmissibleEqX EqX Premises) :
     Derivable F EqX al Premises (Γ := Γ)
       (Formula.all Ty.nat (Formula.all Ty.nat (Formula.all Ty.nat
         ((x₁ +ᵗ x₀) ∸ᵗ (x₂ +ᵗ x₀) =₀ x₁ ∸ᵗ x₂)))) := by
