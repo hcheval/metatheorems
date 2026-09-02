@@ -695,7 +695,9 @@ def dialectica_soundness_ctx' {Γ : Ctx ι} {A : Formula F Γ}
         simp [Term.interpret, Term.interpret_subst0])
   -- The pseudometric axioms. `dist_self` is `eqAtType (.base i) x x` — literally `eq_R
   -- (d x x) 0ℝ` — so `realize` at the reflexive instance covers it. The other two are not of
-  -- that shape and are owed as their own `EqXInterp` fields; see Defs.lean.
+  -- that shape. `EqXInterp` owes only the two *model facts* `dist_comm_holds`/
+  -- `dist_tri_holds`; `realizer_of_pu` turns each into the realizer used here, since
+  -- `eq_R` and `le_R_pu` are purely universal and ∨-free. See Defs.lean.
   | .dist_self i x    => fun env => eqxi.realize i x x env rfl
   | .dist_comm i x y  => fun env => eqxi.dist_comm_realize i x y env
   | .dist_tri i x y z => fun env => eqxi.dist_tri_realize i x y z env

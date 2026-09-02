@@ -697,6 +697,94 @@ theorem dialecticaMatrix_weaken {ι : Type} {X : ι → Type} {F : ι → Ty ι}
   exact key
 
 -- ============================================================================
+-- Realizers for purely universal, ∨-free formulas
+-- ============================================================================
+
+/-- For a **quantifier-free ∨-free** formula, the Dialectica matrix is the formula's own
+semantic interpretation — at *every* witness and *every* counter, because both types are
+subsingletons (`dialecticaWitness_subsingleton`).
+
+This duplicates `dialecticaMatrix_iff_interpFormula` (`Metatheorem.lean`), which cannot be
+used here: `Metatheorem.lean` sits far above this file. When the two are ever unified, this
+is the one to keep — it is the lower of the two. -/
+theorem dialecticaMatrix_iff_interp_qf {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    (si : SpaceInterp X F) {Γ : Ctx ι}
+    (A : Formula F Γ) (hqf : A.isQF = true) (hvf : A.isVFree = true)
+    (env : Ctx.interpret X Γ) (w : 𝕎 X A) (c : ℂ X A) :
+    dialecticaMatrix si A env w c ↔ Formula.interpret si A env :=
+  match A, hqf, hvf, env, w, c with
+  | .bot, _, _, _, _, _ => Iff.rfl
+  | .eq0 .., _, _, _, _, _ => Iff.rfl
+  | .and A B, hqf, hvf, env, (wA, wB), (cA, cB) => by
+    simp only [Formula.isQF, Formula.isVFree, Bool.and_eq_true] at hqf hvf
+    simp only [dialecticaMatrix, Formula.interpret]
+    exact Iff.and
+      (dialecticaMatrix_iff_interp_qf si A hqf.1 hvf.1 env wA cA)
+      (dialecticaMatrix_iff_interp_qf si B hqf.2 hvf.2 env wB cB)
+  | .or .., _, hvf, _, _, _ => by simp [Formula.isVFree] at hvf
+  | .imp A B, hqf, hvf, env, (f, g), (wA, cB) => by
+    simp only [Formula.isQF, Formula.isVFree, Bool.and_eq_true] at hqf hvf
+    simp only [dialecticaMatrix, Formula.interpret]
+    constructor
+    · intro h hA
+      have := (dialecticaMatrix_iff_interp_qf si A hqf.1 hvf.1 env wA (g wA cB)).mpr hA
+      exact (dialecticaMatrix_iff_interp_qf si B hqf.2 hvf.2 env (f wA) cB).mp (h this)
+    · intro h hM
+      have := (dialecticaMatrix_iff_interp_qf si A hqf.1 hvf.1 env wA (g wA cB)).mp hM
+      exact (dialecticaMatrix_iff_interp_qf si B hqf.2 hvf.2 env (f wA) cB).mpr (h this)
+
+/-- **A purely universal ∨-free formula is Dialectica-realized by its own truth.**
+
+The witness type of such a formula is a *singleton*: `wTy` of `∀x₁…∀xₖ. A_qf` is
+`ρ₁ →ₜ … →ₜ ρₖ →ₜ unit`-shaped, everything bottoming out in `Ty.unit` (or products of
+such). So a realizer carries no information, and all the content is that the formula holds
+in the model — which is exactly the hypothesis `htrue`.
+
+The recursion has three cases: `∀` (a function), `∧` (a pair — `isPurelyUniversal` is
+closed under `∧` since the 2026-09-01 merge), and the quantifier-free core, where
+`dialecticaMatrix_iff_interp_qf` discharges the matrix *for every counter*.
+
+`srealizer_of_pu` (`Dialectica/Syntactic.lean`) is the syntactic counterpart. -/
+def realizer_of_pu {ι : Type} {X : ι → Type} {F : ι → Ty ι} (si : SpaceInterp X F) :
+    {Γ : Ctx ι} → (B : Formula F Γ) →
+      B.isPurelyUniversal = true → B.isVFree = true →
+      (∀ env : Ctx.interpret X Γ, Formula.interpret si B env) →
+      ∀ env : Ctx.interpret X Γ, dialecticaRealizerCtx si B env
+  | _, .all _ A, hpu, hvf, htrue, env =>
+      have r : ∀ v, dialecticaRealizerCtx si A (v, env) := fun v =>
+        realizer_of_pu si A hpu hvf (fun e => htrue e.2 e.1) (v, env)
+      ⟨fun v => (r v).val, fun y => (r y.1).property y.2⟩
+  | _, .and A B, hpu, hvf, htrue, env =>
+      have hpuA : A.isPurelyUniversal = true := by
+        simp only [Formula.isPurelyUniversal, Bool.and_eq_true] at hpu; exact hpu.1
+      have hpuB : B.isPurelyUniversal = true := by
+        simp only [Formula.isPurelyUniversal, Bool.and_eq_true] at hpu; exact hpu.2
+      have hvfA : A.isVFree = true := by
+        simp only [Formula.isVFree, Bool.and_eq_true] at hvf; exact hvf.1
+      have hvfB : B.isVFree = true := by
+        simp only [Formula.isVFree, Bool.and_eq_true] at hvf; exact hvf.2
+      have rA : dialecticaRealizerCtx si A env :=
+        realizer_of_pu si A hpuA hvfA (fun e => (htrue e).1) env
+      have rB : dialecticaRealizerCtx si B env :=
+        realizer_of_pu si B hpuB hvfB (fun e => (htrue e).2) env
+      ⟨(rA.val, rB.val), fun y => ⟨rA.property y.1, rB.property y.2⟩⟩
+  | _, .bot, hpu, hvf, htrue, env =>
+      ⟨dialecticaDefaultWitness si _,
+       fun c => (dialecticaMatrix_iff_interp_qf si _ hpu hvf env _ c).mpr (htrue env)⟩
+  | _, .eq0 _ _, hpu, hvf, htrue, env =>
+      ⟨dialecticaDefaultWitness si _,
+       fun c => (dialecticaMatrix_iff_interp_qf si _ hpu hvf env _ c).mpr (htrue env)⟩
+  | _, .or _ _, hpu, hvf, htrue, env =>
+      ⟨dialecticaDefaultWitness si _,
+       fun c => (dialecticaMatrix_iff_interp_qf si _ hpu hvf env _ c).mpr (htrue env)⟩
+  | _, .imp _ _, hpu, hvf, htrue, env =>
+      ⟨dialecticaDefaultWitness si _,
+       fun c => (dialecticaMatrix_iff_interp_qf si _ hpu hvf env _ c).mpr (htrue env)⟩
+  | _, .ex _ _, hpu, hvf, htrue, env =>
+      ⟨dialecticaDefaultWitness si _,
+       fun c => (dialecticaMatrix_iff_interp_qf si _ hpu hvf env _ c).mpr (htrue env)⟩
+
+-- ============================================================================
 -- EqX interface for the Dialectica proof (Def. of "purely universal" EqX)
 -- ============================================================================
 
@@ -752,45 +840,48 @@ structure EqXInterp {ι : Type} (X : ι → Type) (F : ι → Ty ι)
 
       `Derivable.dist_comm` is a constructor, so Dialectica soundness owes its truth in the
       model. It is *not* an instance of `realize`: `eq_R (d x y) (d y x)` is not of the form
-      `eqAtType (.base i) s t`, which is `eq_R (d s t) 0ℝ`. See ARCHITECTURE.md. -/
-  dist_comm_realize : ∀ (i : ι) {Γ : Ctx ι} (x y : Term F Γ (Ty.base i))
+      `eqAtType (.base i) s t`, which is `eq_R (d s t) 0ℝ`. See ARCHITECTURE.md.
+
+      Only the model fact is asked for — no realizer and no realizing term. `eq_R` is purely
+      universal and ∨-free, so `realizer_of_pu` / `srealizer_of_pu` build both from this;
+      see `EqXInterp.dist_comm_realize` just below and `sDistComm` in
+      `Dialectica/Syntactic.lean`. -/
+  dist_comm_holds : ∀ (i : ι) {Γ : Ctx ι} (x y : Term F Γ (Ty.base i))
       (env : Ctx.interpret X Γ),
-      dialecticaRealizerCtx si
+      Formula.interpret si
         (eq_R (Term.app2 (Term.dist i) x y) (Term.app2 (Term.dist i) y x)) env
   /-- `si.distInterp i` satisfies the triangle inequality. The counterpart of
-      `Derivable.dist_tri`, owed for the same reason as `dist_comm_realize`. -/
-  dist_tri_realize : ∀ (i : ι) {Γ : Ctx ι} (x y z : Term F Γ (Ty.base i))
+      `Derivable.dist_tri`, owed for the same reason as `dist_comm_holds`. -/
+  dist_tri_holds : ∀ (i : ι) {Γ : Ctx ι} (x y z : Term F Γ (Ty.base i))
       (env : Ctx.interpret X Γ),
-      dialecticaRealizerCtx si
+      Formula.interpret si
         (le_R_pu (Term.app2 (Term.dist i) x z)
           (Term.app2 Term.add_R
             (Term.app2 (Term.dist i) x y) (Term.app2 (Term.dist i) y z))) env
-  /-- The syntactic counterpart of `dist_comm_realize`: a realizing **term**, needed by
-      `Dialectica/Syntactic.lean` for the same reason `realizeTerm` is. -/
-  dist_comm_term : ∀ (i : ι) {Γ : Ctx ι} (x y : Term F Γ (Ty.base i)),
-      Term F Γ (wTy (eq_R (Term.app2 (Term.dist i) x y) (Term.app2 (Term.dist i) y x)))
-  /-- `dist_comm_term` realizes the matrix, at every counter. -/
-  dist_comm_term_sound : ∀ (i : ι) {Γ : Ctx ι} (x y : Term F Γ (Ty.base i))
-      (env : Ctx.interpret X Γ)
-      (c : dialecticaCounter X
-        (eq_R (Term.app2 (Term.dist i) x y) (Term.app2 (Term.dist i) y x))),
-      dialecticaMatrix si (eq_R (Term.app2 (Term.dist i) x y)
-          (Term.app2 (Term.dist i) y x)) env
-        (Term.interpret si (dist_comm_term i x y) env) c
-  /-- The syntactic counterpart of `dist_tri_realize`. -/
-  dist_tri_term : ∀ (i : ι) {Γ : Ctx ι} (x y z : Term F Γ (Ty.base i)),
-      Term F Γ (wTy (le_R_pu (Term.app2 (Term.dist i) x z)
+
+/-- Symmetry of the distance, as a Dialectica realizer.
+
+Was a field (`dist_comm_realize`) until 2026-09-02; it is now derived from the model fact
+`dist_comm_holds` by `realizer_of_pu`, since `eq_R` is purely universal and ∨-free
+(`isPurelyUniversal` and `isVFree` are both `true` by `rfl`). Its signature is unchanged,
+so call sites in `Dialectica/Lemmas.lean` are untouched. -/
+def EqXInterp.dist_comm_realize {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    {si : SpaceInterp X F} (eqxi : EqXInterp X F si)
+    (i : ι) {Γ : Ctx ι} (x y : Term F Γ (Ty.base i)) (env : Ctx.interpret X Γ) :
+    dialecticaRealizerCtx si
+      (eq_R (Term.app2 (Term.dist i) x y) (Term.app2 (Term.dist i) y x)) env :=
+  realizer_of_pu si _ rfl rfl (eqxi.dist_comm_holds i x y) env
+
+/-- The triangle inequality, as a Dialectica realizer. Derived from `dist_tri_holds`
+exactly as `dist_comm_realize` is; `le_R_pu` is the ∨-free purely universal form of `≤ℝ`
+precisely so that this works. -/
+def EqXInterp.dist_tri_realize {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    {si : SpaceInterp X F} (eqxi : EqXInterp X F si)
+    (i : ι) {Γ : Ctx ι} (x y z : Term F Γ (Ty.base i)) (env : Ctx.interpret X Γ) :
+    dialecticaRealizerCtx si
+      (le_R_pu (Term.app2 (Term.dist i) x z)
         (Term.app2 Term.add_R
-          (Term.app2 (Term.dist i) x y) (Term.app2 (Term.dist i) y z))))
-  /-- `dist_tri_term` realizes the matrix, at every counter. -/
-  dist_tri_term_sound : ∀ (i : ι) {Γ : Ctx ι} (x y z : Term F Γ (Ty.base i))
-      (env : Ctx.interpret X Γ)
-      (c : dialecticaCounter X (le_R_pu (Term.app2 (Term.dist i) x z)
-        (Term.app2 Term.add_R
-          (Term.app2 (Term.dist i) x y) (Term.app2 (Term.dist i) y z)))),
-      dialecticaMatrix si (le_R_pu (Term.app2 (Term.dist i) x z)
-          (Term.app2 Term.add_R
-            (Term.app2 (Term.dist i) x y) (Term.app2 (Term.dist i) y z))) env
-        (Term.interpret si (dist_tri_term i x y z) env) c
+          (Term.app2 (Term.dist i) x y) (Term.app2 (Term.dist i) y z))) env :=
+  realizer_of_pu si _ rfl rfl (eqxi.dist_tri_holds i x y z) env
 
 end Metatheorems

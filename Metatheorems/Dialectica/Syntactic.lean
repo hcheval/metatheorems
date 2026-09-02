@@ -844,6 +844,54 @@ def sEqAtType {si : SpaceInterp X F} (eqxi : EqXInterp X F si) :
           exact congrFun (h e) v)
       ⟨.lam r.val, fun env y => r.property (y.1, env) y.2⟩
 
+/-- **A purely universal ∨-free formula is realized by a term carrying no information.**
+
+The syntactic counterpart of `realizer_of_pu` (`Dialectica/Defs.lean`), and the reason the
+`EqXInterp` interface asks only for *model facts* about the distance: `wTy` of
+`∀x₁…∀xₖ. A_qf` bottoms out in `Ty.unit` at every leaf, so the realizing term is a stack of
+`Term.lam`s (and `Term.mkPair`s, at `∧`) over `Term.unitI` — which is exactly
+`Term.defaultOf`, i.e. `defaultWTerm`. All the content is `htrue`, the formula's truth in
+the model, and `dialecticaMatrix_iff_interp_qf` turns it into the matrix *at every counter*.
+
+Three cases, mirroring `isPurelyUniversal`: `∀` (a `lam`), `∧` (a `mkPair` — the clause
+added by the 2026-09-01 products merge), and the quantifier-free core. -/
+def srealizer_of_pu {si : SpaceInterp X F} :
+    {Γ : Ctx ι} → (B : Formula F Γ) →
+      B.isPurelyUniversal = true → B.isVFree = true →
+      (∀ env : Ctx.interpret X Γ, Formula.interpret si B env) →
+      SRealizer si B
+  | _, .all _ A, hpu, hvf, htrue =>
+      have r : SRealizer si A := srealizer_of_pu A hpu hvf (fun e => htrue e.2 e.1)
+      ⟨.lam r.val, fun env y => r.property (y.1, env) y.2⟩
+  | _, .and A B, hpu, hvf, htrue =>
+      have hpuA : A.isPurelyUniversal = true := by
+        simp only [Formula.isPurelyUniversal, Bool.and_eq_true] at hpu; exact hpu.1
+      have hpuB : B.isPurelyUniversal = true := by
+        simp only [Formula.isPurelyUniversal, Bool.and_eq_true] at hpu; exact hpu.2
+      have hvfA : A.isVFree = true := by
+        simp only [Formula.isVFree, Bool.and_eq_true] at hvf; exact hvf.1
+      have hvfB : B.isVFree = true := by
+        simp only [Formula.isVFree, Bool.and_eq_true] at hvf; exact hvf.2
+      have rA : SRealizer si A := srealizer_of_pu A hpuA hvfA (fun e => (htrue e).1)
+      have rB : SRealizer si B := srealizer_of_pu B hpuB hvfB (fun e => (htrue e).2)
+      ⟨.mkPair rA.val rB.val,
+       fun env y => ⟨rA.property env y.1, rB.property env y.2⟩⟩
+  | _, .bot, hpu, hvf, htrue =>
+      ⟨defaultWTerm _,
+       fun env y => (dialecticaMatrix_iff_interp_qf si _ hpu hvf env _ y).mpr (htrue env)⟩
+  | _, .eq0 _ _, hpu, hvf, htrue =>
+      ⟨defaultWTerm _,
+       fun env y => (dialecticaMatrix_iff_interp_qf si _ hpu hvf env _ y).mpr (htrue env)⟩
+  | _, .or _ _, hpu, hvf, htrue =>
+      ⟨defaultWTerm _,
+       fun env y => (dialecticaMatrix_iff_interp_qf si _ hpu hvf env _ y).mpr (htrue env)⟩
+  | _, .imp _ _, hpu, hvf, htrue =>
+      ⟨defaultWTerm _,
+       fun env y => (dialecticaMatrix_iff_interp_qf si _ hpu hvf env _ y).mpr (htrue env)⟩
+  | _, .ex _ _, hpu, hvf, htrue =>
+      ⟨defaultWTerm _,
+       fun env y => (dialecticaMatrix_iff_interp_qf si _ hpu hvf env _ y).mpr (htrue env)⟩
+
 section EqRules
 
 variable {si : SpaceInterp X F} (eqxi : EqXInterp X F si)
@@ -873,17 +921,20 @@ def sDistSelf (i : ι) (x : Term F Γ (Ty.base i)) :
   sEqAtType eqxi (Ty.base i) x x (fun _ => rfl)
 
 /-- Symmetry of the base-type distance. Not an instance of `sEqAtType`: the formula is
-`eq_R (d x y) (d y x)`, not `eq_R (d s t) 0ℝ`. It is owed by `EqXInterp`. -/
+`eq_R (d x y) (d y x)`, not `eq_R (d s t) 0ℝ`. `EqXInterp` owes only the *model fact*
+`dist_comm_holds`; the realizing term comes from `srealizer_of_pu`, since `eq_R` is purely
+universal and ∨-free. -/
 def sDistComm (i : ι) (x y : Term F Γ (Ty.base i)) :
     SRealizer si (eq_R (Term.app2 (Term.dist i) x y) (Term.app2 (Term.dist i) y x)) :=
-  ⟨eqxi.dist_comm_term i x y, fun env c => eqxi.dist_comm_term_sound i x y env c⟩
+  srealizer_of_pu _ rfl rfl (eqxi.dist_comm_holds i x y)
 
-/-- The triangle inequality for the base-type distance. Owed by `EqXInterp`, as `sDistComm`. -/
+/-- The triangle inequality for the base-type distance. Owed by `EqXInterp` as the model
+fact `dist_tri_holds`, and realized by `srealizer_of_pu` as `sDistComm` is. -/
 def sDistTri (i : ι) (x y z : Term F Γ (Ty.base i)) :
     SRealizer si (le_R_pu (Term.app2 (Term.dist i) x z)
       (Term.app2 Term.add_R
         (Term.app2 (Term.dist i) x y) (Term.app2 (Term.dist i) y z))) :=
-  ⟨eqxi.dist_tri_term i x y z, fun env c => eqxi.dist_tri_term_sound i x y z env c⟩
+  srealizer_of_pu _ rfl rfl (eqxi.dist_tri_holds i x y z)
 
 end EqRules
 

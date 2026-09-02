@@ -1489,6 +1489,252 @@ def eq_R_trans :
   univ_gen (univ_gen (univ_gen
     (eq_R_trans_core (.var (.vs (.vs .vz))) (.var (.vs .vz)) (.var .vz))))
 
+-- ── ℚ helpers: `|·|_ℚ` against a two-sided bound ────────────────────────────
+--
+-- Everything in this block is a ℚ fact; it lives here rather than in
+-- `RationalNumbers.lean` only because that file is another workstream's. The two
+-- load-bearing ones are `le_Q_self_abs` (`z ≤_ℚ |z|_ℚ`, which is how a *directed*
+-- estimate is recovered from a `cauchyfy` bound) and `abs_Q_lt_of_two_sided`
+-- (`z <_ℚ c` and `−z <_ℚ c` give `|z| <_ℚ c`, which is how an `eq_R` goal is discharged
+-- from a pair of one-sided bounds). Neither existed; REALS_PLAN §0.8 item 1 lists the
+-- family as missing.
+--
+-- The route is `le_Q_of_cross` throughout: it turns a `≤_ℚ` goal into ℕ arithmetic on
+-- signed cross products, with no `sub_Q` anywhere.
+
+/-- `0_ℚ −_ℚ x =_ℚ −_ℚ x`. -/
+def sub_Q_zero_l (x : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (eq_Q (Term.app2 Term.sub_Q Term.zero_Q x) (.app Term.neg_Q x)) :=
+  eqQtrans (sub_Q_eq_add_neg Term.zero_Q x)
+    (eqQtrans (add_Q_comm_inst Term.zero_Q (.app Term.neg_Q x))
+      (add_Q_zero_inst (.app Term.neg_Q x)))
+
+/-- **`z ≤_ℚ |z|_ℚ`**, and no sign case is needed: the cross criterion asks
+`posN z · D ≤ (posN z + negN z) · D + negN z · D`, which holds outright. -/
+def le_Q_self_abs (z : Term F Γ Ty.nat) :
+    Derivable F al Premises (le_Q z (.app Term.abs_Q z)) := by
+  let D : Term F Γ Ty.nat := .app Term.rat_den z
+  let P : Term F Γ Ty.nat := Term.app2 Term.mul (posN z) D
+  let N : Term F Γ Ty.nat := Term.app2 Term.mul (negN z) D
+  pmode
+  papplym (le_Q_of_cross z (.app Term.abs_Q z))
+  prw (negN_abs_Q z)
+  prw (posN_abs_Q z)
+  prw (rat_den_abs_Q z)
+  prw (mul_zero_l D)
+  prw (add_zero_l P)
+  papplym (monus_le_of_eq_add P
+    (Term.app2 Term.add (Term.app2 Term.mul (.app Term.rat_num z) D) N)
+    (Term.app2 Term.add N N))
+  prw (Derivable.mp (posN_add_negN z) Derivable.sym0)
+  prw (add_mul (posN z) (negN z) D)
+  pthm (qtrans (add_assoc P N N) (add_comm P (Term.app2 Term.add N N)))
+
+/-- `|z|_ℚ ≤_ℚ z` when `z`'s negative part vanishes, i.e. when `0 ≤_ℚ z`. -/
+def abs_Q_le_self_of_negN_zero (z : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (Formula.eq0 (negN z) .zero →ᶠ le_Q (.app Term.abs_Q z) z) := by
+  let D : Term F Γ Ty.nat := .app Term.rat_den z
+  pmode
+  pintro h
+  papplym (le_Q_of_cross (.app Term.abs_Q z) z)
+  prw (rat_den_abs_Q z)
+  prw (posN_abs_Q z)
+  prw (negN_abs_Q z)
+  prw (mul_zero_l D)
+  prw (add_zero_r (Term.app2 Term.mul (posN z) D))
+  prw (Derivable.mp (posN_add_negN z) Derivable.sym0)
+  prwby h
+  prw (add_zero_r (posN z))
+  prw (mul_zero_l D)
+  prw (add_zero_l (Term.app2 Term.mul (posN z) D))
+  pthm (monus_self (Term.app2 Term.mul (posN z) D))
+
+/-- `|z|_ℚ ≤_ℚ −_ℚ z` when `z`'s positive part vanishes, i.e. when `z ≤_ℚ 0`. -/
+def abs_Q_le_neg_of_posN_zero (z : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (Formula.eq0 (posN z) .zero →ᶠ le_Q (.app Term.abs_Q z) (.app Term.neg_Q z)) := by
+  let D : Term F Γ Ty.nat := .app Term.rat_den z
+  pmode
+  pintro h
+  papplym (le_Q_of_cross (.app Term.abs_Q z) (.app Term.neg_Q z))
+  prw (rat_den_abs_Q z)
+  prw (rat_den_neg_Q z)
+  prw (posN_abs_Q z)
+  prw (negN_abs_Q z)
+  prw (negN_neg_Q z)
+  prw (posN_neg_Q z)
+  prw (mul_zero_l D)
+  prw (add_zero_r (Term.app2 Term.mul (negN z) D))
+  prw (Derivable.mp (posN_add_negN z) Derivable.sym0)
+  prwby h
+  prw (add_zero_l (negN z))
+  prw (mul_zero_l D)
+  prw (add_zero_l (Term.app2 Term.mul (negN z) D))
+  pthm (monus_self (Term.app2 Term.mul (negN z) D))
+
+/-- `|z|_ℚ` is bounded by `z` or by `−_ℚ z` — the dichotomy `|z| = max(z, −z)` in the only
+form the encoding supports. The case split is on `0 ≤_ℚ z` versus `z <_ℚ 0`, not on the sign
+bit, because `le_Q_zero_parts` / `lt_Q_zero_parts` already convert those into the vanishing of
+one signed part, and `prw` cannot see inside `posN`/`negN`. -/
+def abs_Q_le_cases (z : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (le_Q (.app Term.abs_Q z) z ∨ᶠ le_Q (.app Term.abs_Q z) (.app Term.neg_Q z)) := by
+  pmode
+  pfrom hc := le_Q_or_lt_Q Term.zero_Q z
+  pcases hc with hnn | hneg
+  · pleft
+    papplym (le_Q_zero_parts z) in hnn with hz
+    papplym (abs_Q_le_self_of_negN_zero z) in hz with hle
+    pexact hle
+  · pright
+    papplym (lt_Q_to_zero_sub z Term.zero_Q) in hneg with h1
+    papplym (lt_Q_zero_congr (Term.app2 Term.sub_Q Term.zero_Q z) (.app Term.neg_Q z)
+      (sub_Q_zero_l z)) in h1 with h2
+    papplym (lt_Q_zero_parts (.app Term.neg_Q z)) in h2 with h3
+    pdestruct h3 with h4 _h5
+    prw (negN_neg_Q z) in h4 with h6
+    papplym (abs_Q_le_neg_of_posN_zero z) in h6 with hle
+    pexact hle
+
+/-- **The two-sided bound**: `z <_ℚ c` and `−_ℚ z <_ℚ c` give `|z|_ℚ <_ℚ c`. -/
+def abs_Q_lt_of_two_sided (z c : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (lt_Q z c ∧ᶠ lt_Q (.app Term.neg_Q z) c →ᶠ lt_Q (.app Term.abs_Q z) c) := by
+  pmode
+  pintro hyp
+  pdestruct hyp with h1 h2
+  pfrom hc := abs_Q_le_cases z
+  pcases hc with hA | hB
+  · papplym (le_lt_Q_trans (.app Term.abs_Q z) z c)
+    psplit
+    · pexact hA
+    · pexact h1
+  · papplym (le_lt_Q_trans (.app Term.abs_Q z) (.app Term.neg_Q z) c)
+    psplit
+    · pexact hB
+    · pexact h2
+
+/-- `¬(a ≤_ℚ b)` gives `b <_ℚ a`. The `≤_ℚ`/`<_ℚ` dichotomy is decidable in the encoding, so
+this is `le_Q_or_lt_Q` and needs no Markov step. -/
+def lt_Q_of_not_le_Q (a b : Term F Γ Ty.nat) :
+    Derivable F al Premises (¬ᶠ(le_Q a b) →ᶠ lt_Q b a) := by
+  pmode
+  pintro h
+  pfrom hc := le_Q_or_lt_Q a b
+  pcases hc with hle | hlt
+  · pexfalso
+    papply h
+    pexact hle
+  · pexact hlt
+
+/-- Cancelling a common right summand in a `<_ℚ`. `<_ℚ` sees its arguments only through the
+`eq_Q` class of their difference, so this is `sub_Q_add_cancel` read backwards. -/
+def lt_Q_add_cancel (a b c : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (lt_Q (Term.app2 Term.add_Q a c) (Term.app2 Term.add_Q b c) →ᶠ lt_Q a b) :=
+  lt_Q_of_eq_Q_diff (Term.app2 Term.add_Q a c) (Term.app2 Term.add_Q b c) a b
+    (sub_Q_add_cancel a b c)
+
+/-- …and on the left. -/
+def lt_Q_add_cancel_l (c a b : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (lt_Q (Term.app2 Term.add_Q c a) (Term.app2 Term.add_Q c b) →ᶠ lt_Q a b) :=
+  Derivable.syllogism
+    (lt_Q_congr (Term.app2 Term.add_Q c a) (Term.app2 Term.add_Q c b)
+      (Term.app2 Term.add_Q a c) (Term.app2 Term.add_Q b c)
+      (add_Q_comm_inst c a) (add_Q_comm_inst c b))
+    (lt_Q_add_cancel a b c)
+
+-- ── The `cauchyfy` estimates, phrased on `cauchyfy` itself ──────────────────
+
+/-- `cauchyState_cauchy` with `cauchyfy_unfold` applied on both sides:
+`|f̂(n) −ℚ f̂(n+1)|ℚ <ℚ 2^{-(n+1)}`. -/
+def cauchyfy_cauchy (f : Term F Γ (realTy ι)) (n : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (lt_Q (.app Term.abs_Q (Term.app2 Term.sub_Q
+              (Term.app2 Term.cauchyfy f n)
+              (Term.app2 Term.cauchyfy f (.app .succ n))))
+            (.app Term.pow2neg_Q (.app .succ n))) := by
+  pmode
+  prw (cauchyfy_unfold f n)
+  prw (cauchyfy_unfold f (.app .succ n))
+  pthm (cauchyState_cauchy f n)
+
+/-- **Two `cauchyfy` steps**: `|f̂(m) −ℚ f̂(m+2)|ℚ <ℚ 2^{-m}`.
+
+The two steps cost `2^{-(m+1)}` and `2^{-(m+2)}`; relaxing the second to `2^{-(m+1)}` still
+leaves the sum `2^{-m}`, so no telescoping induction is needed — this is a *fixed* two-step
+estimate, unlike the unbounded one `eq_R_trans` needs. -/
+def cauchyfy_two_step (f : Term F Γ (realTy ι)) (m : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (lt_Q (.app Term.abs_Q (Term.app2 Term.sub_Q
+              (Term.app2 Term.cauchyfy f m)
+              (Term.app2 Term.cauchyfy f (.app .succ (.app .succ m)))))
+            (.app Term.pow2neg_Q m)) := by
+  let a  : Term F Γ Ty.nat := Term.app2 Term.cauchyfy f m
+  let a1 : Term F Γ Ty.nat := Term.app2 Term.cauchyfy f (.app .succ m)
+  let a2 : Term F Γ Ty.nat := Term.app2 Term.cauchyfy f (.app .succ (.app .succ m))
+  let X : Term F Γ Ty.nat := .app Term.abs_Q (Term.app2 Term.sub_Q a a1)
+  let Y : Term F Γ Ty.nat := .app Term.abs_Q (Term.app2 Term.sub_Q a1 a2)
+  let e : Term F Γ Ty.nat := .app Term.pow2neg_Q (.app .succ m)
+  pmode
+  pfrom hX := cauchyfy_cauchy f m
+  pfrom hY0 := cauchyfy_cauchy f (.app .succ m)
+  phave hY : lt_Q Y e
+  · papplym (lt_le_Q_trans Y (.app Term.pow2neg_Q (.app .succ (.app .succ m))) e)
+    psplit
+    · pexact hY0
+    · pthm (pow2neg_Q_le_succ (.app .succ m))
+  papplym (le_lt_Q_trans (.app Term.abs_Q (Term.app2 Term.sub_Q a a2))
+    (Term.app2 Term.add_Q X Y) (.app Term.pow2neg_Q m))
+  psplit
+  · pthm (abs_Q_sub_triangle a a1 a2)
+  · papplym (lt_Q_congr (Term.app2 Term.add_Q X Y) (Term.app2 Term.add_Q e e)
+      (Term.app2 Term.add_Q X Y) (.app Term.pow2neg_Q m)
+      (eq_Q_refl_inst (Term.app2 Term.add_Q X Y)) (pow2neg_Q_halve m))
+    papplym (lt_Q_add_both X Y e e)
+    psplit
+    · pexact hX
+    · pexact hY
+
+/-- **`f ≤_ℝ g` in Π₁⁰ form**: `∀n. f̂(n+1) −ℚ ĝ(n+1) <ℚ 2^{-n}`.
+
+`le_R` is a *negated existential*, so it is spent by ∃-introduction — a failure at any single
+index would produce the very witness the hypothesis denies — and the `≤`/`<` dichotomy at ℚ
+then turns the negation into a positive bound. No Markov step is involved: `le_Q_or_lt_Q` is a
+derivable disjunction, the encoding's order being decidable.
+
+The conclusion is stated as a `∀`-formula rather than at a caller-supplied index so that it
+can be `pinst`-antiated *after* a `pforall`; instantiating is what lets `closed_subst` clear
+the proof mode's weakening of `Term.zero_R`, which a direct `papplym` at the weakened
+hypothesis cannot do.
+
+Note the argument order: this is `le_R f g`, i.e. `f ≤ g`. `le_R_pu` in `Terms/Real.lean`
+takes its arguments the *other* way round — `le_R_pu f g` unfolds to `¬(f <_ℝ g)`, which is
+`g ≤_ℝ f`. That discrepancy is not touched here. -/
+def le_R_all (f g : Term F Γ (realTy ι)) :
+    Derivable F al Premises
+      (le_R f g →ᶠ
+        Formula.all Ty.nat
+          (lt_Q (Term.app2 Term.sub_Q
+                   (Term.app2 Term.cauchyfy f.weaken (.app .succ (.var .vz)))
+                   (Term.app2 Term.cauchyfy g.weaken (.app .succ (.var .vz))))
+                (.app Term.pow2neg_Q (.var .vz)))) := by
+  pmode
+  pintro h
+  pforall
+  papplym (lt_Q_of_not_le_Q (.app Term.pow2neg_Q (.var .vz))
+    (Term.app2 Term.sub_Q
+      (Term.app2 Term.cauchyfy f.weaken (.app .succ (.var .vz)))
+      (Term.app2 Term.cauchyfy g.weaken (.app .succ (.var .vz)))))
+  pintro hle
+  papply h
+  pexists (.var .vz)
+  canorm
+  pexact hle
+
 -- ── Properties needed for metric space transitivity ─────────────────────────
 
 /-- ⊢ ∀f,g : ℝ. f =_ℝ 0 ∧ g =_ℝ 0 → f +_ℝ g =_ℝ 0 -/
@@ -1501,40 +1747,250 @@ def add_eq_zero_R :
                    Term.zero_R))) :=
   univ_gen (univ_gen (add_eq_zero_R_core (.var (.vs .vz)) (.var .vz)))
 
-/-- ⊢ ∀f,g : ℝ. f ≤_ℝ g ∧ g =_ℝ 0 → f =_ℝ 0
+/-- `0_ℝ ≤_ℝ f ∧ f ≤_ℝ g ∧ g =_ℝ 0_ℝ → f =_ℝ 0_ℝ`, at explicit reals.
 
-**This statement is FALSE and cannot be proved. It needs a non-negativity hypothesis.**
-
-Assessed 2026-09-02. Take `f := λn.⟨−1⟩_ℚ` and `g := 0_ℝ`. Then
+**The old statement of `le_zero_eq_zero_R` — without the first conjunct — was FALSE**, and the
+counterexample is worth keeping. Take `f := λn.⟨−1⟩_ℚ` and `g := 0_ℝ`. Then
 
 * `le_R f g` unfolds to `¬ lt_R g f`, i.e. `¬∃n (f̂(n+1) −_ℚ ĝ(n+1) ≥_ℚ 2^{-n})`. Here that
   difference is `−1`, which is below every `2^{-n}`, so the `∃` is empty and `f ≤_ℝ g` holds;
 * `g =_ℝ 0_ℝ` holds (`cauchyfy_zero_R`);
 * `f =_ℝ 0_ℝ` fails already at `n = 0`: it asks `|−1|_ℚ <_ℚ ⟨2^{-0}⟩_ℚ`, i.e. `1 <_ℚ 1`.
 
-So the universally quantified formula is false in the standard model and hence not derivable.
-`f ≤_ℝ 0` says nothing about how far *below* `0` the real `f` is.
+So that formula was false in the standard model and hence not derivable: `f ≤_ℝ 0` says
+nothing about how far *below* `0` the real `f` is. Adding `0_ℝ ≤_ℝ f` repairs it, and the
+repaired form is what is proved here (2026-09-02).
 
-What `MetricSpaces.admissibleEqX.eqx_trans` actually needs is the version with the missing
-hypothesis, e.g.
+The estimate, at the goal's index `n`. Write `a_k := f̂(k)`, `b_k := ĝ(k)`.
 
-    ∀f,g. 0_ℝ ≤_ℝ f  ∧  f ≤_ℝ g  ∧  g =_ℝ 0_ℝ  →  f =_ℝ 0_ℝ
+* **lower bound** `−a_{n+1} <ℚ 2^{-n}` — `0_ℝ ≤_ℝ f` read at `n`, directly;
+* **upper bound** `a_{n+1} <ℚ 2^{-n}` — three steps, at index `n+2` rather than `n`, because
+  reading the two hypotheses at `n` gives only `2^{-n} + 2^{-n}` and overshoots:
+  `f ≤_ℝ g` at `n+2` gives `a_{n+3} −ℚ b_{n+3} <ℚ 2^{-(n+2)}`, `g =_ℝ 0` at `n+2` gives
+  `b_{n+3} <ℚ 2^{-(n+2)}` (through `le_Q_self_abs`), so `a_{n+3} <ℚ 2^{-(n+1)}`; and
+  `cauchyfy_two_step` moves back from `n+3` to `n+1` for another `2^{-(n+1)}`.
 
-and then `0_ℝ ≤_ℝ d(x,z)` has to be *derived* from the pseudo-metric premises — it is
-available, since `0 =_ℝ d(x,x) ≤_ℝ d(x,y) +_ℝ d(y,x) =_ℝ d(x,y) +_ℝ d(x,y)` by
-`ax_refl`/`ax_sym`/`ax_triangle` — but nothing in this file or `MetricSpaces.lean` derives it
-yet. Fixing the statement is therefore a *design* decision about the metric-space layer, not
-a proof step, and it is left to whoever owns that layer.
+Both bounds are then folded into `|a_{n+1}| <ℚ 2^{-n}` by `abs_Q_lt_of_two_sided`. Unlike
+`eq_R_trans` this needs no telescoping induction — the shift is a fixed two steps.
 
-Note also that unlike `eq_R_trans` and `add_eq_zero_R`, the corrected statement is not an
-estimate: `le_R` is a negated `∃`, so it is Markov-flavoured and needs a different toolkit. -/
+`MetricSpaces.admissibleEqX.eqx_trans` still has to supply `0_ℝ ≤_ℝ d(x,z)` from the
+pseudo-metric premises; `nonneg_of_add_self_nonneg` below is the ℝ-side half of that. -/
+def le_zero_eq_zero_R_core (f g : Term F Γ (realTy ι)) :
+    Derivable F al Premises
+      (le_R Term.zero_R f ∧ᶠ le_R f g ∧ᶠ eq_R g Term.zero_R →ᶠ eq_R f Term.zero_R) :=
+  let n   : Term F (Ty.nat :: Γ) Ty.nat := .var .vz
+  let n1  : Term F (Ty.nat :: Γ) Ty.nat := .app .succ n
+  let n2  : Term F (Ty.nat :: Γ) Ty.nat := .app .succ n1
+  let n3  : Term F (Ty.nat :: Γ) Ty.nat := .app .succ n2
+  let a   : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.cauchyfy f.weaken n1
+  let a3  : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.cauchyfy f.weaken n3
+  let b3  : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.cauchyfy g.weaken n3
+  let P   : Term F (Ty.nat :: Γ) Ty.nat := .app Term.pow2neg_Q n
+  let P1  : Term F (Ty.nat :: Γ) Ty.nat := .app Term.pow2neg_Q n1
+  let P2  : Term F (Ty.nat :: Γ) Ty.nat := .app Term.pow2neg_Q n2
+  by
+  pmode
+  pintro hyp
+  pdestruct hyp with h01 h3
+  pdestruct h01 with h0 h12
+  papplym (le_R_all Term.zero_R f) in h0 with p0
+  papplym (le_R_all f g) in h12 with p12
+  pforall
+  pinst p0 n with q0
+  pinst p12 n2 with q1
+  pinst h3 n2 with q2
+  canorm
+  -- the lower bound, straight from `0_ℝ ≤_ℝ f` at `n`
+  prw (cauchyfy_zero_R n1) in q0 with q0a
+  papplym (lt_Q_congr (Term.app2 Term.sub_Q Term.zero_Q a) P (.app Term.neg_Q a) P
+    (sub_Q_zero_l a) (eq_Q_refl_inst P)) in q0a with hlow
+  -- `g =_ℝ 0` at `n+2`, turned into the directed bound `b_{n+3} <ℚ 2^{-(n+2)}`
+  prw (cauchyfy_zero_R n3) in q2 with q2a
+  papplym (lt_Q_congr (.app Term.abs_Q (Term.app2 Term.sub_Q b3 Term.zero_Q)) P2
+    (.app Term.abs_Q b3) P2 (abs_Q_congr (sub_Q_zero_Q b3)) (eq_Q_refl_inst P2)) in q2a with q2b
+  phave hb3 : lt_Q b3 P2
+  · papplym (le_lt_Q_trans b3 (.app Term.abs_Q b3) P2)
+    psplit
+    · pthm (le_Q_self_abs b3)
+    · pexact q2b
+  -- adding the two at `n+2`: `a_{n+3} <ℚ 2^{-(n+1)}`
+  phave ha3 : lt_Q a3 P1
+  · papplym (lt_Q_congr (Term.app2 Term.add_Q (Term.app2 Term.sub_Q a3 b3) b3)
+      (Term.app2 Term.add_Q P2 P2) a3 P1
+      (eqQtrans (add_Q_comm_inst (Term.app2 Term.sub_Q a3 b3) b3) (add_Q_sub_cancel a3 b3))
+      (pow2neg_Q_halve n1))
+    papplym (lt_Q_add_both (Term.app2 Term.sub_Q a3 b3) b3 P2 P2)
+    psplit
+    · pexact q1
+    · pexact hb3
+  -- two `cauchyfy` steps back from `n+3` to `n+1`
+  phave hstep : lt_Q (Term.app2 Term.sub_Q a a3) P1
+  · papplym (le_lt_Q_trans (Term.app2 Term.sub_Q a a3)
+      (.app Term.abs_Q (Term.app2 Term.sub_Q a a3)) P1)
+    psplit
+    · pthm (le_Q_self_abs (Term.app2 Term.sub_Q a a3))
+    · pthm (cauchyfy_two_step f.weaken n1)
+  phave hup : lt_Q a P
+  · papplym (lt_Q_congr (Term.app2 Term.add_Q (Term.app2 Term.sub_Q a a3) a3)
+      (Term.app2 Term.add_Q P1 P1) a P
+      (eqQtrans (add_Q_comm_inst (Term.app2 Term.sub_Q a a3) a3) (add_Q_sub_cancel a a3))
+      (pow2neg_Q_halve n))
+    papplym (lt_Q_add_both (Term.app2 Term.sub_Q a a3) a3 P1 P1)
+    psplit
+    · pexact hstep
+    · pexact ha3
+  -- fold the two one-sided bounds into the `eq_R` goal
+  prw (cauchyfy_zero_R n1)
+  papplym (lt_Q_congr (.app Term.abs_Q a) P
+    (.app Term.abs_Q (Term.app2 Term.sub_Q a Term.zero_Q)) P
+    (abs_Q_congr (eqQsym (sub_Q_zero_Q a))) (eq_Q_refl_inst P))
+  papplym (abs_Q_lt_of_two_sided a P)
+  psplit
+  · pexact hup
+  · pexact hlow
+
+/-- ⊢ ∀f,g : ℝ. 0_ℝ ≤_ℝ f ∧ f ≤_ℝ g ∧ g =_ℝ 0_ℝ → f =_ℝ 0_ℝ
+
+The repaired form of the old (false) `le_zero_eq_zero_R`; see `le_zero_eq_zero_R_core` for
+the counterexample to the version without `0_ℝ ≤_ℝ f`, and for the estimate. -/
 def le_zero_eq_zero_R :
     Derivable F al Premises (Γ := Γ)
       (Formula.all rTy (Formula.all rTy
-        (le_R (.var (.vs .vz)) (.var .vz)
+        (le_R Term.zero_R (.var (.vs .vz))
+          ∧ᶠ le_R (.var (.vs .vz)) (.var .vz)
           ∧ᶠ eq_R (.var .vz) Term.zero_R
           →ᶠ eq_R (.var (.vs .vz)) Term.zero_R))) :=
-  sorry
+  univ_gen (univ_gen (le_zero_eq_zero_R_core (.var (.vs .vz)) (.var .vz)))
+
+/-- `0_ℝ ≤_ℝ u → 0_ℝ ≤_ℝ f` where `u` is *any* real whose cauchyfication is `f̂(·+1) +ℚ f̂(·+1)`.
+
+The sum is fed in through an abstract `u` rather than rewritten inside the goal, for the same
+reason `add_eq_zero_R_gen` does it: `prw` at a goal containing `Term.add_R` has to push a
+substitution through that constant, and that is the delta-expansion blow-up CLAUDE.md's
+build-cost section warns about.
+
+The argument, contrapositively — `le_R` on both sides is a negated `∃`, so a witness `n`
+against `0_ℝ ≤_ℝ f` has to be turned into a witness against `0_ℝ ≤_ℝ u`, and the *same* index
+works. Writing `c := −ℚ f̂(n+1)`, `b := −ℚ f̂(n+2)`:
+
+    2^{-n} ≤ℚ c                              -- the given witness at n
+    c <ℚ 2^{-(n+2)} +ℚ b                      -- one `cauchyfy` step, |c −ℚ b| = |f̂(n+1) −ℚ f̂(n+2)|
+    2^{-n} <ℚ 2^{-(n+1)} +ℚ b                 -- and 2^{-(n+2)} ≤ℚ 2^{-(n+1)}
+    2^{-(n+1)} <ℚ b                           -- cancel, since 2^{-n} =ℚ 2^{-(n+1)} +ℚ 2^{-(n+1)}
+    2^{-n} <ℚ b +ℚ b                          -- double
+
+and `b +ℚ b` is `−ℚ û(n+1)`. Note the margin: the Cauchy step costs `2^{-(n+2)}` where a whole
+`2^{-(n+1)}` is available, so this is not a tight estimate and needs no telescoping. -/
+private def nonneg_of_add_self_gen (f u : Term F Γ (realTy ι))
+    (hu : Derivable F al Premises (Γ := Ty.nat :: Γ)
+      (Formula.eq0
+        (Term.app2 Term.cauchyfy u.weaken (.app .succ (.var .vz)))
+        (Term.app2 Term.add_Q
+          (Term.app2 Term.cauchyfy f.weaken (.app .succ (.app .succ (.var .vz))))
+          (Term.app2 Term.cauchyfy f.weaken (.app .succ (.app .succ (.var .vz))))))) :
+    Derivable F al Premises (le_R Term.zero_R u →ᶠ le_R Term.zero_R f) :=
+  let n  : Term F (Ty.nat :: Γ) Ty.nat := .var .vz
+  let n1 : Term F (Ty.nat :: Γ) Ty.nat := .app .succ n
+  let n2 : Term F (Ty.nat :: Γ) Ty.nat := .app .succ n1
+  let a  : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.cauchyfy f.weaken n1
+  let a' : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.cauchyfy f.weaken n2
+  let c  : Term F (Ty.nat :: Γ) Ty.nat := .app Term.neg_Q a
+  let b  : Term F (Ty.nat :: Γ) Ty.nat := .app Term.neg_Q a'
+  let P  : Term F (Ty.nat :: Γ) Ty.nat := .app Term.pow2neg_Q n
+  let P1 : Term F (Ty.nat :: Γ) Ty.nat := .app Term.pow2neg_Q n1
+  let Q  : Term F (Ty.nat :: Γ) Ty.nat := .app Term.pow2neg_Q n2
+  -- `c −ℚ b =ℚ f̂(n+2) −ℚ f̂(n+1)`: negation reverses the difference.
+  let hCB : Derivable F al Premises (Γ := Ty.nat :: Γ)
+      (eq_Q (Term.app2 Term.sub_Q c b) (Term.app2 Term.sub_Q a' a)) :=
+    eqQtrans (sub_Q_eq_add_neg c b)
+      (eqQtrans (addQr c (neg_Q_neg_Q a'))
+        (eqQtrans (add_Q_comm_inst c a') (eqQsym (sub_Q_eq_add_neg a' a))))
+  let hAbs : Derivable F al Premises (Γ := Ty.nat :: Γ)
+      (eq_Q (.app Term.abs_Q (Term.app2 Term.sub_Q c b))
+            (.app Term.abs_Q (Term.app2 Term.sub_Q a a'))) :=
+    eqQtrans (abs_Q_congr hCB) (abs_diff_Q_comm a' a)
+  by
+  pmode
+  pintro hsum
+  pintro hex
+  pobtain hex with hn
+  canorm
+  prw (cauchyfy_zero_R n1) in hn with hn1
+  papplym (le_Q_congr P (Term.app2 Term.sub_Q Term.zero_Q a) P c
+    (eq_Q_refl_inst P) (sub_Q_zero_l a)) in hn1 with hPc
+  phave hcb : lt_Q (Term.app2 Term.sub_Q c b) Q
+  · papplym (le_lt_Q_trans (Term.app2 Term.sub_Q c b)
+      (.app Term.abs_Q (Term.app2 Term.sub_Q c b)) Q)
+    psplit
+    · pthm (le_Q_self_abs (Term.app2 Term.sub_Q c b))
+    · pthm (Derivable.mp (cauchyfy_cauchy f.weaken n1)
+        (lt_Q_congr (.app Term.abs_Q (Term.app2 Term.sub_Q a a')) Q
+          (.app Term.abs_Q (Term.app2 Term.sub_Q c b)) Q
+          (eqQsym hAbs) (eq_Q_refl_inst Q)))
+  phave hcQb : lt_Q c (Term.app2 Term.add_Q Q b)
+  · papplym (lt_Q_congr (Term.app2 Term.add_Q (Term.app2 Term.sub_Q c b) b)
+      (Term.app2 Term.add_Q Q b) c (Term.app2 Term.add_Q Q b)
+      (eqQtrans (add_Q_comm_inst (Term.app2 Term.sub_Q c b) b) (add_Q_sub_cancel c b))
+      (eq_Q_refl_inst (Term.app2 Term.add_Q Q b)))
+    papplym (lt_le_Q_add (Term.app2 Term.sub_Q c b) b Q b)
+    psplit
+    · pexact hcb
+    · pthm (le_Q_refl b)
+  phave hPQb : lt_Q P (Term.app2 Term.add_Q Q b)
+  · papplym (le_lt_Q_trans P c (Term.app2 Term.add_Q Q b))
+    psplit
+    · pexact hPc
+    · pexact hcQb
+  phave hPP1b : lt_Q P (Term.app2 Term.add_Q P1 b)
+  · papplym (lt_le_Q_trans P (Term.app2 Term.add_Q Q b) (Term.app2 Term.add_Q P1 b))
+    psplit
+    · pexact hPQb
+    · pthm (Derivable.mp (pow2neg_Q_le_succ n1) (le_Q_add Q P1 b))
+  phave hP1b : lt_Q P1 b
+  · papplym (lt_Q_add_cancel_l P1 P1 b)
+    papplym (lt_Q_congr P (Term.app2 Term.add_Q P1 b)
+      (Term.app2 Term.add_Q P1 P1) (Term.app2 Term.add_Q P1 b)
+      (eqQsym (pow2neg_Q_halve n)) (eq_Q_refl_inst (Term.app2 Term.add_Q P1 b)))
+    pexact hPP1b
+  -- the same index `n` refutes `0_ℝ ≤_ℝ u`
+  papply hsum
+  pexists n
+  canorm
+  prw (cauchyfy_zero_R n1)
+  prw hu
+  papplym (le_Q_congr P (Term.app2 Term.add_Q b b) P
+    (Term.app2 Term.sub_Q Term.zero_Q (Term.app2 Term.add_Q a' a'))
+    (eq_Q_refl_inst P)
+    (eqQsym (eqQtrans (sub_Q_zero_l (Term.app2 Term.add_Q a' a')) (neg_Q_add_Q a' a'))))
+  papplym (lt_Q_imp_le_Q P (Term.app2 Term.add_Q b b))
+  papplym (lt_Q_congr (Term.app2 Term.add_Q P1 P1) (Term.app2 Term.add_Q b b) P
+    (Term.app2 Term.add_Q b b) (pow2neg_Q_halve n)
+    (eq_Q_refl_inst (Term.app2 Term.add_Q b b)))
+  papplym (lt_Q_add_both P1 P1 b b)
+  psplit
+  · pexact hP1b
+  · pexact hP1b
+
+/-- `0_ℝ ≤_ℝ f +_ℝ f → 0_ℝ ≤_ℝ f`, at an explicit real.
+
+This is the ℝ-side half of the non-negativity of a pseudo-metric: with `ax_refl`, `ax_sym` and
+`ax_triangle` one gets `0 =_ℝ d(x,x) ≤_ℝ d(x,y) +_ℝ d(y,x) =_ℝ d(x,y) +_ℝ d(x,y)`, and this
+lemma converts that into `0_ℝ ≤_ℝ d(x,y)` — the hypothesis `le_zero_eq_zero_R` needs and whose
+absence made the old statement of that lemma false. -/
+def nonneg_of_add_self_nonneg_core (f : Term F Γ (realTy ι)) :
+    Derivable F al Premises
+      (le_R Term.zero_R (Term.app2 Term.add_R f f) →ᶠ le_R Term.zero_R f) :=
+  nonneg_of_add_self_gen f (Term.app2 Term.add_R f f)
+    ((add_R_app_weaken f f).symm ▸
+      cauchyfy_add_R f.weaken f.weaken (.app .succ (.var .vz)))
+
+/-- ⊢ ∀f : ℝ. 0_ℝ ≤_ℝ f +_ℝ f → 0_ℝ ≤_ℝ f -/
+def nonneg_of_add_self_nonneg :
+    Derivable F al Premises (Γ := Γ)
+      (Formula.all rTy
+        (le_R Term.zero_R (Term.app2 Term.add_R (.var .vz) (.var .vz))
+          →ᶠ le_R Term.zero_R (.var .vz))) :=
+  univ_gen (nonneg_of_add_self_nonneg_core (.var .vz))
 
 -- ── From Kohlenbach, *Applied Proof Theory*, §4.1 ───────────────────────────
 --
@@ -1643,6 +2099,15 @@ end OrderedFieldAxioms
 #print axioms eqR_strict
 #print axioms lt_irrefl_R
 #print axioms zero_lt_one_R
+#print axioms le_zero_eq_zero_R
+#print axioms le_zero_eq_zero_R_core
+#print axioms nonneg_of_add_self_nonneg
+#print axioms nonneg_of_add_self_nonneg_core
+-- The ℚ and `cauchyfy` lemmas those two rest on:
+#print axioms le_Q_self_abs
+#print axioms abs_Q_lt_of_two_sided
+#print axioms cauchyfy_two_step
+#print axioms le_R_all
 -- The `cauchyfy` theory the remaining axioms rest on:
 #print axioms cauchy_inv
 #print axioms cauchyState_cauchy

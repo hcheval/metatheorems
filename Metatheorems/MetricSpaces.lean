@@ -46,28 +46,33 @@ abbrev MetricSpace.ι := Unit
 abbrev xTy : Ty MetricSpace.ι := Ty.base ()
 
 /-- Function constant types for a metric space.
-    The single function constant is `d_X : X → X → ℝ` (the metric).
-    `ℝ` is encoded as `Ty.nat →ₜ Ty.nat` (type level 1). -/
-def MetricSpace.F : MetricSpace.ι → Ty MetricSpace.ι
-  | () => xTy →ₜ xTy →ₜ realTy MetricSpace.ι
 
-/-- Shorthand for the metric term d_X in any context. -/
+**There are none.** The metric is no longer a function constant: every base type carries a
+structural `Term.dist`, and equality at `X` is *defined* from it (`EqAtType.lean`). `F` must
+still assign a type to the one index, so it gets `Ty.unit` — a constant carrying no
+information, and one that `Term.unitI` already inhabits.
+
+Leaving the slot free is the point: `F ()` is now available for the next structure in the
+tower — W-hyperbolic's `W`, for instance — without needing the `ι`/`κ` split first. -/
+def MetricSpace.F : MetricSpace.ι → Ty MetricSpace.ι
+  | () => Ty.unit
+
+/-- Shorthand for the metric term d_X in any context.
+
+Now the **structural** `Term.dist ()`, not a function constant. Before this, the model had
+two unrelated distances — `Term.func ()`, which the premises spoke about, and `Term.dist ()`,
+which `eqAtType` used — interpreted by the same function but joined by no axiom. -/
 abbrev d_X {Γ : Ctx MetricSpace.ι} :
     Term MetricSpace.F Γ (xTy →ₜ xTy →ₜ realTy MetricSpace.ι) :=
-  Term.func ()
+  Term.dist ()
 
 -- ============================================================================
 -- Equality at type X
 -- ============================================================================
 
-/-- Equality at the base type X: `x =_X y ≡ d_X(x,y) =_ℝ 0_ℝ`.
-    This is a Π₁⁰ (purely universal) formula since `eq_R` is `∀n. (QF body)`. -/
-def MetricSpace.EqX : (i : MetricSpace.ι) →
-    {Γ : Ctx MetricSpace.ι} →
-    Term MetricSpace.F Γ (Ty.base i) →
-    Term MetricSpace.F Γ (Ty.base i) →
-    Formula MetricSpace.F Γ :=
-  fun () {_} s t => eq_R (Term.app (Term.app (Term.func ()) s) t) Term.zero_R
+-- `MetricSpace.EqX` — DELETED. Equality at `X` is now `eqAtType (Ty.base ())`, defined in
+-- the core as `d_X(s,t) =ℝ 0ℝ`, so a metric-space-specific restatement would be a synonym.
+-- Facts about it live in `BaseEquality.lean`: `eqAtType_refl_base`, `eqAtType_sym_base`.
 
 -- ============================================================================
 -- Metric space axioms (Premises)
@@ -109,12 +114,37 @@ theorem MetricSpace.ax_sym_pu :
 theorem MetricSpace.ax_triangle_pu :
     (MetricSpace.ax_triangle (Γ := Γ)).isPurelyUniversal = true := by rfl
 
-/-- The set of metric space axioms as a `PremiseSet`.
-    Context-polymorphic: axioms are closed formulas, available at any context. -/
+/-- The metric-space premise set is **empty**.
+
+The three axioms above are no longer assumed: `Term.dist` is structural, and `d(x,x) =ℝ 0ℝ`,
+`d(x,y) =ℝ d(y,x)`, `d(x,z) ≤ℝ d(x,y) +ℝ d(y,z)` are the constructors `Derivable.dist_self`,
+`.dist_comm`, `.dist_tri`. They are kept above as *formulas* — the theorems just below show
+each is derivable — because the document names them, and because a future theory may want
+to state something relative to them.
+
+An empty premise set is what makes `MetricSpace.premises_pu` and the `spremise` hypothesis
+of both metatheorems vacuous. -/
 def MetricSpace.Premises : PremiseSet MetricSpace.F :=
-  fun ⟨Γ, A⟩ => A = MetricSpace.ax_refl ∨
-                 A = MetricSpace.ax_sym ∨
-                 A = MetricSpace.ax_triangle
+  fun _ => False
+
+/-- `ax_refl` is derivable — it is `dist_self`, universally generalised. -/
+def MetricSpace.ax_refl_derivable {Γ : Ctx MetricSpace.ι} {a : Allowed}
+    {P : PremiseSet MetricSpace.F} :
+    Derivable MetricSpace.F a P (MetricSpace.ax_refl (Γ := Γ)) :=
+  univ_gen (.dist_self () (Term.var .vz))
+
+/-- `ax_sym` is derivable — it is `dist_comm`, universally generalised twice. -/
+def MetricSpace.ax_sym_derivable {Γ : Ctx MetricSpace.ι} {a : Allowed}
+    {P : PremiseSet MetricSpace.F} :
+    Derivable MetricSpace.F a P (MetricSpace.ax_sym (Γ := Γ)) :=
+  univ_gen (univ_gen (.dist_comm () (Term.var (.vs .vz)) (Term.var .vz)))
+
+/-- `ax_triangle` is derivable — it is `dist_tri`, universally generalised three times. -/
+def MetricSpace.ax_triangle_derivable {Γ : Ctx MetricSpace.ι} {a : Allowed}
+    {P : PremiseSet MetricSpace.F} :
+    Derivable MetricSpace.F a P (MetricSpace.ax_triangle (Γ := Γ)) :=
+  univ_gen (univ_gen (univ_gen
+    (.dist_tri () (Term.var (.vs (.vs .vz))) (Term.var (.vs .vz)) (Term.var .vz))))
 
 -- ============================================================================
 -- Semantic interpretation
@@ -133,11 +163,9 @@ structure MetricSpaceInterp where
 /-- Build a `SpaceInterp` from a `MetricSpaceInterp`. -/
 def MetricSpaceInterp.toSpaceInterp (m : MetricSpaceInterp) :
     SpaceInterp (fun () => m.carrier) MetricSpace.F where
-  funcInterp := fun () => fun x y => m.metric x y
+  -- `F () = Ty.unit`: there are no function constants any more, the metric is structural.
+  funcInterp := fun () => ()
   zeroInterp := fun () => m.zero
-  -- `d_X` is now the structural `Term.dist ()` rather than the function constant `F ()`.
-  -- Both are interpreted by the same metric; `MetricSpace.F` is left in place for now and
-  -- becomes free for a second constant (e.g. W-hyperbolic's `W`).
   distInterp := fun () => fun x y => m.metric x y
 
 -- ============================================================================
@@ -257,10 +285,12 @@ If `n₁ ≽ᵃ_X x` and `n₂ ≽ᵃ_X y`, i.e. `d(a,x) ≤ n₁` and `d(a,y) �
 The self-majorization half is what the document flags separately — *"We also need to check
 that `λx⁰,y⁰.(x+y)∘` majorizes itself"* — and it needs no metric input at all, only that
 `m ≥ n → (m)∘ s-maj₁ (n)∘`. -/
-theorem MetricModel.func_maj (M : MetricModel) (N : ℕ) :
-    ∃ f_star : ℕ → Ty.interpret (fun () => M.carrier) (MetricSpace.F ()).hat,
-      ∀ n ≥ N, bezemMaj (X := fun () => M.carrier) M.base (MetricSpace.F ())
-        (f_star n) (M.si.funcInterp ()) := by
+theorem MetricModel.dist_maj (M : MetricModel) (N : ℕ) :
+    ∃ f_star : ℕ →
+      Ty.interpret (fun () => M.carrier) (xTy →ₜ xTy →ₜ realTy MetricSpace.ι).hat,
+      ∀ n ≥ N, bezemMaj (X := fun () => M.carrier) M.base
+        (xTy →ₜ xTy →ₜ realTy MetricSpace.ι)
+        (f_star n) (M.si.distInterp ()) := by
   -- the binder ascriptions are load-bearing: `Ty.hat` is not reducible, so without them
   -- instance search cannot see that `Ty.interpret X xTy.hat` is `ℕ` and `+` fails to elaborate
   refine ⟨fun _ => fun (n₁ : ℕ) (n₂ : ℕ) => Rounding.roundR ((n₁ + n₂ : ℕ) : ℝ),
@@ -324,11 +354,10 @@ noncomputable def MetricModel.abstractMajorizability (M : MetricModel) :
     (bezem_zero_maj M.base 0)
     (bezem_succ_maj M.base 0)
     (fun ρ => bezem_prec_maj M.base_mono 0 ρ)
-    (fun () => M.func_maj 0)
+    -- `F () = Ty.unit`, so the function-constant obligation is vacuous.
+    (fun () => ⟨fun _ => (), fun _ _ => trivial⟩)
     (fun () => M.zeroX_maj 0)
-    -- `dist ()` has the same type as `F ()` and the same interpretation, so the majorant
-    -- for `d_X` serves both.
-    (fun () => M.func_maj 0)
+    (fun () => M.dist_maj 0)
 
 -- ============================================================================
 -- The metric-space metatheorem
@@ -338,22 +367,26 @@ noncomputable def MetricModel.abstractMajorizability (M : MetricModel) :
 (`particular-cases-metric-spaces.tex`, item 4), obtained by feeding
 `MetricModel.abstractMajorizability` to `syntactic_general_metatheorem`.
 
-From a derivation of `∀x^ρ (∀u B₀ → ∃v C₀)` in the extended system over the pseudo-metric
-premises, we get a bound `Φ` depending **only on a majorant of `x`** — i.e. for the base type
-`X`, only on a natural `n ≥ d(a,x)`, and not on `x` itself. That independence is the whole
-point of the metric metatheorem, and here it is exactly the `X`-clause of `MetricModel.base`.
+From a derivation of `∀x^ρ (∀u B₀ → ∃v C₀)` in the extended system, we get a bound `Φ`
+depending **only on a majorant of `x`** — i.e. for the base type `X`, only on a natural
+`n ≥ d(a,x)`, and not on `x` itself. That independence is the whole point of the metric
+metatheorem, and here it is exactly the `X`-clause of `MetricModel.base`.
 
-The two hypotheses that remain are the honest ones:
+**`spremise` is gone.** `MetricSpace.Premises` is empty — the pseudometric axioms are
+constructors of `Derivable`, not assumptions — so the premise-realizer obligation is vacuous
+and is discharged inline. One of the three unconstructed hypotheses this theorem used to
+carry has therefore ceased to exist rather than been satisfied.
 
-* `eqxi` — that `EqX () s t ≡ d(s,t) =ℝ 0ℝ` is interpreted correctly in this model;
-* `spremise` — a realizing **term** for each of `ax_refl`, `ax_sym`, `ax_triangle`.
+`eqxi` remains, and it is the honest one: that the model interprets base-type equality
+correctly, and that its `distInterp` really is a pseudometric. Nothing in the project
+constructs an `EqXInterp` yet.
 
-Neither is a majorizability question, which is why they are parameters here. `spremise` is
-where `MetricModel`'s `d_self` / `d_comm` / `d_triangle` fields will be consumed. -/
+Historical note, kept because it is the shape of a mistake worth not repeating: `spremise`
+was where `MetricModel`'s `d_self`/`d_comm`/`d_triangle` were *going* to be consumed. They
+are consumed by `EqXInterp` now instead, on the semantic side, which is cheaper — the
+obligation is real-number arithmetic in Mathlib `ℝ` rather than object-level ℝ codes. -/
 theorem MetricModel.metric_metatheorem (M : MetricModel)
     (eqxi : EqXInterp (fun () => M.carrier) MetricSpace.F M.si)
-    (spremise : ∀ (Γ' : Ctx MetricSpace.ι) (B : Formula MetricSpace.F Γ'),
-      MetricSpace.Premises ⟨Γ', B⟩ → SRealizer M.si B)
     {ρ : Ty MetricSpace.ι} {B₀ C₀ : Formula MetricSpace.F [Ty.nat, ρ]}
     (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
     (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
@@ -366,18 +399,18 @@ theorem MetricModel.metric_metatheorem (M : MetricModel)
         M.abstractMajorizability.toRel.maj ρ x_star x →
         (∀ u : Nat, u ≤ Φ x_star → Formula.interpret M.si B₀ (u, (x, ()))) →
         ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret M.si C₀ (v, (x, ())) :=
-  syntactic_general_metatheorem eqxi spremise M.abstractMajorizability
+  syntactic_general_metatheorem eqxi (fun _ _ h => h.elim) M.abstractMajorizability
     hB_qf hB_vf hC_qf hC_vf prf
 
-/-- Every metric-space premise is purely universal — `eq_R` and `le_R_pu` are Π₁⁰ by
-construction, and the axioms only prefix them with `∀x^X`. -/
+/-- Every metric-space premise is purely universal — **vacuously**, since there are no
+premises. The three axioms are constructors of `Derivable` now, not assumptions.
+
+The `ax_*_pu` theorems above are kept: they still record that the three *formulas* are Π⁰₁,
+which is what makes the corresponding constructors' Dialectica witness types singletons. -/
 theorem MetricSpace.premises_pu :
     ∀ (Γ' : Ctx MetricSpace.ι) (B : Formula MetricSpace.F Γ'),
-      MetricSpace.Premises ⟨Γ', B⟩ → B.isPurelyUniversal = true := by
-  rintro Γ' B (rfl | rfl | rfl)
-  · exact MetricSpace.ax_refl_pu
-  · exact MetricSpace.ax_sym_pu
-  · exact MetricSpace.ax_triangle_pu
+      MetricSpace.Premises ⟨Γ', B⟩ → B.isPurelyUniversal = true :=
+  fun _ _ h => h.elim
 
 -- ============================================================================
 -- AdmissibleEqX for the metric space EqX
@@ -408,23 +441,18 @@ theorem MetricSpace.premises_pu :
 
 /-- `ax_refl` instantiated at an arbitrary term: `⊢ d(t,t) =ℝ 0ℝ`.
 
-This is `eqx_refl` modulo unfolding `EqX`, and it is the first thing in the file that
-*uses* a metric axiom rather than merely stating it. Note the premise set is fixed: this
-is not derivable in the empty theory, which is exactly why `AdmissibleEqX` carries
-`Premises`. -/
+Once `Term.dist` became structural this stopped needing a premise at all — it is the
+`dist_self` constructor. Kept under its old name because the notes refer to it, and because
+it records where the metric-space `=_X` reflexivity comes from.
+
+The history is worth keeping: this used to be `.premise ax_refl` + `forall_ax`, and it was
+the *only* one of the three `=_X` equivalence properties that worked that way. Symmetry and
+transitivity are not instances of an axiom — they need reasoning about `=ℝ` — and that
+asymmetry is what exposed the whole `AdmissibleEqX` circularity. See ARCHITECTURE.md §1. -/
 def MetricSpace.d_self_derivable {Γ : Ctx MetricSpace.ι} {a : Allowed}
-    (t : Term MetricSpace.F Γ xTy) :
-    Derivable MetricSpace.F a MetricSpace.Premises
-      (eq_R (Term.app2 d_X t t) Term.zero_R) := by
-  have hax : Derivable MetricSpace.F a MetricSpace.Premises
-      (MetricSpace.ax_refl (Γ := Γ)) := .premise (Or.inl rfl)
-  have hinst := Derivable.mp hax
-    (Derivable.forall_ax (allowed := a)
-      (Premises := MetricSpace.Premises)
-      (A := eq_R (Term.app2 d_X (Term.var .vz) (Term.var .vz)) Term.zero_R) t)
-  -- `forall_ax` lands on `A.subst0 t`; push the substitution through `eq_R`.
-  simpa only [Formula.subst0, eq_R_substF, Term.subst, Term.subst0_map,
-    Term.app2, zero_R_closed_subst] using hinst
+    {P : PremiseSet MetricSpace.F} (t : Term MetricSpace.F Γ xTy) :
+    Derivable MetricSpace.F a P (eq_R (Term.app2 d_X t t) Term.zero_R) :=
+  .dist_self () t
 
 -- `MetricSpace.admissibleEqX` is GONE, because the structure it inhabited is gone: `EqX` is
 -- no longer a parameter and `AdmissibleEqX` was deleted with it (Stage 3). Each of its five
@@ -451,19 +479,17 @@ This is the combination that `general_metatheorem_classical` cannot deliver: tha
 asks for a `Majorizability`, i.e. a total majorizer on every semantic value, and a metric
 model supplies only an `AbstractMajorizability` (`MetricModel.abstractMajorizability`).
 
-**`adm` is discharged here, not assumed.** `AdmissibleEqX` is a hypothesis of the *general*
-metatheorem precisely because `EqX` is abstract there; supplying it is part of what
-instantiating to metric spaces consists of, alongside `eqxi` and `spremise`. Taking it back
-as a parameter would make this theorem a second abstract metatheorem rather than an
-instantiation, and would hide `MetricSpace.admissibleEqX`'s three open fields inside a
-binder. So this theorem currently depends on `sorryAx`, visibly and in one place.
+**`adm` is gone, not discharged.** This theorem used to take an `AdmissibleEqX` parameter,
+and then (correctly) to discharge it with `MetricSpace.admissibleEqX` — which was `sorry`-ed,
+so the theorem depended on `sorryAx`. The structure no longer exists: base-type equality is
+defined rather than parameterised, and its equivalence properties are theorems
+(`BaseEquality.lean`) or constructors (`Derivable.dist_self`/`dist_comm`/`dist_tri`).
 
-`nts` is likewise not a parameter: the premises are purely universal, so `ntStable_of_pu`
-supplies it. -/
+`spremise` and `nts` are likewise gone: `MetricSpace.Premises` is empty, so both are vacuous
+and are supplied inline. Of the three unconstructed hypotheses this theorem carried this
+morning, two have ceased to exist; only `eqxi` remains. -/
 theorem MetricModel.metric_metatheorem_classical (M : MetricModel)
     (eqxi : EqXInterp (fun () => M.carrier) MetricSpace.F M.si)
-    (spremise : ∀ (Γ' : Ctx MetricSpace.ι) (B : Formula MetricSpace.F Γ'),
-      MetricSpace.Premises ⟨Γ', B⟩ → SRealizer M.si B)
     {ρ : Ty MetricSpace.ι} {B₀ C₀ : Formula MetricSpace.F [Ty.nat, ρ]}
     (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
     (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
@@ -477,7 +503,7 @@ theorem MetricModel.metric_metatheorem_classical (M : MetricModel)
         (∀ u : Nat, u ≤ Φ x_star → Formula.interpret M.si B₀ (u, (x, ()))) →
         ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret M.si C₀ (v, (x, ())) :=
   syntactic_general_metatheorem_classical eqxi
-    (ntStable_of_pu MetricSpace.premises_pu) spremise
+    (ntStable_of_pu MetricSpace.premises_pu) (fun _ _ h => h.elim)
     M.abstractMajorizability hB_qf hB_vf hC_qf hC_vf prf
 
 end Metatheorems
