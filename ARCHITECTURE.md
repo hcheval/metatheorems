@@ -427,6 +427,37 @@ owes the model's `distInterp` being a pseudometric, since `dist_comm`/`dist_tri`
 constructors and are *not* of the shape `eqAtType (.base i) s t`. Costless today because
 nothing constructs an `EqXInterp`, but it widens what instantiating a metric model will cost.
 
+## 9c. Why the theory is pseudometric and the model is metric
+
+Not a compromise — forced, and by the same constraint that shapes everything else here.
+
+`isPurelyUniversal` falls through to `isQF` at `.imp`, so **an implication between Π⁰₁
+formulas is not Π⁰₁**. Separation has exactly that shape:
+
+```
+∀x,y. ( d(x,y) =ℝ 0ℝ  →  x =_X y )
+        └── Π⁰₁ ──┘      └─ Π⁰₁ ─┘
+```
+
+The metatheorem's premise interface admits only purely universal (or NT-stable) formulas, so
+separation **cannot be an axiom of the theory**. Reflexivity, symmetry and the triangle
+inequality can: stated about `d`, they are Π⁰₁ outright.
+
+So separation lives in the *model* — `MetricModel.d_eq_zero` — because that is the only place
+it can live. `EqXInterp.extract` needs it (it yields Lean equality of interpretations), and a
+model that satisfies the pseudometric axioms *and* is separated is a genuine metric space,
+which is what Kohlenbach's models are.
+
+The payoff of keeping the theory weak: derivations use only the three Π⁰₁ axioms, so the
+extracted bounds are valid over any structure satisfying them — a strictly stronger theorem
+than one that assumed separation.
+
+**This is the same reason symmetry of `=_X` is not an axiom.** `x =_X y → y =_X x` is an
+implication between Π⁰₁ formulas, so its Dialectica witness type carries a real `ℕ → ℕ`
+counter-transformer instead of being a singleton (§8). Axiomatising `dist_comm` — Π⁰₁, about
+`d` — and *deriving* symmetry keeps the whole theory inside the fragment where the
+interpretation is trivial. The axiomatisation is chosen for that, not for elegance.
+
 ## 10. Scope decisions
 
 - **`general_metatheorem` may narrow to theories whose base types are pointed pseudometric
