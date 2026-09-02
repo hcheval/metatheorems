@@ -142,6 +142,23 @@ theorem isNatBased_hat_eq (τ : Ty ι) (h : τ.isNatBased = true) : τ.hat = τ 
     simp [isNatBased, Bool.and_eq_true] at h
     simp [hat, ihρ h.1, ihτ h.2]
 
+/-- Types at which `eqAtType` never reaches a base type.
+
+**The recursion must mirror `eqAtType`'s own, not the type's syntax.** `eqAtType` at an arrow
+recurses only into the *codomain* — the domain appears solely as a binder — so `X →ₜ nat` is
+eq-base-free even though `X` occurs in it. The obvious wrong definition
+(`| .arr ρ τ => ρ.eqBaseFree && τ.eqBaseFree`) is not an error, it just silently makes fewer
+lemmas applicable. Only the codomain spine matters.
+
+This is what lets the arithmetic tower — everything at `nat` and `realTy = nat →ₜ nat` — use
+`eqAtType_sym`/`eqAtType_trans` *below* the real-number layer, where the base case (which
+needs `eq_R` symmetry and transitivity) is not yet available. See ARCHITECTURE.md. -/
+def eqBaseFree : Ty ι → Bool
+  | .base _      => false
+  | .arr _ τ     => τ.eqBaseFree
+  | .prod ρ τ    => ρ.eqBaseFree && τ.eqBaseFree
+  | .nat | .unit => true
+
 /-- The degree of a pure type (Definition 8.1.7). -/
 def degree : Ty ι → Nat
   | .nat      => 0

@@ -125,39 +125,49 @@ def eqAtType_refl {Γ : Ctx ι} {ρ : Ty ι} (s : Term F Γ ρ) :
     .mp taut step2
 
 /-- Symmetry of higher-type equality (from sym0 + forall_rule). -/
-def eqAtType_sym {Γ : Ctx ι} {ρ : Ty ι} {s t : Term F Γ ρ} :
+def eqAtType_sym {Γ : Ctx ι} {ρ : Ty ι} {s t : Term F Γ ρ}
+    (hbf : ρ.eqBaseFree = true := by rfl) :
     Derivable F al Premises (eqAtType ρ s t →ᶠ eqAtType ρ t s) :=
-  match ρ with
-  | .nat    => .sym0
-  -- STAGE 5: needs eq_R sym/trans, which live above this file. See ARCHITECTURE.md.
-  | .base _ => sorry
-  | .unit   => self_imp_h
-  | .prod ρ' σ' =>
-    pair_h (.syllogism .and_weak eqAtType_sym) (.syllogism and_proj2 eqAtType_sym)
-  | .arr ρ' σ' =>
+  match ρ, hbf with
+  | .nat, _    => .sym0
+  -- Unreachable: `eqBaseFree (.base _) = false`. The base case genuinely needs symmetry and
+  -- transitivity of `eq_R`, which live above this file; `eqAtType_sym_all` supplies it there.
+  | .base _, h => absurd h (by simp [Ty.eqBaseFree])
+  | .unit, _   => self_imp_h
+  | .prod ρ' σ', h =>
+    have hs : ρ'.eqBaseFree = true ∧ σ'.eqBaseFree = true := by
+      simpa only [Ty.eqBaseFree, Bool.and_eq_true] using h
+    pair_h (.syllogism .and_weak (eqAtType_sym hs.1))
+      (.syllogism and_proj2 (eqAtType_sym hs.2))
+  | .arr ρ' σ', h =>
+    -- `eqBaseFree (ρ' →ₜ σ') = σ'.eqBaseFree` definitionally: the domain is only a binder.
     let P_st : Formula F (ρ' :: Γ) :=
       eqAtType σ' (Term.app s.weaken (.var .vz)) (Term.app t.weaken (.var .vz))
     let inst_st := forall_ax_inst P_st
     let ih : Derivable F al Premises (P_st →ᶠ
         eqAtType σ' (Term.app t.weaken (.var .vz)) (Term.app s.weaken (.var .vz))) :=
-      eqAtType_sym
+      eqAtType_sym h
     .forall_rule (.syllogism inst_st ih)
 
 /-- Transitivity of higher-type equality (from trans0 + forall_rule). -/
-def eqAtType_trans {Γ : Ctx ι} {ρ : Ty ι} {s t u : Term F Γ ρ} :
+def eqAtType_trans {Γ : Ctx ι} {ρ : Ty ι} {s t u : Term F Γ ρ}
+    (hbf : ρ.eqBaseFree = true := by rfl) :
     Derivable F al Premises (eqAtType ρ s t ∧ᶠ eqAtType ρ t u →ᶠ eqAtType ρ s u) :=
-  match ρ with
-  | .nat    => .trans0
-  -- STAGE 5: needs eq_R sym/trans, which live above this file. See ARCHITECTURE.md.
-  | .base _ => sorry
-  | .unit   => .and_weak
-  | .prod ρ' σ' =>
+  match ρ, hbf with
+  | .nat, _    => .trans0
+  -- Unreachable, as in `eqAtType_sym`. `eqAtType_trans_all` covers base types, above the
+  -- real-number layer.
+  | .base _, h => absurd h (by simp [Ty.eqBaseFree])
+  | .unit, _   => .and_weak
+  | .prod ρ' σ', h =>
+    have hs : ρ'.eqBaseFree = true ∧ σ'.eqBaseFree = true := by
+      simpa only [Ty.eqBaseFree, Bool.and_eq_true] using h
     pair_h
       (.syllogism (pair_h (.syllogism .and_weak .and_weak) (.syllogism and_proj2 .and_weak))
-        eqAtType_trans)
+        (eqAtType_trans hs.1))
       (.syllogism (pair_h (.syllogism .and_weak and_proj2) (.syllogism and_proj2 and_proj2))
-        eqAtType_trans)
-  | .arr ρ' σ' =>
+        (eqAtType_trans hs.2))
+  | .arr ρ' σ', h =>
     let P_st : Formula F (ρ' :: Γ) :=
       eqAtType σ' (Term.app s.weaken (.var .vz)) (Term.app t.weaken (.var .vz))
     let P_tu : Formula F (ρ' :: Γ) :=
@@ -166,7 +176,7 @@ def eqAtType_trans {Γ : Ctx ι} {ρ : Ty ι} {s t u : Term F Γ ρ} :
     let inst_tu := forall_ax_inst P_tu
     let ih : Derivable F al Premises (P_st ∧ᶠ P_tu →ᶠ
         eqAtType σ' (Term.app s.weaken (.var .vz)) (Term.app u.weaken (.var .vz))) :=
-      eqAtType_trans
+      eqAtType_trans h
     let get_P_st : Derivable F al Premises
         ((Formula.all ρ' P_st ∧ᶠ Formula.all ρ' P_tu).weakenBy ρ' →ᶠ P_st) :=
       .syllogism .and_weak inst_st
@@ -292,7 +302,8 @@ def univ_gen {Γ : Ctx ι} {ρ : Ty ι} {A : Formula F (ρ :: Γ)}
     Second level: lam_correct body (s₂.weaken) in context ρ₂ :: Γ,
     then universalize over ρ₂ and instantiate at s₁. -/
 def Term.lam2_correct {ρ₂ ρ₁ τ : Ty ι} {Γ : Ctx ι}
-        (body : Term F (ρ₁ :: ρ₂ :: Γ) τ) (s₁ : Term F Γ ρ₂) (s₂ : Term F Γ ρ₁) :
+        (body : Term F (ρ₁ :: ρ₂ :: Γ) τ) (s₁ : Term F Γ ρ₂) (s₂ : Term F Γ ρ₁)
+        (hbf : τ.eqBaseFree = true := by rfl) :
     Derivable F al Premises (eqAtType τ
       (Term.app2 (Term.lam (Term.lam body)) s₁ s₂)
       ((body.subst0 (s₂.weaken)).subst0 s₁)) :=
@@ -333,30 +344,33 @@ def Term.lam2_correct {ρ₂ ρ₁ τ : Ty ι} {Γ : Ctx ι}
       rw [weaken_subst0_h]
   let step_b2 := Eq.mp (congrArg (Derivable F al Premises) heq_b) step_b2_raw
   -- Chain step_a2 and step_b2 via eqAtType_trans
-  .mp (.mp step_b2 (.mp step_a2 and_intro)) (eqAtType_trans)
+  .mp (.mp step_b2 (.mp step_a2 and_intro)) (eqAtType_trans hbf)
 
 /-- lam2_correct with explicit normal form: gives
     app2 (lam (lam body)) s₁ s₂ =_τ target
     when `(body.subst0 (s₂.weaken)).subst0 s₁ = target`. -/
 def lam2_correct_nf {ρ₂ ρ₁ τ : Ty ι} {Γ : Ctx ι}
     (body : Term F (ρ₁ :: ρ₂ :: Γ) τ) (s₁ : Term F Γ ρ₂) (s₂ : Term F Γ ρ₁)
-    {target : Term F Γ τ} (hnf : (body.subst0 (s₂.weaken)).subst0 s₁ = target) :
+    {target : Term F Γ τ} (hnf : (body.subst0 (s₂.weaken)).subst0 s₁ = target)
+    (hbf : τ.eqBaseFree = true := by rfl) :
     Derivable F al Premises (eqAtType τ (Term.app2 (Term.lam (Term.lam body)) s₁ s₂) target) :=
   Eq.mp (congrArg (Derivable F al Premises ·)
     (congrArg (eqAtType τ (Term.app2 (Term.lam (Term.lam body)) s₁ s₂)) hnf))
-    (Term.lam2_correct body s₁ s₂)
+    (Term.lam2_correct body s₁ s₂ hbf)
 
 /-- Beta-reduction for 3-argument lambda application.
     `(lam (lam (lam body))) s₁ s₂ s₃ =_τ NF`
     where NF = `((body.subst0 (s₃.weaken.weaken)).subst0 (s₂.weaken)).subst0 s₁`. -/
 def Term.lam3_correct {ρ₃ ρ₂ ρ₁ τ : Ty ι} {Γ : Ctx ι}
         (body : Term F (ρ₁ :: ρ₂ :: ρ₃ :: Γ) τ)
-    (s₁ : Term F Γ ρ₃) (s₂ : Term F Γ ρ₂) (s₃ : Term F Γ ρ₁) :
+    (s₁ : Term F Γ ρ₃) (s₂ : Term F Γ ρ₂) (s₃ : Term F Γ ρ₁)
+    (hbf : τ.eqBaseFree = true := by rfl) :
     Derivable F al Premises (eqAtType τ
       (Term.app3 (Term.lam (Term.lam (Term.lam body))) s₁ s₂ s₃)
       (((body.subst0 (s₃.weaken.weaken)).subst0 (s₂.weaken)).subst0 s₁)) :=
-  -- Step A: lam2_correct on outer two lambdas gives function-type equality
-  let step_a := Term.lam2_correct (Term.lam body) s₁ s₂
+  -- Step A: lam2_correct on outer two lambdas gives function-type equality.
+  -- `eqBaseFree (ρ₁ →ₜ τ) = τ.eqBaseFree` definitionally, so `hbf` serves directly.
+  let step_a := Term.lam2_correct (Term.lam body) s₁ s₂ hbf
   -- step_a : eqAtType (ρ₁ →ₜ τ) (app2 (lam₃ body) s₁ s₂) mid
   -- where mid = ((lam body).subst0 (s₂.weaken)).subst0 s₁
   -- Step B: instantiate at s₃ via forall_ax + transport
@@ -406,19 +420,20 @@ def Term.lam3_correct {ρ₃ ρ₂ ρ₁ τ : Ty ι} {Γ : Ctx ι}
       rw [weaken_subst0_h]
   let step_c4 := Eq.mp (congrArg (Derivable F al Premises) heq_c2) step_c4_raw
   -- Chain step_b and step_c4 via eqAtType_trans
-  .mp (.mp step_c4 (.mp step_b and_intro)) (eqAtType_trans)
+  .mp (.mp step_c4 (.mp step_b and_intro)) (eqAtType_trans hbf)
 
 /-- lam3_correct with explicit normal form. -/
 def lam3_correct_nf {ρ₃ ρ₂ ρ₁ τ : Ty ι} {Γ : Ctx ι}
     (body : Term F (ρ₁ :: ρ₂ :: ρ₃ :: Γ) τ)
     (s₁ : Term F Γ ρ₃) (s₂ : Term F Γ ρ₂) (s₃ : Term F Γ ρ₁)
     {target : Term F Γ τ}
-    (hnf : ((body.subst0 (s₃.weaken.weaken)).subst0 (s₂.weaken)).subst0 s₁ = target) :
+    (hnf : ((body.subst0 (s₃.weaken.weaken)).subst0 (s₂.weaken)).subst0 s₁ = target)
+    (hbf : τ.eqBaseFree = true := by rfl) :
     Derivable F al Premises (eqAtType τ
       (Term.app3 (Term.lam (Term.lam (Term.lam body))) s₁ s₂ s₃) target) :=
   Eq.mp (congrArg (Derivable F al Premises ·)
     (congrArg (eqAtType τ (Term.app3 (Term.lam (Term.lam (Term.lam body))) s₁ s₂ s₃)) hnf))
-    (Term.lam3_correct body s₁ s₂ s₃)
+    (Term.lam3_correct body s₁ s₂ s₃ hbf)
 
 /-- lam_correct with explicit normal form. -/
 def lam_correct_nf {ρ τ : Ty ι} {Γ : Ctx ι}
