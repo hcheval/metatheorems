@@ -1669,6 +1669,25 @@ def eq_R_sym :
         (.app Term.abs_Q (Term.app2 Term.sub_Q B A)) e
       (abs_diff_Q_comm adm A B) (eq_Q_refl_inst adm e))))
 
+/-- Symmetry of `=_ℝ` at explicit reals — the `_core` companion of `eq_R_sym`, in the same
+style as `eq_R_trans_core` / `add_eq_zero_R_core`.
+
+Instantiating the `∀`-quantified `eq_R_sym` at two terms means pushing two `subst0`s through
+`eq_R`; taking the terms as parameters skips that entirely, and the proof is `eq_R_sym`'s own
+body with `f`/`g` in place of the two bound variables. Used by
+`MetricSpace.admissibleEqX.eqx_sym`. -/
+def eq_R_sym_core (f g : Term F Γ (realTy ι)) :
+    Derivable F EqX al Premises (eq_R f g →ᶠ eq_R g f) :=
+  let A : Term F (Ty.nat :: Γ) Ty.nat :=
+    Term.app (Term.app Term.cauchyfy f.weaken) (.app .succ (.var .vz))
+  let B : Term F (Ty.nat :: Γ) Ty.nat :=
+    Term.app (Term.app Term.cauchyfy g.weaken) (.app .succ (.var .vz))
+  let e : Term F (Ty.nat :: Γ) Ty.nat := .app Term.pow2neg_Q (.var .vz)
+  forall_map
+    (lt_Q_congr adm (.app Term.abs_Q (Term.app2 Term.sub_Q A B)) e
+        (.app Term.abs_Q (Term.app2 Term.sub_Q B A)) e
+      (abs_diff_Q_comm adm A B) (eq_Q_refl_inst adm e))
+
 /-- ⊢ ∀f,g,h : ℝ. f =_ℝ g ∧ g =_ℝ h → f =_ℝ h -/
 def eq_R_trans :
     Derivable F EqX al Premises (Γ := Γ)

@@ -395,11 +395,32 @@ theorem MetricSpace.premises_pu :
 -- `d_X` is an uninterpreted constant, so `metric x y = fun _ => 1` refutes `d(t,t) =ℝ 0ℝ`.
 -- The three `sorry`s below now stand for unfinished work rather than for a false claim.
 
+/-- `ax_refl` instantiated at an arbitrary term: `⊢ d(t,t) =ℝ 0ℝ`.
+
+This is `eqx_refl` modulo unfolding `EqX`, and it is the first thing in the file that
+*uses* a metric axiom rather than merely stating it. Note the premise set is fixed: this
+is not derivable in the empty theory, which is exactly why `AdmissibleEqX` carries
+`Premises`. -/
+def MetricSpace.d_self_derivable {Γ : Ctx MetricSpace.ι} {a : Allowed}
+    (t : Term MetricSpace.F Γ xTy) :
+    Derivable MetricSpace.F MetricSpace.EqX a MetricSpace.Premises
+      (eq_R (Term.app2 d_X t t) Term.zero_R) := by
+  have hax : Derivable MetricSpace.F MetricSpace.EqX a MetricSpace.Premises
+      (MetricSpace.ax_refl (Γ := Γ)) := .premise (Or.inl rfl)
+  have hinst := Derivable.mp hax
+    (Derivable.forall_ax (EqX := MetricSpace.EqX) (allowed := a)
+      (Premises := MetricSpace.Premises)
+      (A := eq_R (Term.app2 d_X (Term.var .vz) (Term.var .vz)) Term.zero_R) t)
+  -- `forall_ax` lands on `A.subst0 t`; push the substitution through `eq_R`.
+  simpa only [Formula.subst0, eq_R_substF, Term.subst, Term.subst0_map,
+    Term.app2, zero_R_closed_subst] using hinst
+
 def MetricSpace.admissibleEqX : AdmissibleEqX MetricSpace.EqX MetricSpace.Premises where
   substF_nat := fun {_ _} () u v σ => by
     simp only [MetricSpace.EqX, eq_R_substF, Term.subst, Term.app2,
       zero_R_closed_subst]
-  eqx_refl := sorry
+  eqx_refl := fun {_} {_} {i} t => match i with
+    | () => MetricSpace.d_self_derivable t
   eqx_sym := sorry
   eqx_trans := sorry
   eqx_pu := fun () {_} _ _ => eq_R_isPurelyUniversal _ _
