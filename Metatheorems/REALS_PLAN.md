@@ -1,6 +1,10 @@
 # The real-number layer: what it needs, in dependency order
 
 > **Revision 2026-09-01 — read §0 first. Three of this note's claims are wrong.**
+>
+> **Revision 2026-09-02 — §0.02 and §0.03 are the newest state (the additive package and the
+> `<_ℝ` shift). §0.6 is SUPERSEDED (`AdmissibleEqX` no longer exists) and §0.5 item 3 was
+> superseded rather than built; both now say so in place.**
 
 ## 0. What the 2026-09-01 session established
 
@@ -15,6 +19,113 @@ below was never checked.
 
 **Proved (4/19), `#print axioms` = `[propext, Quot.sound]` in-file:**
 `eq_R_refl`, `eq_R_sym`, `lt_irrefl_R`, `zero_lt_one_R`.
+
+> **Running total, 2026-09-02 (end of `reals-additive`): 10 proved.** The four above, plus
+> `eq_R_trans` and `add_eq_zero_R` (§0.05), `le_zero_eq_zero_R` (§0.05(c), in its *repaired*
+> form), and `add_zero_R` / `add_assoc_R` / `add_neg_R` (§0.02). Still open: `add_comm_R`,
+> `mul_comm_R`, `mul_assoc_R`, `mul_one_R`, `distrib_R`, `lt_trans_R`, `lt_add_R`,
+> `lt_mul_pos_R`, `archimedean_R`, plus `approx_R`, `cauchy_complete_R`, `abs_R_bound`.
+> `RealNumbers.lean` carries **12** sorried declarations.
+
+### 0.02 The additive package, 2026-09-02 (branch `reals-additive`)
+
+**`add_zero_R`, `add_assoc_R`, `add_neg_R` are proved**, all `[propext, Quot.sound]`.
+`RealNumbers.lean` is at **12** sorried declarations. Four findings, in decreasing order of
+importance.
+
+**(a) The `eqR_le` engine did NOT generalise, and did not need to.** §0.05's telescoping
+machinery is for *tight* statements only. `add_zero_R` and `add_assoc_R` are not tight:
+the two sides are the same sum read at indices differing by a fixed number of `cauchyfy`
+steps, each costing `2^{-(index+1)}` against a budget of `2^{-n}`, so `cauchyfy_cauchy` alone
+closes them with a factor of two (resp. four) to spare. `add_neg_R` has *no* estimate at all —
+the sum is `eq_Q`-zero outright. So the engine was neither reused nor re-run; the right
+question turned out to be "is this statement tight?", and only `eq_R_trans` in the additive
+package is. What *would* be worth packaging, if a tight additive statement ever appears, is
+`eqR_strict` plus the two `cauchyfy_unfold` rewrites — i.e. `eqR_hyp f h →ᶠ eq_R f h` — which
+is `eq_R_trans_core`'s last four lines.
+
+**(b) `add_neg_R` needed a genuinely new piece: `cauchyfy_neg`.** `neg_R f = λn. neg_Q (f n)`
+applies to the **raw** `f`, so nothing related `(neg_R f)^` to `f̂`, and `f` is an arbitrary
+`ℕ → ℕ` so `cauchyfy_id` does not apply either. What works is that the two recursions run in
+lockstep *on the nose*:
+
+    state(neg_R f, n)  =₀  pair( neg_Q (fst_pair (state(f, n))), snd_pair (state(f, n)) )
+
+— same flag, negated value, at every index (`cauchyState_neg`, by `pinduction`, three cases
+mirroring `cauchy_inv`'s). The value half is bookkeeping. The flag half is the content: the
+Cauchy check is taken on the *raw* sequences and `|neg_Q a −ℚ neg_Q b|ℚ` is only `eq_Q`-equal
+to `|a −ℚ b|ℚ`, so the flags agree only because `lt_Q_dec`'s **decision** is `eq_Q`-invariant.
+`sg_bar_congr_iff` (new) is the bridge — it turns the two-way implication `lt_Q_congr` supplies
+into the `=₀` equality of `sg_bar` values that `cauchyState_advance`/`_trip` demand.
+
+**This is §0.2's blocker in a special case, and it went through.** §0.2 says `add_comm_R` /
+`mul_comm_R` need "an `eq_Q`-level congruence for `cauchyfy`… an induction carrying an
+object-level hypothesis, so it needs `seq_induction`". That is right *in general*; but when
+the two sequences are related by a **fixed ℚ-operation** rather than by an assumed pointwise
+`eq_Q`, the induction hypothesis is a plain `=₀` equation and ordinary `pinduction` suffices.
+`cauchyState_neg` is 60 lines. Whether `add_comm_R` can be reached the same way — via a
+`cauchyState_congr` for a fixed operation rather than a hypothesis — was not tested, but the
+route is no longer obviously closed.
+
+**(c) `prw` at a goal containing `Term.add_R` bit exactly as predicted**, three times. All
+three proofs go through a `_gen` companion taking the composed real as an abstract Lean
+parameter, following `add_eq_zero_R_gen`. Two new `=₀` congruences, `addQ_l_nat` and
+`addQ_r_nat` (the mirror of `RationalNumbers.lean`'s private `add_Q_congr_r_nat`), assemble
+the `cauchyfy_add_R` chains *outside* the proof mode so no `prw` ever sees `add_R`.
+
+**(d) A named `Formula` definition hides itself from `canorm`.** `canorm` normalises
+substitutions with `simp only`, which does not unfold a `def`, so an abbreviation like
+`negF f : Formula F (Ty.nat :: Γ)` makes `pinduction`'s own bookkeeping fail with
+"the pattern does not occur in the goal". The lockstep claim is therefore written out at both
+its occurrences. This is the `Formula`-level twin of §0.1's "a named wrapper hides its
+contents from `prw`", and `cauchy_inv`'s `invF` avoids it only because it uses raw
+`.induction` with hand-written `subst0`/`substVar0` lemmas rather than `pinduction`.
+
+### 0.03 `lt_trans_R`: the estimate is proved, the assembly is blocked on the proof mode
+
+**`lt_shift1`, `lt_shift`, `lt_shift_at` are proved** (`[propext, Quot.sound]`).
+**`lt_trans_R` is still `sorryAx`**, through a new `lt_trans_R_core`.
+
+§0.4 is right that `lt_trans_R` must combine two witnesses at different indices, and the
+device is that a `<_ℝ` witness at `n` is a witness at every later index *with the bound
+shrinking at exactly the dyadic rate*:
+
+    2^{-n} ≤ℚ D(n)  ⟹  2^{-(n+k)} ≤ℚ D(n+k),        D(p) := ĝ(p+1) −ℚ f̂(p+1)
+
+`lt_shift1` is one step: `D(n) −ℚ D(n+1)` is `(ĝ(n+1) −ℚ ĝ(n+2)) +ℚ (f̂(n+2) −ℚ f̂(n+1))`, both
+parts below `2^{-(n+2)}` *strictly* by `cauchyfy_cauchy` and `le_Q_self_abs` (which is what
+turns a bound on `|·|` into the directed bound actually needed), so the sum is strictly below
+`2^{-(n+1)}` and one `lt_Q_add_cancel` finishes. `lt_shift` iterates it by induction on `k`,
+the index bookkeeping being `add_succ` against `add_succ_l` exactly as in `eqR_tail`.
+
+**With that, transitivity needs no `max`**: shift the first witness by `n₂` and the second by
+`n₁`, both land at `n₁ +ℕ n₂`, and there `(ĥ −ℚ ĝ) +ℚ (ĝ −ℚ f̂) = ĥ −ℚ f̂` by
+`sub_Q_trans_split`; only one of the two shifted bounds is spent as a bound, the other through
+`0ℚ ≤ℚ 2^{-m} ≤ℚ ĥ −ℚ ĝ`, so the dyadic scale does not double.
+
+**What blocks it is `pobtain`, not arithmetic.** `lt_R f g ∧ᶠ lt_R g h` needs two nested
+`pobtain`s, and `pm_exE` maps `Formula.weakenBy ρ` over the whole hypothesis context — so the
+witness obtained *first* ends up wrapped in a bare `Formula.weakenBy`. `canorm` does not
+normalise that: `q_cons_norm` handles `renameF (Renaming.ext …)`, which is why the
+*second*-obtained witness comes out clean, but nothing handles the bare wrapper. And
+`ProofMode/Pretty.lean` **hides** it, so the hypothesis and the goal print identically while
+being different terms — with `pp.explicit` the tell is that the hypothesis's context prints as
+`nat :: Γ` inside a sequent over `nat :: nat :: Γ`. `pexact` / `papplym … in h` on it then run
+`isDefEq` on two stuck terms containing `Term.cauchyfy` and exhaust the heartbeat budget.
+A display-assisted trap, in the same family as metaprogramming trap 11 in CLAUDE.md.
+
+Note that `ProofMode/MCTLazy.lean` never nests `pobtain`s, and reaches earlier hypotheses only
+through `pinst`/`pfrom` — `pinst` whnf's through `weakenBy`, `pexact` does not. Three ways out
+are written up at `lt_trans_R_core`, along with the complete script, kept verbatim.
+
+**`lt_add_R` is harder than `lt_trans_R` and was not attempted.** The same shift lands the
+hypothesis at index `m+2` (`add_R`'s extra shift), where `D(m+2) > 2^{-(m+1)}` — short of the
+required `2^{-m}` by exactly a factor of two, *at every `m`*, and the estimate
+`D_p ≥ 2^{-(p-1)}` is the fixed point of the drift recursion so bootstrapping does not improve
+it. The witness has to depend on `f` through the Cauchy slack at the hypothesis's own index,
+`d := 2^{-(n+2)} −ℚ |ĝ(n+1) −ℚ ĝ(n+2)|`, exactly as in §0.8's analysis of `approx_R`; so
+`lt_add_R` and `approx_R` are one job, and `pow2neg_rat_den_le` is the Archimedean step both
+need.
 
 ### 0.05 Class C, 2026-09-02: `eq_R_trans` and `add_eq_zero_R` are proved
 
@@ -170,8 +281,14 @@ with the two outer terms strict and the rest `≤`. That needs, none of which ex
 1. `abs_Q_triangle` (`|a +ℚ b| ≤ℚ |a| +ℚ |b|`), `le_Q_trans`, `le_Q_add` — §3.2's three
    remaining items;
 2. a **mixed** `<`/`≤` addition lemma (`a <ℚ A`, `b ≤ℚ B` ⟹ `a +ℚ b <ℚ A +ℚ B`);
-3. an **unbounded telescoping induction**: `|f̂(p) − f̂(p+k)| ≤ℚ 2^{-p} − 2^{-(p+k)}`, by
-   induction on `k`, on top of `cauchyState_cauchy`;
+3. ~~an **unbounded telescoping induction**: `|f̂(p) − f̂(p+k)| ≤ℚ 2^{-p} − 2^{-(p+k)}`, by
+   induction on `k`, on top of `cauchyState_cauchy`~~ — **SUPERSEDED, and never built. Do not
+   build it.** `eqR_tail` (§0.05) is the same induction in a form that never mentions the
+   difference `f̂(p) − f̂(p+k)`: it carries the *whole* estimate `X_{p+1} <ℚ 2^{-p} + 2^{-(p+k)}`
+   through, so no separate sum lemma is needed and `eq_R_trans` is closed without this. The
+   refined form that keeps one step's slack out of the sum is still open and is what
+   `approx_R` and `lt_add_R` need (§0.03, §0.8 item 2) — but that is a *different* statement
+   from the one written here;
 4. the exact dyadic identities `4·2^{-(n+2)} =ℚ 2^{-n}` and `2^{-p} − 2^{-(p+k)}` telescoping.
 
 Item 3 is a second `cauchyfy`-scale induction. Everything in Class C — and `lt_trans_R`,
@@ -179,10 +296,17 @@ Item 3 is a second `cauchyfy`-scale induction. Everything in Class C — and `lt
 sequences that merely converge together. **This, not `cauchyfy`, is the real remaining
 project.**
 
-### 0.6 One statement-level change was made
+### 0.6 One statement-level change was made — ⚠ SUPERSEDED, do not act on this
 
-The 19 axioms now take `(adm : AdmissibleEqX EqX)`, as every ℚ theorem already does. Nothing
-else about any statement changed.
+This section used to read: *"The 19 axioms now take `(adm : AdmissibleEqX EqX)`, as every ℚ
+theorem already does."*
+
+**`AdmissibleEqX` was DELETED on 2026-09-02**, later the same day, along with `Derivable`'s
+`EqX` index. Base-type equality is now *defined* — `eqAtType (.base i) s t ≡ eq_R (dist i s t)
+0ℝ` — the pseudometric axioms are Π⁰₁ constructors `Derivable.dist_self` / `dist_comm` /
+`dist_tri`, and refl/sym/trans at base types are theorems in `BaseEquality.lean`. **No axiom in
+`RealNumbers.lean` takes an `adm` parameter.** Check the signatures in the file, not this note.
+See CLAUDE.md's design table ("Base-type equality") and ARCHITECTURE.md §1, §8.
 
 ### 0.65 The ℚ layer as of 2026-09-01 (end of the `approx-r` session)
 
