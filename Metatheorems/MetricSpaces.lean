@@ -169,6 +169,131 @@ theorem roundR_smaj_of_le {ι : Type} {X : ι → Type}
     exact hmono y hy h
 
 -- ============================================================================
+-- The model, built from a genuine real metric
+-- ============================================================================
+
+/-! `MetricSpaceInterp` above takes `metric : carrier → carrier → (ℕ → ℕ)`, i.e. the metric
+*already in code form*. That is the wrong starting point for majorization: to majorize `d_X`
+one has to know the codes came from actual reals. Kohlenbach builds the model the other way
+round — `[dX]_M := λx,y ∈ X.(d(x,y))◦` (p. 430) — so we do too.
+
+Axioms are passed explicitly rather than via a `PseudoMetricSpace` instance, matching the
+project's `AdmissibleEqX` precedent. Note this is a **pseudo**metric: the document's premises
+are `ax_refl`/`ax_sym`/`ax_triangle` with no separation axiom, and `EqX` is
+`d(x,y) =ℝ 0` precisely because points at distance 0 are to be identified. -/
+structure MetricModel where
+  /-- The carrier. -/
+  carrier : Type
+  /-- The genuine real-valued (pseudo)metric. -/
+  d : carrier → carrier → ℝ
+  /-- Distances are non-negative. Needed for `(·)◦`, whose domain is `[0,∞)`. -/
+  d_nonneg : ∀ x y, 0 ≤ d x y
+  /-- `ax_refl`. -/
+  d_self : ∀ x, d x x = 0
+  /-- `ax_sym`. -/
+  d_comm : ∀ x y, d x y = d y x
+  /-- `ax_triangle`. -/
+  d_triangle : ∀ x y z, d x z ≤ d x y + d y z
+  /-- The distinguished point `0_X`. -/
+  zeroX : carrier
+  /-- The reference point `a` of Definition 17.50. Majorants depend on it; the *domains* of
+      the majorizable functionals do not. -/
+  ref : carrier
+
+/-- The interpretation: `d_X` is interpreted by `(d(x,y))◦`.
+
+`noncomputable` because `(·)◦` is `Nat.floor` on a Mathlib real. This does **not** violate the
+project's "no `noncomputable` on the extraction path": that path is
+`Derivable → NegTrans → Dialectica → Term`, and it stays computable. What is noncomputable is
+the *model the extracted bound is interpreted in*, which is a set-theoretic object and was
+never going to be executable. -/
+noncomputable def MetricModel.toMetricSpaceInterp (M : MetricModel) : MetricSpaceInterp where
+  carrier := M.carrier
+  metric := fun x y => Rounding.roundR (M.d x y)
+  zero := M.zeroX
+
+/-- The `SpaceInterp` this model induces. -/
+noncomputable def MetricModel.si (M : MetricModel) :
+    SpaceInterp (fun () => M.carrier) MetricSpace.F :=
+  M.toMetricSpaceInterp.toSpaceInterp
+
+/-- **The `X`-clause of `≽ᵃ`** (Definition 17.50): `n ≽ᵃ_X x :≡ (n)ℝ ≥ℝ d(a, x)`.
+
+Kohlenbach notes (p. 430) this is equivalent to `n ≥ d(a,x)` outright, which is how we state
+it — the `(·)◦` wrapper on the left would only be undone again. -/
+def MetricModel.base (M : MetricModel) : (i : MetricSpace.ι) → Nat → M.carrier → Prop
+  | (), n, x => M.d M.ref x ≤ (n : ℝ)
+
+/-- **`0_X` is majorizable**: take any `n ≥ d(a, 0_X)`. -/
+theorem MetricModel.zeroX_maj (M : MetricModel) (N : ℕ) :
+    ∃ z_star : ℕ → Nat, ∀ n ≥ N,
+      bezemMaj (X := fun () => M.carrier) M.base (Ty.base ()) (z_star n)
+        (M.si.zeroInterp ()) :=
+  ⟨fun _ => ⌈M.d M.ref M.zeroX⌉₊, fun _ _ => Nat.le_ceil _⟩
+
+/-- The two monotonicity facts about `(·)◦` that both `bezemMaj` and `hatMaj` need at type
+`1 = nat →ₜ nat`. Stated once because at that type the two relations unfold to *the same*
+pair: `bezemMaj` at `.nat` and `hatMaj` at `.nat` are both `≥`. -/
+theorem Rounding.roundR_maj_pair {a b : ℝ} (hb : 0 ≤ b) (hab : a ≤ b) :
+    (∀ p q : ℕ, p ≥ q → Rounding.roundR b p ≥ Rounding.roundR a q) ∧
+    (∀ p q : ℕ, p ≥ q → Rounding.roundR b p ≥ Rounding.roundR b q) := by
+  have hmono : Monotone (Rounding.roundR b) :=
+    monotone_nat_of_le_succ (Rounding.roundR_mono hb)
+  exact ⟨fun p q h => Nat.le_trans (Rounding.roundR_le₁_of_le hab q) (hmono h),
+         fun p q h => hmono h⟩
+
+/-- **`d_X` is majorizable**, by `λx⁰,y⁰.(x + y)∘` — the document's majorant
+(`particular-cases-metric-spaces.tex:100`), justified by the triangle inequality.
+
+If `n₁ ≽ᵃ_X x` and `n₂ ≽ᵃ_X y`, i.e. `d(a,x) ≤ n₁` and `d(a,y) ≤ n₂`, then
+`d(x,y) ≤ d(x,a) + d(a,y) = d(a,x) + d(a,y) ≤ n₁ + n₂`, and Lemma 17.8(4) turns that into
+`(n₁+n₂)∘ s-maj₁ (d(x,y))∘`.
+
+The self-majorization half is what the document flags separately — *"We also need to check
+that `λx⁰,y⁰.(x+y)∘` majorizes itself"* — and it needs no metric input at all, only that
+`m ≥ n → (m)∘ s-maj₁ (n)∘`. -/
+theorem MetricModel.func_maj (M : MetricModel) (N : ℕ) :
+    ∃ f_star : ℕ → Ty.interpret (fun () => M.carrier) (MetricSpace.F ()).hat,
+      ∀ n ≥ N, bezemMaj (X := fun () => M.carrier) M.base (MetricSpace.F ())
+        (f_star n) (M.si.funcInterp ()) := by
+  -- the binder ascriptions are load-bearing: `Ty.hat` is not reducible, so without them
+  -- instance search cannot see that `Ty.interpret X xTy.hat` is `ℕ` and `+` fails to elaborate
+  refine ⟨fun _ => fun (n₁ : ℕ) (n₂ : ℕ) => Rounding.roundR ((n₁ + n₂ : ℕ) : ℝ),
+          fun _ _ => ?_⟩
+  -- `d(x,y) ≤ n₁ + n₂` from the two `X`-clause hypotheses and the triangle inequality
+  have key : ∀ (n₁ n₂ : ℕ) (x y : M.carrier),
+      M.base () n₁ x → M.base () n₂ y → M.d x y ≤ ((n₁ + n₂ : ℕ) : ℝ) := by
+    intro n₁ n₂ x y hx hy
+    have h := M.d_triangle x M.ref y
+    rw [M.d_comm x M.ref] at h
+    push_cast
+    exact h.trans (add_le_add hx hy)
+  -- the self-majorization block, shared: `(a + ·)∘` dominates `(b + ·)∘` whenever `b ≤ a`
+  have self : ∀ a b : ℕ, b ≤ a →
+      hatMaj (X := fun () => M.carrier) (xTy →ₜ realTy MetricSpace.ι)
+        (fun (p : ℕ) => Rounding.roundR ((a + p : ℕ) : ℝ))
+        (fun (q : ℕ) => Rounding.roundR ((b + q : ℕ) : ℝ)) := by
+    intro a b hba
+    refine ⟨?_, ?_⟩
+    · intro p q hpq
+      exact Rounding.roundR_maj_pair (by positivity)
+        (by exact_mod_cast Nat.add_le_add hba hpq)
+    · intro p q hpq
+      exact Rounding.roundR_maj_pair (by positivity)
+        (by exact_mod_cast Nat.add_le_add_left hpq a)
+  refine ⟨?_, ?_⟩
+  · -- majorization
+    intro n₁ x hx
+    refine ⟨?_, ?_⟩
+    · intro n₂ y hy
+      exact Rounding.roundR_maj_pair (by positivity) (key n₁ n₂ x y hx hy)
+    · -- `(n₁ + ·)∘` majorizes itself
+      exact (self n₁ n₁ (Nat.le_refl _)).2
+  · -- self-majorization of the whole majorant. `bezemMaj`'s second conjunct is a single
+    -- ∀-statement, not a nested pair — so this is exactly `self`.
+    exact fun a b h => self a b h
+
+-- ============================================================================
 -- AdmissibleEqX for the metric space EqX
 -- ============================================================================
 
