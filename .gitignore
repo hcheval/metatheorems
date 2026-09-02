@@ -17,4 +17,7 @@ _mcp_snippet_*.lean
 .claude/memory/
 .claude/worktrees/
 
+# Agent worktrees (git worktree add .worktrees/<name>); branches live in .git regardless
+/.worktrees/
+
 /AML-Formalization
