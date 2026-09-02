@@ -45,16 +45,15 @@ namespace ProofMode
 open Formula
 
 variable {ι : Type} {F : ι → Ty ι}
-    {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
     {al : Allowed} {Premises : PremiseSet F} {Γ : Ctx ι}
 
 /-- **The budget descent.** `∀k ((∀u B₀ u) → ∀m (a m ≤ k → ∃n (a n = a (n + g n))))`.
 
 `a`, `g` and `K` are separate parameters here; the fusion into the single functional `h` that
 `mctStatement` quantifies over happens only at the end, in `mct_p2`. -/
-def mct_descent (adm : AdmissibleEqX EqX Premises)
+def mct_descent 
     (a g : Term F Γ (Ty.nat →ₜ Ty.nat)) (K : Term F Γ Ty.nat) :
-    Derivable F EqX al Premises (Γ := Γ)
+    Derivable F al Premises (Γ := Γ)
       (Formula.all Ty.nat                                        -- k = x₀
         (Formula.all Ty.nat                                      -- u = x₁
             ((a ⬝ S x₁ ∸ᵗ a ⬝ x₁ =₀ Term.zero) ∧ᶠ
@@ -72,21 +71,21 @@ def mct_descent (adm : AdmissibleEqX EqX Premises)
     pforall
     pintro hm
     pexists x₀
-    prw (monus_zero adm (a ⬝ x₀)) in hm with hm0
+    prw (monus_zero (a ⬝ x₀)) in hm with hm0
     phave hstep : Formula.all Ty.nat (a ⬝ S x₁ ∸ᵗ a ⬝ x₁ =₀ Term.zero)
     · pforall
       pspecialize H with Hu
       anorm_ren
       pand_left
       pexact Hu
-    pfrom ac := antitone_chain adm a
+    pfrom ac := antitone_chain a
     pinst ac (g ⬝ x₀) with ac1
     anorm
     pinst ac1 x₀ with ac2
     anorm
     papply ac2 in hstep with hanti
     prwby hm0 in hanti with hanti'
-    prw (monus_zero adm (a ⬝ (x₀ +ᵗ g ⬝ x₀))) in hanti' with hz
+    prw (monus_zero (a ⬝ (x₀ +ᵗ g ⬝ x₀))) in hanti' with hz
     ptrans Term.zero
     · pexact hm0
     · psym
@@ -104,7 +103,7 @@ def mct_descent (adm : AdmissibleEqX EqX Premises)
       anorm_ren
       pand_left
       pexact Hu
-    pfrom ac := antitone_chain adm a
+    pfrom ac := antitone_chain a
     pinst ac (g ⬝ x₁) with ac1
     anorm
     pinst ac1 x₁ with ac2
@@ -113,14 +112,14 @@ def mct_descent (adm : AdmissibleEqX EqX Premises)
     -- is the window at m already flat?
     phave hlem :
       (a ⬝ x₁ =₀ a ⬝ (x₁ +ᵗ g ⬝ x₁)) ∨ᶠ ¬ᶠ(a ⬝ x₁ =₀ a ⬝ (x₁ +ᵗ g ⬝ x₁))
-    · pthm (qf_lem (adm := adm) rfl)
+    · pthm (qf_lem rfl)
     pcases hlem with heq | hne
     · -- flat: m is the witness
       pexists x₁
       anorm
       pexact heq
     · -- not flat: the budget drops, and the induction hypothesis applies at m + g m
-      pfrom sd := strict_drop adm
+      pfrom sd := strict_drop
       pinst sd x₀ with sd1
       anorm
       pinst sd1 (a ⬝ (x₁ +ᵗ g ⬝ x₁)) with sd2
@@ -140,15 +139,15 @@ def mct_descent (adm : AdmissibleEqX EqX Premises)
 
 The descent at `k := K` and `m := 0`; the side condition `a 0 ≤ K` is the premise's second
 conjunct at `u := 0`. -/
-def mct_body (adm : AdmissibleEqX EqX Premises)
+def mct_body 
     (a g : Term F Γ (Ty.nat →ₜ Ty.nat)) (K : Term F Γ Ty.nat) :
-    Derivable F EqX al Premises (Γ := Γ)
+    Derivable F al Premises (Γ := Γ)
       (Formula.all Ty.nat
           ((a ⬝ S x₀ ∸ᵗ a ⬝ x₀ =₀ Term.zero) ∧ᶠ (a ⬝ x₀ ∸ᵗ K =₀ Term.zero))
         →ᶠ Formula.ex Ty.nat (a ⬝ x₀ =₀ a ⬝ (x₀ +ᵗ g ⬝ x₀))) := by
   pmode
   pintro H
-  pfrom d := mct_descent adm a g K
+  pfrom d := mct_descent a g K
   pinst d K with d1
   anorm
   papply d1 in H with d2
@@ -166,11 +165,11 @@ def mct_body (adm : AdmissibleEqX EqX Premises)
 `MCTStatement.lean` encodes them: `a := h 0`, `g := h 1`, `K := h 2 0`. Fusing them into one
 parameter is what lets a single majorant cover all three; the proof above never needed to know
 that, which is why it was done over three separate parameters and specialised only here. -/
-def mct_p2 (adm : AdmissibleEqX EqX Premises) :
-    Derivable F EqX al Premises (Γ := []) mctStatement := by
+def mct_p2 :
+    Derivable F al Premises (Γ := []) mctStatement := by
   pmode
   pforall
-  pthm (mct_body adm (x₀ ⬝ (Term.ofNat 0)) (x₀ ⬝ (Term.ofNat 1))
+  pthm (mct_body (x₀ ⬝ (Term.ofNat 0)) (x₀ ⬝ (Term.ofNat 1))
           ((x₀ ⬝ (Term.ofNat 2)) ⬝ (Term.ofNat 0)))
 
 /-! ## It goes through the metatheorem
@@ -185,28 +184,28 @@ variable {X : ι → Type}
 
 /-- **A4, first half.** The two functionals p₂ yields: `U` says where to test the premise,
 `V` is the witness. Both compute — nothing here is `noncomputable`. -/
-def mct_extract_p2 (si : SpaceInterp X F) (eqxi : EqXInterp X F si EqX)
-    (adm : AdmissibleEqX EqX Premises)
+def mct_extract_p2 (si : SpaceInterp X F) (eqxi : EqXInterp X F si)
+    
     (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
       ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env) :=
-  mctExtract si eqxi premise_realizer (mct_p2 (al := Allowed.extended) adm)
+  mctExtract si eqxi premise_realizer (mct_p2 (al := Allowed.extended))
 
 /-- **A4, second half.** The bound, from that extraction plus majorants for `U` and `V`. -/
-theorem mct_bound_p2 (si : SpaceInterp X F) (eqxi : EqXInterp X F si EqX)
-    (adm : AdmissibleEqX EqX Premises) (mj : MajorizabilityRel si)
+theorem mct_bound_p2 (si : SpaceInterp X F) (eqxi : EqXInterp X F si)
+    (mj : MajorizabilityRel si)
     (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
       ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
     (U_star V_star : Ty.interpret X (mctTy ι →ₜ Ty.nat).hat)
     (hU : mj.maj (mctTy ι →ₜ Ty.nat) U_star
-      (mct_extract_p2 si eqxi adm premise_realizer).val.1)
+      (mct_extract_p2 si eqxi premise_realizer).val.1)
     (hV : mj.maj (mctTy ι →ₜ Ty.nat) V_star
-      (mct_extract_p2 si eqxi adm premise_realizer).val.2) :
+      (mct_extract_p2 si eqxi premise_realizer).val.2) :
     ∃ Φ : Ty.interpret X (mctTy ι).hat → Nat,
       ∀ (x : Ty.interpret X (mctTy ι)) (x_star : Ty.interpret X (mctTy ι).hat),
         mj.maj (mctTy ι) x_star x →
         (∀ u : Nat, u ≤ Φ x_star → Formula.interpret si mctB₀ (u, (x, ()))) →
         ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret si mctC₀ (v, (x, ())) :=
-  mct_bound si eqxi mj premise_realizer (mct_p2 (al := Allowed.extended) adm)
+  mct_bound si eqxi mj premise_realizer (mct_p2 (al := Allowed.extended))
     U_star V_star hU hV
 
 end Extraction

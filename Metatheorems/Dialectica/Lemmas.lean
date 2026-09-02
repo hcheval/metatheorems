@@ -25,9 +25,7 @@ via `.val`.
 open Formula
 
 variable {ι : Type} {X : ι → Type} {F : ι → Ty ι} (si : SpaceInterp X F)
-variable {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) →
-          Formula F Γ}
-variable (eqxi : EqXInterp X F si EqX)
+variable (eqxi : EqXInterp X F si)
 variable {Premises : PremiseSet F}
 variable (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
     ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
@@ -189,7 +187,7 @@ def dialectica_trans0 {Γ : Ctx ι} {s t u : Term F Γ Ty.nat} (env : Ctx.interp
   ⟨⟨fun _ => (), fun _ _ => ((), ())⟩, fun ⟨((), ()), ()⟩ ⟨h1, h2⟩ => h1.trans h2⟩
 
 -- ============================================================================
--- QF-ER (qfer): A₀ →ᶠ eqAtType EqX ρ s t  implies  A₀ →ᶠ eqAtType EqX σ (r.subst0 s) (r.subst0 t)
+-- QF-ER (qfer): A₀ →ᶠ eqAtType ρ s t  implies  A₀ →ᶠ eqAtType σ (r.subst0 s) (r.subst0 t)
 -- ============================================================================
 
 /-- A canonical element of `Ty.interpret X ρ`, using `si.zeroInterp` at base types. -/
@@ -205,9 +203,9 @@ private def Ty.interpret_default' {ι : Type} {X : ι → Type} {F : ι → Ty �
 -- They avoid `induction` in `def` bodies to prevent the "code generator does not
 -- support recursor Ty.rec" error; use term-mode `match` instead.
 
-/-- A canonical counter for `eqAtType EqX ρ s t`. -/
+/-- A canonical counter for `eqAtType ρ s t`. -/
 def eqAtType_default_ctr {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ) :
-    ℂ X (eqAtType EqX ρ s t) :=
+    ℂ X (eqAtType ρ s t) :=
   match ρ, s, t with
   | .nat,      _, _  => ()
   | .base i,   s, t  => eqxi.counterDefault i s t
@@ -218,9 +216,9 @@ def eqAtType_default_ctr {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ) :
     (Ty.interpret_default' si ρ',
      eqAtType_default_ctr τ (s.weaken.app (.var .vz)) (t.weaken.app (.var .vz)))
 
-/-- A canonical witness for `eqAtType EqX ρ s t`. -/
+/-- A canonical witness for `eqAtType ρ s t`. -/
 def eqAtType_default_wit {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ) :
-    𝕎 X (eqAtType EqX ρ s t) :=
+    𝕎 X (eqAtType ρ s t) :=
   match ρ, s, t with
   | .nat,      _, _  => ()
   | .base i,   s, t  => eqxi.witnessDefault i s t
@@ -230,13 +228,13 @@ def eqAtType_default_wit {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ) :
   | .arr ρ' τ, s, t  =>
     fun _ => eqAtType_default_wit τ (s.weaken.app (.var .vz)) (t.weaken.app (.var .vz))
 
-/-- The witness type for `eqAtType EqX ρ s t` is a subsingleton.
+/-- The witness type for `eqAtType ρ s t` is a subsingleton.
     At `nat` the witness is `Unit`; at `base i` this follows from `EqX` being purely
     universal (encoded in `eqxi.witnessSubsingleton`); at function types the witness
     is a function into a subsingleton, which is again a subsingleton. -/
-lemma dialecticaWitness_eqAtType_ss (eqxi : EqXInterp X F si EqX) (ρ : Ty ι) :
+lemma dialecticaWitness_eqAtType_ss (eqxi : EqXInterp X F si) (ρ : Ty ι) :
     ∀ {Γ : Ctx ι} (s t : Term F Γ ρ),
-    Subsingleton (𝕎 X (eqAtType EqX ρ s t)) := by
+    Subsingleton (𝕎 X (eqAtType ρ s t)) := by
   induction ρ with
   | nat    => intro Γ s t; simp only [eqAtType, dialecticaWitness]; exact ⟨fun _ _ => rfl⟩
   | base i => intro Γ s t; exact eqxi.witnessSubsingleton i s t
@@ -253,18 +251,18 @@ lemma dialecticaWitness_eqAtType_ss (eqxi : EqXInterp X F si EqX) (ρ : Ty ι) :
     exact ⟨fun f g => funext (fun z =>
       (ih_τ (Term.app s.weaken (.var .vz)) (Term.app t.weaken (.var .vz))).elim (f z) (g z))⟩
 
-/-- Extract semantic equality from a full realizer for `eqAtType EqX ρ s t`. -/
+/-- Extract semantic equality from a full realizer for `eqAtType ρ s t`. -/
 def eqAtType_to_semEq {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
-    (env : Ctx.interpret X Γ) (h : dialecticaRealizerCtx si (eqAtType EqX ρ s t) env) :
+    (env : Ctx.interpret X Γ) (h : dialecticaRealizerCtx si (eqAtType ρ s t) env) :
     Term.interpret si s env = Term.interpret si t env :=
   match ρ, s, t, env, h with
   | .nat, s, t, env, h => h.property ()
   | .base i, s, t, env, h => eqxi.extract i s t env h
   | .unit, s, t, env, h => rfl
   | .prod ρ' τ, s, t, env, h => by
-      have h₁ : dialecticaRealizerCtx si (eqAtType EqX ρ' (Term.fst s) (Term.fst t)) env :=
+      have h₁ : dialecticaRealizerCtx si (eqAtType ρ' (Term.fst s) (Term.fst t)) env :=
         ⟨h.val.1, fun y => (h.property (y, dialecticaDefaultCounter si _)).1⟩
-      have h₂ : dialecticaRealizerCtx si (eqAtType EqX τ (Term.snd s) (Term.snd t)) env :=
+      have h₂ : dialecticaRealizerCtx si (eqAtType τ (Term.snd s) (Term.snd t)) env :=
         ⟨h.val.2, fun y => (h.property (dialecticaDefaultCounter si _, y)).2⟩
       have e₁ := eqAtType_to_semEq ρ' (Term.fst s) (Term.fst t) env h₁
       have e₂ := eqAtType_to_semEq τ (Term.snd s) (Term.snd t) env h₂
@@ -273,7 +271,7 @@ def eqAtType_to_semEq {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
   | .arr ρ' τ, s, t, env, h => by
       funext z
       have hz : dialecticaRealizerCtx si
-          (eqAtType EqX τ (Term.app s.weaken (.var .vz)) (Term.app t.weaken (.var .vz)))
+          (eqAtType τ (Term.app s.weaken (.var .vz)) (Term.app t.weaken (.var .vz)))
           (z, env) :=
         ⟨h.val z, fun yτ => h.property (z, yτ)⟩
       have heq := eqAtType_to_semEq τ
@@ -281,12 +279,12 @@ def eqAtType_to_semEq {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
       simp only [Term.interpret, Term.interpret_weaken, Ctx.lookup] at heq
       exact heq
 
-/-- Build a full realizer for `eqAtType EqX ρ s t` from a semantic equality.
+/-- Build a full realizer for `eqAtType ρ s t` from a semantic equality.
     The `base i` case uses `eqxi.realize`, which encodes the semantic correctness
     of the base-type equality predicate `EqX i`. -/
 def eqAtType_from_semEq {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
     (env : Ctx.interpret X Γ) (h : Term.interpret si s env = Term.interpret si t env) :
-    dialecticaRealizerCtx si (eqAtType EqX ρ s t) env :=
+    dialecticaRealizerCtx si (eqAtType ρ s t) env :=
   match ρ, s, t, env, h with
   | .nat, s, t, env, h => ⟨(), fun () => h⟩
   | .base i, s, t, env, h => eqxi.realize i s t env h
@@ -310,24 +308,24 @@ def eqAtType_from_semEq {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ)
 /-- Dialectica soundness for the QF-ER (qfer) rule.
     Requires A₀ to be QF and ∨-free so that `ℂ X A₀` is a
     subsingleton; this lets us lift a single-counter hypothesis to a full
-    realizer for `eqAtType EqX ρ s t`, extract the semantic equality, and then
+    realizer for `eqAtType ρ s t`, extract the semantic equality, and then
     rebuild the conclusion's realizer using `eqxi`. -/
 def dialectica_qfer {Γ : Ctx ι} {A₀ : Formula F Γ} {ρ σ : Ty ι}
     {s t : Term F Γ ρ} {r : Term F (ρ :: Γ) σ}
     (hqf : A₀.isQF = true) (hvf : A₀.isVFree = true)
-    (ih : ∀ env, dialecticaRealizerCtx si (A₀ →ᶠ eqAtType EqX ρ s t) env) :
-    ∀ env, dialecticaRealizerCtx si (A₀ →ᶠ eqAtType EqX σ (r.subst0 s) (r.subst0 t)) env := by
+    (ih : ∀ env, dialecticaRealizerCtx si (A₀ →ᶠ eqAtType ρ s t) env) :
+    ∀ env, dialecticaRealizerCtx si (A₀ →ᶠ eqAtType σ (r.subst0 s) (r.subst0 t)) env := by
   intro env
   have ssC : Subsingleton (ℂ X A₀) :=
     (dialecticaWitness_subsingleton A₀ hqf hvf).2
-  have ssW_σ : Subsingleton (𝕎 X (eqAtType EqX σ (r.subst0 s) (r.subst0 t))) :=
+  have ssW_σ : Subsingleton (𝕎 X (eqAtType σ (r.subst0 s) (r.subst0 t))) :=
     dialecticaWitness_eqAtType_ss si eqxi σ (r.subst0 s) (r.subst0 t)
   let yρ_default := eqAtType_default_ctr si eqxi ρ s t
   let wσ_default := eqAtType_default_wit si eqxi σ (r.subst0 s) (r.subst0 t)
   obtain ⟨⟨U₀, Y₀⟩, hprop⟩ := ih env
   refine ⟨⟨fun _ => wσ_default, fun xA₀ _ => Y₀ xA₀ yρ_default⟩, ?_⟩
   intro ⟨xA₀, yEqσ⟩ hA₀
-  have hfull : dialecticaRealizerCtx si (eqAtType EqX ρ s t) env :=
+  have hfull : dialecticaRealizerCtx si (eqAtType ρ s t) env :=
     ⟨U₀ xA₀, fun yρ => by
       have hcc : Y₀ xA₀ yρ = Y₀ xA₀ yρ_default := ssC.elim _ _
       exact hprop (xA₀, yρ) (by
@@ -645,7 +643,7 @@ def dialectica_ac {Γ : Ctx ι} {ρ τ : Ty ι} {A : Formula F (τ :: ρ :: Γ)}
 /-- Generalized Dialectica realizer for any context and environment.
     Returns a realizer for all environments; structural recursion on the derivation. -/
 def dialectica_soundness_ctx' {Γ : Ctx ι} {A : Formula F Γ}
-    (h : @Derivable ι F EqX Allowed.extended Premises Γ A) :
+    (h : @Derivable ι F Allowed.extended Premises Γ A) :
     ∀ env : Ctx.interpret X Γ, dialecticaRealizerCtx si A env :=
   match h with
   -- Premises
@@ -695,6 +693,12 @@ def dialectica_soundness_ctx' {Γ : Ctx ι} {A : Formula F Γ}
   | .beta_eq body u => fun env =>
       eqAtType_from_semEq si eqxi _ _ _ env (by
         simp [Term.interpret, Term.interpret_subst0])
+  -- The pseudometric axioms. `dist_self` is `eqAtType (.base i) x x` — literally `eq_R
+  -- (d x x) 0ℝ` — so `realize` at the reflexive instance covers it. The other two are not of
+  -- that shape and are owed as their own `EqXInterp` fields; see Defs.lean.
+  | .dist_self i x    => fun env => eqxi.realize i x x env rfl
+  | .dist_comm i x y  => fun env => eqxi.dist_comm_realize i x y env
+  | .dist_tri i x y z => fun env => eqxi.dist_tri_realize i x y z env
   | .refl0     => fun env => dialectica_refl0 si env
   | .sym0      => fun env => dialectica_sym0 si env
   | .trans0    => fun env => dialectica_trans0 si env
@@ -715,7 +719,7 @@ def dialectica_soundness_ctx' {Γ : Ctx ι} {A : Formula F Γ}
 
 /-- **Dialectica Soundness Theorem** (Theorem 3.0.7). -/
 def dialectica_soundness' {A : Formula F ([] : Ctx ι)}
-    (h : @Derivable ι F EqX Allowed.extended Premises [] A) : dialecticaRealizer si A :=
-  @dialectica_soundness_ctx' ι X F si EqX eqxi Premises premise_realizer [] A h ()
+    (h : @Derivable ι F Allowed.extended Premises [] A) : dialecticaRealizer si A :=
+  @dialectica_soundness_ctx' ι X F si eqxi Premises premise_realizer [] A h ()
 
 end Metatheorems

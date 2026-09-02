@@ -16,13 +16,11 @@ proof system for WE-HA^{ω,X}_{=_X}.
 
 The system is parametric in:
 - `F : ι → Ty ι` — the abstract space function constants
-- `EqX : (i : ι) → {Γ} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ`
-  — the equality predicate at each base type X_i
 - `allowed : Allowed` — which extension principles (LEM, AC, Markov, IP) are available
 
-`EqX` is a purely syntactic parameter: no axioms about it appear here.
-Concrete theories (e.g. metric spaces) extend this system by adding purely
-universal axioms for their chosen `EqX`, which are trivially Dialectica-realized.
+Equality at a base type is no longer a parameter: it is *defined*, as
+`eqAtType (.base i) s t ≡ d_i(s,t) =ℝ 0ℝ`, with `Term.dist` structural and the three
+pseudometric axioms below as constructors. See `EqAtType.lean` and ARCHITECTURE.md.
 -/
 
 open Formula
@@ -86,8 +84,8 @@ end Allowed
 
 /-- Derivability in WE-HA^{ω,X}_{=_X} + allowed extensions.
 
-Parametric in `F` (function constants), `EqX` (base-type equality predicates),
-and `allowed` (which extension principles are available).
+Parametric in `F` (function constants) and `allowed` (which extension principles are
+available).
 
 When `allowed = Allowed.base`, this is pure WE-HA^{ω,X}.
 When `allowed = Allowed.extended`, this adds AC + IP + Markov.

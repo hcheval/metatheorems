@@ -45,7 +45,6 @@ namespace ProofMode
 open Lean Formula
 
 variable {ι : Type} {F : ι → Ty ι}
-    {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
     {a : Allowed} {Premises : PremiseSet F} {Γ : Ctx ι} {ns : List String}
 
 -- ============================================================================
@@ -54,42 +53,42 @@ variable {ι : Type} {F : ι → Ty ι}
 
 /-- Introduce an implication, naming the new hypothesis. -/
 def pm_intro (n : String) {Δ : HCtx F Γ} {A B : Formula F Γ}
-    (h : SeqD (n :: ns) F EqX a Premises (A :: Δ) B) :
-    SeqD ns F EqX a Premises Δ (A →ᶠ B) :=
+    (h : SeqD (n :: ns) F a Premises (A :: Δ) B) :
+    SeqD ns F a Premises Δ (A →ᶠ B) :=
   seq_intro h
 
 /-- Split a conjunctive goal. -/
 def pm_split {Δ : HCtx F Γ} {A B : Formula F Γ}
-    (h₁ : SeqD ns F EqX a Premises Δ A) (h₂ : SeqD ns F EqX a Premises Δ B) :
-    SeqD ns F EqX a Premises Δ (A ∧ᶠ B) :=
+    (h₁ : SeqD ns F a Premises Δ A) (h₂ : SeqD ns F a Premises Δ B) :
+    SeqD ns F a Premises Δ (A ∧ᶠ B) :=
   seq_andI h₁ h₂
 
 /-- Take the left disjunct. -/
 def pm_left {Δ : HCtx F Γ} {A B : Formula F Γ}
-    (h : SeqD ns F EqX a Premises Δ A) : SeqD ns F EqX a Premises Δ (A ∨ᶠ B) :=
+    (h : SeqD ns F a Premises Δ A) : SeqD ns F a Premises Δ (A ∨ᶠ B) :=
   seq_orI₁ h
 
 /-- Take the right disjunct. -/
 def pm_right {Δ : HCtx F Γ} {A B : Formula F Γ}
-    (h : SeqD ns F EqX a Premises Δ B) : SeqD ns F EqX a Premises Δ (A ∨ᶠ B) :=
+    (h : SeqD ns F a Premises Δ B) : SeqD ns F a Premises Δ (A ∨ᶠ B) :=
   seq_orI₂ h
 
 /-- Case analysis on a disjunction, naming the hypothesis in each branch. -/
 def pm_cases (n m : String) {Δ : HCtx F Γ} {A B C : Formula F Γ}
-    (hAB : SeqD ns F EqX a Premises Δ (A ∨ᶠ B))
-    (h₁ : SeqD (n :: ns) F EqX a Premises (A :: Δ) C)
-    (h₂ : SeqD (m :: ns) F EqX a Premises (B :: Δ) C) :
-    SeqD ns F EqX a Premises Δ C :=
+    (hAB : SeqD ns F a Premises Δ (A ∨ᶠ B))
+    (h₁ : SeqD (n :: ns) F a Premises (A :: Δ) C)
+    (h₂ : SeqD (m :: ns) F a Premises (B :: Δ) C) :
+    SeqD ns F a Premises Δ C :=
   seq_orE hAB h₁ h₂
 
 /-- Project out of a conjunctive hypothesis-shaped goal (left). -/
 def pm_andE₁ {Δ : HCtx F Γ} {A B : Formula F Γ}
-    (h : SeqD ns F EqX a Premises Δ (A ∧ᶠ B)) : SeqD ns F EqX a Premises Δ A :=
+    (h : SeqD ns F a Premises Δ (A ∧ᶠ B)) : SeqD ns F a Premises Δ A :=
   seq_andE₁ h
 
 /-- Project out of a conjunctive hypothesis-shaped goal (right). -/
 def pm_andE₂ {Δ : HCtx F Γ} {A B : Formula F Γ}
-    (h : SeqD ns F EqX a Premises Δ (A ∧ᶠ B)) : SeqD ns F EqX a Premises Δ B :=
+    (h : SeqD ns F a Premises Δ (A ∧ᶠ B)) : SeqD ns F a Premises Δ B :=
   seq_andE₂ h
 
 /-- Destructure a conjunction into two named hypotheses.
@@ -98,53 +97,53 @@ Stated as a *cut* rather than as an in-place rewrite of one position, so it does
 where the conjunction sits in `Δ`: the caller proves `A ∧ᶠ B` however it likes (typically
 `pexact`), and the two components arrive on top of the context. -/
 def pm_andcut (n m : String) {Δ : HCtx F Γ} {A B C : Formula F Γ}
-    (hAB : SeqD ns F EqX a Premises Δ (A ∧ᶠ B))
-    (k : SeqD (n :: m :: ns) F EqX a Premises (A :: B :: Δ) C) :
-    SeqD ns F EqX a Premises Δ C :=
+    (hAB : SeqD ns F a Premises Δ (A ∧ᶠ B))
+    (k : SeqD (n :: m :: ns) F a Premises (A :: B :: Δ) C) :
+    SeqD ns F a Premises Δ C :=
   seq_cut (seq_andE₂ hAB) (seq_cut (seq_andE₁ (seq_weaken hAB)) k)
 
 /-- `⊥` eliminates to anything. -/
 def pm_exfalso {Δ : HCtx F Γ} {A : Formula F Γ}
-    (h : SeqD ns F EqX a Premises Δ ⊥ᶠ) : SeqD ns F EqX a Premises Δ A :=
+    (h : SeqD ns F a Premises Δ ⊥ᶠ) : SeqD ns F a Premises Δ A :=
   seq_exfalso h
 
 /-- Conjoin two hypotheses into one. -/
 def pm_conj (n : String) {Δ : HCtx F Γ} {A B C : Formula F Γ}
-    (hA : SeqD ns F EqX a Premises Δ A) (hB : SeqD ns F EqX a Premises Δ B)
-    (k : SeqD (n :: ns) F EqX a Premises ((A ∧ᶠ B) :: Δ) C) :
-    SeqD ns F EqX a Premises Δ C :=
+    (hA : SeqD ns F a Premises Δ A) (hB : SeqD ns F a Premises Δ B)
+    (k : SeqD (n :: ns) F a Premises ((A ∧ᶠ B) :: Δ) C) :
+    SeqD ns F a Premises Δ C :=
   seq_cut (seq_andI hA hB) k
 
 /-- Case split on `A ∨ᶠ ¬ᶠA`. Needs LEM, so it is not available in the base system. -/
 def pm_classic (n m : String) (hlem : a.lem = true) (A : Formula F Γ)
     {Δ : HCtx F Γ} {C : Formula F Γ}
-    (h₁ : SeqD (n :: ns) F EqX a Premises (A :: Δ) C)
-    (h₂ : SeqD (m :: ns) F EqX a Premises ((¬ᶠA) :: Δ) C) :
-    SeqD ns F EqX a Premises Δ C :=
+    (h₁ : SeqD (n :: ns) F a Premises (A :: Δ) C)
+    (h₂ : SeqD (m :: ns) F a Premises ((¬ᶠA) :: Δ) C) :
+    SeqD ns F a Premises Δ C :=
   seq_orE (seq_of_thm (.lem hlem)) h₁ h₂
 
 /-- Use an implicational hypothesis, proving its antecedent, and keep the conclusion. -/
 def pm_impcut (n : String) {Δ : HCtx F Γ} {A B C : Formula F Γ}
-    (h : SeqD ns F EqX a Premises Δ (A →ᶠ B))
-    (hA : SeqD ns F EqX a Premises Δ A)
-    (k : SeqD (n :: ns) F EqX a Premises (B :: Δ) C) :
-    SeqD ns F EqX a Premises Δ C :=
+    (h : SeqD ns F a Premises Δ (A →ᶠ B))
+    (hA : SeqD ns F a Premises Δ A)
+    (k : SeqD (n :: ns) F a Premises (B :: Δ) C) :
+    SeqD ns F a Premises Δ C :=
   seq_cut (seq_mp h hA) k
 
 /-- Rename a hypothesis. Names are display data, so this is the identity. -/
 def pm_rename {ns' : List String} {Δ : HCtx F Γ} {B : Formula F Γ}
-    (h : SeqD ns' F EqX a Premises Δ B) : SeqD ns F EqX a Premises Δ B := h
+    (h : SeqD ns' F a Premises Δ B) : SeqD ns F a Premises Δ B := h
 
 /-- Revert the most recent hypothesis into the goal. Definitionally the identity — the
 packing is arranged so that it is (see `Packing.lean`). -/
 def pm_revert {n : String} {Δ : HCtx F Γ} {A B : Formula F Γ}
-    (h : SeqD ns F EqX a Premises Δ (A →ᶠ B)) :
-    SeqD (n :: ns) F EqX a Premises (A :: Δ) B := h
+    (h : SeqD ns F a Premises Δ (A →ᶠ B)) :
+    SeqD (n :: ns) F a Premises (A :: Δ) B := h
 
 /-- Prove the goal in a *weaker* system. The counterpart of `use <reasoning> in H`: since
 `Allowed` is a flag rather than a constraint system, weakening is a plain cast. -/
 def pm_in_system {a' : Allowed} (h_le : Allowed.le a' a) {Δ : HCtx F Γ} {B : Formula F Γ}
-    (h : SeqD ns F EqX a' Premises Δ B) : SeqD ns F EqX a Premises Δ B :=
+    (h : SeqD ns F a' Premises Δ B) : SeqD ns F a Premises Δ B :=
   Derivable.castAllowed h_le h
 
 /-- **Enter the proof mode** from an ordinary kernel goal.
@@ -152,58 +151,58 @@ def pm_in_system {a' : Allowed} (h_le : Allowed.le a' a) {Δ : HCtx F Γ} {B : F
 `Seq` with an empty hypothesis context *is* `Derivable`, so this is the identity — but a
 script has to say so, or the goal stays a kernel derivation and none of the tactics apply. -/
 def pm_enter {Γ : Ctx ι} {A : Formula F Γ}
-    (h : SeqD [] F EqX a Premises [] A) : Derivable F EqX a Premises A := h
+    (h : SeqD [] F a Premises [] A) : Derivable F a Premises A := h
 
 /-- Introduce a `∀`. The whole hypothesis context weakens; the *names* do not change, which
 is why the name list can be reused verbatim. -/
 def pm_allI {ρ : Ty ι} {Δ : HCtx F Γ} {A : Formula F (ρ :: Γ)}
-    (h : SeqD ns F EqX a Premises (Δ.map (Formula.weakenBy ρ)) A) :
-    SeqD ns F EqX a Premises Δ (Formula.all ρ A) :=
+    (h : SeqD ns F a Premises (Δ.map (Formula.weakenBy ρ)) A) :
+    SeqD ns F a Premises Δ (Formula.all ρ A) :=
   seq_allI h
 
 /-- Instantiate a weakened `∀`-hypothesis at the bound variable. -/
 def pm_allE_here {ρ : Ty ι} {Δ : HCtx F (ρ :: Γ)} {A : Formula F (ρ :: Γ)}
-    (h : SeqD ns F EqX a Premises Δ (Formula.weakenBy ρ (Formula.all ρ A))) :
-    SeqD ns F EqX a Premises Δ A :=
+    (h : SeqD ns F a Premises Δ (Formula.weakenBy ρ (Formula.all ρ A))) :
+    SeqD ns F a Premises Δ A :=
   seq_allE_here h
 
 /-- Supply a witness for an `∃` goal. -/
 def pm_exI {ρ : Ty ι} {Δ : HCtx F Γ} {A : Formula F (ρ :: Γ)} (t : Term F Γ ρ)
-    (h : SeqD ns F EqX a Premises Δ (A.subst0 t)) :
-    SeqD ns F EqX a Premises Δ (Formula.ex ρ A) :=
+    (h : SeqD ns F a Premises Δ (A.subst0 t)) :
+    SeqD ns F a Premises Δ (Formula.ex ρ A) :=
   seq_exI t h
 
 /-- Supply a witness at a *headline* `∃`. The recursor ban is enforced by the `pbound`
 tactic, not by this lemma — see `ProofMode/Linter.lean`. -/
 def pm_bound {ρ : Ty ι} {Δ : HCtx F Γ} {A : Formula F (ρ :: Γ)} (t : Term F Γ ρ)
-    (h : SeqD ns F EqX a Premises Δ (A.subst0 t)) :
-    SeqD ns F EqX a Premises Δ (Formula.ex ρ A) :=
+    (h : SeqD ns F a Premises Δ (A.subst0 t)) :
+    SeqD ns F a Premises Δ (Formula.ex ρ A) :=
   seq_bound t h
 
 /-- Consume an `∃`, naming the body. -/
 def pm_exE (n : String) {ρ : Ty ι} {Δ : HCtx F Γ} {A : Formula F (ρ :: Γ)} {B : Formula F Γ}
-    (hex : SeqD ns F EqX a Premises Δ (Formula.ex ρ A))
-    (hbody : SeqD (n :: ns) F EqX a Premises
+    (hex : SeqD ns F a Premises Δ (Formula.ex ρ A))
+    (hbody : SeqD (n :: ns) F a Premises
       (A :: Δ.map (Formula.weakenBy ρ)) (Formula.weakenBy ρ B)) :
-    SeqD ns F EqX a Premises Δ B :=
+    SeqD ns F a Premises Δ B :=
   seq_exE hex hbody
 
 /-- Use a theorem of the kernel — the escape hatch into `Derivable`. -/
 def pm_have {Δ : HCtx F Γ} {A : Formula F Γ}
-    (h : Derivable F EqX a Premises A) : SeqD ns F EqX a Premises Δ A :=
+    (h : Derivable F a Premises A) : SeqD ns F a Premises Δ A :=
   seq_of_thm h
 
 /-- Modus ponens against a hypothesis. -/
 def pm_mp {Δ : HCtx F Γ} {A B : Formula F Γ}
-    (hAB : SeqD ns F EqX a Premises Δ (A →ᶠ B)) (hA : SeqD ns F EqX a Premises Δ A) :
-    SeqD ns F EqX a Premises Δ B :=
+    (hAB : SeqD ns F a Premises Δ (A →ᶠ B)) (hA : SeqD ns F a Premises Δ A) :
+    SeqD ns F a Premises Δ B :=
   seq_mp hAB hA
 
 /-- Forward reasoning: prove something, then keep it as a named hypothesis. -/
 def pm_cut (n : String) {Δ : HCtx F Γ} {A C : Formula F Γ}
-    (hA : SeqD ns F EqX a Premises Δ A)
-    (k : SeqD (n :: ns) F EqX a Premises (A :: Δ) C) :
-    SeqD ns F EqX a Premises Δ C :=
+    (hA : SeqD ns F a Premises Δ A)
+    (k : SeqD (n :: ns) F a Premises (A :: Δ) C) :
+    SeqD ns F a Premises Δ C :=
   seq_cut hA k
 
 -- ============================================================================
@@ -212,13 +211,13 @@ def pm_cut (n : String) {Δ : HCtx F Γ} {A C : Formula F Γ}
 
 /-- Reflexivity of `=₀`. -/
 def pm_refl {Δ : HCtx F Γ} {t : Term F Γ Ty.nat} :
-    SeqD ns F EqX a Premises Δ (Formula.eq0 t t) :=
+    SeqD ns F a Premises Δ (Formula.eq0 t t) :=
   seq_of_thm .refl0
 
 /-- Symmetry of `=₀`. -/
 def pm_sym {Δ : HCtx F Γ} {s t : Term F Γ Ty.nat}
-    (h : SeqD ns F EqX a Premises Δ (Formula.eq0 t s)) :
-    SeqD ns F EqX a Premises Δ (Formula.eq0 s t) :=
+    (h : SeqD ns F a Premises Δ (Formula.eq0 t s)) :
+    SeqD ns F a Premises Δ (Formula.eq0 s t) :=
   seq_mono .sym0 h
 
 /-- Transitivity of `=₀`, as a *step*: name the midpoint and get the two halves as goals.
@@ -227,9 +226,9 @@ The kernel gives transitivity in `∧`-form; this is the curried form a script w
 is the closest thing to a `calc` step the object logic has — there is no rewriting, because
 there is no extensionality. -/
 def pm_trans {Δ : HCtx F Γ} {s u : Term F Γ Ty.nat} (t : Term F Γ Ty.nat)
-    (h₁ : SeqD ns F EqX a Premises Δ (Formula.eq0 s t))
-    (h₂ : SeqD ns F EqX a Premises Δ (Formula.eq0 t u)) :
-    SeqD ns F EqX a Premises Δ (Formula.eq0 s u) :=
+    (h₁ : SeqD ns F a Premises Δ (Formula.eq0 s t))
+    (h₂ : SeqD ns F a Premises Δ (Formula.eq0 t u)) :
+    SeqD ns F a Premises Δ (Formula.eq0 s u) :=
   seq_mp (seq_of_thm .trans0) (seq_andI h₁ h₂)
 
 /-- Rewrite inside an equational hypothesis, keeping the result under a new name.
@@ -237,18 +236,18 @@ def pm_trans {Δ : HCtx F Γ} {s u : Term F Γ Ty.nat} (t : Term F Γ Ty.nat)
 `congP` and `congQ` are the two congruences QF-ER supplies, one per side; the hypothesis is
 threaded between them by transitivity. -/
 def pm_rw_at (n : String) {Δ : HCtx F Γ} {P P' Q Q' : Term F Γ Ty.nat} {C : Formula F Γ}
-    (congP : SeqD ns F EqX a Premises Δ (Formula.eq0 P P'))
-    (congQ : SeqD ns F EqX a Premises Δ (Formula.eq0 Q Q'))
-    (hf : SeqD ns F EqX a Premises Δ (Formula.eq0 P Q))
-    (k : SeqD (n :: ns) F EqX a Premises (Formula.eq0 P' Q' :: Δ) C) :
-    SeqD ns F EqX a Premises Δ C :=
+    (congP : SeqD ns F a Premises Δ (Formula.eq0 P P'))
+    (congQ : SeqD ns F a Premises Δ (Formula.eq0 Q Q'))
+    (hf : SeqD ns F a Premises Δ (Formula.eq0 P Q))
+    (k : SeqD (n :: ns) F a Premises (Formula.eq0 P' Q' :: Δ) C) :
+    SeqD ns F a Premises Δ C :=
   seq_cut (pm_trans P (pm_sym congP) (pm_trans Q hf congQ)) k
 
 /-- Flip an equational hypothesis, keeping the flipped form under a new name. -/
 def pm_sym_at (n : String) {Δ : HCtx F Γ} {s t : Term F Γ Ty.nat} {C : Formula F Γ}
-    (h : SeqD ns F EqX a Premises Δ (Formula.eq0 s t))
-    (k : SeqD (n :: ns) F EqX a Premises (Formula.eq0 t s :: Δ) C) :
-    SeqD ns F EqX a Premises Δ C :=
+    (h : SeqD ns F a Premises Δ (Formula.eq0 s t))
+    (k : SeqD (n :: ns) F a Premises (Formula.eq0 t s :: Δ) C) :
+    SeqD ns F a Premises Δ C :=
   seq_cut (pm_sym h) k
 
 -- ============================================================================
@@ -258,17 +257,17 @@ def pm_sym_at (n : String) {Δ : HCtx F Γ} {s t : Term F Γ Ty.nat} {C : Formul
 /-- Induction on `ℕ`, with the hypothesis context carried through. See
 `ProofMode/Induction.lean` for why the context is not free here. -/
 def pm_induction {Δ : HCtx F Γ} {A : Formula F (Ty.nat :: Γ)}
-    (base : SeqD ns F EqX a Premises Δ (A.subst0 Term.zero))
-    (step : SeqD ns F EqX a Premises Δ
+    (base : SeqD ns F a Premises Δ (A.subst0 Term.zero))
+    (step : SeqD ns F a Premises Δ
       (Formula.all Ty.nat (A →ᶠ Formula.substVar0 A succVar0))) :
-    SeqD ns F EqX a Premises Δ (Formula.all Ty.nat A) :=
+    SeqD ns F a Premises Δ (Formula.all Ty.nat A) :=
   seq_induction base step
 
 /-- Markov's principle: a `∃` over a QF ∨-free matrix may be proved by contradiction. -/
 def pm_markov {Δ : HCtx F Γ} {ρ : Ty ι} {A₀ : Formula F (ρ :: Γ)}
     (hm : a.markov = true) (hqf : A₀.isQF = true) (hvf : A₀.isVFree = true)
-    (h : SeqD ns F EqX a Premises Δ (¬ᶠ¬ᶠ(Formula.ex ρ A₀))) :
-    SeqD ns F EqX a Premises Δ (Formula.ex ρ A₀) :=
+    (h : SeqD ns F a Premises Δ (¬ᶠ¬ᶠ(Formula.ex ρ A₀))) :
+    SeqD ns F a Premises Δ (Formula.ex ρ A₀) :=
   seq_mono (.markov hm hqf hvf) h
 
 /-- Instantiate a weakened `∀`-hypothesis at the bound variable, keeping the result as a
@@ -276,27 +275,27 @@ named hypothesis. The forward counterpart of `pm_allE_here`, and the move you ne
 `pm_allI` to *use* a `∀`-hypothesis rather than to prove a `∀`-goal. -/
 def pm_allE_here_cut (n : String) {ρ : Ty ι} {Δ : HCtx F (ρ :: Γ)}
     {A C : Formula F (ρ :: Γ)}
-    (h : SeqD ns F EqX a Premises Δ (Formula.weakenBy ρ (Formula.all ρ A)))
-    (k : SeqD (n :: ns) F EqX a Premises (A :: Δ) C) :
-    SeqD ns F EqX a Premises Δ C :=
+    (h : SeqD ns F a Premises Δ (Formula.weakenBy ρ (Formula.all ρ A)))
+    (k : SeqD (n :: ns) F a Premises (A :: Δ) C) :
+    SeqD ns F a Premises Δ C :=
   seq_cut (seq_allE_here h) k
 
 /-- Instantiate a `∀`-hypothesis at a term, keeping the result as a named hypothesis. -/
 def pm_inst (n : String) {ρ : Ty ι} {Δ : HCtx F Γ} {A : Formula F (ρ :: Γ)} {C : Formula F Γ}
     (t : Term F Γ ρ)
-    (h : SeqD ns F EqX a Premises Δ (Formula.all ρ A))
-    (k : SeqD (n :: ns) F EqX a Premises (A.subst0 t :: Δ) C) :
-    SeqD ns F EqX a Premises Δ C :=
+    (h : SeqD ns F a Premises Δ (Formula.all ρ A))
+    (k : SeqD (n :: ns) F a Premises (A.subst0 t :: Δ) C) :
+    SeqD ns F a Premises Δ C :=
   seq_cut (seq_allE h t) k
 
 /-- QF-AC, forwards: from `∀x ∃y A₀` obtain the choice function. -/
 def pm_qfac (n : String) {ρ τ : Ty ι} {Δ : HCtx F Γ} {A₀ : Formula F (τ :: ρ :: Γ)}
     {C : Formula F Γ}
     (hq : a.qfac = true) (hqf : A₀.isQF = true) (hvf : A₀.isVFree = true)
-    (h : SeqD ns F EqX a Premises Δ (Formula.all ρ (Formula.ex τ A₀)))
-    (k : SeqD (n :: ns) F EqX a Premises
+    (h : SeqD ns F a Premises Δ (Formula.all ρ (Formula.ex τ A₀)))
+    (k : SeqD (n :: ns) F a Premises
       (Formula.ex (ρ →ₜ τ) (Formula.all ρ (Formula.substF Formula.acSubst A₀)) :: Δ) C) :
-    SeqD ns F EqX a Premises Δ C :=
+    SeqD ns F a Premises Δ C :=
   seq_cut (seq_mono (.qfac hq hqf hvf) h) k
 
 -- ============================================================================
@@ -316,7 +315,7 @@ elab "pexact " h:ident : tactic => do
   let goal ← getMainGoal
   let ty ← instantiateMVars (← goal.getType)
   let args := ty.getAppArgs
-  unless ty.isAppOf ``SeqD && args.size == 9 do
+  unless ty.isAppOf ``SeqD && args.size == 8 do
     throwError "pexact: the goal is not a proof-mode sequent{indentExpr ty}"
   let some namesE := listLit? args[1]! |
     throwError "pexact: the hypothesis names are not a literal list"
@@ -336,7 +335,7 @@ macro "pmode" : tactic => `(tactic| refine pm_enter ?_)
 elab "passumption" : tactic => do
   let ty ← instantiateMVars (← (← getMainGoal).getType)
   let args := ty.getAppArgs
-  unless ty.isAppOf ``SeqD && args.size == 9 do
+  unless ty.isAppOf ``SeqD && args.size == 8 do
     throwError "passumption: the goal is not a proof-mode sequent{indentExpr ty}"
   let names := ((listLit? args[1]!).getD []).filterMap strLit?
   for n in names do
@@ -366,7 +365,7 @@ private def evalBoolCheck (e : Expr) : TacticM (Option Bool) := do
   | .const ``Bool.false _ => return some false
   | _ => return none
 
-/-- The `SeqD` goal, split into its arguments: `ι, names, F, EqX, a, Premises, Γ, Δ, B`.
+/-- The `SeqD` goal, split into its arguments: `ι, names, F, a, Premises, Γ, Δ, B`.
 
 `consumeMData` is load-bearing. Lean's `have`/`obtain` leave the target wrapped in an `mdata`
 node, and without stripping it `isAppOf ``SeqD` is false — so every proof-mode tactic used
@@ -377,7 +376,7 @@ nargs=0` after. -/
 def seqDGoalArgs (who : String) : TacticM (Array Expr) := do
   let ty := (← instantiateMVars (← (← getMainGoal).getType)).consumeMData
   let args := ty.getAppArgs
-  unless ty.isAppOf ``SeqD && args.size == 9 do
+  unless ty.isAppOf ``SeqD && args.size == 8 do
     throwError "{who}: the goal is not a proof-mode sequent{indentExpr ty}"
   return args
 
@@ -389,7 +388,7 @@ private def hypFormula (who : String) (n : String) : TacticM Expr := do
   let names := namesE.filterMap strLit?
   let some i := names.findIdx? (· == n) |
     throwError "{who}: no hypothesis named `{n}` (have: {names})"
-  let some hyps ← whnfListLit? args[7]! |
+  let some hyps ← whnfListLit? args[6]! |
     throwError "{who}: the hypothesis context is not a literal list"
   let some A := hyps[i]? | throwError "{who}: `{n}` names position {i}, which is not there"
   return A
@@ -429,12 +428,12 @@ def elabRuleInCtx (eStx : TSyntax `term) (Γ expected : Expr) : TacticM Expr :=
     catch _ => pure ()
   Lean.Elab.Term.withoutErrToSorry (elabTerm eStx (some expected))
 
-/-- The type `Derivable F EqX a Premises Γ ?A` for the goal's parameters — the expected type
+/-- The type `Derivable F a Premises Γ ?A` for the goal's parameters — the expected type
 a kernel theorem is elaborated against. -/
 def derivableInGoal (args : Array Expr) : TacticM Expr := do
-  let A ← mkFreshExprMVar (mkAppN (.const ``Formula []) #[args[0]!, args[2]!, args[6]!])
+  let A ← mkFreshExprMVar (mkAppN (.const ``Formula []) #[args[0]!, args[2]!, args[5]!])
   return mkAppN (.const ``Derivable [])
-    #[args[0]!, args[2]!, args[3]!, args[4]!, args[5]!, args[6]!, A]
+    #[args[0]!, args[2]!, args[3]!, args[4]!, args[5]!, A]
 
 /-- Elaborate a term the *user wrote* at a surface position, and enforce the recursor ban.
 
@@ -494,7 +493,7 @@ macro "psym" : tactic => `(tactic| refine pm_sym ?_)
 
 elab "ptrans " tStx:term : tactic => withMainContext do
   let args ← seqDGoalArgs "ptrans"
-  let target ← whnfD args[8]!
+  let target ← whnfD args[7]!
   let targs := target.getAppArgs
   unless target.isAppOf ``Formula.eq0 && targs.size == 5 do
     throwError "ptrans: the goal is not an equation."
@@ -527,7 +526,7 @@ macro_rules
 /-- The `Formula.ex` the goal is, split into `ι, F, Γ, ρ, A`. -/
 private def exGoalArgs (who : String) : TacticM (Array Expr) := do
   let args ← seqDGoalArgs who
-  let target ← whnfD args[8]!
+  let target ← whnfD args[7]!
   let targs := target.getAppArgs
   unless target.isAppOf ``Formula.ex && targs.size == 5 do
     throwError "{who}: the goal is not an ∃, so there is no witness to supply."
@@ -580,10 +579,10 @@ every call, and on a large statement that is where it diverges. -/
 elab "pthm " eStx:term : tactic => withMainContext do
   let args ← seqDGoalArgs "pthm"
   let e ← try
-      Lean.Elab.Term.withoutErrToSorry (elabRuleInCtx eStx args[6]! (← derivableInGoal args))
+      Lean.Elab.Term.withoutErrToSorry (elabRuleInCtx eStx args[5]! (← derivableInGoal args))
     catch _ =>
-      elabRuleInCtx eStx args[6]! (mkAppN (.const ``Derivable [])
-        #[args[0]!, args[2]!, args[3]!, args[4]!, args[5]!, args[6]!, args[8]!])
+      elabRuleInCtx eStx args[5]! (mkAppN (.const ``Derivable [])
+        #[args[0]!, args[2]!, args[3]!, args[4]!, args[5]!, args[7]!])
   let eS ← Lean.Elab.Term.exprToSyntax (← instantiateMVars e)
   evalTactic (← `(tactic| exact pm_have $eS))
 
@@ -593,7 +592,7 @@ It peels as many arrows as it takes to reach the goal, so a hypothesis with seve
 produces several subgoals, in order — the same way Lean's own `apply` does. -/
 elab "papply " h:ident : tactic => do
   let args ← seqDGoalArgs "papply"
-  let goalF := args[8]!
+  let goalF := args[7]!
   let hyp ← hypFormula "papply" h.getId.toString
   -- How many antecedents lie between `h` and the goal? Probed without committing to any
   -- unification the probe happens to make.
@@ -625,14 +624,14 @@ macro "papply " h:ident " in " k:ident " with " m:ident : tactic =>
 the escape hatch's `apply`, next to `pthm`'s `exact`. -/
 elab "papplym " eStx:term : tactic => withMainContext do
   let args ← seqDGoalArgs "papplym"
-  let goalF := args[8]!
-  let e ← elabRuleInCtx eStx args[6]! (← derivableInGoal args)
+  let goalF := args[7]!
+  let e ← elabRuleInCtx eStx args[5]! (← derivableInGoal args)
   let ety ← instantiateMVars (← inferType e)
   let etyArgs := ety.getAppArgs
-  unless ety.isAppOf ``Derivable && etyArgs.size == 7 do
+  unless ety.isAppOf ``Derivable && etyArgs.size == 6 do
     throwError "papplym: not a kernel derivation{indentExpr ety}"
   let k? ← withoutModifyingState do
-    let mut cur ← whnfD etyArgs[6]!
+    let mut cur ← whnfD etyArgs[5]!
     for i in [0:16] do
       if (← isDefEq cur goalF) then return some i
       let cargs := cur.getAppArgs
@@ -652,7 +651,7 @@ elab "papplym " eStx:term : tactic => withMainContext do
 theorem is elaborated in the goal's context, so it can mention `x₀`. -/
 elab "papplym " eStx:term " in " h:ident " with " k:ident : tactic => withMainContext do
   let args ← seqDGoalArgs "papplym"
-  let e ← elabRuleInCtx eStx args[6]! (← derivableInGoal args)
+  let e ← elabRuleInCtx eStx args[5]! (← derivableInGoal args)
   let eS ← Lean.Elab.Term.exprToSyntax (← instantiateMVars e)
   evalTactic (← `(tactic| refine pm_cut $(Lean.quote k.getId.toString)
       (pm_mp (pm_have $eS) (by pexact $h)) ?_))
@@ -673,7 +672,7 @@ macro "pcontradiction " h:ident : tactic => `(tactic| (pexfalso; pexact $h))
 goal — unless LEM is available. -/
 elab "pclassic " A:term " with " h:ident ppSpace k:ident : tactic => withMainContext do
   let args ← seqDGoalArgs "pclassic"
-  if (← evalBoolCheck (mkAppN (.const ``Allowed.lem []) #[args[4]!])) == some false then
+  if (← evalBoolCheck (mkAppN (.const ``Allowed.lem []) #[args[3]!])) == some false then
     throwError "pclassic: excluded middle is not available here — \
       `allowed.lem` is not `true`."
   evalTactic (← `(tactic|
@@ -691,9 +690,9 @@ private def hypSplit (who : String) (n : String) :
   let names := namesE.filterMap strLit?
   let some i := names.findIdx? (· == n) |
     throwError "{who}: no hypothesis named `{n}` (have: {names})"
-  let some hyps ← whnfListLit? args[7]! |
+  let some hyps ← whnfListLit? args[6]! |
     throwError "{who}: the hypothesis context is not a literal list"
-  let fTy := mkAppN (.const ``Formula []) #[args[0]!, args[2]!, args[6]!]
+  let fTy := mkAppN (.const ``Formula []) #[args[0]!, args[2]!, args[5]!]
   return (args, names, hyps, i, fTy)
 
 /-- Replace the goal by `newTy`, justified by `proof newGoal`. -/
@@ -706,7 +705,7 @@ private def replaceGoalWith (newTy : Expr) (proof : Expr → Expr) : TacticM Uni
 /-- Rebuild a `SeqD` goal with new names and a new hypothesis context. -/
 private def mkSeqD (args : Array Expr) (namesE ΔE : Expr) : Expr :=
   mkAppN (.const ``SeqD []) #[args[0]!, namesE, args[2]!, args[3]!, args[4]!,
-    args[5]!, args[6]!, ΔE, args[8]!]
+    args[5]!, ΔE, args[7]!]
 
 private def mkStrListLit (xs : List String) : MetaM Expr :=
   Lean.Meta.mkListLit (.const ``String []) (xs.map (Expr.lit <| .strVal ·))
@@ -719,8 +718,8 @@ elab "pclear " h:ident : tactic => do
   let namesE ← mkStrListLit (names.take i ++ names.drop (i + 1))
   let ΔE ← Lean.Meta.mkListLit fTy (hyps.take i ++ hyps.drop (i + 1))
   replaceGoalWith (mkSeqD args namesE ΔE) fun m =>
-    mkAppN (.const ``seq_clear []) #[args[0]!, args[2]!, args[3]!, args[4]!, args[5]!,
-      args[6]!, Δ₁, hyps[i]!, Δ₂, args[8]!, m]
+    mkAppN (.const ``seq_clear []) #[args[0]!, args[2]!, args[3]!, args[4]!,
+      args[5]!, Δ₁, hyps[i]!, Δ₂, args[7]!, m]
 
 /-- `pswap h with k` exchanges two *adjacent* hypotheses. Non-adjacent swaps compose from
 these; the kit rule is the adjacent one. -/
@@ -739,8 +738,8 @@ elab "pswap " h:ident " with " k:ident : tactic => do
   let ΔE ← Lean.Meta.mkListLit fTy
     (hyps.take i ++ [hyps[j]!, hyps[i]!] ++ hyps.drop (i + 2))
   replaceGoalWith (mkSeqD args namesE ΔE) fun m =>
-    mkAppN (.const ``seq_swap []) #[args[0]!, args[2]!, args[3]!, args[4]!, args[5]!,
-      args[6]!, Δ₁, hyps[j]!, hyps[i]!, Δ₂, args[8]!, m]
+    mkAppN (.const ``seq_swap []) #[args[0]!, args[2]!, args[3]!, args[4]!,
+      args[5]!, Δ₁, hyps[j]!, hyps[i]!, Δ₂, args[7]!, m]
 
 /-- `prevert` moves the most recent hypothesis back into the goal;
 `prevert h` moves a named one, walking it to the top with adjacent exchanges first. -/
@@ -797,7 +796,7 @@ would leave `pm_cut`'s own `Γ` a metavariable at the moment the formula is proc
 elab "phave " h:ident " : " AStx:term : tactic => withMainContext do
   let args ← seqDGoalArgs "phave"
   let A ← instantiateMVars
-    (← elabTerm AStx (some (mkAppN (.const ``Formula []) #[args[0]!, args[2]!, args[6]!])))
+    (← elabTerm AStx (some (mkAppN (.const ``Formula []) #[args[0]!, args[2]!, args[5]!])))
   if mentionsPrec A then
     throwError "phave: the formula applies the primitive recursor directly.\n\
       Iteration is what extraction produces, so writing it by hand makes the extraction\n\
@@ -812,7 +811,7 @@ a parameter in the *outer* context is usable under binders, the parameter weaken
 coercion. -/
 elab "pfrom " h:ident " := " eStx:term : tactic => withMainContext do
   let args ← seqDGoalArgs "pfrom"
-  let e ← elabRuleInCtx eStx args[6]! (← derivableInGoal args)
+  let e ← elabRuleInCtx eStx args[5]! (← derivableInGoal args)
   let eStx' ← Lean.Elab.Term.exprToSyntax e
   evalTactic (← `(tactic|
     refine pm_cut $(Lean.quote h.getId.toString) (pm_have $eStx') ?_))
@@ -831,7 +830,7 @@ goal they did not write. -/
 elab "pby_contra " h:ident : tactic => do
   let args ← seqDGoalArgs "pby_contra"
   -- `Formula.ex` : {ι} {F} {Γ} (ρ) (A)
-  let target ← whnfD args[8]!
+  let target ← whnfD args[7]!
   let targs := target.getAppArgs
   unless target.isAppOf ``Formula.ex && targs.size == 5 do
     throwError "pby_contra: the goal is not an ∃ — not a Markov shape.\n\
@@ -842,7 +841,7 @@ elab "pby_contra " h:ident : tactic => do
   let fargs := (← instantiateMVars (← inferType A₀)).getAppArgs
   let check (fn : Name) : TacticM (Option Bool) :=
     evalBoolCheck (mkAppN (.const fn []) #[fargs[0]!, fargs[1]!, fargs[2]!, A₀])
-  if (← evalBoolCheck (mkAppN (.const ``Allowed.markov []) #[args[4]!])) == some false then
+  if (← evalBoolCheck (mkAppN (.const ``Allowed.markov []) #[args[3]!])) == some false then
     throwError "pby_contra: Markov is not available here — `allowed.markov` is not `true`."
   if (← check ``Formula.isQF) == some false then
     throwError "pby_contra: the matrix is not quantifier-free — not a Markov shape.\n\

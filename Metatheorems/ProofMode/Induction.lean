@@ -59,7 +59,6 @@ end Formula
 namespace ProofMode
 
 variable {ι : Type} {F : ι → Ty ι}
-    {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
     {a : Allowed} {Premises : PremiseSet F} {Γ : Ctx ι}
 
 open Formula
@@ -70,25 +69,25 @@ open Formula
 
 /-- Weaken the consequent of an implication. -/
 def imp_mono_right {Γ : Ctx ι} {W Y Z : Formula F Γ}
-    (h : Derivable F EqX a Premises (Y →ᶠ Z)) :
-    Derivable F EqX a Premises ((W →ᶠ Y) →ᶠ (W →ᶠ Z)) :=
+    (h : Derivable F a Premises (Y →ᶠ Z)) :
+    Derivable F a Premises ((W →ᶠ Y) →ᶠ (W →ᶠ Z)) :=
   .exportation (.syllogism (.importation mp_form) h)
 
 /-- `∀` is monotone. -/
 def forall_mono {Γ : Ctx ι} {ρ : Ty ι} {X Y : Formula F (ρ :: Γ)}
-    (h : Derivable F EqX a Premises (X →ᶠ Y)) :
-    Derivable F EqX a Premises (Formula.all ρ X →ᶠ Formula.all ρ Y) :=
+    (h : Derivable F a Premises (X →ᶠ Y)) :
+    Derivable F a Premises (Formula.all ρ X →ᶠ Formula.all ρ Y) :=
   .forall_rule (.syllogism (forall_ax_vz (ρ := ρ) (A := X)) h)
 
 /-- Push a hypothesis under a `∀` it does not mention. Converse of `forall_imp_pull`. -/
 def forall_imp_push {Γ : Ctx ι} {ρ : Ty ι} {B : Formula F Γ} {X : Formula F (ρ :: Γ)} :
-    Derivable F EqX a Premises
+    Derivable F a Premises
       ((B →ᶠ Formula.all ρ X) →ᶠ Formula.all ρ (Formula.weakenBy ρ B →ᶠ X)) :=
   .forall_rule (imp_mono_right (forall_ax_vz (ρ := ρ) (A := X)))
 
 /-- Transport a sequent along an equality of goals. -/
 def seq_cast {Δ : HCtx F Γ} {X Y : Formula F Γ} (h : X = Y)
-    (d : Seq F EqX a Premises Δ X) : Seq F EqX a Premises Δ Y :=
+    (d : Seq F a Premises Δ X) : Seq F a Premises Δ Y :=
   h ▸ d
 
 -- ============================================================================
@@ -105,17 +104,17 @@ At each hypothesis the formula inducted on gains that hypothesis as an anteceden
 the usual "strengthen the induction hypothesis by the context" step written out. The user of
 the tactic never sees it: `Δ` and the names come back unchanged. -/
 def seq_induction : {Δ : HCtx F Γ} → {A : Formula F (Ty.nat :: Γ)} →
-    Seq F EqX a Premises Δ (A.subst0 Term.zero) →
-    Seq F EqX a Premises Δ (Formula.all Ty.nat (A →ᶠ Formula.substVar0 A succVar0)) →
-    Seq F EqX a Premises Δ (Formula.all Ty.nat A)
+    Seq F a Premises Δ (A.subst0 Term.zero) →
+    Seq F a Premises Δ (Formula.all Ty.nat (A →ᶠ Formula.substVar0 A succVar0)) →
+    Seq F a Premises Δ (Formula.all Ty.nat A)
   | [],      _, base, step => .induction base step
   | A₀ :: Δ, A, base, step =>
       -- The formula actually inducted on.
       let A' : Formula F (Ty.nat :: Γ) := Formula.weakenBy Ty.nat A₀ →ᶠ A
-      let base' : Seq F EqX a Premises Δ (A'.subst0 Term.zero) :=
+      let base' : Seq F a Premises Δ (A'.subst0 Term.zero) :=
         seq_cast (congrArg (· →ᶠ A.subst0 Term.zero)
           (Formula.subst0_weakenBy A₀ Term.zero).symm) base
-      let step' : Seq F EqX a Premises Δ
+      let step' : Seq F a Premises Δ
           (Formula.all Ty.nat (A' →ᶠ Formula.substVar0 A' succVar0)) :=
         seq_cast
           (congrArg (Formula.all Ty.nat)

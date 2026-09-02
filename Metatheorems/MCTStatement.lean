@@ -95,13 +95,12 @@ If this elaborates, the shape is right: the only remaining input is the derivati
 
 example
     {X : ι → Type} (si : SpaceInterp X F)
-    {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
-    (eqxi : EqXInterp X F si EqX)
+    (eqxi : EqXInterp X F si)
     (mj : Majorizability si)
     {Premises : PremiseSet F}
     (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
       ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
-    (prf : @Derivable ι F EqX Allowed.extended Premises [] mctStatement) :
+    (prf : @Derivable ι F Allowed.extended Premises [] mctStatement) :
     { Φ : Ty.interpret X (mctTy ι).hat → Nat //
       ∀ (x : Ty.interpret X (mctTy ι)) (x_star : Ty.interpret X (mctTy ι).hat),
         mj.maj (mctTy ι) x_star x →
@@ -128,8 +127,7 @@ definitionally. Each `rfl`-shaped proof below that elaborates means no rewriting
 
 section Plumbing
 
-variable {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
-    {al : Allowed} {Premises : PremiseSet F}
+variable {al : Allowed} {Premises : PremiseSet F}
 
 /-- The context after introducing the parameter binder. -/
 abbrev mctCtx1 (ι : Type) : Ctx ι := [mctTy ι]
@@ -148,21 +146,21 @@ abbrev mctK1 : Term F (mctCtx1 ι) Ty.nat :=
 /-- **P2b-i.** Instantiate the premise at `t` and project out one-step antitonicity.
 If `subst0` did not compute through `app2`/`ofNat`, this would not typecheck. -/
 def mct_anti_step (t : Term F (mctCtx1 ι) Ty.nat) :
-    Derivable F EqX al Premises
+    Derivable F al Premises
       (Formula.all Ty.nat mctB₀ →ᶠ
         .eq0 (Term.app2 Term.monus (mctA1 (.app .succ t)) (mctA1 t)) Term.zero) :=
   .syllogism (.forall_ax t) .and_weak
 
 /-- **P2b-ii.** … and boundedness. -/
 def mct_bounded (t : Term F (mctCtx1 ι) Ty.nat) :
-    Derivable F EqX al Premises
+    Derivable F al Premises
       (Formula.all Ty.nat mctB₀ →ᶠ
         .eq0 (Term.app2 Term.monus (mctA1 t) mctK1) Term.zero) :=
   .syllogism (.forall_ax t) and_proj2
 
 /-- **P2b-iii.** ∃-introduction at a witness `t`: the goal the derivation must eventually hit. -/
 def mct_ex_intro (t : Term F (mctCtx1 ι) Ty.nat) :
-    Derivable F EqX al Premises
+    Derivable F al Premises
       (Formula.eq0 (mctA1 t) (mctA1 (Term.app2 Term.add t (mctG1 t)))
         →ᶠ Formula.ex Ty.nat mctC₀) :=
   .exist_ax t mctC₀
@@ -170,10 +168,10 @@ def mct_ex_intro (t : Term F (mctCtx1 ι) Ty.nat) :
 /-- **P2b-iv.** The ∀-introduction that closes the outer binder, given the body.
 `B := ⊥ᶠ →ᶠ ⊥ᶠ` is the "no hypothesis yet" placeholder; `mp` discharges it. -/
 def mct_close
-    (body : Derivable F EqX al Premises
+    (body : Derivable F al Premises
       (Formula.weakenBy (mctTy ι) (⊥ᶠ →ᶠ ⊥ᶠ) →ᶠ
         (Formula.all Ty.nat mctB₀ →ᶠ Formula.ex Ty.nat mctC₀))) :
-    Derivable F EqX al Premises (mctStatement (ι := ι) (F := F)) :=
+    Derivable F al Premises (mctStatement (ι := ι) (F := F)) :=
   .mp I_comb (.forall_rule body)
 
 /-! ### The step that consumes the induction hypothesis
@@ -238,24 +236,24 @@ example :
 
 /-- **P2c-iii.** The `induction` constructor accepts those two shapes and yields `∀k A(k)`. -/
 def mctInduction
-    (base : Derivable F EqX al Premises
+    (base : Derivable F al Premises
       (Formula.all Ty.nat mctB₀ →ᶠ
         Formula.all Ty.nat
           (leAt (aAt (.var (.vs .vz)) (.var .vz)) Term.zero →ᶠ flatEx (.var (.vs .vz)))))
-    (step : Derivable F EqX al Premises
+    (step : Derivable F al Premises
       (Formula.all Ty.nat (mctIndF →ᶠ
         (Formula.weakenBy Ty.nat (Formula.all Ty.nat mctB₀) →ᶠ
           Formula.all Ty.nat
             (leAt (aAt (.var (.vs (.vs .vz))) (.var .vz)) (.app .succ (.var (.vs .vz)))
               →ᶠ flatEx (.var (.vs (.vs .vz)))))))) :
-    Derivable F EqX al Premises (Formula.all Ty.nat (mctIndF (ι := ι) (F := F))) :=
+    Derivable F al Premises (Formula.all Ty.nat (mctIndF (ι := ι) (F := F))) :=
   .induction base step
 
 /-- **P2c-iv.** Instantiating the induction at `k := K` gives the goal the outer proof needs.
 `K` is a term over the parameter, not a numeral, so this exercises `subst0` at a compound term. -/
 def mctInstK
-    (h : Derivable F EqX al Premises (Formula.all Ty.nat (mctIndF (ι := ι) (F := F)))) :
-    Derivable F EqX al Premises
+    (h : Derivable F al Premises (Formula.all Ty.nat (mctIndF (ι := ι) (F := F)))) :
+    Derivable F al Premises
       (Formula.all Ty.nat mctB₀ →ᶠ
         Formula.all Ty.nat
           (leAt (aAt (.var (.vs .vz)) (.var .vz))
@@ -277,26 +275,25 @@ extracted functionals. This checks the two halves actually fit together here. -/
 
 section Compose
 
-variable {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
 
 /-- The two functionals the derivation yields: `U` says where to test the premise,
 `V` is the witness. Both compute. -/
 def mctExtract
-    {X : ι → Type} (si : SpaceInterp X F) (eqxi : EqXInterp X F si EqX)
+    {X : ι → Type} (si : SpaceInterp X F) (eqxi : EqXInterp X F si)
     {Premises : PremiseSet F}
     (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
       ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
-    (prf : @Derivable ι F EqX Allowed.extended Premises [] mctStatement) :=
+    (prf : @Derivable ι F Allowed.extended Premises [] mctStatement) :=
   general_metatheorem_extract si eqxi premise_realizer rfl rfl rfl rfl prf
 
 /-- **The bound**, from the extraction plus majorants for `U` and `V`. -/
 theorem mct_bound
-    {X : ι → Type} (si : SpaceInterp X F) (eqxi : EqXInterp X F si EqX)
+    {X : ι → Type} (si : SpaceInterp X F) (eqxi : EqXInterp X F si)
     (mj : MajorizabilityRel si)
     {Premises : PremiseSet F}
     (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
       ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
-    (prf : @Derivable ι F EqX Allowed.extended Premises [] mctStatement)
+    (prf : @Derivable ι F Allowed.extended Premises [] mctStatement)
     (U_star V_star : Ty.interpret X (mctTy ι →ₜ Ty.nat).hat)
     (hU : mj.maj (mctTy ι →ₜ Ty.nat) U_star
       (mctExtract si eqxi premise_realizer prf).val.1)

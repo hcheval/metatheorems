@@ -51,19 +51,10 @@ end Term
 section ClosedSubst
 variable {Γ Δ : Ctx ι} (σ : Term.Subst F Γ Δ)
 
-@[simp] theorem cauchyfy_closed_subst :
-    (Term.cauchyfy : Term F Γ _).subst σ = Term.cauchyfy := by
-  simp only [Term.cauchyfy, Term.subst, Term.Subst.ext, Term.app2, Term.app3,
-    Term.weaken, Term.rename, Term.Renaming.ext, Term.Renaming.shift,
-    fst_pair_closed_subst, pair_closed_subst, snd_pair_closed_subst,
-    lt_Q_dec_closed_subst, abs_Q_closed_subst, sub_Q_closed_subst,
-    pow2neg_Q_closed_subst, ite_nat_closed_subst, sg_bar_closed_subst]
+-- `cauchyfy_closed_subst`, `zero_R_closed_subst` and `one_R_closed_subst` MOVED to
+-- `Metatheorems/Terms/ClosedSubst.lean` (below `eqAtType`), together with the ℚ block they
+-- rest on and with `eq_R_substF` / `le_R_pu_substF`. See that file and ARCHITECTURE.md §7.
 
-attribute [closed_subst] cauchyfy_closed_subst
-@[simp] theorem zero_R_closed_subst :
-    (Term.zero_R : Term F Γ _).subst σ = Term.zero_R := by rfl
-@[simp] theorem one_R_closed_subst :
-    (Term.one_R : Term F Γ _).subst σ = Term.one_R := by rfl
 @[simp] private theorem embed_nat_R_closed_subst :
     (Term.embed_nat_R : Term F Γ _).subst σ = Term.embed_nat_R := by rfl
 @[simp] private theorem neg_R_closed_subst :
@@ -140,20 +131,9 @@ end Term
 -- Key Properties
 -- ============================================================================
 
-/-- `eq_R` is quantifier-free under the ∀n wrapper, so the whole formula
-    is purely universal (Π₁⁰). This is needed for EqX admissibility. -/
-theorem eq_R_isPurelyUniversal (f g : Term F Γ (realTy ι)) :
-    (eq_R f g).isPurelyUniversal = true := by rfl
-
-/-- `eq_R` commutes with substitution: naturality for the real equality formula.
-    This is needed for `AdmissibleEqX.substF_nat` in the metric space case. -/
-theorem eq_R_substF {Γ Δ : Ctx ι} (f g : Term F Γ (realTy ι))
-    (σ : Term.Subst F Γ Δ) :
-    (eq_R f g).substF σ = eq_R (f.subst σ) (g.subst σ) := by
-  simp only [eq_R, Formula.substF, Term.subst, Term.Subst.ext, Term.app2,
-    Term.weaken_subst_ext,
-    lt_Q_dec_closed_subst, abs_Q_closed_subst, sub_Q_closed_subst,
-    cauchyfy_closed_subst, pow2neg_Q_closed_subst]
+-- `eq_R_isPurelyUniversal`, `eq_R_substF`, `le_R_pu_isPurelyUniversal` and
+-- `le_R_pu_substF` MOVED to `Metatheorems/Terms/ClosedSubst.lean`: `eqAtType`'s base case is
+-- `eq_R`, so `eqAtType_substF` (in `Arithmetic.lean`) needs `eq_R_substF` below it.
 
 -- `le_R` is Π₁⁰ (purely universal after unfolding ¬∃ to ∀¬).
 -- Note: le_R unfolds to (∃n. body) → ⊥, which is NOT syntactically purely
@@ -161,18 +141,6 @@ theorem eq_R_substF {Γ Δ : Ctx ι} (f g : Term F Γ (realTy ι))
 -- purely universal premises, we would need to reformulate le_R as
 -- ∀n. ¬(body) = ∀n. (body → ⊥). This is logically equivalent but
 -- syntactically different. See le_R_unfolded below.
-
-theorem le_R_pu_isPurelyUniversal (f g : Term F Γ (realTy ι)) :
-    (le_R_pu f g).isPurelyUniversal = true := by rfl
-
-/-- `le_R_pu` commutes with substitution. -/
-theorem le_R_pu_substF {Γ Δ : Ctx ι} (f g : Term F Γ (realTy ι))
-    (σ : Term.Subst F Γ Δ) :
-    (le_R_pu f g).substF σ = le_R_pu (f.subst σ) (g.subst σ) := by
-  simp only [le_R_pu, Formula.substF, Term.subst, Term.Subst.ext, Term.app2,
-    Term.weaken_subst_ext,
-    le_Q_dec_closed_subst, sub_Q_closed_subst, cauchyfy_closed_subst,
-    pow2neg_Q_closed_subst]
 
 -- ============================================================================
 -- Rounding: (·)_∘ for embedding [0,∞) into ℕ^ℕ
@@ -185,10 +153,7 @@ theorem le_R_pu_substF {Γ Δ : Ctx ι} (f g : Term F Γ (realTy ι))
 -- Following Kohlenbach's condition (m): (ℕ^ℕ, +_ℝ, ·_ℝ, 0_ℝ, 1_ℝ, <_ℝ)
 -- is an Archimedean ordered field, provably in WE-HA^ω.
 
-variable {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) →
-    Term F Γ (Ty.base i) → Formula F Γ}
-  {al : Allowed} {Premises : PremiseSet F}
-  (adm : AdmissibleEqX EqX Premises)
+variable {al : Allowed} {Premises : PremiseSet F}
 
 -- Notation: real-typed variables in context
 private abbrev rTy := realTy ι
@@ -234,7 +199,7 @@ private def cauchyfy_body : Term F (Ty.nat :: realTy ι :: Γ) Ty.nat :=
 /-- The one beta step: `cauchyfy f n =₀ fst_pair (state f n)`. Everything else about
 `cauchyfy` is reasoning about `cauchyState`, which is an ordinary `prec`. -/
 def cauchyfy_unfold (f : Term F Γ (realTy ι)) (n : Term F Γ Ty.nat) :
-    Derivable F EqX al Premises
+    Derivable F al Premises
       (Formula.eq0 (Term.app2 Term.cauchyfy f n)
         (.app Term.fst_pair (Term.cauchyState f n))) :=
   have body_eq : (Term.cauchyfy : Term F Γ _) = Term.lam (Term.lam cauchyfy_body) := by rfl
@@ -244,12 +209,12 @@ def cauchyfy_unfold (f : Term F Γ (realTy ι)) (n : Term F Γ Ty.nat) :
       Term.cauchy_check_at, Term.subst0, Term.subst, Term.subst0_map, Term.Subst.ext,
       Term.app2, Term.app3, Term.weaken, Term.rename, Term.Renaming.shift,
       subst0_rename_vs, closed_subst]
-  body_eq ▸ lam2_correct_nf adm cauchyfy_body f n nf
+  body_eq ▸ lam2_correct_nf cauchyfy_body f n nf
 
 /-- Congruence under `fst_pair`. -/
 private def fst_pair_congr {s t : Term F Γ Ty.nat}
-    (h : Derivable F EqX al Premises (Formula.eq0 s t)) :
-    Derivable F EqX al Premises
+    (h : Derivable F al Premises (Formula.eq0 s t)) :
+    Derivable F al Premises
       (Formula.eq0 (.app Term.fst_pair s) (.app Term.fst_pair t)) :=
   qfer_no_premise_nat_nf h (r := .app Term.fst_pair (.var .vz))
     (by simp only [Term.subst0, Term.subst, Term.subst0_map, closed_subst])
@@ -257,8 +222,8 @@ private def fst_pair_congr {s t : Term F Γ Ty.nat}
 
 /-- Congruence under `snd_pair`. -/
 private def snd_pair_congr {s t : Term F Γ Ty.nat}
-    (h : Derivable F EqX al Premises (Formula.eq0 s t)) :
-    Derivable F EqX al Premises
+    (h : Derivable F al Premises (Formula.eq0 s t)) :
+    Derivable F al Premises
       (Formula.eq0 (.app Term.snd_pair s) (.app Term.snd_pair t)) :=
   qfer_no_premise_nat_nf h (r := .app Term.snd_pair (.var .vz))
     (by simp only [Term.subst0, Term.subst, Term.subst0_map, closed_subst])
@@ -266,13 +231,13 @@ private def snd_pair_congr {s t : Term F Γ Ty.nat}
 
 /-- The recursion's base case, as a statement about the state. -/
 def cauchyState_zero (f : Term F Γ (realTy ι)) :
-    Derivable F EqX al Premises
+    Derivable F al Premises
       (Formula.eq0 (Term.cauchyState f Term.zero) (Term.cauchyBase f)) :=
   Derivable.rec_zero (ρ := Ty.nat) (y := Term.cauchyBase f) (z := Term.cauchyStep f)
 
 /-- The recursion's step, as a statement about the state. -/
 def cauchyState_succ (f : Term F Γ (realTy ι)) (n : Term F Γ Ty.nat) :
-    Derivable F EqX al Premises
+    Derivable F al Premises
       (Formula.eq0 (Term.cauchyState f (.app .succ n))
         (Term.app2 (Term.cauchyStep f) (Term.cauchyState f n) n)) :=
   Derivable.rec_succ (ρ := Ty.nat) (y := Term.cauchyBase f) (z := Term.cauchyStep f) (x := n)
@@ -290,7 +255,7 @@ private def cauchyStep_body (f : Term F Γ (realTy ι)) :
 
 /-- One step of the recursion, beta-reduced. -/
 def cauchyStep_unfold (f : Term F Γ (realTy ι)) (st k : Term F Γ Ty.nat) :
-    Derivable F EqX al Premises
+    Derivable F al Premises
       (Formula.eq0 (Term.app2 (Term.cauchyStep f) st k)
         (Term.app3 Term.ite_nat (.app Term.snd_pair st) st
           (Term.app3 Term.ite_nat (.app Term.sg_bar (Term.cauchy_check_at f k))
@@ -305,11 +270,11 @@ def cauchyStep_unfold (f : Term F Γ (realTy ι)) (st k : Term F Γ Ty.nat) :
     simp only [cauchyStep_body, Term.cauchy_check_at, Term.subst0, Term.subst,
       Term.subst0_map, Term.app2, Term.app3, Term.weaken, Term.Renaming.shift,
       subst0_rename_vs, closed_subst]
-  body_eq ▸ lam2_correct_nf adm (cauchyStep_body f) st k nf
+  body_eq ▸ lam2_correct_nf (cauchyStep_body f) st k nf
 
 /-- The step, with the state's two components exposed. -/
 def cauchyState_succ_unfold (f : Term F Γ (realTy ι)) (n : Term F Γ Ty.nat) :
-    Derivable F EqX al Premises
+    Derivable F al Premises
       (Formula.eq0 (Term.cauchyState f (.app .succ n))
         (Term.app3 Term.ite_nat (.app Term.snd_pair (Term.cauchyState f n))
           (Term.cauchyState f n)
@@ -317,22 +282,22 @@ def cauchyState_succ_unfold (f : Term F Γ (realTy ι)) (n : Term F Γ Ty.nat) :
             (Term.app2 Term.pair (.app f (.app .succ n)) .zero)
             (Term.app2 Term.pair (.app Term.fst_pair (Term.cauchyState f n))
               (.app .succ .zero))))) :=
-  qtrans (cauchyState_succ f n) (cauchyStep_unfold adm f (Term.cauchyState f n) n)
+  qtrans (cauchyState_succ f n) (cauchyStep_unfold f (Term.cauchyState f n) n)
 
 /-- Once the flag is set the state freezes. -/
 def cauchyState_frozen (f : Term F Γ (realTy ι)) (n : Term F Γ Ty.nat) :
-    Derivable F EqX al Premises
+    Derivable F al Premises
       (Formula.eq0 (.app Term.snd_pair (Term.cauchyState f n)) (.app .succ .zero) →ᶠ
        Formula.eq0 (Term.cauchyState f (.app .succ n)) (Term.cauchyState f n)) := by
   pmode
   pintro h
-  prw (cauchyState_succ_unfold adm f n)
+  prw (cauchyState_succ_unfold f n)
   prwby h
-  pthm (ite_nat_one adm (Term.cauchyState f n) _)
+  pthm (ite_nat_one (Term.cauchyState f n) _)
 
 /-- Flag clear and the Cauchy check passing at `n`: the next value is `f (n+1)`. -/
 def cauchyState_advance (f : Term F Γ (realTy ι)) (n : Term F Γ Ty.nat) :
-    Derivable F EqX al Premises
+    Derivable F al Premises
       (Formula.eq0 (.app Term.snd_pair (Term.cauchyState f n)) .zero
         ∧ᶠ Formula.eq0 (.app Term.sg_bar (Term.cauchy_check_at f n)) (.app .succ .zero) →ᶠ
        Formula.eq0 (Term.cauchyState f (.app .succ n))
@@ -340,14 +305,14 @@ def cauchyState_advance (f : Term F Γ (realTy ι)) (n : Term F Γ Ty.nat) :
   pmode
   pintro hyp
   pdestruct hyp with h0 h1
-  prw (cauchyState_succ_unfold adm f n)
+  prw (cauchyState_succ_unfold f n)
   prwby h0
   prwby h1
-  pthm (qtrans (ite_nat_zero adm _ _) (ite_nat_one adm _ _))
+  pthm (qtrans (ite_nat_zero _ _) (ite_nat_one _ _))
 
 /-- Flag clear and the Cauchy check failing at `n`: the value freezes and the flag is set. -/
 def cauchyState_trip (f : Term F Γ (realTy ι)) (n : Term F Γ Ty.nat) :
-    Derivable F EqX al Premises
+    Derivable F al Premises
       (Formula.eq0 (.app Term.snd_pair (Term.cauchyState f n)) .zero
         ∧ᶠ Formula.eq0 (.app Term.sg_bar (Term.cauchy_check_at f n)) .zero →ᶠ
        Formula.eq0 (Term.cauchyState f (.app .succ n))
@@ -356,30 +321,30 @@ def cauchyState_trip (f : Term F Γ (realTy ι)) (n : Term F Γ Ty.nat) :
   pmode
   pintro hyp
   pdestruct hyp with h0 h1
-  prw (cauchyState_succ_unfold adm f n)
+  prw (cauchyState_succ_unfold f n)
   prwby h0
   prwby h1
-  pthm (qtrans (ite_nat_zero adm _ _) (ite_nat_zero adm _ _))
+  pthm (qtrans (ite_nat_zero _ _) (ite_nat_zero _ _))
 
 /-- The flag starts clear. -/
 def cFlag_zero (f : Term F Γ (realTy ι)) :
-    Derivable F EqX al Premises
+    Derivable F al Premises
       (Formula.eq0 (.app Term.snd_pair (Term.cauchyState f Term.zero)) .zero) :=
   qtrans (snd_pair_congr (cauchyState_zero f))
-    (snd_pair_pair adm (.app f .zero) Term.zero)
+    (snd_pair_pair (.app f .zero) Term.zero)
 
 /-- The value starts at `f 0`. -/
 def cVal_zero (f : Term F Γ (realTy ι)) :
-    Derivable F EqX al Premises
+    Derivable F al Premises
       (Formula.eq0 (.app Term.fst_pair (Term.cauchyState f Term.zero)) (.app f .zero)) :=
   qtrans (fst_pair_congr (cauchyState_zero f))
-    (fst_pair_pair adm (.app f .zero) Term.zero)
+    (fst_pair_pair (.app f .zero) Term.zero)
 
 /-- `f̂(0) =₀ f(0)`: cauchyfication does not move the first term. -/
 def cauchyfy_zero (f : Term F Γ (realTy ι)) :
-    Derivable F EqX al Premises
+    Derivable F al Premises
       (Formula.eq0 (Term.app2 Term.cauchyfy f Term.zero) (.app f .zero)) :=
-  qtrans (cauchyfy_unfold adm f Term.zero) (cVal_zero adm f)
+  qtrans (cauchyfy_unfold f Term.zero) (cVal_zero f)
 
 -- ── The invariant ──────────────────────────────────────────────────────────
 --
@@ -421,40 +386,40 @@ either the flag is clear and the value is `f n` verbatim, or the flag is set. No
 about `cauchyfy` can be proved without this — in particular nothing pins the flag down to
 `{0, 1}`, and `ite_nat` applied to anything else computes garbage. -/
 def cauchy_inv (f : Term F Γ (realTy ι)) :
-    Derivable F EqX al Premises (Formula.all Ty.nat (invF f)) :=
-  let base : Derivable F EqX al Premises ((invF f).subst0 Term.zero) :=
+    Derivable F al Premises (Formula.all Ty.nat (invF f)) :=
+  let base : Derivable F al Premises ((invF f).subst0 Term.zero) :=
     invF_subst0 f Term.zero ▸
-      Derivable.mp (Derivable.mp (cVal_zero adm f)
-        (Derivable.mp (cFlag_zero adm f) and_intro)) .or_weak
+      Derivable.mp (Derivable.mp (cVal_zero f)
+        (Derivable.mp (cFlag_zero f) and_intro)) .or_weak
   let fw : Term F (Ty.nat :: Γ) (realTy ι) := f.weaken
   let nv : Term F (Ty.nat :: Γ) Ty.nat := .var .vz
-  let step : Derivable F EqX al Premises
+  let step : Derivable F al Premises
       (invF f →ᶠ Formula.substVar0 (invF f) (.app .succ (.var .vz))) :=
     invF_substVar0 f ▸ (by
       pmode
       pintro ih
       pcases ih with hL | hR
       · pdestruct hL with h0 _hv
-        pfrom hsg := sg_bar_cases adm (Term.cauchy_check_at fw nv)
+        pfrom hsg := sg_bar_cases (Term.cauchy_check_at fw nv)
         pcases hsg with hs1 | hs0
         · -- the Cauchy check passes at `n`: the value advances to `f (n+1)`
           pconj h0 hs1 with hboth
-          papplym (cauchyState_advance adm fw nv) in hboth with hst
+          papplym (cauchyState_advance fw nv) in hboth with hst
           pleft
           psplit
           · prwby hst
-            pthm (snd_pair_pair adm (.app fw (.app .succ nv)) Term.zero)
+            pthm (snd_pair_pair (.app fw (.app .succ nv)) Term.zero)
           · prwby hst
-            pthm (fst_pair_pair adm (.app fw (.app .succ nv)) Term.zero)
+            pthm (fst_pair_pair (.app fw (.app .succ nv)) Term.zero)
         · -- the check fails: the flag trips
           pconj h0 hs0 with hboth
-          papplym (cauchyState_trip adm fw nv) in hboth with hst
+          papplym (cauchyState_trip fw nv) in hboth with hst
           pright
           prwby hst
-          pthm (snd_pair_pair adm (.app Term.fst_pair (Term.cauchyState fw nv))
+          pthm (snd_pair_pair (.app Term.fst_pair (Term.cauchyState fw nv))
             (.app .succ .zero))
       · -- already tripped: the state freezes, so the flag stays set
-        papplym (cauchyState_frozen adm fw nv) in hR with hst
+        papplym (cauchyState_frozen fw nv) in hR with hst
         pright
         prwby hst
         pexact hR)
@@ -462,8 +427,8 @@ def cauchy_inv (f : Term F Γ (realTy ι)) :
 
 /-- The invariant at an explicit index. -/
 def cauchy_inv_at (f : Term F Γ (realTy ι)) (s : Term F Γ Ty.nat) :
-    Derivable F EqX al Premises (invAt f s) :=
-  invF_subst0 f s ▸ Derivable.mp (cauchy_inv adm f) (.forall_ax s)
+    Derivable F al Premises (invAt f s) :=
+  invF_subst0 f s ▸ Derivable.mp (cauchy_inv f) (.forall_ax s)
 
 /-- **`cauchyfy` produces a Cauchy sequence**, for *any* `f` whatsoever:
 `|f̂(n) −ℚ f̂(n+1)|ℚ <ℚ 2^{-(n+1)}`. Stated on the state's value component; `cauchyfy_unfold`
@@ -473,32 +438,32 @@ Three cases, all supplied by the invariant: the check passed at `n` (so the two 
 `f n` and `f (n+1)`, and the check *is* the inequality), the check failed at `n`, or the flag
 was already set — in the latter two the value does not move and the difference is `0`. -/
 def cauchyState_cauchy (f : Term F Γ (realTy ι)) (n : Term F Γ Ty.nat) :
-    Derivable F EqX al Premises
+    Derivable F al Premises
       (lt_Q (.app Term.abs_Q (Term.app2 Term.sub_Q
               (.app Term.fst_pair (Term.cauchyState f n))
               (.app Term.fst_pair (Term.cauchyState f (.app .succ n)))))
             (.app Term.pow2neg_Q (.app .succ n))) := by
   pmode
-  pfrom hinv := cauchy_inv_at adm f n
+  pfrom hinv := cauchy_inv_at f n
   pcases hinv with hL | hR
   · pdestruct hL with h0 hv
-    pfrom hsg := sg_bar_cases adm (Term.cauchy_check_at f n)
+    pfrom hsg := sg_bar_cases (Term.cauchy_check_at f n)
     pcases hsg with hs1 | hs0
     · pconj h0 hs1 with hboth
-      papplym (cauchyState_advance adm f n) in hboth with hst
+      papplym (cauchyState_advance f n) in hboth with hst
       prwby hst
-      prw (fst_pair_pair adm (.app f (.app .succ n)) Term.zero)
+      prw (fst_pair_pair (.app f (.app .succ n)) Term.zero)
       prwby hv
-      papplym (sg_bar_eq_S0_implies_zero adm (Term.cauchy_check_at f n)) in hs1 with hchk
+      papplym (sg_bar_eq_S0_implies_zero (Term.cauchy_check_at f n)) in hs1 with hchk
       pexact hchk
     · pconj h0 hs0 with hboth
-      papplym (cauchyState_trip adm f n) in hboth with hst
+      papplym (cauchyState_trip f n) in hboth with hst
       prwby hst
-      prw (fst_pair_pair adm (.app Term.fst_pair (Term.cauchyState f n)) (.app .succ .zero))
-      pthm (lt_Q_abs_sub_self adm (.app Term.fst_pair (Term.cauchyState f n)) (.app .succ n))
-  · papplym (cauchyState_frozen adm f n) in hR with hst
+      prw (fst_pair_pair (.app Term.fst_pair (Term.cauchyState f n)) (.app .succ .zero))
+      pthm (lt_Q_abs_sub_self (.app Term.fst_pair (Term.cauchyState f n)) (.app .succ n))
+  · papplym (cauchyState_frozen f n) in hR with hst
     prwby hst
-    pthm (lt_Q_abs_sub_self adm (.app Term.fst_pair (Term.cauchyState f n)) (.app .succ n))
+    pthm (lt_Q_abs_sub_self (.app Term.fst_pair (Term.cauchyState f n)) (.app .succ n))
 
 -- ── `cauchyfy` is the identity on sequences that are already Cauchy ────────
 
@@ -534,18 +499,18 @@ The hypothesis is stated at the bound index `x₀` of the context `[n, …Γ]`, 
 where the induction step needs it — so no weakening of a derivation is required, and this is
 why the lemma takes a Lean-level argument rather than an object-level antecedent. -/
 def cauchyState_id_of_cauchy (f : Term F Γ (realTy ι))
-    (hC : Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
+    (hC : Derivable F al Premises (Γ := Ty.nat :: Γ)
       (Formula.eq0 (Term.cauchy_check_at f.weaken (.var .vz)) .zero)) :
-    Derivable F EqX al Premises (Formula.all Ty.nat (idF f)) :=
-  let base : Derivable F EqX al Premises ((idF f).subst0 Term.zero) :=
+    Derivable F al Premises (Formula.all Ty.nat (idF f)) :=
+  let base : Derivable F al Premises ((idF f).subst0 Term.zero) :=
     idF_subst0 f Term.zero ▸
-      Derivable.mp (cVal_zero adm f) (Derivable.mp (cFlag_zero adm f) and_intro)
+      Derivable.mp (cVal_zero f) (Derivable.mp (cFlag_zero f) and_intro)
   let fw : Term F (Ty.nat :: Γ) (realTy ι) := f.weaken
   let nv : Term F (Ty.nat :: Γ) Ty.nat := .var .vz
-  let hsg : Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
+  let hsg : Derivable F al Premises (Γ := Ty.nat :: Γ)
       (Formula.eq0 (.app Term.sg_bar (Term.cauchy_check_at fw nv)) (.app .succ .zero)) :=
     qtrans (sg_bar_congr hC) sg_bar_zero
-  let step : Derivable F EqX al Premises
+  let step : Derivable F al Premises
       (idF f →ᶠ Formula.substVar0 (idF f) (.app .succ (.var .vz))) :=
     idF_substVar0 f ▸ (by
       pmode
@@ -553,21 +518,21 @@ def cauchyState_id_of_cauchy (f : Term F Γ (realTy ι))
       pdestruct ih with h0 _hv
       pfrom hs1 := hsg
       pconj h0 hs1 with hboth
-      papplym (cauchyState_advance adm fw nv) in hboth with hst
+      papplym (cauchyState_advance fw nv) in hboth with hst
       psplit
       · prwby hst
-        pthm (snd_pair_pair adm (.app fw (.app .succ nv)) Term.zero)
+        pthm (snd_pair_pair (.app fw (.app .succ nv)) Term.zero)
       · prwby hst
-        pthm (fst_pair_pair adm (.app fw (.app .succ nv)) Term.zero))
+        pthm (fst_pair_pair (.app fw (.app .succ nv)) Term.zero))
   .induction base (univ_gen step)
 
 /-- The same, at an explicit index. -/
 def cauchyState_id_at (f : Term F Γ (realTy ι))
-    (hC : Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
+    (hC : Derivable F al Premises (Γ := Ty.nat :: Γ)
       (Formula.eq0 (Term.cauchy_check_at f.weaken (.var .vz)) .zero))
     (s : Term F Γ Ty.nat) :
-    Derivable F EqX al Premises (idAt f s) :=
-  idF_subst0 f s ▸ Derivable.mp (cauchyState_id_of_cauchy adm f hC) (.forall_ax s)
+    Derivable F al Premises (idAt f s) :=
+  idF_subst0 f s ▸ Derivable.mp (cauchyState_id_of_cauchy f hC) (.forall_ax s)
 
 /-- Weakening *is* a substitution (`Term.rename_eq_subst`), so the `closed_subst` set
 discharges weakening of a closed constant too. -/
@@ -581,26 +546,26 @@ private theorem one_R_weaken {Δ : Ctx ι} {ρ : Ty ι} :
 
 /-- `f̂(n) =₀ f(n)` for a sequence that already passes the check everywhere. -/
 def cauchyfy_id (f : Term F Γ (realTy ι))
-    (hC : Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
+    (hC : Derivable F al Premises (Γ := Ty.nat :: Γ)
       (Formula.eq0 (Term.cauchy_check_at f.weaken (.var .vz)) .zero))
     (s : Term F Γ Ty.nat) :
-    Derivable F EqX al Premises
+    Derivable F al Premises
       (Formula.eq0 (Term.app2 Term.cauchyfy f s) (.app f s)) :=
-  qtrans (cauchyfy_unfold adm f s)
-    (Derivable.mp (cauchyState_id_at adm f hC s) and_proj2)
+  qtrans (cauchyfy_unfold f s)
+    (Derivable.mp (cauchyState_id_at f hC s) and_proj2)
 
 -- ── The two constant sequences ────────────────────────────────────────────
 
 /-- `0_ℝ` is the constant sequence `0_ℚ`. -/
 def zero_R_apply (x : Term F Γ Ty.nat) :
-    Derivable F EqX al Premises
+    Derivable F al Premises
       (Formula.eq0 (.app Term.zero_R x) Term.zero_Q) :=
   lam_correct_nf (Term.zero_Q : Term F (Ty.nat :: Γ) Ty.nat) x
     (by simp only [Term.subst0, Term.subst, Term.subst0_map, closed_subst])
 
 /-- `1_ℝ` is the constant sequence `1_ℚ`. -/
 def one_R_apply (x : Term F Γ Ty.nat) :
-    Derivable F EqX al Premises
+    Derivable F al Premises
       (Formula.eq0 (.app Term.one_R x) Term.one_Q) :=
   lam_correct_nf (Term.one_Q : Term F (Ty.nat :: Γ) Ty.nat) x
     (by simp only [Term.subst0, Term.subst, Term.subst0_map, closed_subst])
@@ -609,7 +574,7 @@ def one_R_apply (x : Term F Γ Ty.nat) :
 -- descends through `Term.app`/`app2`/`app3` nodes only, so a named wrapper would hide the
 -- applications of `0_ℝ` from the rewrite. It is definitionally the same formula.
 private def zero_R_check :
-    Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
+    Derivable F al Premises (Γ := Ty.nat :: Γ)
       (Formula.eq0
         (Term.app2 Term.lt_Q_dec
           (.app Term.abs_Q (Term.app2 Term.sub_Q
@@ -620,10 +585,10 @@ private def zero_R_check :
   pmode
   prw (zero_R_apply (.var .vz))
   prw (zero_R_apply (.app .succ (.var .vz)))
-  pthm (lt_Q_abs_sub_self adm Term.zero_Q (.app .succ (.var .vz)))
+  pthm (lt_Q_abs_sub_self Term.zero_Q (.app .succ (.var .vz)))
 
 private def one_R_check :
-    Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
+    Derivable F al Premises (Γ := Ty.nat :: Γ)
       (Formula.eq0
         (Term.app2 Term.lt_Q_dec
           (.app Term.abs_Q (Term.app2 Term.sub_Q
@@ -634,18 +599,18 @@ private def one_R_check :
   pmode
   prw (one_R_apply (.var .vz))
   prw (one_R_apply (.app .succ (.var .vz)))
-  pthm (lt_Q_abs_sub_self adm Term.one_Q (.app .succ (.var .vz)))
+  pthm (lt_Q_abs_sub_self Term.one_Q (.app .succ (.var .vz)))
 
 -- ── The sum of two reals is Cauchy, so `cauchyfy` fixes it ────────────────
 
 /-- `(f +_ℝ g)(x) =₀ f̂(x+1) +_ℚ ĝ(x+1)` — the three beta steps of `add_R`. -/
 def add_R_apply (f g : Term F Γ (realTy ι)) (x : Term F Γ Ty.nat) :
-    Derivable F EqX al Premises
+    Derivable F al Premises
       (Formula.eq0 (Term.app3 Term.add_R f g x)
         (Term.app2 Term.add_Q
           (Term.app2 Term.cauchyfy f (.app .succ x))
           (Term.app2 Term.cauchyfy g (.app .succ x)))) :=
-  lam3_correct_nf adm
+  lam3_correct_nf
     (Term.app2 Term.add_Q
       (Term.app2 Term.cauchyfy (.var (.vs (.vs .vz))) (.app .succ (.var .vz)))
       (Term.app2 Term.cauchyfy (.var (.vs .vz)) (.app .succ (.var .vz))))
@@ -668,7 +633,7 @@ private theorem add_R_app_weaken {Δ : Ctx ι} {ρ : Ty ι} (f g : Term F Δ (re
 `2^{-(k+2)}`, and the two together by less than `2^{-(k+1)}`. Spelled out rather than written
 with `Term.cauchy_check_at`, for the same reason `zero_R_check` is. -/
 private def add_R_check (f g : Term F Γ (realTy ι)) :
-    Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
+    Derivable F al Premises (Γ := Ty.nat :: Γ)
       (Formula.eq0
         (Term.app2 Term.lt_Q_dec
           (.app Term.abs_Q (Term.app2 Term.sub_Q
@@ -677,13 +642,13 @@ private def add_R_check (f g : Term F Γ (realTy ι)) :
           (.app Term.pow2neg_Q (.app .succ (.var .vz))))
         .zero) := by
   pmode
-  prw (add_R_apply adm f.weaken g.weaken (.var .vz))
-  prw (add_R_apply adm f.weaken g.weaken (.app .succ (.var .vz)))
-  prw (cauchyfy_unfold adm f.weaken (.app .succ (.var .vz)))
-  prw (cauchyfy_unfold adm g.weaken (.app .succ (.var .vz)))
-  prw (cauchyfy_unfold adm f.weaken (.app .succ (.app .succ (.var .vz))))
-  prw (cauchyfy_unfold adm g.weaken (.app .succ (.app .succ (.var .vz))))
-  papplym (le_lt_Q_trans adm
+  prw (add_R_apply f.weaken g.weaken (.var .vz))
+  prw (add_R_apply f.weaken g.weaken (.app .succ (.var .vz)))
+  prw (cauchyfy_unfold f.weaken (.app .succ (.var .vz)))
+  prw (cauchyfy_unfold g.weaken (.app .succ (.var .vz)))
+  prw (cauchyfy_unfold f.weaken (.app .succ (.app .succ (.var .vz))))
+  prw (cauchyfy_unfold g.weaken (.app .succ (.app .succ (.var .vz))))
+  papplym (le_lt_Q_trans
     (.app Term.abs_Q (Term.app2 Term.sub_Q
       (Term.app2 Term.add_Q
         (.app Term.fst_pair (Term.cauchyState f.weaken (.app .succ (.var .vz))))
@@ -704,14 +669,14 @@ private def add_R_check (f g : Term F Γ (realTy ι)) :
           (Term.cauchyState g.weaken (.app .succ (.app .succ (.var .vz))))))))
     (.app Term.pow2neg_Q (.app .succ (.var .vz))))
   psplit
-  · pthm (abs_Q_sub_add_split adm
+  · pthm (abs_Q_sub_add_split
       (.app Term.fst_pair
         (Term.cauchyState f.weaken (.app .succ (.app .succ (.var .vz)))))
       (.app Term.fst_pair
         (Term.cauchyState g.weaken (.app .succ (.app .succ (.var .vz)))))
       (.app Term.fst_pair (Term.cauchyState f.weaken (.app .succ (.var .vz))))
       (.app Term.fst_pair (Term.cauchyState g.weaken (.app .succ (.var .vz)))))
-  · papplym (lt_Q_congr adm
+  · papplym (lt_Q_congr
       (Term.app2 Term.add_Q
         (.app Term.abs_Q (Term.app2 Term.sub_Q
           (.app Term.fst_pair (Term.cauchyState f.weaken (.app .succ (.var .vz))))
@@ -734,9 +699,9 @@ private def add_R_check (f g : Term F Γ (realTy ι)) :
           (.app Term.fst_pair
             (Term.cauchyState g.weaken (.app .succ (.app .succ (.var .vz))))))))
       (.app Term.pow2neg_Q (.app .succ (.var .vz)))
-      (eq_Q_refl_inst adm _)
-      (pow2neg_Q_halve adm (.app .succ (.var .vz))))
-    papplym (lt_Q_add_both adm
+      (eq_Q_refl_inst _)
+      (pow2neg_Q_halve (.app .succ (.var .vz))))
+    papplym (lt_Q_add_both
       (.app Term.abs_Q (Term.app2 Term.sub_Q
         (.app Term.fst_pair (Term.cauchyState f.weaken (.app .succ (.var .vz))))
         (.app Term.fst_pair
@@ -748,32 +713,32 @@ private def add_R_check (f g : Term F Γ (realTy ι)) :
       (.app Term.pow2neg_Q (.app .succ (.app .succ (.var .vz))))
       (.app Term.pow2neg_Q (.app .succ (.app .succ (.var .vz)))))
     psplit
-    · pthm (cauchyState_cauchy adm f.weaken (.app .succ (.var .vz)))
-    · pthm (cauchyState_cauchy adm g.weaken (.app .succ (.var .vz)))
+    · pthm (cauchyState_cauchy f.weaken (.app .succ (.var .vz)))
+    · pthm (cauchyState_cauchy g.weaken (.app .succ (.var .vz)))
 
 /-- `(f +_ℝ g)^(s) =₀ f̂(s+1) +_ℚ ĝ(s+1)`: `cauchyfy` is the identity on a sum. -/
 def cauchyfy_add_R (f g : Term F Γ (realTy ι)) (s : Term F Γ Ty.nat) :
-    Derivable F EqX al Premises
+    Derivable F al Premises
       (Formula.eq0 (Term.app2 Term.cauchyfy (Term.app2 Term.add_R f g) s)
         (Term.app2 Term.add_Q
           (Term.app2 Term.cauchyfy f (.app .succ s))
           (Term.app2 Term.cauchyfy g (.app .succ s)))) :=
-  qtrans (cauchyfy_id adm (Term.app2 Term.add_R f g)
-      (add_R_app_weaken f g ▸ add_R_check adm f g) s)
-    (add_R_apply adm f g s)
+  qtrans (cauchyfy_id (Term.app2 Term.add_R f g)
+      (add_R_app_weaken f g ▸ add_R_check f g) s)
+    (add_R_apply f g s)
 
 /-- `0̂_ℝ(n) =₀ 0_ℚ`: the constant sequences are fixed by `cauchyfy`. -/
 def cauchyfy_zero_R (s : Term F Γ Ty.nat) :
-    Derivable F EqX al Premises
+    Derivable F al Premises
       (Formula.eq0 (Term.app2 Term.cauchyfy Term.zero_R s) Term.zero_Q) :=
-  qtrans (cauchyfy_id adm Term.zero_R (zero_R_weaken ▸ zero_R_check adm) s)
+  qtrans (cauchyfy_id Term.zero_R (zero_R_weaken ▸ zero_R_check) s)
     (zero_R_apply s)
 
 /-- `1̂_ℝ(n) =₀ 1_ℚ`. -/
 def cauchyfy_one_R (s : Term F Γ Ty.nat) :
-    Derivable F EqX al Premises
+    Derivable F al Premises
       (Formula.eq0 (Term.app2 Term.cauchyfy Term.one_R s) Term.one_Q) :=
-  qtrans (cauchyfy_id adm Term.one_R (one_R_weaken ▸ one_R_check adm) s)
+  qtrans (cauchyfy_id Term.one_R (one_R_weaken ▸ one_R_check) s)
     (one_R_apply s)
 
 end Cauchyfy
@@ -786,7 +751,7 @@ variable {Γ : Ctx ι}
 
 /-- ⊢ ∀f,g : ℝ. f +_ℝ g =_ℝ g +_ℝ f -/
 def add_comm_R :
-    Derivable F EqX al Premises (Γ := Γ)
+    Derivable F al Premises (Γ := Γ)
       (Formula.all rTy (Formula.all rTy
         (eq_R (Term.app2 Term.add_R (.var (.vs .vz)) (.var .vz))
               (Term.app2 Term.add_R (.var .vz) (.var (.vs .vz)))))) :=
@@ -794,7 +759,7 @@ def add_comm_R :
 
 /-- ⊢ ∀f,g,h : ℝ. (f +_ℝ g) +_ℝ h =_ℝ f +_ℝ (g +_ℝ h) -/
 def add_assoc_R :
-    Derivable F EqX al Premises (Γ := Γ)
+    Derivable F al Premises (Γ := Γ)
       (Formula.all rTy (Formula.all rTy (Formula.all rTy
         (eq_R
           (Term.app2 Term.add_R
@@ -806,7 +771,7 @@ def add_assoc_R :
 
 /-- ⊢ ∀f : ℝ. f +_ℝ 0_ℝ =_ℝ f -/
 def add_zero_R :
-    Derivable F EqX al Premises (Γ := Γ)
+    Derivable F al Premises (Γ := Γ)
       (Formula.all rTy
         (eq_R (Term.app2 Term.add_R (.var .vz) Term.zero_R)
               (.var .vz))) :=
@@ -814,7 +779,7 @@ def add_zero_R :
 
 /-- ⊢ ∀f : ℝ. f +_ℝ neg_R(f) =_ℝ 0_ℝ -/
 def add_neg_R :
-    Derivable F EqX al Premises (Γ := Γ)
+    Derivable F al Premises (Γ := Γ)
       (Formula.all rTy
         (eq_R (Term.app2 Term.add_R (.var .vz)
                 (.app Term.neg_R (.var .vz)))
@@ -825,7 +790,7 @@ def add_neg_R :
 
 /-- ⊢ ∀f,g : ℝ. f ·_ℝ g =_ℝ g ·_ℝ f -/
 def mul_comm_R :
-    Derivable F EqX al Premises (Γ := Γ)
+    Derivable F al Premises (Γ := Γ)
       (Formula.all rTy (Formula.all rTy
         (eq_R (Term.app2 Term.mul_R (.var (.vs .vz)) (.var .vz))
               (Term.app2 Term.mul_R (.var .vz) (.var (.vs .vz)))))) :=
@@ -833,7 +798,7 @@ def mul_comm_R :
 
 /-- ⊢ ∀f,g,h : ℝ. (f ·_ℝ g) ·_ℝ h =_ℝ f ·_ℝ (g ·_ℝ h) -/
 def mul_assoc_R :
-    Derivable F EqX al Premises (Γ := Γ)
+    Derivable F al Premises (Γ := Γ)
       (Formula.all rTy (Formula.all rTy (Formula.all rTy
         (eq_R
           (Term.app2 Term.mul_R
@@ -845,7 +810,7 @@ def mul_assoc_R :
 
 /-- ⊢ ∀f : ℝ. f ·_ℝ 1_ℝ =_ℝ f -/
 def mul_one_R :
-    Derivable F EqX al Premises (Γ := Γ)
+    Derivable F al Premises (Γ := Γ)
       (Formula.all rTy
         (eq_R (Term.app2 Term.mul_R (.var .vz) Term.one_R)
               (.var .vz))) :=
@@ -855,7 +820,7 @@ def mul_one_R :
 
 /-- ⊢ ∀f,g,h : ℝ. f ·_ℝ (g +_ℝ h) =_ℝ (f ·_ℝ g) +_ℝ (f ·_ℝ h) -/
 def distrib_R :
-    Derivable F EqX al Premises (Γ := Γ)
+    Derivable F al Premises (Γ := Γ)
       (Formula.all rTy (Formula.all rTy (Formula.all rTy
         (eq_R
           (Term.app2 Term.mul_R (.var (.vs (.vs .vz)))
@@ -870,24 +835,24 @@ def distrib_R :
 
 /-- ⊢ ∀f : ℝ. ¬(f <_ℝ f) (irreflexivity of <_ℝ) -/
 def lt_irrefl_R :
-    Derivable F EqX al Premises (Γ := Γ)
+    Derivable F al Premises (Γ := Γ)
       (Formula.all rTy (Formula.neg (lt_R (.var .vz) (.var .vz)))) :=
   let A : Term F (Ty.nat :: rTy :: Γ) Ty.nat :=
     Term.app (Term.app Term.cauchyfy (Term.weaken (.var .vz))) (.app .succ (.var .vz))
   let e : Term F (Ty.nat :: rTy :: Γ) Ty.nat := .app Term.pow2neg_Q (.var .vz)
   -- `f̂(n+1) −ℚ f̂(n+1) =ℚ 0`, and `2^{-n} ≤ℚ 0` contradicts `0 <ℚ 2^{-n}`.
-  let step : Derivable F EqX al Premises
+  let step : Derivable F al Premises
       (le_Q e (Term.app2 Term.sub_Q A A) →ᶠ ⊥ᶠ) :=
     .syllogism
-      (le_Q_congr adm e (Term.app2 Term.sub_Q A A) e Term.zero_Q
-        (eq_Q_refl_inst adm e) (sub_Q_self adm A))
-      (.syllogism (pair_h (weaken_intro_h (zero_lt_pow2neg_Q adm (.var .vz))) I_comb)
-        (lt_Q_le_Q_absurd adm Term.zero_Q e))
+      (le_Q_congr e (Term.app2 Term.sub_Q A A) e Term.zero_Q
+        (eq_Q_refl_inst e) (sub_Q_self A))
+      (.syllogism (pair_h (weaken_intro_h (zero_lt_pow2neg_Q (.var .vz))) I_comb)
+        (lt_Q_le_Q_absurd Term.zero_Q e))
   univ_gen (.exist_rule step)
 
 /-- ⊢ ∀f,g,h : ℝ. f <_ℝ g ∧ g <_ℝ h → f <_ℝ h -/
 def lt_trans_R :
-    Derivable F EqX al Premises (Γ := Γ)
+    Derivable F al Premises (Γ := Γ)
       (Formula.all rTy (Formula.all rTy (Formula.all rTy
         ((lt_R (.var (.vs (.vs .vz))) (.var (.vs .vz))
           ∧ᶠ lt_R (.var (.vs .vz)) (.var .vz))
@@ -896,7 +861,7 @@ def lt_trans_R :
 
 /-- ⊢ ∀f,g,h : ℝ. f <_ℝ g → f +_ℝ h <_ℝ g +_ℝ h -/
 def lt_add_R :
-    Derivable F EqX al Premises (Γ := Γ)
+    Derivable F al Premises (Γ := Γ)
       (Formula.all rTy (Formula.all rTy (Formula.all rTy
         (lt_R (.var (.vs (.vs .vz))) (.var (.vs .vz))
           →ᶠ lt_R
@@ -906,7 +871,7 @@ def lt_add_R :
 
 /-- ⊢ ∀f,g : ℝ. 0 <_ℝ f ∧ 0 <_ℝ g → 0 <_ℝ f ·_ℝ g -/
 def lt_mul_pos_R :
-    Derivable F EqX al Premises (Γ := Γ)
+    Derivable F al Premises (Γ := Γ)
       (Formula.all rTy (Formula.all rTy
         ((lt_R Term.zero_R (.var (.vs .vz))
           ∧ᶠ lt_R Term.zero_R (.var .vz))
@@ -916,18 +881,18 @@ def lt_mul_pos_R :
 
 /-- ⊢ 0_ℝ <_ℝ 1_ℝ -/
 def zero_lt_one_R :
-    Derivable F EqX al Premises (Γ := Γ)
+    Derivable F al Premises (Γ := Γ)
       (lt_R Term.zero_R Term.one_R) :=
   -- `2^{-0} = 1_ℚ`, and both sides are constant, so the witness is `n = 0`:
   -- `1̂(1) −ℚ 0̂(1) = 1_ℚ −ℚ 0_ℚ = 1_ℚ ≥ℚ 2^{-0}`.
-  let pow0 : Derivable F EqX al Premises (Γ := Γ)
+  let pow0 : Derivable F al Premises (Γ := Γ)
       (Formula.eq0 (.app Term.pow2neg_Q Term.zero) Term.one_Q) := by
     pmode
     prw (pow2neg_Q_unfold Term.zero)
     prw exp2_zero
-    prw (pd_succ adm Term.zero)
+    prw (pd_succ Term.zero)
     prefl
-  let body : Derivable F EqX al Premises (Γ := Γ)
+  let body : Derivable F al Premises (Γ := Γ)
       (Formula.eq0
         (Term.app2 Term.le_Q_dec (.app Term.pow2neg_Q Term.zero)
           (Term.app2 Term.sub_Q
@@ -935,11 +900,11 @@ def zero_lt_one_R :
             (Term.app2 Term.cauchyfy Term.zero_R (.app .succ Term.zero))))
         Term.zero) := by
     pmode
-    prw (cauchyfy_one_R adm (.app .succ Term.zero))
-    prw (cauchyfy_zero_R adm (.app .succ Term.zero))
-    prw (sub_Q_one_zero adm)
+    prw (cauchyfy_one_R (.app .succ Term.zero))
+    prw (cauchyfy_zero_R (.app .succ Term.zero))
+    prw (sub_Q_one_zero)
     prw pow0
-    pthm (le_Q_refl adm Term.one_Q)
+    pthm (le_Q_refl Term.one_Q)
   have nf : (Formula.eq0
       (Term.app2 Term.le_Q_dec (.app Term.pow2neg_Q (.var .vz))
         (Term.app2 Term.sub_Q
@@ -962,7 +927,7 @@ def zero_lt_one_R :
 
 /-- ⊢ ∀f : ℝ. ∃n⁰. f <_ℝ embed_nat(n) -/
 def archimedean_R :
-    Derivable F EqX al Premises (Γ := Γ)
+    Derivable F al Premises (Γ := Γ)
       (Formula.all rTy
         (Formula.ex Ty.nat
           (lt_R (Term.var (.vs .vz))
@@ -1012,7 +977,7 @@ abbrev cDiff (f h : Term F Γ (realTy ι)) (n : Term F Γ Ty.nat) : Term F Γ Ty
 Both `cauchyfy` steps are *strict*, and their sum is exactly `2^{-q}`; carrying that
 strictness is the whole reason `eq_R_trans` closes at all. -/
 def cauchy_pair_step (f h : Term F Γ (realTy ι)) (q : Term F Γ Ty.nat) :
-    Derivable F EqX al Premises
+    Derivable F al Premises
       (lt_Q (cDiff f h q)
         (Term.app2 Term.add_Q (.app Term.pow2neg_Q q) (cDiff f h (.app .succ q)))) :=
   let a  : Term F Γ Ty.nat := cV f q
@@ -1025,47 +990,47 @@ def cauchy_pair_step (f h : Term F Γ (realTy ι)) (q : Term F Γ Ty.nat) :
   let e : Term F Γ Ty.nat := .app Term.pow2neg_Q (.app .succ q)
   by
   pmode
-  pfrom hX := cauchyState_cauchy adm f q
-  pfrom hZ0 := cauchyState_cauchy adm h q
-  papplym (lt_Q_congr adm (.app Term.abs_Q (Term.app2 Term.sub_Q b b')) e Z e
-      (abs_diff_Q_comm adm b b') (eq_Q_refl_inst adm e)) in hZ0 with hZ
+  pfrom hX := cauchyState_cauchy f q
+  pfrom hZ0 := cauchyState_cauchy h q
+  papplym (lt_Q_congr (.app Term.abs_Q (Term.app2 Term.sub_Q b b')) e Z e
+      (abs_diff_Q_comm b b') (eq_Q_refl_inst e)) in hZ0 with hZ
   phave hXZ : lt_Q (Term.app2 Term.add_Q X Z) (.app Term.pow2neg_Q q)
-  · papplym (lt_Q_congr adm (Term.app2 Term.add_Q X Z) (Term.app2 Term.add_Q e e)
+  · papplym (lt_Q_congr (Term.app2 Term.add_Q X Z) (Term.app2 Term.add_Q e e)
       (Term.app2 Term.add_Q X Z) (.app Term.pow2neg_Q q)
-      (eq_Q_refl_inst adm (Term.app2 Term.add_Q X Z)) (pow2neg_Q_halve adm q))
-    papplym (lt_Q_add_both adm X Z e e)
+      (eq_Q_refl_inst (Term.app2 Term.add_Q X Z)) (pow2neg_Q_halve q))
+    papplym (lt_Q_add_both X Z e e)
     psplit
     · pexact hX
     · pexact hZ
   phave htri : le_Q (cDiff f h q) (Term.app2 Term.add_Q (Term.app2 Term.add_Q X Z) Y)
-  · papplym (le_Q_trans adm (cDiff f h q)
+  · papplym (le_Q_trans (cDiff f h q)
       (Term.app2 Term.add_Q X (Term.app2 Term.add_Q Y Z))
       (Term.app2 Term.add_Q (Term.app2 Term.add_Q X Z) Y))
     psplit
-    · papplym (le_Q_trans adm (cDiff f h q)
+    · papplym (le_Q_trans (cDiff f h q)
         (Term.app2 Term.add_Q X (.app Term.abs_Q (Term.app2 Term.sub_Q a' b)))
         (Term.app2 Term.add_Q X (Term.app2 Term.add_Q Y Z)))
       psplit
-      · pthm (abs_Q_sub_triangle adm a a' b)
-      · papplym (le_Q_add_both adm X (.app Term.abs_Q (Term.app2 Term.sub_Q a' b))
+      · pthm (abs_Q_sub_triangle a a' b)
+      · papplym (le_Q_add_both X (.app Term.abs_Q (Term.app2 Term.sub_Q a' b))
           X (Term.app2 Term.add_Q Y Z))
         psplit
-        · pthm (le_Q_refl adm X)
-        · pthm (abs_Q_sub_triangle adm a' b' b)
-    · papplym (le_Q_congr adm (Term.app2 Term.add_Q X (Term.app2 Term.add_Q Y Z))
+        · pthm (le_Q_refl X)
+        · pthm (abs_Q_sub_triangle a' b' b)
+    · papplym (le_Q_congr (Term.app2 Term.add_Q X (Term.app2 Term.add_Q Y Z))
         (Term.app2 Term.add_Q X (Term.app2 Term.add_Q Y Z))
         (Term.app2 Term.add_Q X (Term.app2 Term.add_Q Y Z))
         (Term.app2 Term.add_Q (Term.app2 Term.add_Q X Z) Y)
-        (eq_Q_refl_inst adm (Term.app2 Term.add_Q X (Term.app2 Term.add_Q Y Z)))
-        (eqQtrans adm (addQr adm X (add_Q_comm_inst adm Y Z))
-          (eqQsym adm (add_Q_assoc_inst adm X Z Y))))
-      pthm (le_Q_refl adm (Term.app2 Term.add_Q X (Term.app2 Term.add_Q Y Z)))
-  papplym (le_lt_Q_trans adm (cDiff f h q)
+        (eq_Q_refl_inst (Term.app2 Term.add_Q X (Term.app2 Term.add_Q Y Z)))
+        (eqQtrans (addQr X (add_Q_comm_inst Y Z))
+          (eqQsym (add_Q_assoc_inst X Z Y))))
+      pthm (le_Q_refl (Term.app2 Term.add_Q X (Term.app2 Term.add_Q Y Z)))
+  papplym (le_lt_Q_trans (cDiff f h q)
     (Term.app2 Term.add_Q (Term.app2 Term.add_Q X Z) Y)
     (Term.app2 Term.add_Q (.app Term.pow2neg_Q q) Y))
   psplit
   · pexact htri
-  · papplym (lt_Q_add_inst adm (Term.app2 Term.add_Q X Z) (.app Term.pow2neg_Q q) Y)
+  · papplym (lt_Q_add_inst (Term.app2 Term.add_Q X Z) (.app Term.pow2neg_Q q) Y)
     pexact hXZ
 
 /-- `q_ord_norm`, with the `cauchyfy` state and the two display abbreviations folded in. -/
@@ -1095,7 +1060,7 @@ def eqR_hyp (f h : Term F Γ (realTy ι)) : Formula F Γ :=
 Each round spends one `cauchyfy` step on each side — together exactly
 `2^{-(p+1)} +ℚ 2^{-(p+1)} =ℚ 2^{-p}` — and pushes the residual one index further out. -/
 def eqR_tail (f h : Term F Γ (realTy ι)) :
-    Derivable F EqX al Premises
+    Derivable F al Premises
       (eqR_hyp f h →ᶠ
        Formula.all Ty.nat (Formula.all Ty.nat
         (lt_Q (cDiff f.weaken.weaken h.weaken.weaken (.app .succ (.var .vz)))
@@ -1110,7 +1075,7 @@ def eqR_tail (f h : Term F Γ (realTy ι)) :
     pforall
     pspecialize hh with h1
     canorm
-    prw (add_zero_r adm (.var .vz))
+    prw (add_zero_r (.var .vz))
     pexact h1
   · pforall
     pintro ih
@@ -1118,9 +1083,9 @@ def eqR_tail (f h : Term F Γ (realTy ι)) :
     pforall
     pinst ih (.app .succ (.var .vz)) with ihp
     canorm
-    prw (add_succ_l adm (.var .vz) (.var (.vs .vz))) in ihp with ihp2
-    prw (add_succ adm (.var .vz) (.var (.vs .vz)))
-    papplym (lt_Q_congr adm
+    prw (add_succ_l (.var .vz) (.var (.vs .vz))) in ihp with ihp2
+    prw (add_succ (.var .vz) (.var (.vs .vz)))
+    papplym (lt_Q_congr
       (cDiff f.weaken.weaken h.weaken.weaken (.app .succ (.var .vz)))
       (Term.app2 Term.add_Q (.app Term.pow2neg_Q (.app .succ (.var .vz)))
         (Term.app2 Term.add_Q (.app Term.pow2neg_Q (.app .succ (.var .vz)))
@@ -1130,17 +1095,17 @@ def eqR_tail (f h : Term F Γ (realTy ι)) :
       (Term.app2 Term.add_Q (.app Term.pow2neg_Q (.var .vz))
         (.app Term.pow2neg_Q
           (.app .succ (Term.app2 Term.add (.var .vz) (.var (.vs .vz))))))
-      (eq_Q_refl_inst adm _)
-      (eqQtrans adm
-        (eqQsym adm (add_Q_assoc_inst adm
+      (eq_Q_refl_inst _)
+      (eqQtrans
+        (eqQsym (add_Q_assoc_inst
           (.app Term.pow2neg_Q (.app .succ (.var .vz)))
           (.app Term.pow2neg_Q (.app .succ (.var .vz)))
           (.app Term.pow2neg_Q
             (.app .succ (Term.app2 Term.add (.var .vz) (.var (.vs .vz)))))))
-        (addQl adm (pow2neg_Q_halve adm (.var .vz))
+        (addQl (pow2neg_Q_halve (.var .vz))
           (.app Term.pow2neg_Q
             (.app .succ (Term.app2 Term.add (.var .vz) (.var (.vs .vz))))))))
-    papplym (lt_Q_trans_inst adm
+    papplym (lt_Q_trans_inst
       (cDiff f.weaken.weaken h.weaken.weaken (.app .succ (.var .vz)))
       (Term.app2 Term.add_Q (.app Term.pow2neg_Q (.app .succ (.var .vz)))
         (cDiff f.weaken.weaken h.weaken.weaken (.app .succ (.app .succ (.var .vz)))))
@@ -1149,9 +1114,9 @@ def eqR_tail (f h : Term F Γ (realTy ι)) :
           (.app Term.pow2neg_Q
             (.app .succ (Term.app2 Term.add (.var .vz) (.var (.vs .vz))))))))
     psplit
-    · pthm (cauchy_pair_step adm f.weaken.weaken h.weaken.weaken
+    · pthm (cauchy_pair_step f.weaken.weaken h.weaken.weaken
         (.app .succ (.var .vz)))
-    · papplym (lt_Q_add_l adm (.app Term.pow2neg_Q (.app .succ (.var .vz)))
+    · papplym (lt_Q_add_l (.app Term.pow2neg_Q (.app .succ (.var .vz)))
         (cDiff f.weaken.weaken h.weaken.weaken (.app .succ (.app .succ (.var .vz))))
         (Term.app2 Term.add_Q (.app Term.pow2neg_Q (.app .succ (.var .vz)))
           (.app Term.pow2neg_Q
@@ -1164,24 +1129,24 @@ strict `<ℚ 2^{-p} +ℚ 2^{-(p+k)}` collapses to a non-strict `≤ℚ 2^{-p}`.
 `pow2neg_rat_den_le` supplies the index: if the excess `r := X_{p+1} −ℚ 2^{-p}` were positive,
 `2^{-(p + den r)} ≤ℚ 2^{-den r} ≤ℚ r` and the estimate at `k := den r` gives `X <ℚ X`. -/
 def eqR_le (f h : Term F Γ (realTy ι)) :
-    Derivable F EqX al Premises
+    Derivable F al Premises
       (eqR_hyp f h →ᶠ
        Formula.all Ty.nat
         (le_Q (cDiff f.weaken h.weaken (.app .succ (.var .vz)))
               (.app Term.pow2neg_Q (.var .vz)))) := by
   pmode
   pintro hh
-  papplym (eqR_tail adm f h) in hh with hT
+  papplym (eqR_tail f h) in hh with hT
   pforall
-  pfrom hdic := le_Q_or_lt_Q adm
+  pfrom hdic := le_Q_or_lt_Q
     (cDiff f.weaken h.weaken (.app .succ (.var .vz)))
     (.app Term.pow2neg_Q (.var .vz))
   pcases hdic with hle | hgt
   · pexact hle
   · pexfalso
-    papplym (lt_Q_to_zero_sub adm (.app Term.pow2neg_Q (.var .vz))
+    papplym (lt_Q_to_zero_sub (.app Term.pow2neg_Q (.var .vz))
       (cDiff f.weaken h.weaken (.app .succ (.var .vz)))) in hgt with hpos
-    papplym (pow2neg_rat_den_le adm (Term.app2 Term.sub_Q
+    papplym (pow2neg_rat_den_le (Term.app2 Term.sub_Q
       (cDiff f.weaken h.weaken (.app .succ (.var .vz)))
       (.app Term.pow2neg_Q (.var .vz)))) in hpos with hd
     pinst hT (.app Term.rat_den (Term.app2 Term.sub_Q
@@ -1200,7 +1165,7 @@ def eqR_le (f h : Term F Γ (realTy ι)) :
           (Term.app2 Term.sub_Q
             (cDiff f.weaken h.weaken (.app .succ (.var .vz)))
             (.app Term.pow2neg_Q (.var .vz))))
-    · papplym (le_Q_add_l adm (.app Term.pow2neg_Q (.var .vz))
+    · papplym (le_Q_add_l (.app Term.pow2neg_Q (.var .vz))
         (.app Term.pow2neg_Q (Term.app2 Term.add (.var .vz)
           (.app Term.rat_den (Term.app2 Term.sub_Q
             (cDiff f.weaken h.weaken (.app .succ (.var .vz)))
@@ -1208,7 +1173,7 @@ def eqR_le (f h : Term F Γ (realTy ι)) :
         (Term.app2 Term.sub_Q
           (cDiff f.weaken h.weaken (.app .succ (.var .vz)))
           (.app Term.pow2neg_Q (.var .vz))))
-      papplym (le_Q_trans adm
+      papplym (le_Q_trans
         (.app Term.pow2neg_Q (Term.app2 Term.add (.var .vz)
           (.app Term.rat_den (Term.app2 Term.sub_Q
             (cDiff f.weaken h.weaken (.app .succ (.var .vz)))
@@ -1220,14 +1185,14 @@ def eqR_le (f h : Term F Γ (realTy ι)) :
           (cDiff f.weaken h.weaken (.app .succ (.var .vz)))
           (.app Term.pow2neg_Q (.var .vz))))
       psplit
-      · pthm (pow2neg_Q_le_add_r adm (.var .vz)
+      · pthm (pow2neg_Q_le_add_r (.var .vz)
           (.app Term.rat_den (Term.app2 Term.sub_Q
             (cDiff f.weaken h.weaken (.app .succ (.var .vz)))
             (.app Term.pow2neg_Q (.var .vz)))))
       · pexact hd
     phave hXX : lt_Q (cDiff f.weaken h.weaken (.app .succ (.var .vz)))
                      (cDiff f.weaken h.weaken (.app .succ (.var .vz)))
-    · papplym (lt_Q_congr adm
+    · papplym (lt_Q_congr
         (cDiff f.weaken h.weaken (.app .succ (.var .vz)))
         (Term.app2 Term.add_Q (.app Term.pow2neg_Q (.var .vz))
           (Term.app2 Term.sub_Q
@@ -1235,11 +1200,11 @@ def eqR_le (f h : Term F Γ (realTy ι)) :
             (.app Term.pow2neg_Q (.var .vz))))
         (cDiff f.weaken h.weaken (.app .succ (.var .vz)))
         (cDiff f.weaken h.weaken (.app .succ (.var .vz)))
-        (eq_Q_refl_inst adm _)
-        (add_Q_sub_cancel adm
+        (eq_Q_refl_inst _)
+        (add_Q_sub_cancel
           (cDiff f.weaken h.weaken (.app .succ (.var .vz)))
           (.app Term.pow2neg_Q (.var .vz))))
-      papplym (lt_le_Q_trans adm
+      papplym (lt_le_Q_trans
         (cDiff f.weaken h.weaken (.app .succ (.var .vz)))
         (Term.app2 Term.add_Q (.app Term.pow2neg_Q (.var .vz))
           (.app Term.pow2neg_Q (Term.app2 Term.add (.var .vz)
@@ -1253,7 +1218,7 @@ def eqR_le (f h : Term F Γ (realTy ι)) :
       psplit
       · pexact hT2
       · pexact hchain
-    papplym (lt_Q_irrefl_inst adm
+    papplym (lt_Q_irrefl_inst
       (cDiff f.weaken h.weaken (.app .succ (.var .vz))))
     pexact hXX
 
@@ -1261,34 +1226,34 @@ def eqR_le (f h : Term F Γ (realTy ι)) :
 is strict and costs `2^{-(n+1)}`, the squeeze at `n+1` costs `2^{-(n+1)}`, and they sum to
 exactly `2^{-n}`. This is where the tightness of `eq_R` is finally paid for. -/
 def eqR_strict (f h : Term F Γ (realTy ι)) :
-    Derivable F EqX al Premises
+    Derivable F al Premises
       (eqR_hyp f h →ᶠ
        Formula.all Ty.nat
         (lt_Q (cDiff f.weaken h.weaken (.app .succ (.var .vz)))
               (.app Term.pow2neg_Q (.var .vz)))) := by
   pmode
   pintro hh
-  papplym (eqR_le adm f h) in hh with hle
+  papplym (eqR_le f h) in hh with hle
   pforall
   pinst hle (.app .succ (.var .vz)) with hle1
   canorm
-  papplym (lt_Q_congr adm
+  papplym (lt_Q_congr
     (cDiff f.weaken h.weaken (.app .succ (.var .vz)))
     (Term.app2 Term.add_Q (.app Term.pow2neg_Q (.app .succ (.var .vz)))
       (.app Term.pow2neg_Q (.app .succ (.var .vz))))
     (cDiff f.weaken h.weaken (.app .succ (.var .vz)))
     (.app Term.pow2neg_Q (.var .vz))
-    (eq_Q_refl_inst adm _)
-    (pow2neg_Q_halve adm (.var .vz)))
-  papplym (lt_le_Q_trans adm
+    (eq_Q_refl_inst _)
+    (pow2neg_Q_halve (.var .vz)))
+  papplym (lt_le_Q_trans
     (cDiff f.weaken h.weaken (.app .succ (.var .vz)))
     (Term.app2 Term.add_Q (.app Term.pow2neg_Q (.app .succ (.var .vz)))
       (cDiff f.weaken h.weaken (.app .succ (.app .succ (.var .vz)))))
     (Term.app2 Term.add_Q (.app Term.pow2neg_Q (.app .succ (.var .vz)))
       (.app Term.pow2neg_Q (.app .succ (.var .vz)))))
   psplit
-  · pthm (cauchy_pair_step adm f.weaken h.weaken (.app .succ (.var .vz)))
-  · papplym (le_Q_add_l adm (.app Term.pow2neg_Q (.app .succ (.var .vz)))
+  · pthm (cauchy_pair_step f.weaken h.weaken (.app .succ (.var .vz)))
+  · papplym (le_Q_add_l (.app Term.pow2neg_Q (.app .succ (.var .vz)))
       (cDiff f.weaken h.weaken (.app .succ (.app .succ (.var .vz))))
       (.app Term.pow2neg_Q (.app .succ (.var .vz))))
     pexact hle1
@@ -1296,7 +1261,7 @@ def eqR_strict (f h : Term F Γ (realTy ι)) :
 /-- The base of the induction, from the two `=_ℝ` hypotheses: one triangle inequality at
 each index. -/
 def eqR_hyp_of (f g h : Term F Γ (realTy ι)) :
-    Derivable F EqX al Premises
+    Derivable F al Premises
       (eq_R f g ∧ᶠ eq_R g h →ᶠ eqR_hyp f h) := by
   pmode
   pintro hyp
@@ -1305,11 +1270,11 @@ def eqR_hyp_of (f g h : Term F Γ (realTy ι)) :
   pspecialize hfg with h1
   pspecialize hgh with h2
   canorm
-  prw (cauchyfy_unfold adm f.weaken (.app .succ (.var .vz))) in h1 with h1a
-  prw (cauchyfy_unfold adm g.weaken (.app .succ (.var .vz))) in h1a with h1b
-  prw (cauchyfy_unfold adm g.weaken (.app .succ (.var .vz))) in h2 with h2a
-  prw (cauchyfy_unfold adm h.weaken (.app .succ (.var .vz))) in h2a with h2b
-  papplym (le_lt_Q_trans adm
+  prw (cauchyfy_unfold f.weaken (.app .succ (.var .vz))) in h1 with h1a
+  prw (cauchyfy_unfold g.weaken (.app .succ (.var .vz))) in h1a with h1b
+  prw (cauchyfy_unfold g.weaken (.app .succ (.var .vz))) in h2 with h2a
+  prw (cauchyfy_unfold h.weaken (.app .succ (.var .vz))) in h2a with h2b
+  papplym (le_lt_Q_trans
     (cDiff f.weaken h.weaken (.app .succ (.var .vz)))
     (Term.app2 Term.add_Q
       (cDiff f.weaken g.weaken (.app .succ (.var .vz)))
@@ -1317,9 +1282,9 @@ def eqR_hyp_of (f g h : Term F Γ (realTy ι)) :
     (Term.app2 Term.add_Q (.app Term.pow2neg_Q (.var .vz))
       (.app Term.pow2neg_Q (.var .vz))))
   psplit
-  · pthm (abs_Q_sub_triangle adm (cV f.weaken (.app .succ (.var .vz)))
+  · pthm (abs_Q_sub_triangle (cV f.weaken (.app .succ (.var .vz)))
       (cV g.weaken (.app .succ (.var .vz))) (cV h.weaken (.app .succ (.var .vz))))
-  · papplym (lt_Q_add_both adm
+  · papplym (lt_Q_add_both
       (cDiff f.weaken g.weaken (.app .succ (.var .vz)))
       (cDiff g.weaken h.weaken (.app .succ (.var .vz)))
       (.app Term.pow2neg_Q (.var .vz)) (.app Term.pow2neg_Q (.var .vz)))
@@ -1329,16 +1294,16 @@ def eqR_hyp_of (f g h : Term F Γ (realTy ι)) :
 
 /-- Transitivity of `=_ℝ` at explicit reals. -/
 def eq_R_trans_core (f g h : Term F Γ (realTy ι)) :
-    Derivable F EqX al Premises (eq_R f g ∧ᶠ eq_R g h →ᶠ eq_R f h) := by
+    Derivable F al Premises (eq_R f g ∧ᶠ eq_R g h →ᶠ eq_R f h) := by
   pmode
   pintro hyp
-  papplym (eqR_hyp_of adm f g h) in hyp with hH0
-  papplym (eqR_strict adm f h) in hH0 with hst
+  papplym (eqR_hyp_of f g h) in hyp with hH0
+  papplym (eqR_strict f h) in hH0 with hst
   pforall
   pspecialize hst with hs1
   canorm
-  prw (cauchyfy_unfold adm f.weaken (.app .succ (.var .vz)))
-  prw (cauchyfy_unfold adm h.weaken (.app .succ (.var .vz)))
+  prw (cauchyfy_unfold f.weaken (.app .succ (.var .vz)))
+  prw (cauchyfy_unfold h.weaken (.app .succ (.var .vz)))
   pexact hs1
 
 /-- `f =_ℝ 0 ∧ g =_ℝ 0 → f +_ℝ g =_ℝ 0`, at explicit reals.
@@ -1347,13 +1312,13 @@ def eq_R_trans_core (f g h : Term F Γ (realTy ι)) :
 hypotheses are read one index in — where each is bounded by `2^{-(n+1)}`, and the two sum to
 exactly `2^{-n}`. No telescoping is needed: unlike `eq_R_trans` this one is not tight. -/
 private def add_eq_zero_R_gen (f g u : Term F Γ (realTy ι))
-    (hu : Derivable F EqX al Premises (Γ := Ty.nat :: Γ)
+    (hu : Derivable F al Premises (Γ := Ty.nat :: Γ)
       (Formula.eq0
         (Term.app2 Term.cauchyfy u.weaken (.app .succ (.var .vz)))
         (Term.app2 Term.add_Q
           (Term.app2 Term.cauchyfy f.weaken (.app .succ (.app .succ (.var .vz))))
           (Term.app2 Term.cauchyfy g.weaken (.app .succ (.app .succ (.var .vz))))))) :
-    Derivable F EqX al Premises
+    Derivable F al Premises
       (eq_R f Term.zero_R ∧ᶠ eq_R g Term.zero_R →ᶠ eq_R u Term.zero_R) := by
   pmode
   pintro hyp
@@ -1362,11 +1327,11 @@ private def add_eq_zero_R_gen (f g u : Term F Γ (realTy ι))
   pinst hf (.app .succ (.var .vz)) with hf1
   pinst hg (.app .succ (.var .vz)) with hg1
   canorm
-  prw (cauchyfy_zero_R adm (.app .succ (.app .succ (.var .vz)))) in hf1 with hf2
-  prw (cauchyfy_zero_R adm (.app .succ (.app .succ (.var .vz)))) in hg1 with hg2
-  prw (cauchyfy_zero_R adm (.app .succ (.var .vz)))
+  prw (cauchyfy_zero_R (.app .succ (.app .succ (.var .vz)))) in hf1 with hf2
+  prw (cauchyfy_zero_R (.app .succ (.app .succ (.var .vz)))) in hg1 with hg2
+  prw (cauchyfy_zero_R (.app .succ (.var .vz)))
   prw hu
-  papplym (le_lt_Q_trans adm
+  papplym (le_lt_Q_trans
     (.app Term.abs_Q (Term.app2 Term.sub_Q
       (Term.app2 Term.add_Q
         (Term.app2 Term.cauchyfy f.weaken (.app .succ (.app .succ (.var .vz))))
@@ -1381,7 +1346,7 @@ private def add_eq_zero_R_gen (f g u : Term F Γ (realTy ι))
         Term.zero_Q)))
     (.app Term.pow2neg_Q (.var .vz)))
   psplit
-  · papplym (le_Q_congr adm
+  · papplym (le_Q_congr
       (.app Term.abs_Q (Term.app2 Term.sub_Q
         (Term.app2 Term.add_Q
           (Term.app2 Term.cauchyfy f.weaken (.app .succ (.app .succ (.var .vz))))
@@ -1406,16 +1371,16 @@ private def add_eq_zero_R_gen (f g u : Term F Γ (realTy ι))
         (.app Term.abs_Q (Term.app2 Term.sub_Q
           (Term.app2 Term.cauchyfy g.weaken (.app .succ (.app .succ (.var .vz))))
           Term.zero_Q)))
-      (abs_Q_congr adm (sub_Q_congr adm
-        (eq_Q_refl_inst adm (Term.app2 Term.add_Q
+      (abs_Q_congr (sub_Q_congr
+        (eq_Q_refl_inst (Term.app2 Term.add_Q
           (Term.app2 Term.cauchyfy f.weaken (.app .succ (.app .succ (.var .vz))))
           (Term.app2 Term.cauchyfy g.weaken (.app .succ (.app .succ (.var .vz))))))
-        (add_Q_zero_inst adm Term.zero_Q)))
-      (eq_Q_refl_inst adm _))
-    pthm (abs_Q_sub_add_split adm Term.zero_Q Term.zero_Q
+        (add_Q_zero_inst Term.zero_Q)))
+      (eq_Q_refl_inst _))
+    pthm (abs_Q_sub_add_split Term.zero_Q Term.zero_Q
       (Term.app2 Term.cauchyfy f.weaken (.app .succ (.app .succ (.var .vz))))
       (Term.app2 Term.cauchyfy g.weaken (.app .succ (.app .succ (.var .vz)))))
-  · papplym (lt_Q_congr adm
+  · papplym (lt_Q_congr
       (Term.app2 Term.add_Q
         (.app Term.abs_Q (Term.app2 Term.sub_Q
           (Term.app2 Term.cauchyfy f.weaken (.app .succ (.app .succ (.var .vz))))
@@ -1433,9 +1398,9 @@ private def add_eq_zero_R_gen (f g u : Term F Γ (realTy ι))
           (Term.app2 Term.cauchyfy g.weaken (.app .succ (.app .succ (.var .vz))))
           Term.zero_Q)))
       (.app Term.pow2neg_Q (.var .vz))
-      (eq_Q_refl_inst adm _)
-      (pow2neg_Q_halve adm (.var .vz)))
-    papplym (lt_Q_add_both adm
+      (eq_Q_refl_inst _)
+      (pow2neg_Q_halve (.var .vz)))
+    papplym (lt_Q_add_both
       (.app Term.abs_Q (Term.app2 Term.sub_Q
         (Term.app2 Term.cauchyfy f.weaken (.app .succ (.app .succ (.var .vz))))
         Term.zero_Q))
@@ -1455,12 +1420,12 @@ goal: `prw` would have to push a substitution through `Term.add_R`, which is the
 delta-expansion blow-up CLAUDE.md's build-cost section warns about (measured here: a
 heartbeat timeout). As a Lean-level parameter it costs nothing. -/
 def add_eq_zero_R_core (f g : Term F Γ (realTy ι)) :
-    Derivable F EqX al Premises
+    Derivable F al Premises
       (eq_R f Term.zero_R ∧ᶠ eq_R g Term.zero_R →ᶠ
        eq_R (Term.app2 Term.add_R f g) Term.zero_R) :=
-  add_eq_zero_R_gen adm f g (Term.app2 Term.add_R f g)
+  add_eq_zero_R_gen f g (Term.app2 Term.add_R f g)
     ((add_R_app_weaken f g).symm ▸
-      cauchyfy_add_R adm f.weaken g.weaken (.app .succ (.var .vz)))
+      cauchyfy_add_R f.weaken g.weaken (.app .succ (.var .vz)))
 
 -- ── =_ℝ is an equivalence relation ─────────────────────────────────────────
 
@@ -1469,19 +1434,19 @@ def add_eq_zero_R_core (f g : Term F Γ (realTy ι)) :
 `eq_R` is not an equation, so this is not `refl`: it says `|f̂(n+1) −ℚ f̂(n+1)|ℚ <ℚ 2^{-n}`,
 which is `0 <ℚ 2^{-n}` transported along `abs_Q_sub_self`. -/
 def eq_R_refl :
-    Derivable F EqX al Premises (Γ := Γ)
+    Derivable F al Premises (Γ := Γ)
       (Formula.all rTy (eq_R (.var .vz) (.var .vz))) :=
   let A : Term F (Ty.nat :: rTy :: Γ) Ty.nat :=
     Term.app (Term.app Term.cauchyfy (Term.weaken (.var .vz))) (.app .succ (.var .vz))
   let e : Term F (Ty.nat :: rTy :: Γ) Ty.nat := .app Term.pow2neg_Q (.var .vz)
   univ_gen (univ_gen
-    (Derivable.mp (zero_lt_pow2neg_Q adm (.var .vz))
-      (lt_Q_congr adm Term.zero_Q e (.app Term.abs_Q (Term.app2 Term.sub_Q A A)) e
-        (eqQsym adm (abs_Q_sub_self adm A)) (eq_Q_refl_inst adm e))))
+    (Derivable.mp (zero_lt_pow2neg_Q (.var .vz))
+      (lt_Q_congr Term.zero_Q e (.app Term.abs_Q (Term.app2 Term.sub_Q A A)) e
+        (eqQsym (abs_Q_sub_self A)) (eq_Q_refl_inst e))))
 
 /-- ⊢ ∀f,g : ℝ. f =_ℝ g → g =_ℝ f -/
 def eq_R_sym :
-    Derivable F EqX al Premises (Γ := Γ)
+    Derivable F al Premises (Γ := Γ)
       (Formula.all rTy (Formula.all rTy
         (eq_R (.var (.vs .vz)) (.var .vz) →ᶠ
          eq_R (.var .vz) (.var (.vs .vz))))) :=
@@ -1491,9 +1456,9 @@ def eq_R_sym :
     Term.app (Term.app Term.cauchyfy (Term.weaken (.var .vz))) (.app .succ (.var .vz))
   let e : Term F (Ty.nat :: rTy :: rTy :: Γ) Ty.nat := .app Term.pow2neg_Q (.var .vz)
   univ_gen (univ_gen (forall_map
-    (lt_Q_congr adm (.app Term.abs_Q (Term.app2 Term.sub_Q A B)) e
+    (lt_Q_congr (.app Term.abs_Q (Term.app2 Term.sub_Q A B)) e
         (.app Term.abs_Q (Term.app2 Term.sub_Q B A)) e
-      (abs_diff_Q_comm adm A B) (eq_Q_refl_inst adm e))))
+      (abs_diff_Q_comm A B) (eq_Q_refl_inst e))))
 
 /-- Symmetry of `=_ℝ` at explicit reals — the `_core` companion of `eq_R_sym`, in the same
 style as `eq_R_trans_core` / `add_eq_zero_R_core`.
@@ -1503,38 +1468,38 @@ Instantiating the `∀`-quantified `eq_R_sym` at two terms means pushing two `su
 body with `f`/`g` in place of the two bound variables. Used by
 `MetricSpace.admissibleEqX.eqx_sym`. -/
 def eq_R_sym_core (f g : Term F Γ (realTy ι)) :
-    Derivable F EqX al Premises (eq_R f g →ᶠ eq_R g f) :=
+    Derivable F al Premises (eq_R f g →ᶠ eq_R g f) :=
   let A : Term F (Ty.nat :: Γ) Ty.nat :=
     Term.app (Term.app Term.cauchyfy f.weaken) (.app .succ (.var .vz))
   let B : Term F (Ty.nat :: Γ) Ty.nat :=
     Term.app (Term.app Term.cauchyfy g.weaken) (.app .succ (.var .vz))
   let e : Term F (Ty.nat :: Γ) Ty.nat := .app Term.pow2neg_Q (.var .vz)
   forall_map
-    (lt_Q_congr adm (.app Term.abs_Q (Term.app2 Term.sub_Q A B)) e
+    (lt_Q_congr (.app Term.abs_Q (Term.app2 Term.sub_Q A B)) e
         (.app Term.abs_Q (Term.app2 Term.sub_Q B A)) e
-      (abs_diff_Q_comm adm A B) (eq_Q_refl_inst adm e))
+      (abs_diff_Q_comm A B) (eq_Q_refl_inst e))
 
 /-- ⊢ ∀f,g,h : ℝ. f =_ℝ g ∧ g =_ℝ h → f =_ℝ h -/
 def eq_R_trans :
-    Derivable F EqX al Premises (Γ := Γ)
+    Derivable F al Premises (Γ := Γ)
       (Formula.all rTy (Formula.all rTy (Formula.all rTy
         (eq_R (.var (.vs (.vs .vz))) (.var (.vs .vz))
           ∧ᶠ eq_R (.var (.vs .vz)) (.var .vz)
           →ᶠ eq_R (.var (.vs (.vs .vz))) (.var .vz))))) :=
   univ_gen (univ_gen (univ_gen
-    (eq_R_trans_core adm (.var (.vs (.vs .vz))) (.var (.vs .vz)) (.var .vz))))
+    (eq_R_trans_core (.var (.vs (.vs .vz))) (.var (.vs .vz)) (.var .vz))))
 
 -- ── Properties needed for metric space transitivity ─────────────────────────
 
 /-- ⊢ ∀f,g : ℝ. f =_ℝ 0 ∧ g =_ℝ 0 → f +_ℝ g =_ℝ 0 -/
 def add_eq_zero_R :
-    Derivable F EqX al Premises (Γ := Γ)
+    Derivable F al Premises (Γ := Γ)
       (Formula.all rTy (Formula.all rTy
         (eq_R (.var (.vs .vz)) Term.zero_R
           ∧ᶠ eq_R (.var .vz) Term.zero_R
           →ᶠ eq_R (Term.app2 Term.add_R (.var (.vs .vz)) (.var .vz))
                    Term.zero_R))) :=
-  univ_gen (univ_gen (add_eq_zero_R_core adm (.var (.vs .vz)) (.var .vz)))
+  univ_gen (univ_gen (add_eq_zero_R_core (.var (.vs .vz)) (.var .vz)))
 
 /-- ⊢ ∀f,g : ℝ. f ≤_ℝ g ∧ g =_ℝ 0 → f =_ℝ 0
 
@@ -1564,7 +1529,7 @@ a proof step, and it is left to whoever owns that layer.
 Note also that unlike `eq_R_trans` and `add_eq_zero_R`, the corrected statement is not an
 estimate: `le_R` is a negated `∃`, so it is Markov-flavoured and needs a different toolkit. -/
 def le_zero_eq_zero_R :
-    Derivable F EqX al Premises (Γ := Γ)
+    Derivable F al Premises (Γ := Γ)
       (Formula.all rTy (Formula.all rTy
         (le_R (.var (.vs .vz)) (.var .vz)
           ∧ᶠ eq_R (.var .vz) Term.zero_R
@@ -1605,7 +1570,7 @@ def const_R {Γ : Ctx ι} (q : Term F Γ Ty.nat) : Term F Γ (realTy ι) :=
     `cauchyfy_const` at an arbitrary constant. Note that with `le_R` in place of `lt_R` the
     statement is Π₁⁰ and needs no witness at all. -/
 def approx_R :
-    Derivable F EqX al Premises (Γ := Γ)
+    Derivable F al Premises (Γ := Γ)
       (Formula.all rTy (Formula.all Ty.nat
         (lt_R
           (Term.app Term.abs_R
@@ -1623,7 +1588,7 @@ def approx_R :
     The book notes the witness is definable outright — `f k := Φ(k+3)(k+3)` — so the
     `∃` should not need to be found by search. -/
 def cauchy_complete_R :
-    Derivable F EqX al Premises (Γ := Γ)
+    Derivable F al Premises (Γ := Γ)
       (Formula.all (Ty.nat →ₜ rTy)
         (Formula.all Ty.nat (Formula.all Ty.nat (Formula.all Ty.nat
             (Formula.eq0 (Term.app2 Term.monus (.var (.vs (.vs .vz))) (.var (.vs .vz)))
@@ -1653,7 +1618,7 @@ def cauchy_complete_R :
     dominates the magnitude it encodes. It is Kohlenbach's lemma, not an invention of
     this development, and `mul_R` should not be "fixed" to avoid it. -/
 def abs_R_bound :
-    Derivable F EqX al Premises (Γ := Γ)
+    Derivable F al Premises (Γ := Γ)
       (Formula.all rTy
         (le_R (Term.app Term.abs_R (.var .vz))
               (Term.app Term.embed_nat_R

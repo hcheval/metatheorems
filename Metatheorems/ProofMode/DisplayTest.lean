@@ -19,7 +19,6 @@ packaging kit applies straight through it — the display layer costs the proof 
 -/
 
 variable {ι : Type} {F : ι → Ty ι}
-    {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
     {a : Allowed} {Premises : PremiseSet F} {Γ : Ctx ι} {A B : Formula F Γ}
 
 open Formula
@@ -29,7 +28,6 @@ open Formula
 /--
 trace: ι : Type
 F : ι → Ty ι
-EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ X[i] → Term F Γ X[i] → Formula F Γ
 a : Allowed
 Premises : PremiseSet F
 Γ : Ctx ι
@@ -41,7 +39,7 @@ A B : Formula F Γ
       A ∧ᶠ B
 -/
 #guard_msgs in
-example : SeqD ["h", "k"] F EqX a Premises [B, A] (A ∧ᶠ B) := by
+example : SeqD ["h", "k"] F a Premises [B, A] (A ∧ᶠ B) := by
   trace_state
   exact seq_andI (seq_id (.hs .hz)) (seq_id .hz)
 
@@ -49,7 +47,6 @@ example : SeqD ["h", "k"] F EqX a Premises [B, A] (A ∧ᶠ B) := by
 /--
 trace: ι : Type
 F : ι → Ty ι
-EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ X[i] → Term F Γ X[i] → Formula F Γ
 a : Allowed
 Premises : PremiseSet F
 Γ : Ctx ι
@@ -59,7 +56,7 @@ A B : Formula F Γ
       A →ᶠ A
 -/
 #guard_msgs in
-example : SeqD [] F EqX a Premises [] (A →ᶠ A) := by
+example : SeqD [] F a Premises [] (A →ᶠ A) := by
   trace_state
   exact I_comb
 
@@ -68,7 +65,6 @@ example : SeqD [] F EqX a Premises [] (A →ᶠ A) := by
 /--
 trace: ι : Type
 F : ι → Ty ι
-EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ X[i] → Term F Γ X[i] → Formula F Γ
 a : Allowed
 Premises : PremiseSet F
 Γ : Ctx ι
@@ -80,7 +76,7 @@ A B : Formula F Γ
       A ∧ᶠ B
 -/
 #guard_msgs in
-example : SeqD ["h"] F EqX a Premises [B, A] (A ∧ᶠ B) := by
+example : SeqD ["h"] F a Premises [B, A] (A ∧ᶠ B) := by
   trace_state
   exact seq_andI (seq_id (.hs .hz)) (seq_id .hz)
 

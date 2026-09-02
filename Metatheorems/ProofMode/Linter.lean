@@ -77,7 +77,6 @@ end Formula
 namespace ProofMode
 
 variable {ι : Type} {F : ι → Ty ι}
-    {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
     {a : Allowed} {Premises : PremiseSet F} {Γ : Ctx ι}
 
 open Formula
@@ -91,8 +90,8 @@ one place. The recursor check itself is a *tactic-level* lint on what the user t
 above), not a hypothesis of this lemma — it is a check on the input language, not a
 soundness side condition, and making it a hypothesis would wrongly reject `x + y`. -/
 def seq_bound {Δ : HCtx F Γ} {ρ : Ty ι} {A : Formula F (ρ :: Γ)} (t : Term F Γ ρ)
-    (h : Seq F EqX a Premises Δ (A.subst0 t)) :
-    Seq F EqX a Premises Δ (Formula.ex ρ A) :=
+    (h : Seq F a Premises Δ (A.subst0 t)) :
+    Seq F a Premises Δ (Formula.ex ρ A) :=
   seq_exI t h
 
 end ProofMode

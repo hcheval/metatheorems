@@ -12,7 +12,7 @@ import Metatheorems.ProofMode.Rewrite
 layer needs the other untested case: a pattern at `nat →ₜ nat`, because `eq_R f g` compares
 `cauchyfy f` with `cauchyfy g` and `cauchyfy` takes its argument as a *function*.
 
-`eqAtType EqX (nat →ₜ nat) f g` unfolds to `∀x. f x =₀ g x`, so pointwise equality of two
+`eqAtType (nat →ₜ nat) f g` unfolds to `∀x. f x =₀ g x`, so pointwise equality of two
 sequences is literally the arrow-type instance of QF-ER. This file checks that `prw` can
 actually consume such a rule.
 
@@ -28,15 +28,14 @@ namespace Probes
 open Formula ProofMode
 
 variable {ι : Type} {F : ι → Ty ι}
-  {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
   {al : Allowed} {Premises : PremiseSet F} {Γ : Ctx ι}
 
 /-- The shape the reals need: a pointwise rule pushed under a function-typed argument
 position. `k` stands for `cauchyfy`, `n` for the index. -/
 example (f g : Term F Γ (Ty.nat →ₜ Ty.nat))
     (k : Term F Γ ((Ty.nat →ₜ Ty.nat) →ₜ Ty.nat →ₜ Ty.nat)) (n : Term F Γ Ty.nat)
-    (h : Derivable F EqX al Premises (eqAtType EqX (Ty.nat →ₜ Ty.nat) f g)) :
-    Derivable F EqX al Premises
+    (h : Derivable F al Premises (eqAtType (Ty.nat →ₜ Ty.nat) f g)) :
+    Derivable F al Premises
       (Formula.eq0 (Term.app (Term.app k f) n) (Term.app (Term.app k g) n)) := by
   pmode
   prw h
@@ -46,20 +45,20 @@ example (f g : Term F Γ (Ty.nat →ₜ Ty.nat))
 derivation will have, since `eqAtType` is a `def` by recursion on the type. -/
 example (f g : Term F Γ (Ty.nat →ₜ Ty.nat))
     (k : Term F Γ ((Ty.nat →ₜ Ty.nat) →ₜ Ty.nat →ₜ Ty.nat)) (n : Term F Γ Ty.nat)
-    (h : Derivable F EqX al Premises
+    (h : Derivable F al Premises
       (Formula.all Ty.nat (Formula.eq0
         (Term.app f.weaken (.var .vz)) (Term.app g.weaken (.var .vz))))) :
-    Derivable F EqX al Premises
+    Derivable F al Premises
       (Formula.eq0 (Term.app (Term.app k f) n) (Term.app (Term.app k g) n)) := by
   pmode
-  prw (show Derivable F EqX al Premises (eqAtType EqX (Ty.nat →ₜ Ty.nat) f g) from h)
+  prw (show Derivable F al Premises (eqAtType (Ty.nat →ₜ Ty.nat) f g) from h)
   prefl
 
 /-- Two occurrences, one on each side of the goal, under arithmetic. -/
 example (f g h' : Term F Γ (Ty.nat →ₜ Ty.nat))
     (k : Term F Γ ((Ty.nat →ₜ Ty.nat) →ₜ Ty.nat →ₜ Ty.nat)) (n : Term F Γ Ty.nat)
-    (h : Derivable F EqX al Premises (eqAtType EqX (Ty.nat →ₜ Ty.nat) f g)) :
-    Derivable F EqX al Premises
+    (h : Derivable F al Premises (eqAtType (Ty.nat →ₜ Ty.nat) f g)) :
+    Derivable F al Premises
       (Formula.eq0
         (Term.app2 Term.add (Term.app (Term.app k f) n) (Term.app (Term.app k h') n))
         (Term.app2 Term.add (Term.app (Term.app k g) n) (Term.app (Term.app k h') n))) := by

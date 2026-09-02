@@ -250,7 +250,7 @@ def derivConcl? (ty : Expr) : MetaM (Option Expr) := do
   let ty ← instantiateMVars ty
   let ty ← whnfR ty
   match ty.getAppFnArgs with
-  | (``Derivable, args) => return if args.size == 7 then some args[6]! else none
+  | (``Derivable, args) => return if args.size == 6 then some args[5]! else none
   | _ => return none
 
 /-- Is this expression a proof of something derivable? -/
@@ -302,11 +302,11 @@ def conclusionOf (e : Expr) : MetaM Format := withObjNotation do
           | none => render Δ
     return hyps ++ " ⊢ " ++ (← render args[i + 1]!)
   match ty.getAppFnArgs with
-  -- `SeqD names F EqX a Premises {Γ} Δ B`, plus the implicit `ι`.
+  -- `SeqD names F a Premises {Γ} Δ B`, plus the implicit `ι`.
   | (``ProofMode.SeqD, args) =>
-    if args.size == 9 then sequent args 7 (decodeStrList? args[1]!) else render ty
-  -- `Seq F EqX a Premises {Γ} Δ B`, plus the implicit `ι`.
-  | (``ProofMode.Seq, args) => if args.size == 8 then sequent args 6 none else render ty
+    if args.size == 8 then sequent args 6 (decodeStrList? args[1]!) else render ty
+  -- `Seq F a Premises {Γ} Δ B`, plus the implicit `ι`.
+  | (``ProofMode.Seq, args) => if args.size == 7 then sequent args 5 none else render ty
   | _ =>
     match ← derivConcl? ty with
     | some c => render c

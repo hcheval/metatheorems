@@ -71,8 +71,7 @@ The full metatheorem composes `negTrans_sound` (external) with this. -/
 def general_metatheorem
     {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     (si : SpaceInterp X F)
-    {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
-    (eqxi : EqXInterp X F si EqX)
+    (eqxi : EqXInterp X F si)
     (mj : Majorizability si)
     {Premises : PremiseSet F}
     (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
@@ -81,7 +80,7 @@ def general_metatheorem
     {B₀ C₀ : Formula F [Ty.nat, ρ]}
     (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
     (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
-    (prf : @Derivable ι F EqX Allowed.extended Premises []
+    (prf : @Derivable ι F Allowed.extended Premises []
       (all ρ (imp (all .nat B₀) (ex .nat C₀)))) :
     { Φ : Ty.interpret X ρ.hat → Nat //
       ∀ (x : Ty.interpret X ρ) (x_star : Ty.interpret X ρ.hat),
@@ -89,7 +88,7 @@ def general_metatheorem
         (∀ u : Nat, u ≤ Φ x_star → Formula.interpret si B₀ (u, (x, ()))) →
         ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret si C₀ (v, (x, ())) } := by
   -- Step 1: Apply Dialectica directly (no NT)
-  let r := @dialectica_soundness_ctx' ι X F si EqX eqxi Premises premise_realizer _ _ prf
+  let r := @dialectica_soundness_ctx' ι X F si eqxi Premises premise_realizer _ _ prf
   -- r : ∀ env, dialecticaRealizerCtx si (all ρ (imp (all .nat B₀) (ex .nat C₀))) env
   -- Specialize to empty env
   let r₀ := r ()
@@ -226,7 +225,6 @@ theorem Formula.interpret_renameF_gen {ι : Type} {X : ι → Type} {F : ι → 
       for all v (→ contradiction). -/
 def prenexify
     {ι : Type} {F : ι → Ty ι}
-    {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
     {Premises : PremiseSet F}
     {Γ : Ctx ι} {ρ : Ty ι}
     {B₀ C₀ : Formula F (Ty.nat :: ρ :: Γ)}
@@ -234,17 +232,17 @@ def prenexify
     (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true) :
     let B₀' := B₀.weakenBy Ty.nat
     let C₀' := C₀.renameF (Term.Renaming.ext Term.Renaming.shift)
-    @Derivable ι F EqX Allowed.classical Premises (ρ :: Γ)
+    @Derivable ι F Allowed.classical Premises (ρ :: Γ)
       ((all Ty.nat B₀ →ᶠ ex Ty.nat C₀) →ᶠ
        ex Ty.nat (ex Ty.nat (B₀' →ᶠ C₀'))) :=
   let G := ex Ty.nat (ex Ty.nat (B₀.weakenBy Ty.nat →ᶠ
     C₀.renameF (Term.Renaming.ext Term.Renaming.shift)))
   let H := all Ty.nat B₀ →ᶠ ex Ty.nat C₀
-  let lem_G := @Derivable.lem _ F EqX Allowed.classical Premises _ G (by decide)
+  let lem_G := @Derivable.lem _ F Allowed.classical Premises _ G (by decide)
   -- ── Local helper: A → (∃σ A).weakenBy σ  (exist intro at var 0) ──
   let eav {σ : Ty ι} {Δ : Ctx ι} (A : Formula F (σ :: Δ)) :
-      Derivable F EqX Allowed.classical Premises (A →ᶠ (ex σ A).weakenBy σ) :=
-    Eq.mp (congrArg (Derivable F EqX Allowed.classical Premises ·)
+      Derivable F Allowed.classical Premises (A →ᶠ (ex σ A).weakenBy σ) :=
+    Eq.mp (congrArg (Derivable F Allowed.classical Premises ·)
       (congrArg (· →ᶠ (ex σ A).weakenBy σ) (substF_renameF_id
         (Renaming.ext Renaming.shift) (Term.subst0_map (.var .vz))
         (fun {_} v => match v with
@@ -253,8 +251,8 @@ def prenexify
       (.exist_ax (.var .vz) (A.renameF (Renaming.ext Renaming.shift)))
   -- ── Local helper: (∀σ A).weakenBy σ → A  (forall elim at var 0) ──
   let fav {σ : Ty ι} {Δ : Ctx ι} (A : Formula F (σ :: Δ)) :
-      Derivable F EqX Allowed.classical Premises ((all σ A).weakenBy σ →ᶠ A) :=
-    Eq.mp (congrArg (Derivable F EqX Allowed.classical Premises ·)
+      Derivable F Allowed.classical Premises ((all σ A).weakenBy σ →ᶠ A) :=
+    Eq.mp (congrArg (Derivable F Allowed.classical Premises ·)
       (congrArg ((all σ A).weakenBy σ →ᶠ ·) (substF_renameF_id
         (Renaming.ext Renaming.shift) (Term.subst0_map (.var .vz))
         (fun {_} v => match v with
@@ -263,27 +261,27 @@ def prenexify
       (.forall_ax (.var .vz))
   -- ── Sub-lemma: ¬∃x P(x) → ∀x ¬P(x) ──
   let neg_ex_to_all_neg {σ : Ty ι} {Δ : Ctx ι} (A : Formula F (σ :: Δ)) :
-      Derivable F EqX Allowed.classical Premises (¬ᶠ(ex σ A) →ᶠ all σ (¬ᶠA)) :=
+      Derivable F Allowed.classical Premises (¬ᶠ(ex σ A) →ᶠ all σ (¬ᶠA)) :=
     .forall_rule (.exportation (eval_h .and_weak (.syllogism and_proj2 (eav A))))
   -- ── Sub-lemma: ¬(P → Q) → P  (classical, uses LEM on P) ──
   let not_imp_left {Δ : Ctx ι} (P Q : Formula F Δ) :
-      Derivable F EqX Allowed.classical Premises (¬ᶠ(P →ᶠ Q) →ᶠ P) :=
-    let lem_P := @Derivable.lem _ F EqX Allowed.classical Premises _ P (by decide)
-    let neg_P_imp : Derivable F EqX Allowed.classical Premises (¬ᶠP →ᶠ (P →ᶠ Q)) :=
+      Derivable F Allowed.classical Premises (¬ᶠ(P →ᶠ Q) →ᶠ P) :=
+    let lem_P := @Derivable.lem _ F Allowed.classical Premises _ P (by decide)
+    let neg_P_imp : Derivable F Allowed.classical Premises (¬ᶠP →ᶠ (P →ᶠ Q)) :=
       .exportation (.syllogism (eval_h .and_weak and_proj2) .exfalso)
     Derivable.mp lem_P (or_elim_rule
       (.exportation .and_weak)
       (.exportation (.syllogism (eval_h and_proj2 (.syllogism .and_weak neg_P_imp)) .exfalso)))
   -- ── Sub-lemma: ¬(P → Q) → ¬Q ──
   let not_imp_right {Δ : Ctx ι} (_P Q : Formula F Δ) :
-      Derivable F EqX Allowed.classical Premises (¬ᶠ(_P →ᶠ Q) →ᶠ ¬ᶠQ) :=
+      Derivable F Allowed.classical Premises (¬ᶠ(_P →ᶠ Q) →ᶠ ¬ᶠQ) :=
     -- ¬(P→Q) ∧ Q → ⊥: from Q get P→Q (weaken_intro), contradicts ¬(P→Q)
     .exportation (eval_h .and_weak (.syllogism and_proj2 (.exportation .and_weak)))
   -- ── Negative case: H ∧ ¬G → G ──
   let B₀w := B₀.weakenBy Ty.nat
   let C₀r := C₀.renameF (Term.Renaming.ext Term.Renaming.shift)
   -- ¬G → ∀u ¬∃v(B₀w→C₀r) → ∀u ∀v ¬(B₀w→C₀r)
-  let neg_G_to_all : Derivable F EqX Allowed.classical Premises
+  let neg_G_to_all : Derivable F Allowed.classical Premises
       (¬ᶠG →ᶠ all Ty.nat (all Ty.nat (¬ᶠ(B₀w →ᶠ C₀r)))) :=
     .syllogism (neg_ex_to_all_neg _) (forall_map (neg_ex_to_all_neg _))
   -- ∀u∀v ¬(B₀w→C₀r) → ∀u B₀
@@ -294,7 +292,7 @@ def prenexify
   let wsf {Δ : Ctx ι} {σ : Ty ι} (A : Formula F Δ) (t : Term F Δ σ) :
       (A.weakenBy σ).subst0 t = A :=
     substF_renameF_id Term.Renaming.shift (Term.subst0_map t) (fun {_} _ => rfl) A
-  let get_B₀ : Derivable F EqX Allowed.classical Premises
+  let get_B₀ : Derivable F Allowed.classical Premises
       (all Ty.nat (all Ty.nat (¬ᶠ(B₀w →ᶠ C₀r))) →ᶠ all Ty.nat B₀) :=
     let C₀r_z := C₀r.subst0 Term.zero
     have nf : (¬ᶠ(B₀w →ᶠ C₀r)).subst0 (Term.zero : Term F (Ty.nat :: ρ :: Γ) _) =
@@ -303,12 +301,12 @@ def prenexify
            Formula.imp (Formula.imp B₀ C₀r_z) ⊥ᶠ
       rw [wsf B₀ (Term.zero : Term F (Ty.nat :: ρ :: Γ) _)]
     forall_map (.syllogism (.forall_ax Term.zero)
-      (Eq.mp (congrArg (Derivable F EqX Allowed.classical Premises ·)
+      (Eq.mp (congrArg (Derivable F Allowed.classical Premises ·)
         (congrArg (· →ᶠ B₀) nf.symm)) (not_imp_left B₀ C₀r_z)))
   -- ∀u∀v ¬(B₀w→C₀r) → ∀v ¬C₀
   -- Strategy: instantiate ∀u at 0, get ∀v ¬(B₀w→C₀r), then forall_map
   -- with (¬(B₀w→C₀r) → ¬C₀r), then C₀r.subst0(0) normalizes to C₀.
-  let get_neg_C₀ : Derivable F EqX Allowed.classical Premises
+  let get_neg_C₀ : Derivable F Allowed.classical Premises
       (all Ty.nat (all Ty.nat (¬ᶠ(B₀w →ᶠ C₀r))) →ᶠ all Ty.nat (¬ᶠC₀)) :=
     -- Instantiate outer ∀u at zero: get ∀v ¬(B₀w' → C₀r')
     -- where B₀w' = B₀w.subst0 zero, C₀r' = C₀r.subst0 zero
@@ -339,15 +337,15 @@ def prenexify
              all Ty.nat (¬ᶠC₀)
       rw [C₀r_nf]; rfl
     .syllogism step1 (.syllogism (.forall_ax Term.zero)
-      (Eq.mp (congrArg (Derivable F EqX Allowed.classical Premises ·)
+      (Eq.mp (congrArg (Derivable F Allowed.classical Premises ·)
         (congrArg (· →ᶠ all Ty.nat (¬ᶠC₀)) nf_neg.symm)) I_comb))
   -- ∃v C₀ ∧ ∀v ¬C₀ → ⊥
-  let exist_all_neg : Derivable F EqX Allowed.classical Premises
+  let exist_all_neg : Derivable F Allowed.classical Premises
       (ex Ty.nat C₀ ∧ᶠ all Ty.nat (¬ᶠC₀) →ᶠ ⊥ᶠ) :=
     .importation (.exist_rule
       (.exportation (eval_h (.syllogism and_proj2 (fav (¬ᶠC₀))) .and_weak)))
   -- Chain: H ∧ ¬G → G
-  let neg_case : Derivable F EqX Allowed.classical Premises (H ∧ᶠ ¬ᶠG →ᶠ G) :=
+  let neg_case : Derivable F Allowed.classical Premises (H ∧ᶠ ¬ᶠG →ᶠ G) :=
     let to_forall_B := .syllogism and_proj2 (.syllogism neg_G_to_all get_B₀)
     let to_exist_C := eval_h .and_weak to_forall_B
     let to_all_neg_C := .syllogism and_proj2 (.syllogism neg_G_to_all get_neg_C₀)
@@ -381,17 +379,15 @@ Factored out so that both the semantic (`general_metatheorem_classical`) and the
 (`syntactic_general_metatheorem_classical`) entry points share it. -/
 def classical_to_prenex_extended
     {ι : Type} {F : ι → Ty ι}
-    {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
     {Premises : PremiseSet F}
-    (adm : AdmissibleEqX EqX Premises)
-    (nts : NTStableD EqX Premises)
+    (nts : NTStableD Premises)
     {ρ : Ty ι}
     {B₀ C₀ : Formula F [Ty.nat, ρ]}
     (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
     (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
-    (prf : @Derivable ι F EqX Allowed.classical Premises []
+    (prf : @Derivable ι F Allowed.classical Premises []
       (all ρ (imp (all .nat B₀) (ex .nat C₀)))) :
-    @Derivable ι F EqX Allowed.extended Premises []
+    @Derivable ι F Allowed.extended Premises []
       (all ρ (¬ᶠ¬ᶠ(ex Ty.nat (ex Ty.nat
         (B₀.weakenBy Ty.nat →ᶠ
           C₀.renameF (Term.Renaming.ext Term.Renaming.shift)))))) := by
@@ -404,11 +400,11 @@ def classical_to_prenex_extended
   have hP_qf : (B₀' →ᶠ C₀').isQF = true := by
     simp only [Formula.isQF, hB'_qf, hC'_qf, Bool.and_self]
   -- ── Step 1: prenexify under ∀x ─────────────────────────────────────────────
-  let pren : Derivable F EqX Allowed.classical Premises
+  let pren : Derivable F Allowed.classical Premises
       (((Formula.all Ty.nat B₀) →ᶠ (Formula.ex Ty.nat C₀)) →ᶠ
         Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀'))) :=
     prenexify hB_qf hB_vf hC_qf hC_vf
-  let prf' : Derivable F EqX Allowed.classical Premises
+  let prf' : Derivable F Allowed.classical Premises
       (Formula.all ρ (Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀')))) :=
     Derivable.mp prf (forall_map pren)
   -- ── Step 2: negative translation ───────────────────────────────────────────
@@ -417,17 +413,17 @@ def classical_to_prenex_extended
         Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀')) := by
     change Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀').kurodaInner) = _
     rw [kurodaInner_qf (B₀' →ᶠ C₀') hP_qf]
-  let nt := negTrans_sound adm nts prf'
+  let nt := negTrans_sound nts prf'
   have hNT : (Formula.all ρ (Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀'))))ᴺᵀ =
       (¬ᶠ¬ᶠ(Formula.all ρ (¬ᶠ¬ᶠ(Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀')))))) := by
     change (¬ᶠ¬ᶠ(Formula.all ρ (¬ᶠ¬ᶠ
       (Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀'))).kurodaInner))) = _
     rw [hEki]
-  let nt' : Derivable F EqX Allowed.nt_target Premises
+  let nt' : Derivable F Allowed.nt_target Premises
       (¬ᶠ¬ᶠ(Formula.all ρ (¬ᶠ¬ᶠ(Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀')))))) :=
-    Eq.mp (congrArg (Derivable F EqX Allowed.nt_target Premises ·) hNT) nt
+    Eq.mp (congrArg (Derivable F Allowed.nt_target Premises ·) hNT) nt
   -- ── Step 3: push the outer ¬¬ inside the ∀ (D-1) ───────────────────────────
-  let stripped : Derivable F EqX Allowed.nt_target Premises
+  let stripped : Derivable F Allowed.nt_target Premises
       (Formula.all ρ (¬ᶠ¬ᶠ(Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀'))))) :=
     Derivable.mp nt' nn_all_nn
   -- ── Step 4: into the extended system ───────────────────────────────────────
@@ -464,19 +460,17 @@ Markov case), so nothing is lost. -/
 def general_metatheorem_classical
     {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     (si : SpaceInterp X F)
-    {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
-    (eqxi : EqXInterp X F si EqX)
+    (eqxi : EqXInterp X F si)
     {Premises : PremiseSet F}
-    (adm : AdmissibleEqX EqX Premises)
     (mj : Majorizability si)
-    (nts : NTStableD EqX Premises)
+    (nts : NTStableD Premises)
     (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
       ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
     {ρ : Ty ι}
     {B₀ C₀ : Formula F [Ty.nat, ρ]}
     (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
     (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
-    (prf : @Derivable ι F EqX Allowed.classical Premises []
+    (prf : @Derivable ι F Allowed.classical Premises []
       (all ρ (imp (all .nat B₀) (ex .nat C₀)))) :
     { Φ : Ty.interpret X ρ.hat → Nat //
       ∀ (x : Ty.interpret X ρ) (x_star : Ty.interpret X ρ.hat),
@@ -500,14 +494,14 @@ def general_metatheorem_classical
   have hP_vf : (B₀' →ᶠ C₀').isVFree = true := by
     simp only [Formula.isVFree, hB'_vf, hC'_vf, Bool.and_self]
   -- ── Steps 1–4: the proof-theoretic reduction, factored out ─────────────────
-  let extd : Derivable F EqX Allowed.extended Premises
+  let extd : Derivable F Allowed.extended Premises
       (Formula.all ρ (¬ᶠ¬ᶠ(Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀'))))) :=
-    classical_to_prenex_extended adm nts hB_qf hB_vf hC_qf hC_vf prf
+    classical_to_prenex_extended nts hB_qf hB_vf hC_qf hC_vf prf
   -- ── Step 5: Dialectica, then read off U and V ──────────────────────────────
   -- Destructed with `obtain`, not `let`: the realizer is a huge term, and leaving it as a
   -- let-value makes every later defeq check try to `whnf` it (a heartbeat timeout).
   obtain ⟨w, hw⟩ :=
-    (@dialectica_soundness_ctx' ι X F si EqX eqxi Premises premise_realizer _ _ extd) ()
+    (@dialectica_soundness_ctx' ι X F si eqxi Premises premise_realizer _ _ extd) ()
   -- The counter for the inner `¬¬` is a witness for `¬E`; any one will do, because the
   -- E-counter it produces is only ever fed to a QF ∨-free matrix.
   let aW : 𝕎 X (¬ᶠ(Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀')))) :=
@@ -628,8 +622,7 @@ Compose with `metatheorem_core_of_majorants` to obtain a uniform bound. -/
 def general_metatheorem_extract
     {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     (si : SpaceInterp X F)
-    {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
-    (eqxi : EqXInterp X F si EqX)
+    (eqxi : EqXInterp X F si)
     {Premises : PremiseSet F}
     (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
       ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
@@ -637,13 +630,13 @@ def general_metatheorem_extract
     {B₀ C₀ : Formula F [Ty.nat, ρ]}
     (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
     (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
-    (prf : @Derivable ι F EqX Allowed.extended Premises []
+    (prf : @Derivable ι F Allowed.extended Premises []
       (all ρ (imp (all .nat B₀) (ex .nat C₀)))) :
     { UV : (Ty.interpret X ρ → Nat) × (Ty.interpret X ρ → Nat) //
       ∀ x : Ty.interpret X ρ,
         Formula.interpret si B₀ (UV.1 x, (x, ())) →
         Formula.interpret si C₀ (UV.2 x, (x, ())) } :=
-  let r := @dialectica_soundness_ctx' ι X F si EqX eqxi Premises premise_realizer _ _ prf
+  let r := @dialectica_soundness_ctx' ι X F si eqxi Premises premise_realizer _ _ prf
   let r₀ := r ()
   let w := r₀.val
   let h := r₀.property

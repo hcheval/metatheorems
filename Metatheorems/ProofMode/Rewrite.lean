@@ -43,32 +43,31 @@ section QferGeneral
 open Formula
 
 variable {ι : Type} {F : ι → Ty ι}
-  {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
   {al : Allowed} {Premises : PremiseSet F}
 
 /-- QF-ER at an arbitrary pair of types, with the two `subst0` round-trips given explicitly.
 
 `qfer_nat_nf` is this at `ρ = σ = nat`. The constructor was always general — `Derivable.qfer`
-is stated for `eqAtType EqX ρ`/`eqAtType EqX σ` — so nothing here is new metatheory; only the
+is stated for `eqAtType ρ`/`eqAtType σ` — so nothing here is new metatheory; only the
 `_nf` wrappers were specialised. -/
 def qfer_at_nf {Γ : Ctx ι} {A₀ : Formula F Γ} {ρ σ : Ty ι}
     (hqf : A₀.isQF = true) (hvf : A₀.isVFree = true)
     {s t : Term F Γ ρ}
-    (h : Derivable F EqX al Premises (A₀ →ᶠ eqAtType EqX ρ s t))
+    (h : Derivable F al Premises (A₀ →ᶠ eqAtType ρ s t))
     {r : Term F (ρ :: Γ) σ} {rs rt : Term F Γ σ}
     (hs : r.subst0 s = rs) (ht : r.subst0 t = rt) :
-    Derivable F EqX al Premises (A₀ →ᶠ eqAtType EqX σ rs rt) :=
-  Eq.mp (congrArg (Derivable F EqX al Premises ·)
+    Derivable F al Premises (A₀ →ᶠ eqAtType σ rs rt) :=
+  Eq.mp (congrArg (Derivable F al Premises ·)
     (by rw [show r.subst0 s = rs from hs, show r.subst0 t = rt from ht]))
     (Derivable.qfer hqf hvf h)
 
 /-- QF-ER without a premise, at an arbitrary pair of types. -/
 def qfer_no_premise_at_nf {Γ : Ctx ι} {ρ σ : Ty ι}
-    {s t : Term F Γ ρ} (h : Derivable F EqX al Premises (eqAtType EqX ρ s t))
+    {s t : Term F Γ ρ} (h : Derivable F al Premises (eqAtType ρ s t))
     {r : Term F (ρ :: Γ) σ} {rs rt : Term F Γ σ}
     (hs : r.subst0 s = rs) (ht : r.subst0 t = rt) :
-    Derivable F EqX al Premises (eqAtType EqX σ rs rt) :=
-  Eq.mp (congrArg (Derivable F EqX al Premises ·)
+    Derivable F al Premises (eqAtType σ rs rt) :=
+  Eq.mp (congrArg (Derivable F al Premises ·)
     (by rw [show r.subst0 s = rs from hs, show r.subst0 t = rt from ht]))
     (qfer_no_premise h)
 
@@ -188,17 +187,16 @@ structure EqShape where
 *folded* presentation has the sides in fixed positions, so this matches on that first and
 only falls back to `whnfD` for the definitions that genuinely unfold to an equation
 (`eq_Q`, `eq_R`, `Formula.neg`-style wrappers). -/
-private def eqView? (ι eqx : Expr) (f : Expr) : MetaM (Option EqShape) := do
+private def eqView? (ι : Expr) (f : Expr) : MetaM (Option EqShape) := do
   let check (e : Expr) : MetaM (Option EqShape) := do
     let a := e.getAppArgs
     if e.isAppOf ``Formula.eq0 && a.size == 5 then
       return some ⟨mkApp (.const ``Ty.nat []) ι, a[3]!, a[4]!⟩
-    if e.isAppOf ``eqAtType && a.size == 7 then
-      return some ⟨a[4]!, a[5]!, a[6]!⟩
-    -- `EqX i s t` at a base type: the head is the goal's own `EqX` parameter, which is an
-    -- fvar, so there is nothing to unfold and only this comparison can identify it.
-    if a.size == 4 && (← isDefEq e.getAppFn eqx) then
-      return some ⟨mkApp2 (.const ``Ty.base []) ι a[0]!, a[2]!, a[3]!⟩
+    if e.isAppOf ``eqAtType && a.size == 6 then
+      return some ⟨a[3]!, a[4]!, a[5]!⟩
+    -- The base-type case used to need a comparison against the goal's own `EqX` fvar. With
+    -- `EqX` gone, `eqAtType (.base i) s t` is a genuine application of `eqAtType`, so the
+    -- folded match above already covers it.
     return none
   if let some v ← check f then return some v
   check (← whnfD f)
@@ -206,8 +204,8 @@ private def eqView? (ι eqx : Expr) (f : Expr) : MetaM (Option EqShape) := do
 /-- The goal as an equation. -/
 private def eqGoalSides (who : String) : TacticM (Array Expr × EqShape) := do
   let args ← seqDGoalArgs who
-  let some v ← eqView? args[0]! args[3]! args[8]! |
-    throwError "{who}: the goal is not an equation{indentExpr args[8]!}"
+  let some v ← eqView? args[0]! args[7]! |
+    throwError "{who}: the goal is not an equation{indentExpr args[7]!}"
   return (args, v)
 
 /-- Rewrite `s` to `t` throughout an equational goal, given a way to build the QF-ER
@@ -215,7 +213,7 @@ congruence proof from the abstraction. Shared by `prw` and `prwby`. -/
 private def prwCore (who : String) (occ : Occ) (ρ s t : Expr)
     (mkProof : TSyntax `term → TacticM (TSyntax `term)) : TacticM Unit := do
   let (args, goal) ← eqGoalSides who
-  let (ι, F, Γ) := (args[0]!, args[2]!, args[6]!)
+  let (ι, F, Γ) := (args[0]!, args[2]!, args[5]!)
   -- The *goal's* type must stay `nat`: the gluing below is `pm_trans`/`pm_sym`, and the
   -- kernel's `.trans0`/`.sym0` are nat-only. At other types transitivity comes from
   -- `eqAtType_trans`, which needs an `AdmissibleEqX` this tactic is not given.
@@ -236,7 +234,7 @@ private def prwCore (who : String) (occ : Occ) (ρ s t : Expr)
           in the goal.\nRewriting{indentExpr s}"
     | .all, _ =>
         throwError "{who}: the pattern does not occur in the goal.\n\
-          Rewriting{indentExpr s}\nbut the goal is{indentExpr args[8]!}"
+          Rewriting{indentExpr s}\nbut the goal is{indentExpr args[7]!}"
   -- `qfer` gives `L =₀ L[s:=t]` and `R =₀ R[s:=t]`; transitivity glues them to the goal.
   -- The abstraction is built, not written, so it goes back as an `Expr` rather than through
   -- the pretty printer: the display layer prints `Term.weaken` as `↑ᶜ`, which does not
@@ -250,9 +248,9 @@ private def prwCore (who : String) (occ : Occ) (ρ s t : Expr)
 
 /-- The type and two sides of an equation, from the formula expression. Same view as the
 goal uses, so a rule may be stated in any of the accepted spellings. -/
-private def eqSides (who : String) (what : MessageData) (ι eqx f : Expr) :
+private def eqSides (who : String) (what : MessageData) (ι f : Expr) :
     TacticM EqShape := do
-  let some v ← eqView? ι eqx f |
+  let some v ← eqView? ι f |
     throwError "{who}: {what} is not an equation{indentExpr f}"
   return v
 
@@ -270,14 +268,14 @@ congruences by transitivity. -/
 private def prwAtCore (who : String) (occ : Occ) (ρ s t : Expr) (h : Ident) (n : Ident)
     (mkProof : TSyntax `term → TacticM (TSyntax `term)) : TacticM Unit := do
   let args ← seqDGoalArgs who
-  let some hyps ← whnfListLit? args[7]! |
+  let some hyps ← whnfListLit? args[6]! |
     throwError "{who}: the hypothesis context is not a literal list"
   let names := ((listLit? args[1]!).getD []).filterMap strLit?
   let some i := names.findIdx? (· == h.getId.toString) |
     throwError "{who}: no hypothesis named `{h.getId}` (have: {names})"
-  let target ← eqSides who m!"`{h.getId}`" args[0]! args[3]! hyps[i]!
+  let target ← eqSides who m!"`{h.getId}`" args[0]! hyps[i]!
   let (P, Q) := (target.lhs, target.rhs)
-  let (ι, F, Γ) := (args[0]!, args[2]!, args[6]!)
+  let (ι, F, Γ) := (args[0]!, args[2]!, args[5]!)
   unless target.ty.isAppOf ``Ty.nat do
     throwError "{who}: `{h.getId}` is an equation at{indentExpr target.ty}\nbut the \
       forward form is glued by `pm_rw_at`, which is stated at `nat`."
@@ -308,12 +306,12 @@ elab "prw " eStx:term occ:(occSel)? : tactic => withMainContext do
   -- nothing pins the rule's `Γ`, and a variable like `x₀` in its arguments has no context to
   -- resolve against — while a term from the outer context needs the weakening coercion.
   let args ← seqDGoalArgs "prw"
-  let e ← elabRuleInCtx eStx args[6]! (← derivableInGoal args)
+  let e ← elabRuleInCtx eStx args[5]! (← derivableInGoal args)
   let ety ← instantiateMVars (← inferType e)
   let etyArgs := ety.getAppArgs
-  unless ety.isAppOf ``Derivable && etyArgs.size == 7 do
+  unless ety.isAppOf ``Derivable && etyArgs.size == 6 do
     throwError "prw: not a kernel derivation{indentExpr ety}"
-  let rule ← eqSides "prw" m!"`{eStx}`" etyArgs[0]! etyArgs[2]! etyArgs[6]!
+  let rule ← eqSides "prw" m!"`{eStx}`" etyArgs[0]! etyArgs[5]!
   -- The rule goes back as an `Expr`: matching may have solved metavariables in it, and
   -- re-elaborating the source would lose those solutions.
   prwCore "prw" (readOcc occ) rule.ty rule.lhs rule.rhs fun r => do
@@ -335,13 +333,13 @@ non-quantifier-free hypotheses like an induction hypothesis. The only requiremen
 `h`'s own formula is quantifier-free and ∨-free, which is exactly what QF-ER asks. -/
 elab "prwby " h:ident occ:(occSel)? : tactic => withMainContext do
   let args ← seqDGoalArgs "prwby"
-  let some hyps ← whnfListLit? args[7]! |
+  let some hyps ← whnfListLit? args[6]! |
     throwError "prwby: the hypothesis context is not a literal list"
   let names := ((listLit? args[1]!).getD []).filterMap strLit?
   let n := h.getId.toString
   let some i := names.findIdx? (· == n) |
     throwError "prwby: no hypothesis named `{n}` (have: {names})"
-  let rule ← eqSides "prwby" m!"`{h.getId}`" args[0]! args[3]! hyps[i]!
+  let rule ← eqSides "prwby" m!"`{h.getId}`" args[0]! hyps[i]!
   -- `s` and `t` have to be given: they are fixed by the premise, and the premise proof is
   -- just "the equation implies itself", which says nothing about its shape.
   let sS ← Lean.Elab.Term.exprToSyntax rule.lhs
@@ -356,12 +354,12 @@ the same congruence and threads the hypothesis between the two sides' copies of 
 elab "prw " eStx:term " in " h:ident " with " n:ident occ:(occSel)? : tactic =>
     withMainContext do
   let args ← seqDGoalArgs "prw"
-  let e ← elabRuleInCtx eStx args[6]! (← derivableInGoal args)
+  let e ← elabRuleInCtx eStx args[5]! (← derivableInGoal args)
   let ety ← instantiateMVars (← inferType e)
   let etyArgs := ety.getAppArgs
-  unless ety.isAppOf ``Derivable && etyArgs.size == 7 do
+  unless ety.isAppOf ``Derivable && etyArgs.size == 6 do
     throwError "prw: not a kernel derivation{indentExpr ety}"
-  let rule ← eqSides "prw" m!"`{eStx}`" etyArgs[0]! etyArgs[2]! etyArgs[6]!
+  let rule ← eqSides "prw" m!"`{eStx}`" etyArgs[0]! etyArgs[5]!
   prwAtCore "prw" (readOcc occ) rule.ty rule.lhs rule.rhs h n fun r => do
     let eS ← Lean.Elab.Term.exprToSyntax (← instantiateMVars e)
     `(pm_have (qfer_no_premise_at_nf (σ := Ty.nat) $eS (r := $r) (by prw_norm) (by prw_norm)))
@@ -370,12 +368,12 @@ elab "prw " eStx:term " in " h:ident " with " n:ident occ:(occSel)? : tactic =>
 elab "prwby " h:ident " in " k:ident " with " n:ident occ:(occSel)? : tactic =>
     withMainContext do
   let args ← seqDGoalArgs "prwby"
-  let some hyps ← whnfListLit? args[7]! |
+  let some hyps ← whnfListLit? args[6]! |
     throwError "prwby: the hypothesis context is not a literal list"
   let names := ((listLit? args[1]!).getD []).filterMap strLit?
   let some i := names.findIdx? (· == h.getId.toString) |
     throwError "prwby: no hypothesis named `{h.getId}` (have: {names})"
-  let rule ← eqSides "prwby" m!"`{h.getId}`" args[0]! args[3]! hyps[i]!
+  let rule ← eqSides "prwby" m!"`{h.getId}`" args[0]! hyps[i]!
   let sS ← Lean.Elab.Term.exprToSyntax rule.lhs
   let tS ← Lean.Elab.Term.exprToSyntax rule.rhs
   prwAtCore "prwby" (readOcc occ) rule.ty rule.lhs rule.rhs k n fun r =>

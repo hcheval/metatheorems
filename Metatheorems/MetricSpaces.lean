@@ -351,13 +351,13 @@ The two hypotheses that remain are the honest ones:
 Neither is a majorizability question, which is why they are parameters here. `spremise` is
 where `MetricModel`'s `d_self` / `d_comm` / `d_triangle` fields will be consumed. -/
 theorem MetricModel.metric_metatheorem (M : MetricModel)
-    (eqxi : EqXInterp (fun () => M.carrier) MetricSpace.F M.si MetricSpace.EqX)
+    (eqxi : EqXInterp (fun () => M.carrier) MetricSpace.F M.si)
     (spremise : ∀ (Γ' : Ctx MetricSpace.ι) (B : Formula MetricSpace.F Γ'),
       MetricSpace.Premises ⟨Γ', B⟩ → SRealizer M.si B)
     {ρ : Ty MetricSpace.ι} {B₀ C₀ : Formula MetricSpace.F [Ty.nat, ρ]}
     (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
     (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
-    (prf : @Derivable MetricSpace.ι MetricSpace.F MetricSpace.EqX Allowed.extended
+    (prf : @Derivable MetricSpace.ι MetricSpace.F Allowed.extended
       MetricSpace.Premises []
       (Formula.all ρ (Formula.imp (Formula.all .nat B₀) (Formula.ex .nat C₀)))) :
     ∃ Φ : Ty.interpret (fun () => M.carrier) ρ.hat → Nat,
@@ -414,27 +414,32 @@ is not derivable in the empty theory, which is exactly why `AdmissibleEqX` carri
 `Premises`. -/
 def MetricSpace.d_self_derivable {Γ : Ctx MetricSpace.ι} {a : Allowed}
     (t : Term MetricSpace.F Γ xTy) :
-    Derivable MetricSpace.F MetricSpace.EqX a MetricSpace.Premises
+    Derivable MetricSpace.F a MetricSpace.Premises
       (eq_R (Term.app2 d_X t t) Term.zero_R) := by
-  have hax : Derivable MetricSpace.F MetricSpace.EqX a MetricSpace.Premises
+  have hax : Derivable MetricSpace.F a MetricSpace.Premises
       (MetricSpace.ax_refl (Γ := Γ)) := .premise (Or.inl rfl)
   have hinst := Derivable.mp hax
-    (Derivable.forall_ax (EqX := MetricSpace.EqX) (allowed := a)
+    (Derivable.forall_ax (allowed := a)
       (Premises := MetricSpace.Premises)
       (A := eq_R (Term.app2 d_X (Term.var .vz) (Term.var .vz)) Term.zero_R) t)
   -- `forall_ax` lands on `A.subst0 t`; push the substitution through `eq_R`.
   simpa only [Formula.subst0, eq_R_substF, Term.subst, Term.subst0_map,
     Term.app2, zero_R_closed_subst] using hinst
 
-def MetricSpace.admissibleEqX : AdmissibleEqX MetricSpace.EqX MetricSpace.Premises where
-  substF_nat := fun {_ _} () u v σ => by
-    simp only [MetricSpace.EqX, eq_R_substF, Term.subst, Term.app2,
-      zero_R_closed_subst]
-  eqx_refl := fun {_} {_} {i} t => match i with
-    | () => MetricSpace.d_self_derivable t
-  eqx_sym := sorry
-  eqx_trans := sorry
-  eqx_pu := fun () {_} _ _ => eq_R_isPurelyUniversal _ _
+-- `MetricSpace.admissibleEqX` is GONE, because the structure it inhabited is gone: `EqX` is
+-- no longer a parameter and `AdmissibleEqX` was deleted with it (Stage 3). Each of its five
+-- fields survives somewhere else, which is the whole point of the restructuring:
+--
+--   `substF_nat` → `eqAtType_base_substF`  (a theorem, `EqAtType.lean`)
+--   `eqx_pu`     → `eqAtType_base_isPurelyUniversal`  (a theorem, `EqAtType.lean`)
+--   `eqx_refl`   → `Derivable.dist_self`  (a constructor; cf. `d_self_derivable` above,
+--                  which is the same statement for the *premise*-based `d_X = func ()`)
+--   `eqx_sym`    → owed: `Derivable.dist_comm` + symmetry of `eq_R`
+--   `eqx_trans`  → owed: `Derivable.dist_tri` + transitivity of `eq_R`
+--
+-- The last two were `sorry` here and are now the two `sorry`s in `Arithmetic.lean`'s
+-- `eqAtType_sym`/`eqAtType_trans` at `.base`. Nothing was proved and nothing was lost; the
+-- obligation moved to where the ℝ layer can discharge it. See ARCHITECTURE.md §8.
 
 /-- **The metric-space metatheorem, from a classical proof.**
 
@@ -456,13 +461,13 @@ binder. So this theorem currently depends on `sorryAx`, visibly and in one place
 `nts` is likewise not a parameter: the premises are purely universal, so `ntStable_of_pu`
 supplies it. -/
 theorem MetricModel.metric_metatheorem_classical (M : MetricModel)
-    (eqxi : EqXInterp (fun () => M.carrier) MetricSpace.F M.si MetricSpace.EqX)
+    (eqxi : EqXInterp (fun () => M.carrier) MetricSpace.F M.si)
     (spremise : ∀ (Γ' : Ctx MetricSpace.ι) (B : Formula MetricSpace.F Γ'),
       MetricSpace.Premises ⟨Γ', B⟩ → SRealizer M.si B)
     {ρ : Ty MetricSpace.ι} {B₀ C₀ : Formula MetricSpace.F [Ty.nat, ρ]}
     (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
     (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
-    (prf : @Derivable MetricSpace.ι MetricSpace.F MetricSpace.EqX Allowed.classical
+    (prf : @Derivable MetricSpace.ι MetricSpace.F Allowed.classical
       MetricSpace.Premises []
       (Formula.all ρ (Formula.imp (Formula.all .nat B₀) (Formula.ex .nat C₀)))) :
     ∃ Φ : Ty.interpret (fun () => M.carrier) ρ.hat → Nat,
@@ -471,8 +476,8 @@ theorem MetricModel.metric_metatheorem_classical (M : MetricModel)
         M.abstractMajorizability.toRel.maj ρ x_star x →
         (∀ u : Nat, u ≤ Φ x_star → Formula.interpret M.si B₀ (u, (x, ()))) →
         ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret M.si C₀ (v, (x, ())) :=
-  syntactic_general_metatheorem_classical eqxi MetricSpace.admissibleEqX
-    (ntStable_of_pu MetricSpace.admissibleEqX MetricSpace.premises_pu) spremise
+  syntactic_general_metatheorem_classical eqxi
+    (ntStable_of_pu MetricSpace.premises_pu) spremise
     M.abstractMajorizability hB_qf hB_vf hC_qf hC_vf prf
 
 end Metatheorems

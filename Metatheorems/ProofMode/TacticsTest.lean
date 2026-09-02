@@ -18,7 +18,6 @@ Nothing here mentions `Derivable`, `pack`, `HVar`, or a de Bruijn index.
 -/
 
 variable {ι : Type} {F : ι → Ty ι}
-    {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
     {a : Allowed} {Premises : PremiseSet F} {Γ : Ctx ι} {A B : Formula F Γ}
 
 open Formula
@@ -40,20 +39,20 @@ def wrapped_iteration : Term F Γ Ty.nat := iterating_zero
 
 /-! ## Propositional -/
 
-example : SeqD [] F EqX a Premises [] (A →ᶠ B →ᶠ (A ∧ᶠ B)) := by
+example : SeqD [] F a Premises [] (A →ᶠ B →ᶠ (A ∧ᶠ B)) := by
   pintro ha hb
   psplit
   · pexact ha
   · pexact hb
 
-example : SeqD [] F EqX a Premises [] ((A ∧ᶠ B) →ᶠ (B ∧ᶠ A)) := by
+example : SeqD [] F a Premises [] ((A ∧ᶠ B) →ᶠ (B ∧ᶠ A)) := by
   pintro h
   pdestruct h with ha hb
   psplit
   · pexact hb
   · pexact ha
 
-example : SeqD [] F EqX a Premises [] ((A ∨ᶠ B) →ᶠ (B ∨ᶠ A)) := by
+example : SeqD [] F a Premises [] ((A ∨ᶠ B) →ᶠ (B ∨ᶠ A)) := by
   pintro h
   pcases h with hl | hr
   · pright
@@ -61,14 +60,14 @@ example : SeqD [] F EqX a Premises [] ((A ∨ᶠ B) →ᶠ (B ∨ᶠ A)) := by
   · pleft
     pexact hr
 
-example : SeqD [] F EqX a Premises [] (⊥ᶠ →ᶠ A) := by
+example : SeqD [] F a Premises [] (⊥ᶠ →ᶠ A) := by
   pintro h
   pexfalso
   pexact h
 
 /-- A kernel theorem, used from inside a script. This is the escape hatch: everything the
 kernel already proves stays available. -/
-example : SeqD [] F EqX a Premises [] (A →ᶠ A) := by
+example : SeqD [] F a Premises [] (A →ᶠ A) := by
   pthm I_comb
 
 /-! ## Quantifiers
@@ -80,13 +79,13 @@ leaves the *names* alone. -/
 section Quantifiers
 variable {ρ : Ty ι} {P Q : Formula F (ρ :: Γ)}
 
-example : SeqD [] F EqX a Premises [] (Formula.all ρ P →ᶠ Formula.all ρ P) := by
+example : SeqD [] F a Premises [] (Formula.all ρ P →ᶠ Formula.all ρ P) := by
   pintro h
   pforall
   pspecialize
   pexact h
 
-example : SeqD [] F EqX a Premises []
+example : SeqD [] F a Premises []
     (Formula.all ρ (P ∧ᶠ Q) →ᶠ Formula.all ρ P ∧ᶠ Formula.all ρ Q) := by
   pintro h
   psplit
@@ -99,13 +98,13 @@ example : SeqD [] F EqX a Premises []
     pspecialize
     pexact h
 
-example : SeqD [] F EqX a Premises [] (Formula.ex ρ P →ᶠ Formula.ex ρ P) := by
+example : SeqD [] F a Premises [] (Formula.ex ρ P →ᶠ Formula.ex ρ P) := by
   pintro h
   pobtain h with x
   pexact h
 
-example (t : Term F Γ ρ) (h : SeqD [] F EqX a Premises [] (P.subst0 t)) :
-    SeqD [] F EqX a Premises [] (Formula.ex ρ P) := by
+example (t : Term F Γ ρ) (h : SeqD [] F a Premises [] (P.subst0 t)) :
+    SeqD [] F a Premises [] (Formula.ex ρ P) := by
   pexists t
   exact h
 
@@ -113,7 +112,7 @@ end Quantifiers
 
 /-! ## Forward reasoning -/
 
-example : SeqD [] F EqX a Premises [] (A →ᶠ (A ∧ᶠ A)) := by
+example : SeqD [] F a Premises [] (A →ᶠ (A ∧ᶠ A)) := by
   pintro h
   phave k : A
   · pexact h
@@ -121,13 +120,13 @@ example : SeqD [] F EqX a Premises [] (A →ᶠ (A ∧ᶠ A)) := by
     · pexact k
     · pexact k
 
-example : SeqD [] F EqX a Premises [] ((A →ᶠ B) →ᶠ A →ᶠ B) := by
+example : SeqD [] F a Premises [] ((A →ᶠ B) →ᶠ A →ᶠ B) := by
   pintro himp ha
   papply himp
   pexact ha
 
 example {ρ : Ty ι} {P : Formula F (ρ :: Γ)} (t : Term F Γ ρ) :
-    SeqD ["h"] F EqX a Premises [Formula.all ρ P] (P.subst0 t) := by
+    SeqD ["h"] F a Premises [Formula.all ρ P] (P.subst0 t) := by
   pinst h t with k
   pexact k
 
@@ -137,7 +136,7 @@ The hypothesis context is carried through the induction by `Packing`'s peeling; 
 does not mention it. Both of these prove `∀n (n =₀ n)`, the second with a hypothesis in
 scope so that the peeling actually runs. -/
 
-example : SeqD [] F EqX a Premises (Γ := Γ) []
+example : SeqD [] F a Premises (Γ := Γ) []
     (Formula.all Ty.nat (Formula.eq0 (Term.var .vz) (Term.var .vz))) := by
   pinduction
   · pthm .refl0
@@ -145,7 +144,7 @@ example : SeqD [] F EqX a Premises (Γ := Γ) []
     pintro hn
     pthm .refl0
 
-example {C : Formula F Γ} : SeqD ["c"] F EqX a Premises [C]
+example {C : Formula F Γ} : SeqD ["c"] F a Premises [C]
     (Formula.all Ty.nat (Formula.eq0 (Term.var .vz) (Term.var .vz))) := by
   pinduction
   · pthm .refl0
@@ -162,7 +161,7 @@ variable {Prem : PremiseSet F}
 
 /-- Markov: the `∃` is proved by contradiction, then the contradiction is produced by
 actually supplying the witness. -/
-example : SeqD [] F EqX Allowed.extended Prem (Γ := Γ) []
+example : SeqD [] F Allowed.extended Prem (Γ := Γ) []
     (Formula.ex Ty.nat (Formula.eq0 (Term.var .vz) Term.zero)) := by
   pby_contra h
   papply h
@@ -170,7 +169,7 @@ example : SeqD [] F EqX Allowed.extended Prem (Γ := Γ) []
   pthm .refl0
 
 /-- QF-AC, forwards: the choice function appears as a new hypothesis. -/
-example : SeqD ["h"] F EqX Allowed.extended Prem (Γ := Γ)
+example : SeqD ["h"] F Allowed.extended Prem (Γ := Γ)
     [Formula.all Ty.nat (Formula.ex Ty.nat (Formula.eq0 (Term.var .vz) (Term.var .vz)))]
     (Formula.ex (Ty.nat →ₜ Ty.nat) (Formula.all Ty.nat
       (Formula.substF Formula.acSubst (Formula.eq0 (Term.var .vz) (Term.var .vz))))) := by
@@ -191,7 +190,7 @@ Is this proof translated? (HANDOFF D-1: the classical content of a hand-translat
 exactly `¬¬∃n(qf) → ∃n(qf)`.)
 -/
 #guard_msgs in
-example : SeqD [] F EqX Allowed.extended Prem (Γ := Γ) [] (A →ᶠ A) := by
+example : SeqD [] F Allowed.extended Prem (Γ := Γ) [] (A →ᶠ A) := by
   pby_contra h
   pthm I_comb
 
@@ -201,7 +200,7 @@ error: pby_contra: the matrix is not quantifier-free — not a Markov shape.
 Is this proof translated?
 -/
 #guard_msgs in
-example : SeqD [] F EqX Allowed.extended Prem (Γ := Γ) []
+example : SeqD [] F Allowed.extended Prem (Γ := Γ) []
     (Formula.ex Ty.nat (Formula.all Ty.nat
       (Formula.eq0 (Term.var (.vs .vz)) (Term.var (.vs .vz))))) := by
   pby_contra h
@@ -215,7 +214,7 @@ error: pby_contra: the matrix contains ∨ — not a Markov shape.
 Is this proof translated?
 -/
 #guard_msgs in
-example : SeqD [] F EqX Allowed.extended Prem (Γ := Γ) []
+example : SeqD [] F Allowed.extended Prem (Γ := Γ) []
     (Formula.ex Ty.nat (Formula.eq0 (Term.var .vz) Term.zero ∨ᶠ
       Formula.eq0 (Term.var .vz) Term.zero)) := by
   pby_contra h
@@ -226,7 +225,7 @@ example : SeqD [] F EqX Allowed.extended Prem (Γ := Γ) []
 -- The right shape, but Markov is not in the system.
 /-- error: pby_contra: Markov is not available here — `allowed.markov` is not `true`. -/
 #guard_msgs in
-example : SeqD [] F EqX Allowed.base Prem (Γ := Γ) []
+example : SeqD [] F Allowed.base Prem (Γ := Γ) []
     (Formula.ex Ty.nat (Formula.eq0 (Term.var .vz) Term.zero)) := by
   pby_contra h
   pexists Term.zero
@@ -244,7 +243,7 @@ Per HANDOFF D-2 the ban is on the *surface language*, so `pexists` and `pinst` c
 `pexists!` is the named escape hatch. -/
 
 /-- An honest witness passes. -/
-example : SeqD [] F EqX a Premises (Γ := Γ) []
+example : SeqD [] F a Premises (Γ := Γ) []
     (Formula.ex Ty.nat (Formula.eq0 (Term.var .vz) Term.zero)) := by
   pbound Term.zero
   pthm .refl0
@@ -258,7 +257,7 @@ extraction vacuous (HANDOFF D-2, surface-recursor ban). If this really is auxili
 explicitly with `pexists!`.
 -/
 #guard_msgs in
-example : SeqD [] F EqX a Premises (Γ := Γ) []
+example : SeqD [] F a Premises (Γ := Γ) []
     (Formula.ex Ty.nat (Formula.eq0 (Term.var .vz) (Term.var .vz))) := by
   pbound iterating_zero
   pthm .refl0
@@ -272,13 +271,13 @@ extraction vacuous (HANDOFF D-2, surface-recursor ban). If this really is auxili
 explicitly with `pexists!`.
 -/
 #guard_msgs in
-example : SeqD [] F EqX a Premises (Γ := Γ) []
+example : SeqD [] F a Premises (Γ := Γ) []
     (Formula.ex Ty.nat (Formula.eq0 (Term.var .vz) (Term.var .vz))) := by
   pexists iterating_zero
   pthm .refl0
 
 /-- `pexists!` is the escape hatch: a bypass has to be written down. -/
-example : SeqD [] F EqX a Premises (Γ := Γ) []
+example : SeqD [] F a Premises (Γ := Γ) []
     (Formula.ex Ty.nat (Formula.eq0 (Term.var .vz) (Term.var .vz))) := by
   pexists! iterating_zero
   pthm .refl0
@@ -293,7 +292,7 @@ explicitly with `pexists!`.
 -/
 #guard_msgs in
 example {P : Formula F (Ty.nat :: Γ)} :
-    SeqD ["h"] F EqX a Premises [Formula.all Ty.nat P] (P.subst0 Term.zero) := by
+    SeqD ["h"] F a Premises [Formula.all Ty.nat P] (P.subst0 Term.zero) := by
   pinst h iterating_zero with k
   pinst h Term.zero with k'
   pexact k'
@@ -306,7 +305,7 @@ Iteration is what extraction produces, so writing it by hand makes the extractio
 vacuous (HANDOFF D-2, surface-recursor ban).
 -/
 #guard_msgs in
-example : SeqD [] F EqX a Premises (Γ := Γ) [] (A →ᶠ A) := by
+example : SeqD [] F a Premises (Γ := Γ) [] (A →ᶠ A) := by
   phave k : Formula.eq0 iterating_zero iterating_zero
   pthm I_comb
 
@@ -314,7 +313,7 @@ example : SeqD [] F EqX a Premises (Γ := Γ) [] (A →ᶠ A) := by
 check must not unfold constants — `Term.add` is built from `Term.prec` too, and `x + y` is
 not a smuggled bound. A whitelist of surface constants is the fix; a blacklist of one cannot
 distinguish these. -/
-example : SeqD [] F EqX a Premises (Γ := Γ) []
+example : SeqD [] F a Premises (Γ := Γ) []
     (Formula.ex Ty.nat (Formula.eq0 (Term.var .vz) (Term.var .vz))) := by
   pbound wrapped_iteration
   pthm .refl0
@@ -328,13 +327,13 @@ sense here. One test per move. -/
 section Parity
 
 /-- `mlIntro`+`mlAssumption`: close by *whichever* hypothesis fits, without naming it. -/
-example : SeqD [] F EqX a Premises [] (A →ᶠ B →ᶠ A) := by
+example : SeqD [] F a Premises [] (A →ᶠ B →ᶠ A) := by
   pintro ha hb
   passumption
 
 /-- `toMLGoal`: a theorem stated as an ordinary kernel derivation, proved as a script. This
 is what makes the mode usable — every other test states its goal as a `SeqD` already. -/
-example : Derivable F EqX a Premises (Γ := Γ) (A →ᶠ B →ᶠ (A ∧ᶠ B)) := by
+example : Derivable F a Premises (Γ := Γ) (A →ᶠ B →ᶠ (A ∧ᶠ B)) := by
   pmode
   pintro ha hb
   psplit
@@ -342,38 +341,38 @@ example : Derivable F EqX a Premises (Γ := Γ) (A →ᶠ B →ᶠ (A ∧ᶠ B))
   · pexact hb
 
 /-- `mlApply "H" in "H0"`: forward application into a hypothesis. -/
-example : SeqD [] F EqX a Premises [] ((A →ᶠ B) →ᶠ A →ᶠ B) := by
+example : SeqD [] F a Premises [] ((A →ᶠ B) →ᶠ A →ᶠ B) := by
   pintro himp ha
   papply himp in ha with hb
   pexact hb
 
 /-- `mlApplyMeta`: apply a *kernel theorem* to the goal, leaving its antecedents. -/
-example : SeqD [] F EqX a Premises [] (A →ᶠ B →ᶠ (A ∧ᶠ B)) := by
+example : SeqD [] F a Premises [] (A →ᶠ B →ᶠ (A ∧ᶠ B)) := by
   pintro ha hb
   papplym and_intro
   · pexact ha
   · pexact hb
 
 /-- `mlConj`: conjoin two hypotheses. -/
-example : SeqD [] F EqX a Premises [] (A →ᶠ B →ᶠ (A ∧ᶠ B)) := by
+example : SeqD [] F a Premises [] (A →ᶠ B →ᶠ (A ∧ᶠ B)) := by
   pintro ha hb
   pconj ha hb with hab
   pexact hab
 
 /-- `mlDestructBot`. -/
-example : SeqD [] F EqX a Premises [] (⊥ᶠ →ᶠ A) := by
+example : SeqD [] F a Premises [] (⊥ᶠ →ᶠ A) := by
   pintro hbot
   pcontradiction hbot
 
 /-- `mlRename`. -/
-example : SeqD [] F EqX a Premises [] (A →ᶠ A) := by
+example : SeqD [] F a Premises [] (A →ᶠ A) := by
   pintro h
   prename h into k
   pexact k
 
 /-- `mlClassic`: case split on `A ∨ᶠ ¬ᶠA`, available only where LEM is. -/
 example {Prem : PremiseSet F} :
-    SeqD [] F EqX Allowed.classical Prem (Γ := Γ) [] (A →ᶠ A) := by
+    SeqD [] F Allowed.classical Prem (Γ := Γ) [] (A →ᶠ A) := by
   pintro h
   pclassic A with hpos hneg
   · pexact h
@@ -385,13 +384,13 @@ error: pclassic: excluded middle is not available here — `allowed.lem` is not 
 -/
 #guard_msgs in
 example {Prem : PremiseSet F} :
-    SeqD [] F EqX Allowed.base Prem (Γ := Γ) [] (A →ᶠ A) := by
+    SeqD [] F Allowed.base Prem (Γ := Γ) [] (A →ᶠ A) := by
   pintro h
   pclassic A with hpos hneg
   pexact h
 
 /-- `mlApplyMeta … in "H"`. -/
-example : SeqD [] F EqX a Premises [] (A →ᶠ B →ᶠ (A ∧ᶠ B)) := by
+example : SeqD [] F a Premises [] (A →ᶠ B →ᶠ (A ∧ᶠ B)) := by
   pintro ha hb
   -- `and_intro` applied to `ha` alone leaves its second conjunct open, so it is given here;
   -- the same ambiguity Lean's own `apply … at` has.
@@ -400,7 +399,7 @@ example : SeqD [] F EqX a Premises [] (A →ᶠ B →ᶠ (A ∧ᶠ B)) := by
   pexact hb
 
 /-- `mlDestructImp`: prove the antecedent, keep the conclusion. -/
-example : SeqD [] F EqX a Premises [] ((A →ᶠ B) →ᶠ A →ᶠ B) := by
+example : SeqD [] F a Premises [] ((A →ᶠ B) →ᶠ A →ᶠ B) := by
   pintro himp ha
   pdestruct_imp himp with hb
   · pexact ha
@@ -408,20 +407,20 @@ example : SeqD [] F EqX a Premises [] ((A →ᶠ B) →ᶠ A →ᶠ B) := by
 
 /-- `mlTransitivity` for `→ᶠ`. The kit lemma it needs is itself proved as a script — the
 mode is now strong enough to build its own furniture. -/
-example : SeqD [] F EqX a Premises [] ((A →ᶠ B) →ᶠ (B →ᶠ C) →ᶠ (A →ᶠ C)) := by
+example : SeqD [] F a Premises [] ((A →ᶠ B) →ᶠ (B →ᶠ C) →ᶠ (A →ᶠ C)) := by
   pintro hab hbc ha
   papply hbc
   papply hab
   pexact ha
 
 /-- `mlClear`: drop a hypothesis from the *middle* of the context, not just the top. -/
-example : SeqD [] F EqX a Premises [] (A →ᶠ B →ᶠ B) := by
+example : SeqD [] F a Premises [] (A →ᶠ B →ᶠ B) := by
   pintro ha hb
   pclear ha
   pexact hb
 
 /-- `mlSwap`: exchange two adjacent hypotheses; the names move with them. -/
-example : SeqD [] F EqX a Premises [] (A →ᶠ B →ᶠ (A ∧ᶠ B)) := by
+example : SeqD [] F a Premises [] (A →ᶠ B →ᶠ (A ∧ᶠ B)) := by
   pintro ha hb
   pswap hb with ha
   psplit
@@ -429,14 +428,14 @@ example : SeqD [] F EqX a Premises [] (A →ᶠ B →ᶠ (A ∧ᶠ B)) := by
   · pexact hb
 
 /-- `mlRevertLast`. -/
-example : SeqD [] F EqX a Premises [] (A →ᶠ A) := by
+example : SeqD [] F a Premises [] (A →ᶠ A) := by
   pintro h
   prevert
   pthm I_comb
 
 /-- `mlRevert "H"` for a hypothesis that is *not* the most recent: it is walked to the top
 by adjacent exchanges first. -/
-example : SeqD [] F EqX a Premises [] (A →ᶠ B →ᶠ (A ∧ᶠ B)) := by
+example : SeqD [] F a Premises [] (A →ᶠ B →ᶠ (A ∧ᶠ B)) := by
   pintro ha hb
   prevert ha
   pintro ha'
@@ -446,7 +445,7 @@ example : SeqD [] F EqX a Premises [] (A →ᶠ B →ᶠ (A ∧ᶠ B)) := by
 
 /-- `mlTransitivity` for `↔ᶠ`. Proved as a script — `↔ᶠ` is a conjunction of implications,
 and the tactics see through the definition. -/
-example : SeqD [] F EqX a Premises [] ((A ↔ᶠ B) →ᶠ (B ↔ᶠ C) →ᶠ (A ↔ᶠ C)) := by
+example : SeqD [] F a Premises [] ((A ↔ᶠ B) →ᶠ (B ↔ᶠ C) →ᶠ (A ↔ᶠ C)) := by
   pintro hab hbc
   pdestruct hab with hab1 hab2
   pdestruct hbc with hbc1 hbc2
@@ -462,14 +461,14 @@ example : SeqD [] F EqX a Premises [] ((A ↔ᶠ B) →ᶠ (B ↔ᶠ C) →ᶠ (
 
 /-- `use <reasoning> in H`: discharge the goal in a weaker system. -/
 example {Prem : PremiseSet F} :
-    SeqD [] F EqX Allowed.extended Prem (Γ := Γ) [] (A →ᶠ A) := by
+    SeqD [] F Allowed.extended Prem (Γ := Γ) [] (A →ᶠ A) := by
   pin_system (Allowed.base_le Allowed.extended)
   pintro h
   pexact h
 
 /-- `mlSymmetry in "H"`. -/
 example {s t : Term F Γ Ty.nat} :
-    SeqD [] F EqX a Premises [] (Formula.eq0 s t →ᶠ Formula.eq0 t s) := by
+    SeqD [] F a Premises [] (Formula.eq0 s t →ᶠ Formula.eq0 t s) := by
   pintro h
   psym in h with h'
   pexact h'
@@ -489,7 +488,6 @@ variable {ρ σ : Ty ι} {P Q : Formula F (ρ :: Γ)}
 /--
 trace: ι : Type
 F : ι → Ty ι
-EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ X[i] → Term F Γ X[i] → Formula F Γ
 a : Allowed
 Premises : PremiseSet F
 Γ : Ctx ι
@@ -502,7 +500,7 @@ P Q : Formula F (ρ :: Γ)
       P x₀
 -/
 #guard_msgs in
-example : SeqD ["h"] F EqX a Premises (Γ := ρ :: Γ)
+example : SeqD ["h"] F a Premises (Γ := ρ :: Γ)
     [Formula.weakenBy ρ (Formula.all ρ (P ∧ᶠ Q))] P := by
   trace_state
   pspecialize h with hpq
@@ -514,7 +512,6 @@ example : SeqD ["h"] F EqX a Premises (Γ := ρ :: Γ)
 /--
 trace: ι : Type
 F : ι → Ty ι
-EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ X[i] → Term F Γ X[i] → Formula F Γ
 a : Allowed
 Premises : PremiseSet F
 Γ : Ctx ι
@@ -527,7 +524,7 @@ P Q : Formula F (ρ :: Γ)
       P x₀
 -/
 #guard_msgs in
-example : SeqD ["p"] F EqX a Premises (Γ := σ :: ρ :: Γ)
+example : SeqD ["p"] F a Premises (Γ := σ :: ρ :: Γ)
     [Formula.weakenBy σ P] (Formula.weakenBy σ P) := by
   trace_state
   pexact p
@@ -541,7 +538,7 @@ end Naming
 
 /-- error: pexact: no hypothesis named `nope` (have: [h]) -/
 #guard_msgs in
-example : SeqD [] F EqX a Premises [] (A →ᶠ A) := by
+example : SeqD [] F a Premises [] (A →ᶠ A) := by
   pintro h
   pexact nope
 

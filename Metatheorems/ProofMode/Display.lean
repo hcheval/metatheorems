@@ -10,7 +10,7 @@ import Metatheorems.ProofMode.Pretty
 /-!
 # Rendering a proof-mode goal
 
-`Seq F EqX a Premises Δ B` is legible only if you can read `Δ` as a *list of named
+`Seq F a Premises Δ B` is legible only if you can read `Δ` as a *list of named
 hypotheses* rather than as a `List (Formula F Γ)` printed inline. This file adds the display
 layer: a name-carrying wrapper `SeqD` and a delaborator that renders it as a box.
 
@@ -20,7 +20,7 @@ layer: a name-carrying wrapper `SeqD` and a delaborator that renders it as a box
 it (`HVar` is a de Bruijn index). Names are display data, so they are carried by a separate
 *reducible* wrapper:
 
-    SeqD names F EqX a Premises Δ B  :=  Seq F EqX a Premises Δ B
+    SeqD names F a Premises Δ B  :=  Seq F a Premises Δ B
 
 Being `@[reducible]`, every kit lemma applies through it by unification: the tactic layer
 never has to translate between the two. Its job is only to keep `names` in step with `Δ`
@@ -50,25 +50,23 @@ namespace ProofMode
 open Lean
 
 variable {ι : Type} {F : ι → Ty ι}
-    {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
     {a : Allowed} {Premises : PremiseSet F} {Γ : Ctx ι}
 
 /-- `Seq` together with display names for the hypothesis positions.
 
 Reducible, hence interchangeable with `Seq` for every purpose except printing. -/
 @[reducible] def SeqD (_names : List String) (F : ι → Ty ι)
-    (EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ)
     (a : Allowed) (Premises : PremiseSet F) {Γ : Ctx ι}
     (Δ : HCtx F Γ) (B : Formula F Γ) : Type :=
-  Seq F EqX a Premises Δ B
+  Seq F a Premises Δ B
 
 /-- Forget the names. Definitionally the identity. -/
 def SeqD.toSeq {names : List String} {Δ : HCtx F Γ} {B : Formula F Γ} :
-    SeqD names F EqX a Premises Δ B → Seq F EqX a Premises Δ B := id
+    SeqD names F a Premises Δ B → Seq F a Premises Δ B := id
 
 /-- Attach names. Definitionally the identity. -/
 def SeqD.ofSeq {names : List String} {Δ : HCtx F Γ} {B : Formula F Γ} :
-    Seq F EqX a Premises Δ B → SeqD names F EqX a Premises Δ B := id
+    Seq F a Premises Δ B → SeqD names F a Premises Δ B := id
 
 -- ============================================================================
 -- Syntax
@@ -121,7 +119,7 @@ def strLit? (e : Expr) : Option String :=
   | .lit (.strVal s) => some s
   | _ => none
 
-/-- Render `SeqD names F EqX a Premises Δ B` as a proof-mode box.
+/-- Render `SeqD names F a Premises Δ B` as a proof-mode box.
 
 Fails (falling back to the default application delaborator) only when `Δ` is not a literal
 list — there is nothing sensible to draw in that case. -/
@@ -129,21 +127,21 @@ list — there is nothing sensible to draw in that case. -/
 def delabSeqD : Delab := do
   let e ← SubExpr.getExpr
   let args := e.getAppArgs
-  -- ι, names, F, EqX, a, Premises, Γ, Δ, B
-  guard (args.size == 9)
+  -- ι, names, F, a, Premises, Γ, Δ, B
+  guard (args.size == 8)
   -- `∀`-introduction leaves `Δ` as `Δ.map (weakenBy ρ)`, so the spine has to be reduced
   -- rather than matched syntactically.
-  let some hyps ← whnfListLit? args[7]! | failure
+  let some hyps ← whnfListLit? args[6]! | failure
   let names : List String :=
     (listLit? args[1]!).map (·.filterMap strLit?) |>.getD []
   -- The term context: its explicit prefix is shown as named binders, under the same naming
   -- scheme the term printer uses, and its (usually abstract) tail as itself.
-  let (tail, tys) := Pretty.ctxSplit args[6]!
+  let (tail, tys) := Pretty.ctxSplit args[5]!
   let tailStx ← Lean.PrettyPrinter.delab tail
   -- Outermost-first, under the same naming the term printer uses.
-  let tvs : Array (TSyntax `term) := Pretty.ctxVarIdents 0 0 args[6]!
+  let tvs : Array (TSyntax `term) := Pretty.ctxVarIdents 0 0 args[5]!
   let tts ← tys.toArray.reverse.mapM fun t => (Lean.PrettyPrinter.delab t : MetaM _)
-  let goalStx ← Lean.PrettyPrinter.delab args[8]!
+  let goalStx ← Lean.PrettyPrinter.delab args[7]!
   -- `Δ`'s head is the most recent hypothesis; display oldest-first.
   let hyps := hyps.reverse
   let names := (names ++ List.replicate hyps.length "_").take hyps.length |>.reverse

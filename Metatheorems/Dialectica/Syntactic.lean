@@ -821,14 +821,13 @@ def sInduction {A : Formula F (Ty.nat :: Γ)}
        exact hiff.mp hconc⟩
 
 
-/-- A **term** realizing `eqAtType EqX ρ s t`, given that the two sides are semantically
+/-- A **term** realizing `eqAtType ρ s t`, given that the two sides are semantically
 equal. Recursion on `ρ`: trivial at `nat` and `unit`, componentwise at products, a `lam`
 at arrows, and `eqxi.realizeTerm` at the base types. -/
-def sEqAtType {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) →
-      Formula F Γ} {si : SpaceInterp X F} (eqxi : EqXInterp X F si EqX) :
+def sEqAtType {si : SpaceInterp X F} (eqxi : EqXInterp X F si) :
     ∀ (ρ : Ty ι) {Γ : Ctx ι} (s t : Term F Γ ρ),
       (∀ env : Ctx.interpret X Γ, Term.interpret si s env = Term.interpret si t env) →
-      SRealizer si (eqAtType EqX ρ s t)
+      SRealizer si (eqAtType ρ s t)
   | .nat,      _, _, _, h => ⟨.unitI, fun env _ => h env⟩
   | .base i,   _, s, t, h =>
       ⟨eqxi.realizeTerm i s t, fun env y => eqxi.realizeTerm_sound i s t env (h env) y⟩
@@ -847,26 +846,44 @@ def sEqAtType {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Te
 
 section EqRules
 
-variable {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) →
-    Formula F Γ} {si : SpaceInterp X F} (eqxi : EqXInterp X F si EqX)
+variable {si : SpaceInterp X F} (eqxi : EqXInterp X F si)
 
 /-- Recursor at zero. -/
 def sRecZero {ρ : Ty ι} {y : Term F Γ ρ} {z : Term F Γ (ρ →ₜ Ty.nat →ₜ ρ)} :
-    SRealizer si (eqAtType EqX ρ (Term.app3 (.prec ρ) y z Term.zero) y) :=
+    SRealizer si (eqAtType ρ (Term.app3 (.prec ρ) y z Term.zero) y) :=
   sEqAtType eqxi ρ _ _ (fun _ => by simp [Term.interpret, Term.app3])
 
 /-- Recursor at a successor. -/
 def sRecSucc {ρ : Ty ι} {y : Term F Γ ρ} {z : Term F Γ (ρ →ₜ Ty.nat →ₜ ρ)}
     {x : Term F Γ Ty.nat} :
-    SRealizer si (eqAtType EqX ρ
+    SRealizer si (eqAtType ρ
       (Term.app3 (.prec ρ) y z (Term.app Term.succ x))
       (Term.app2 z (Term.app3 (.prec ρ) y z x) x)) :=
   sEqAtType eqxi ρ _ _ (fun _ => by simp [Term.interpret, Term.app3, Term.app2])
 
 /-- β-equality. -/
 def sBetaEq {ρ τ : Ty ι} {body : Term F (ρ :: Γ) τ} {u : Term F Γ ρ} :
-    SRealizer si (eqAtType EqX τ (Term.app (.lam body) u) (Term.subst0 body u)) :=
+    SRealizer si (eqAtType τ (Term.app (.lam body) u) (Term.subst0 body u)) :=
   sEqAtType eqxi τ _ _ (fun _ => by simp [Term.interpret, Term.interpret_subst0])
+
+/-- Reflexivity of the base-type distance. `eqAtType (.base i) x x` *is*
+`eq_R (d x x) 0ℝ`, so this is `sEqAtType` at the reflexive instance — no new hypothesis. -/
+def sDistSelf (i : ι) (x : Term F Γ (Ty.base i)) :
+    SRealizer si (eq_R (Term.app2 (Term.dist i) x x) Term.zero_R) :=
+  sEqAtType eqxi (Ty.base i) x x (fun _ => rfl)
+
+/-- Symmetry of the base-type distance. Not an instance of `sEqAtType`: the formula is
+`eq_R (d x y) (d y x)`, not `eq_R (d s t) 0ℝ`. It is owed by `EqXInterp`. -/
+def sDistComm (i : ι) (x y : Term F Γ (Ty.base i)) :
+    SRealizer si (eq_R (Term.app2 (Term.dist i) x y) (Term.app2 (Term.dist i) y x)) :=
+  ⟨eqxi.dist_comm_term i x y, fun env c => eqxi.dist_comm_term_sound i x y env c⟩
+
+/-- The triangle inequality for the base-type distance. Owed by `EqXInterp`, as `sDistComm`. -/
+def sDistTri (i : ι) (x y z : Term F Γ (Ty.base i)) :
+    SRealizer si (le_R_pu (Term.app2 (Term.dist i) x z)
+      (Term.app2 Term.add_R
+        (Term.app2 (Term.dist i) x y) (Term.app2 (Term.dist i) y z))) :=
+  ⟨eqxi.dist_tri_term i x y z, fun env c => eqxi.dist_tri_term_sound i x y z env c⟩
 
 end EqRules
 
@@ -874,28 +891,27 @@ end EqRules
 /-- QF-ER. The witness may be *any* inhabitant of `wTy (eqAtType σ …)`, since that type is
 a subsingleton for `eqAtType`; the content is in the counter, which feeds the induction
 hypothesis a canonical counter. -/
-def sQfer {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) →
-      Formula F Γ} {si : SpaceInterp X F} (eqxi : EqXInterp X F si EqX)
+def sQfer {si : SpaceInterp X F} (eqxi : EqXInterp X F si)
     {A₀ : Formula F Γ} {ρ σ : Ty ι} {s t : Term F Γ ρ} {r : Term F (ρ :: Γ) σ}
     (hqf : A₀.isQF = true) (hvf : A₀.isVFree = true)
-    (ih : SRealizer si (A₀ →ᶠ eqAtType EqX ρ s t)) :
-    SRealizer si (A₀ →ᶠ eqAtType EqX σ (r.subst0 s) (r.subst0 t)) :=
+    (ih : SRealizer si (A₀ →ᶠ eqAtType ρ s t)) :
+    SRealizer si (A₀ →ᶠ eqAtType σ (r.subst0 s) (r.subst0 t)) :=
   SRealizer.imp
-    (.lam (Term.weaken (defaultWTerm (eqAtType EqX σ (r.subst0 s) (r.subst0 t)))))
+    (.lam (Term.weaken (defaultWTerm (eqAtType σ (r.subst0 s) (r.subst0 t)))))
     (.lam (.lam (.app (.app (Term.weaken (Term.weaken (.snd ih.val))) (.var (.vs .vz)))
-      (Term.weaken (Term.weaken (defaultCTerm (eqAtType EqX ρ s t)))))))
+      (Term.weaken (Term.weaken (defaultCTerm (eqAtType ρ s t)))))))
     (fun env w y hA₀ => by
       have ssC : Subsingleton (ℂ X A₀) := (dialecticaWitness_subsingleton A₀ hqf hvf).2
-      have ssW : Subsingleton (𝕎 X (eqAtType EqX σ (r.subst0 s) (r.subst0 t))) :=
+      have ssW : Subsingleton (𝕎 X (eqAtType σ (r.subst0 s) (r.subst0 t))) :=
         dialecticaWitness_eqAtType_ss si eqxi σ (r.subst0 s) (r.subst0 t)
       simp only [Term.interpret, Term.interpret_weaken, Ctx.lookup] at hA₀ ⊢
       -- the induction hypothesis, as a semantic realizer of the equation
-      have hfull : dialecticaRealizerCtx si (eqAtType EqX ρ s t) env :=
+      have hfull : dialecticaRealizerCtx si (eqAtType ρ s t) env :=
         ⟨(Term.interpret si ih.val env).1 w, fun yρ => by
           refine ih.property env (w, yρ) ?_
           have hcc : (Term.interpret si ih.val env).2 w yρ
               = (Term.interpret si ih.val env).2 w
-                  (Term.interpret si (defaultCTerm (eqAtType EqX ρ s t)) env) :=
+                  (Term.interpret si (defaultCTerm (eqAtType ρ s t)) env) :=
             ssC.elim _ _
           rw [hcc]; exact hA₀⟩
       have hsem : Term.interpret si s env = Term.interpret si t env :=
@@ -904,7 +920,7 @@ def sQfer {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F
         rw [Term.interpret_subst0, Term.interpret_subst0, hsem]
       have hrσ := eqAtType_from_semEq si eqxi σ (r.subst0 s) (r.subst0 t) env hsem_r
       have hwW : hrσ.val
-          = Term.interpret si (defaultWTerm (eqAtType EqX σ (r.subst0 s) (r.subst0 t))) env :=
+          = Term.interpret si (defaultWTerm (eqAtType σ (r.subst0 s) (r.subst0 t))) env :=
         ssW.elim _ _
       rw [← hwW]
       exact hrσ.property y)
@@ -1018,8 +1034,7 @@ end Rules
 
 section Soundness
 
-variable {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) →
-    Formula F Γ} {si : SpaceInterp X F} {Premises : PremiseSet F}
+variable {si : SpaceInterp X F} {Premises : PremiseSet F}
 
 /-- **Dialectica soundness, syntactically.**
 
@@ -1029,10 +1044,10 @@ the semantic version could not offer.
 
 `spremise` is the syntactic counterpart of `premise_realizer`: a premise must come with a
 realizing term, not merely a realizing value. -/
-def syntactic_soundness (eqxi : EqXInterp X F si EqX)
+def syntactic_soundness (eqxi : EqXInterp X F si)
     (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B) :
     {Γ : Ctx ι} → {A : Formula F Γ} →
-    @Derivable ι F EqX Allowed.extended Premises Γ A → SRealizer si A
+    @Derivable ι F Allowed.extended Premises Γ A → SRealizer si A
   | _, _, .premise hp      => spremise _ _ hp
   | _, _, .or_contract     => sOrContract
   | _, _, .and_contract    => sAndContract
@@ -1058,6 +1073,9 @@ def syntactic_soundness (eqxi : EqXInterp X F si EqX)
   | _, _, .rec_zero        => sRecZero eqxi
   | _, _, .rec_succ        => sRecSucc eqxi
   | _, _, .beta_eq _ _     => sBetaEq eqxi
+  | _, _, .dist_self i x   => sDistSelf eqxi i x
+  | _, _, .dist_comm i x y => sDistComm eqxi i x y
+  | _, _, .dist_tri i x y z => sDistTri eqxi i x y z
   | _, _, .refl0           => sRefl0
   | _, _, .sym0            => sSym0
   | _, _, .trans0          => sTrans0

@@ -44,15 +44,14 @@ namespace ProofMode
 open Formula
 
 variable {ι : Type} {F : ι → Ty ι}
-    {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
     {al : Allowed} {Premises : PremiseSet F} {Γ : Ctx ι}
 
 /-- **The body of the statement**, proved lazily: `(∀u B₀ u) → ∃n (a n = a (n + g n))`.
 
 `hmk` is what makes the reductio legal — `pby_contra` is the Markov rule and says so. -/
-def mct_lazy_body (adm : AdmissibleEqX EqX Premises) (hmk : al.markov = true)
+def mct_lazy_body (hmk : al.markov = true)
     (a g : Term F Γ (Ty.nat →ₜ Ty.nat)) (K : Term F Γ Ty.nat) :
-    Derivable F EqX al Premises (Γ := Γ)
+    Derivable F al Premises (Γ := Γ)
       (Formula.all Ty.nat
           ((a ⬝ S x₀ ∸ᵗ a ⬝ x₀ =₀ Term.zero) ∧ᶠ (a ⬝ x₀ ∸ᵗ K =₀ Term.zero))
         →ᶠ Formula.ex Ty.nat (a ⬝ x₀ =₀ a ⬝ (x₀ +ᵗ g ⬝ x₀))) := by
@@ -77,14 +76,14 @@ def mct_lazy_body (adm : AdmissibleEqX EqX Premises) (hmk : al.markov = true)
       anorm_ren
       pand_left
       pexact Hu
-    pfrom ac := antitone_chain adm a
+    pfrom ac := antitone_chain a
     pinst ac (g ⬝ x₀) with ac1
     anorm
     pinst ac1 x₀ with ac2
     anorm
     papply ac2 in hstep with hanti
     pspecialize hne with hne0
-    pfrom sn := monus_succ_of_ne adm
+    pfrom sn := monus_succ_of_ne
     pinst sn (a ⬝ (x₀ +ᵗ g ⬝ x₀)) with sn1
     anorm
     pinst sn1 (a ⬝ x₀) with sn2
@@ -100,8 +99,8 @@ def mct_lazy_body (adm : AdmissibleEqX EqX Premises) (hmk : al.markov = true)
     · anorm
       pexists Term.zero
       anorm
-      prw (add_zero_r adm (a ⬝ Term.zero))
-      pthm (monus_self adm (a ⬝ Term.zero))
+      prw (add_zero_r (a ⬝ Term.zero))
+      pthm (monus_self (a ⬝ Term.zero))
     · pforall
       pintro ih
       anorm
@@ -110,7 +109,7 @@ def mct_lazy_body (adm : AdmissibleEqX EqX Premises) (hmk : al.markov = true)
       anorm
       pinst hdrop x₁ with hd
       anorm
-      pfrom ama := add_monus_add adm
+      pfrom ama := add_monus_add
       pinst ama x₀ with ama1
       anorm
       pinst ama1 (S (a ⬝ (x₁ +ᵗ g ⬝ x₁))) with ama2
@@ -118,7 +117,7 @@ def mct_lazy_body (adm : AdmissibleEqX EqX Premises) (hmk : al.markov = true)
       pinst ama2 (a ⬝ x₁) with ama3
       anorm
       prwby hd in ama3 with ama4
-      pfrom mt := monus_trans adm
+      pfrom mt := monus_trans
       pinst mt ((S (a ⬝ (x₁ +ᵗ g ⬝ x₁))) +ᵗ x₀) with mt1
       anorm
       pinst mt1 ((a ⬝ x₁) +ᵗ x₀) with mt2
@@ -127,8 +126,8 @@ def mct_lazy_body (adm : AdmissibleEqX EqX Premises) (hmk : al.markov = true)
       anorm
       papply mt3 in ama4 with mt4
       papply mt4 in him with hfin
-      prw (add_succ adm (a ⬝ (x₁ +ᵗ g ⬝ x₁)) x₀)
-      prw (add_succ_l adm (a ⬝ (x₁ +ᵗ g ⬝ x₁)) x₀) in hfin with hfin'
+      prw (add_succ (a ⬝ (x₁ +ᵗ g ⬝ x₁)) x₀)
+      prw (add_succ_l (a ⬝ (x₁ +ᵗ g ⬝ x₁)) x₀) in hfin with hfin'
       pexact hfin'
   -- K + 1 drops do not fit under a 0 ≤ K
   pinst hQ (S K) with hQ1
@@ -137,7 +136,7 @@ def mct_lazy_body (adm : AdmissibleEqX EqX Premises) (hmk : al.markov = true)
   pinst H Term.zero with H0
   anorm
   pdestruct H0 with _hmono hb
-  pfrom mt := monus_trans adm
+  pfrom mt := monus_trans
   pinst mt ((a ⬝ x₀) +ᵗ S K) with mt1
   anorm
   pinst mt1 (a ⬝ Term.zero) with mt2
@@ -146,7 +145,7 @@ def mct_lazy_body (adm : AdmissibleEqX EqX Premises) (hmk : al.markov = true)
   anorm
   papply mt3 in hm with mt4
   papply mt4 in hb with hle
-  pfrom mas := monus_add_self_l adm
+  pfrom mas := monus_add_self_l
   pinst mas (a ⬝ x₀) with mas1
   anorm
   pinst mas1 (S K) with mas2
@@ -160,7 +159,7 @@ def mct_lazy_body (adm : AdmissibleEqX EqX Premises) (hmk : al.markov = true)
   papply n3 in mas2 with n4
   papply n4 in hle with hSK
   -- but S K ∸ K = 1
-  pfrom sms := succ_monus_self adm
+  pfrom sms := succ_monus_self
   pinst sms K with sms1
   anorm
   pfrom snz := Derivable.succ_ne_zero
@@ -175,11 +174,11 @@ def mct_lazy_body (adm : AdmissibleEqX EqX Premises) (hmk : al.markov = true)
 /-- **A3 — ℕ-MCT, proof p₁.** The lazy derivation of `mctStatement`.
 
 Same statement, same encoding, same shared lemmas as `mct_p2`; a different tree. -/
-def mct_p1 (adm : AdmissibleEqX EqX Premises) (hmk : al.markov = true) :
-    Derivable F EqX al Premises (Γ := []) mctStatement := by
+def mct_p1 (hmk : al.markov = true) :
+    Derivable F al Premises (Γ := []) mctStatement := by
   pmode
   pforall
-  pthm (mct_lazy_body adm hmk (x₀ ⬝ (Term.ofNat 0)) (x₀ ⬝ (Term.ofNat 1))
+  pthm (mct_lazy_body hmk (x₀ ⬝ (Term.ofNat 0)) (x₀ ⬝ (Term.ofNat 1))
           ((x₀ ⬝ (Term.ofNat 2)) ⬝ (Term.ofNat 0)))
 
 /-! ## The other extraction
@@ -199,32 +198,32 @@ variable {X : ι → Type}
 The result type is written out rather than inferred: inferring it means normalising the
 Dialectica interpretation of the whole derivation, and this one is large enough that the
 elaborator does not get there. -/
-def mct_extract_p1 (si : SpaceInterp X F) (eqxi : EqXInterp X F si EqX)
-    (adm : AdmissibleEqX EqX Premises)
+def mct_extract_p1 (si : SpaceInterp X F) (eqxi : EqXInterp X F si)
+    
     (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
       ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env) :
     { UV : (Ty.interpret X (mctTy ι) → Nat) × (Ty.interpret X (mctTy ι) → Nat) //
       ∀ x : Ty.interpret X (mctTy ι),
         Formula.interpret si mctB₀ (UV.1 x, (x, ())) →
         Formula.interpret si mctC₀ (UV.2 x, (x, ())) } :=
-  mctExtract si eqxi premise_realizer (mct_p1 (al := Allowed.extended) adm rfl)
+  mctExtract si eqxi premise_realizer (mct_p1 (al := Allowed.extended) rfl)
 
 /-- The bound p₁ gives, from majorants for its `U` and `V`. -/
-theorem mct_bound_p1 (si : SpaceInterp X F) (eqxi : EqXInterp X F si EqX)
-    (adm : AdmissibleEqX EqX Premises) (mj : MajorizabilityRel si)
+theorem mct_bound_p1 (si : SpaceInterp X F) (eqxi : EqXInterp X F si)
+    (mj : MajorizabilityRel si)
     (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
       ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
     (U_star V_star : Ty.interpret X (mctTy ι →ₜ Ty.nat).hat)
     (hU : mj.maj (mctTy ι →ₜ Ty.nat) U_star
-      (mctExtract si eqxi premise_realizer (mct_p1 (al := Allowed.extended) adm rfl)).val.1)
+      (mctExtract si eqxi premise_realizer (mct_p1 (al := Allowed.extended) rfl)).val.1)
     (hV : mj.maj (mctTy ι →ₜ Ty.nat) V_star
-      (mctExtract si eqxi premise_realizer (mct_p1 (al := Allowed.extended) adm rfl)).val.2) :
+      (mctExtract si eqxi premise_realizer (mct_p1 (al := Allowed.extended) rfl)).val.2) :
     ∃ Φ : Ty.interpret X (mctTy ι).hat → Nat,
       ∀ (x : Ty.interpret X (mctTy ι)) (x_star : Ty.interpret X (mctTy ι).hat),
         mj.maj (mctTy ι) x_star x →
         (∀ u : Nat, u ≤ Φ x_star → Formula.interpret si mctB₀ (u, (x, ()))) →
         ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret si mctC₀ (v, (x, ())) :=
-  mct_bound si eqxi mj premise_realizer (mct_p1 (al := Allowed.extended) adm rfl)
+  mct_bound si eqxi mj premise_realizer (mct_p1 (al := Allowed.extended) rfl)
     U_star V_star hU hV
 
 end Extraction

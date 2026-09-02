@@ -15,8 +15,8 @@ namespace Metatheorems
 The ND-interpretation composes two translations:
 
 1. **Kuroda's negative translation** (NT): maps a classical proof of `A`
-   in `Derivable F EqX Allowed.classical` to an intuitionistic
-   proof of `NT(A) = ¬¬nt(A)` in `Derivable F EqX Allowed.extended`.
+   in `Derivable F Allowed.classical` to an intuitionistic
+   proof of `NT(A) = ¬¬nt(A)` in `Derivable F Allowed.extended`.
 
 2. **Dialectica interpretation** (D): maps a proof of `NT(A)` in the extended system
    to a Lean-computable realizer for the Dialectica translation of `NT(A)`.
@@ -32,35 +32,31 @@ open Formula
 def nd_soundness
     {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     (si : SpaceInterp X F)
-    {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
-    (eqxi : EqXInterp X F si EqX)
+    (eqxi : EqXInterp X F si)
     {Premises : PremiseSet F}
-    (adm : AdmissibleEqX EqX Premises)
-    (nts : NTStableD EqX Premises)
+    (nts : NTStableD Premises)
     (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
       ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
     {Γ : Ctx ι} {A : Formula F Γ}
-    (h : @Derivable ι F EqX Allowed.classical Premises Γ A)
+    (h : @Derivable ι F Allowed.classical Premises Γ A)
     (env : Ctx.interpret X Γ)
     : dialecticaRealizerCtx si Aᴺᵀ env :=
   dialectica_soundness_ctx si eqxi premise_realizer Aᴺᵀ env
-    ((negTrans_sound adm nts h).castAllowed (by constructor <;> decide))
+    ((negTrans_sound nts h).castAllowed (by constructor <;> decide))
 
 /-- Closed-formula variant: the realizer lives at the empty environment. -/
 def nd_soundness_closed
     {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     (si : SpaceInterp X F)
-    {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
-    (eqxi : EqXInterp X F si EqX)
+    (eqxi : EqXInterp X F si)
     {Premises : PremiseSet F}
-    (adm : AdmissibleEqX EqX Premises)
-    (nts : NTStableD EqX Premises)
+    (nts : NTStableD Premises)
     (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
       ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
     {A : Formula F ([] : Ctx ι)}
-    (h : @Derivable ι F EqX Allowed.classical Premises [] A)
+    (h : @Derivable ι F Allowed.classical Premises [] A)
     : dialecticaRealizer si Aᴺᵀ :=
-  nd_soundness si eqxi adm nts premise_realizer h ()
+  nd_soundness si eqxi nts premise_realizer h ()
 #print axioms nd_soundness 
 
 end Metatheorems

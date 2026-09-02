@@ -716,25 +716,23 @@ five conditions needed in the inductive argument:
 Concrete theories (e.g. metric spaces) supply an `EqXInterp` instance
 for their chosen equality predicate. -/
 structure EqXInterp {ι : Type} (X : ι → Type) (F : ι → Ty ι)
-    (si : SpaceInterp X F)
-    (EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) →
-           Formula F Γ) where
+    (si : SpaceInterp X F) where
   /-- The witness type for `EqX i s t` is a subsingleton (purely universal). -/
   witnessSubsingleton : ∀ (i : ι) {Γ : Ctx ι} (s t : Term F Γ (Ty.base i)),
-      Subsingleton (dialecticaWitness X (EqX i s t))
+      Subsingleton (dialecticaWitness X (eqAtType (Ty.base i) s t))
   /-- A canonical Dialectica witness for `EqX i s t`. -/
   witnessDefault : ∀ (i : ι) {Γ : Ctx ι} (s t : Term F Γ (Ty.base i)),
-      dialecticaWitness X (EqX i s t)
+      dialecticaWitness X (eqAtType (Ty.base i) s t)
   /-- A canonical Dialectica counter for `EqX i s t`. -/
   counterDefault : ∀ (i : ι) {Γ : Ctx ι} (s t : Term F Γ (Ty.base i)),
-      dialecticaCounter X (EqX i s t)
+      dialecticaCounter X (eqAtType (Ty.base i) s t)
   /-- From semantic equality, build a Dialectica realizer for `EqX i s t`. -/
   realize : ∀ (i : ι) {Γ : Ctx ι} (s t : Term F Γ (Ty.base i)) (env : Ctx.interpret X Γ),
       Term.interpret si s env = Term.interpret si t env →
-      dialecticaRealizerCtx si (EqX i s t) env
+      dialecticaRealizerCtx si (eqAtType (Ty.base i) s t) env
   /-- From a Dialectica realizer for `EqX i s t`, recover semantic equality. -/
   extract : ∀ (i : ι) {Γ : Ctx ι} (s t : Term F Γ (Ty.base i)) (env : Ctx.interpret X Γ),
-      dialecticaRealizerCtx si (EqX i s t) env →
+      dialecticaRealizerCtx si (eqAtType (Ty.base i) s t) env →
       Term.interpret si s env = Term.interpret si t env
   /-- A **term** realizing `EqX i s t`, for the syntactic development.
 
@@ -742,13 +740,57 @@ structure EqXInterp {ι : Type} (X : ι → Type) (F : ι → Ty ι)
       equality predicate of a space must therefore also be realized *syntactically* —
       the syntactic analogue of condition 4. For `ι = Empty` this is vacuous. -/
   realizeTerm : ∀ (i : ι) {Γ : Ctx ι} (s t : Term F Γ (Ty.base i)),
-      Term F Γ (wTy (EqX i s t))
+      Term F Γ (wTy (eqAtType (Ty.base i) s t))
   /-- `realizeTerm` is correct wherever the two sides are semantically equal. -/
   realizeTerm_sound : ∀ (i : ι) {Γ : Ctx ι} (s t : Term F Γ (Ty.base i))
       (env : Ctx.interpret X Γ),
       Term.interpret si s env = Term.interpret si t env →
-      ∀ y : dialecticaCounter X (EqX i s t),
-        dialecticaMatrix si (EqX i s t) env
+      ∀ y : dialecticaCounter X (eqAtType (Ty.base i) s t),
+        dialecticaMatrix si (eqAtType (Ty.base i) s t) env
           (Term.interpret si (realizeTerm i s t) env) y
+  /-- `si.distInterp i` is symmetric, in the sense the object language asserts.
+
+      `Derivable.dist_comm` is a constructor, so Dialectica soundness owes its truth in the
+      model. It is *not* an instance of `realize`: `eq_R (d x y) (d y x)` is not of the form
+      `eqAtType (.base i) s t`, which is `eq_R (d s t) 0ℝ`. See ARCHITECTURE.md. -/
+  dist_comm_realize : ∀ (i : ι) {Γ : Ctx ι} (x y : Term F Γ (Ty.base i))
+      (env : Ctx.interpret X Γ),
+      dialecticaRealizerCtx si
+        (eq_R (Term.app2 (Term.dist i) x y) (Term.app2 (Term.dist i) y x)) env
+  /-- `si.distInterp i` satisfies the triangle inequality. The counterpart of
+      `Derivable.dist_tri`, owed for the same reason as `dist_comm_realize`. -/
+  dist_tri_realize : ∀ (i : ι) {Γ : Ctx ι} (x y z : Term F Γ (Ty.base i))
+      (env : Ctx.interpret X Γ),
+      dialecticaRealizerCtx si
+        (le_R_pu (Term.app2 (Term.dist i) x z)
+          (Term.app2 Term.add_R
+            (Term.app2 (Term.dist i) x y) (Term.app2 (Term.dist i) y z))) env
+  /-- The syntactic counterpart of `dist_comm_realize`: a realizing **term**, needed by
+      `Dialectica/Syntactic.lean` for the same reason `realizeTerm` is. -/
+  dist_comm_term : ∀ (i : ι) {Γ : Ctx ι} (x y : Term F Γ (Ty.base i)),
+      Term F Γ (wTy (eq_R (Term.app2 (Term.dist i) x y) (Term.app2 (Term.dist i) y x)))
+  /-- `dist_comm_term` realizes the matrix, at every counter. -/
+  dist_comm_term_sound : ∀ (i : ι) {Γ : Ctx ι} (x y : Term F Γ (Ty.base i))
+      (env : Ctx.interpret X Γ)
+      (c : dialecticaCounter X
+        (eq_R (Term.app2 (Term.dist i) x y) (Term.app2 (Term.dist i) y x))),
+      dialecticaMatrix si (eq_R (Term.app2 (Term.dist i) x y)
+          (Term.app2 (Term.dist i) y x)) env
+        (Term.interpret si (dist_comm_term i x y) env) c
+  /-- The syntactic counterpart of `dist_tri_realize`. -/
+  dist_tri_term : ∀ (i : ι) {Γ : Ctx ι} (x y z : Term F Γ (Ty.base i)),
+      Term F Γ (wTy (le_R_pu (Term.app2 (Term.dist i) x z)
+        (Term.app2 Term.add_R
+          (Term.app2 (Term.dist i) x y) (Term.app2 (Term.dist i) y z))))
+  /-- `dist_tri_term` realizes the matrix, at every counter. -/
+  dist_tri_term_sound : ∀ (i : ι) {Γ : Ctx ι} (x y z : Term F Γ (Ty.base i))
+      (env : Ctx.interpret X Γ)
+      (c : dialecticaCounter X (le_R_pu (Term.app2 (Term.dist i) x z)
+        (Term.app2 Term.add_R
+          (Term.app2 (Term.dist i) x y) (Term.app2 (Term.dist i) y z)))),
+      dialecticaMatrix si (le_R_pu (Term.app2 (Term.dist i) x z)
+          (Term.app2 Term.add_R
+            (Term.app2 (Term.dist i) x y) (Term.app2 (Term.dist i) y z))) env
+        (Term.interpret si (dist_tri_term i x y z) env) c
 
 end Metatheorems

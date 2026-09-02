@@ -18,8 +18,7 @@ variable {ι : Type} {F : ι → Ty ι} {X : ι → Type}
 
 section Metatheorem
 
-variable {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) →
-    Formula F Γ} {si : SpaceInterp X F} {Premises : PremiseSet F}
+variable {si : SpaceInterp X F} {Premises : PremiseSet F}
 
 /-- **The point of the whole branch.**
 
@@ -31,13 +30,13 @@ by `all_closed_terms_majorizable`, because the extracted functionals are closed 
 Compare `general_metatheorem`, which had to assume a total majorizer on every semantic
 value. -/
 theorem syntactic_general_metatheorem
-    (eqxi : EqXInterp X F si EqX)
+    (eqxi : EqXInterp X F si)
     (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B)
     (am : AbstractMajorizability si)
     {ρ : Ty ι} {B₀ C₀ : Formula F [Ty.nat, ρ]}
     (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
     (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
-    (prf : @Derivable ι F EqX Allowed.extended Premises []
+    (prf : @Derivable ι F Allowed.extended Premises []
       (Formula.all ρ (Formula.imp (Formula.all .nat B₀) (Formula.ex .nat C₀)))) :
     ∃ Φ : Ty.interpret X ρ.hat → Nat,
       ∀ (x : Ty.interpret X ρ) (x_star : Ty.interpret X ρ.hat),
@@ -95,15 +94,14 @@ The default challenge in step 3 is legitimate for the same reason the semantic v
 its matrix to the formula's interpretation **for every** counter. That is precisely the
 property the unprenexified route lacks. -/
 theorem syntactic_general_metatheorem_classical
-    (eqxi : EqXInterp X F si EqX)
-    (adm : AdmissibleEqX EqX Premises)
-    (nts : NTStableD EqX Premises)
+    (eqxi : EqXInterp X F si)
+    (nts : NTStableD Premises)
     (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B)
     (am : AbstractMajorizability si)
     {ρ : Ty ι} {B₀ C₀ : Formula F [Ty.nat, ρ]}
     (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
     (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
-    (prf : @Derivable ι F EqX Allowed.classical Premises []
+    (prf : @Derivable ι F Allowed.classical Premises []
       (Formula.all ρ (Formula.imp (Formula.all .nat B₀) (Formula.ex .nat C₀)))) :
     ∃ Φ : Ty.interpret X ρ.hat → Nat,
       ∀ (x : Ty.interpret X ρ) (x_star : Ty.interpret X ρ.hat),
@@ -126,7 +124,7 @@ theorem syntactic_general_metatheorem_classical
   -- would try to `whnf` it.
   obtain ⟨w, hw⟩ :=
     syntactic_soundness eqxi spremise
-      (classical_to_prenex_extended adm nts hB_qf hB_vf hC_qf hC_vf prf)
+      (classical_to_prenex_extended nts hB_qf hB_vf hC_qf hC_vf prf)
   -- Step 3: the two extractors, as closed terms
   let Ut := extractUTermP (P := B₀' →ᶠ C₀') w
   let Vt := extractVTermP (P := B₀' →ᶠ C₀') w

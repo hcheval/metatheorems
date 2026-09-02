@@ -3,7 +3,7 @@ Copyright (c) 2026. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Horatiu
 -/
-import Metatheorems.Terms.Real
+import Metatheorems.Terms.ClosedSubst
 
 namespace Metatheorems
 
@@ -51,5 +51,16 @@ This was the `eqx_pu` field of `AdmissibleEqX`; with `EqX` fixed it is a theorem
 theorem eqAtType_base_isPurelyUniversal {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι} (i : ι)
     (s t : Term F Γ (Ty.base i)) :
     (eqAtType (Ty.base i) s t).isPurelyUniversal = true := by rfl
+
+/-- Equality at a base type commutes with substitution.
+
+This was the `substF_nat` field of `AdmissibleEqX`; with `EqX` fixed to `d_i(·,·) =ℝ 0ℝ` it
+is a theorem, from `eq_R_substF` plus the fact that `Term.dist i` and `Term.zero_R` are
+closed. It is the base case of `eqAtType_substF` in `Arithmetic.lean`. -/
+theorem eqAtType_base_substF {ι : Type} {F : ι → Ty ι} {Γ Δ : Ctx ι} (i : ι)
+    (u v : Term F Γ (Ty.base i)) (σ : Term.Subst F Γ Δ) :
+    (eqAtType (Ty.base i) u v).substF σ
+      = eqAtType (Ty.base i) (u.subst σ) (v.subst σ) := by
+  simp only [eqAtType, eq_R_substF, Term.app2, Term.subst, zero_R_closed_subst]
 
 end Metatheorems
