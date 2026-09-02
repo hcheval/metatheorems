@@ -8,6 +8,7 @@ import Metatheorems.Derivable
 import Metatheorems.RealNumbers
 import Metatheorems.Rounding
 import Metatheorems.Majorizability
+import Metatheorems.SyntacticMetatheorem
 
 namespace Metatheorems
 
@@ -292,6 +293,74 @@ theorem MetricModel.func_maj (M : MetricModel) (N : ℕ) :
   · -- self-majorization of the whole majorant. `bezemMaj`'s second conjunct is a single
     -- ∀-statement, not a nested pair — so this is exactly `self`.
     exact fun a b h => self a b h
+
+/-- The metric base relation is upward closed in its numeric argument: if `n ≥ m` and
+`d(a,x) ≤ m` then `d(a,x) ≤ n`. This is `BaseMono`, the one extra hypothesis the two-clause
+`bezemMaj` forces, and for a metric it is immediate. -/
+theorem MetricModel.base_mono (M : MetricModel) :
+    BaseMono (X := fun () => M.carrier) M.base := by
+  intro i n m x hnm hm
+  exact hm.trans (by exact_mod_cast hnm)
+
+/-- **The metric space is an abstract majorizability** — the document's Proposition
+(`particular-cases-metric-spaces.tex:51`), assembled.
+
+Every obligation is now discharged:
+
+* the structural conditions and `arrow_intro` — `bezemAbstract`, definitionally;
+* `0`, `S` — `bezem_zero_maj` / `bezem_succ_maj`, for any base relation;
+* `R` — `bezem_prec_maj`, which is what the two-clause widening bought;
+* `0_X`, `d_X` — `zeroX_maj` / `func_maj` above, the only space-specific ones.
+
+`N` is `0`: nothing here needs a threshold, since every majorant is uniform in the index.
+That the `ℕ →` indexing does no work is discussed in CLAUDE.md. -/
+noncomputable def MetricModel.abstractMajorizability (M : MetricModel) :
+    AbstractMajorizability M.si :=
+  bezemAbstract M.si M.base 0
+    (bezem_zero_maj M.base 0)
+    (bezem_succ_maj M.base 0)
+    (fun ρ => bezem_prec_maj M.base_mono 0 ρ)
+    (fun () => M.func_maj 0)
+    (fun () => M.zeroX_maj 0)
+
+-- ============================================================================
+-- The metric-space metatheorem
+-- ============================================================================
+
+/-- **The metric-space metatheorem.** The document's Theorem for `≽ᵃ`
+(`particular-cases-metric-spaces.tex`, item 4), obtained by feeding
+`MetricModel.abstractMajorizability` to `syntactic_general_metatheorem`.
+
+From a derivation of `∀x^ρ (∀u B₀ → ∃v C₀)` in the extended system over the pseudo-metric
+premises, we get a bound `Φ` depending **only on a majorant of `x`** — i.e. for the base type
+`X`, only on a natural `n ≥ d(a,x)`, and not on `x` itself. That independence is the whole
+point of the metric metatheorem, and here it is exactly the `X`-clause of `MetricModel.base`.
+
+The two hypotheses that remain are the honest ones:
+
+* `eqxi` — that `EqX () s t ≡ d(s,t) =ℝ 0ℝ` is interpreted correctly in this model;
+* `spremise` — a realizing **term** for each of `ax_refl`, `ax_sym`, `ax_triangle`.
+
+Neither is a majorizability question, which is why they are parameters here. `spremise` is
+where `MetricModel`'s `d_self` / `d_comm` / `d_triangle` fields will be consumed. -/
+theorem MetricModel.metric_metatheorem (M : MetricModel)
+    (eqxi : EqXInterp (fun () => M.carrier) MetricSpace.F M.si MetricSpace.EqX)
+    (spremise : ∀ (Γ' : Ctx MetricSpace.ι) (B : Formula MetricSpace.F Γ'),
+      MetricSpace.Premises ⟨Γ', B⟩ → SRealizer M.si B)
+    {ρ : Ty MetricSpace.ι} {B₀ C₀ : Formula MetricSpace.F [Ty.nat, ρ]}
+    (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
+    (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
+    (prf : @Derivable MetricSpace.ι MetricSpace.F MetricSpace.EqX Allowed.extended
+      MetricSpace.Premises []
+      (Formula.all ρ (Formula.imp (Formula.all .nat B₀) (Formula.ex .nat C₀)))) :
+    ∃ Φ : Ty.interpret (fun () => M.carrier) ρ.hat → Nat,
+      ∀ (x : Ty.interpret (fun () => M.carrier) ρ)
+        (x_star : Ty.interpret (fun () => M.carrier) ρ.hat),
+        M.abstractMajorizability.toRel.maj ρ x_star x →
+        (∀ u : Nat, u ≤ Φ x_star → Formula.interpret M.si B₀ (u, (x, ()))) →
+        ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret M.si C₀ (v, (x, ())) :=
+  syntactic_general_metatheorem eqxi spremise M.abstractMajorizability
+    hB_qf hB_vf hC_qf hC_vf prf
 
 -- ============================================================================
 -- AdmissibleEqX for the metric space EqX
