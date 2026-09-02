@@ -12,6 +12,7 @@ import Metatheorems.RationalNumbers
 import Metatheorems.SyntacticMetatheorem
 import Metatheorems.RealNumbers
 import Metatheorems.BaseEquality
+import Metatheorems.Soundness
 import Metatheorems.Rounding
 import Metatheorems.MetricSpaces
 import Metatheorems.QVal
