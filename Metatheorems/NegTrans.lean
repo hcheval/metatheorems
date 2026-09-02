@@ -227,8 +227,12 @@ private def not_not_or_intro {Γ : Ctx ι} {A B : Formula F Γ} :
 Proof: apply `forall_rule` with the derivation (in context ρ :: Γ):
   `(¬¬(∀x.¬¬Q)).weaken → ¬¬Q`
 obtained via `forall_ax (.var .vz)` (using `substF_renameF_id` to simplify the
-substituted formula to `¬¬Q`) composed with `neg_neg_imp_rev + neg_neg_mp`. -/
-private def nn_all_nn {Γ : Ctx ι} {ρ : Ty ι} {Q : Formula F (ρ :: Γ)} :
+substituted formula to `¬¬Q`) composed with `neg_neg_imp_rev + neg_neg_mp`.
+
+Public (it was `private` until 2026-09-02): `general_metatheorem_classical` uses it as the
+step that pushes the outer `¬¬` of `NT(∀x A)` inside the `∀`, which is FEASIBILITY decision
+D-1 and the only place the prenexified route needs it. -/
+def nn_all_nn {Γ : Ctx ι} {ρ : Ty ι} {Q : Formula F (ρ :: Γ)} :
     Derivable F EqX a Premises (¬ᶠ¬ᶠ(Formula.all ρ (¬ᶠ¬ᶠQ)) →ᶠ Formula.all ρ (¬ᶠ¬ᶠQ)) :=
   -- Use forall_rule: suffices to derive (¬¬(∀x.¬¬Q)).weaken →ᶠ ¬¬Q in context ρ :: Γ.
   -- Key: forall_ax (.var .vz) gives (∀x.¬¬Q).weaken →ᶠ ¬¬Q after substF_renameF_id.

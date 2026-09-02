@@ -137,6 +137,78 @@ def general_metatheorem
              hUV x (hB (U x) (Nat.le_trans hU_le (Nat.le_max_left ..)))⟩⟩
 
 -- ============================================================================
+-- Renaming lemmas used by the classical (prenexified) route
+-- ============================================================================
+
+/-- `renameF` preserves quantifier-freeness. -/
+theorem isQF_renameF {ι : Type} {F : ι → Ty ι} {Γ Δ : Ctx ι}
+    (r : Term.Renaming Γ Δ) (A : Formula F Γ) :
+    (A.renameF r).isQF = A.isQF := by
+  induction A generalizing Δ with
+  | bot => rfl
+  | eq0 _ _ => rfl
+  | and _ _ ihA ihB => simp only [Formula.renameF, Formula.isQF, ihA r, ihB r]
+  | or _ _ ihA ihB => simp only [Formula.renameF, Formula.isQF, ihA r, ihB r]
+  | imp _ _ ihA ihB => simp only [Formula.renameF, Formula.isQF, ihA r, ihB r]
+  | all _ _ _ => rfl
+  | ex _ _ _ => rfl
+
+/-- `renameF` preserves ∨-freeness. -/
+theorem isVFree_renameF {ι : Type} {F : ι → Ty ι} {Γ Δ : Ctx ι}
+    (r : Term.Renaming Γ Δ) (A : Formula F Γ) :
+    (A.renameF r).isVFree = A.isVFree := by
+  induction A generalizing Δ with
+  | bot => rfl
+  | eq0 _ _ => rfl
+  | and _ _ ihA ihB => simp only [Formula.renameF, Formula.isVFree, ihA r, ihB r]
+  | or _ _ _ _ => rfl
+  | imp _ _ ihA ihB => simp only [Formula.renameF, Formula.isVFree, ihA r, ihB r]
+  | all _ _ ih => simp only [Formula.renameF, Formula.isVFree, ih (Term.Renaming.ext r)]
+  | ex _ _ ih => simp only [Formula.renameF, Formula.isVFree, ih (Term.Renaming.ext r)]
+
+theorem isQF_weakenBy {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι} {ρ : Ty ι} (A : Formula F Γ) :
+    (A.weakenBy ρ).isQF = A.isQF := isQF_renameF _ A
+
+theorem isVFree_weakenBy {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι} {ρ : Ty ι} (A : Formula F Γ) :
+    (A.weakenBy ρ).isVFree = A.isVFree := isVFree_renameF _ A
+
+/-- Semantic counterpart of `Term.interpret_rename_gen`: a renamed formula evaluated in
+`envΔ` means the same as the original evaluated in `envΓ`, provided the two environments
+agree on variable lookups through the renaming. -/
+theorem Formula.interpret_renameF_gen {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    (si : SpaceInterp X F) {Γ Δ : Ctx ι}
+    (r : Term.Renaming Γ Δ) (A : Formula F Γ)
+    (envΔ : Ctx.interpret X Δ) (envΓ : Ctx.interpret X Γ)
+    (h : ∀ {σ} (v : Var Γ σ), Ctx.lookup (r v) envΔ = Ctx.lookup v envΓ) :
+    Formula.interpret si (A.renameF r) envΔ = Formula.interpret si A envΓ := by
+  induction A generalizing Δ with
+  | bot => rfl
+  | eq0 s t =>
+    simp only [Formula.renameF, Formula.interpret,
+      Term.interpret_rename_gen si r s envΔ envΓ h,
+      Term.interpret_rename_gen si r t envΔ envΓ h]
+  | and _ _ ihA ihB =>
+    simp only [Formula.renameF, Formula.interpret, ihA r envΔ envΓ h, ihB r envΔ envΓ h]
+  | or _ _ ihA ihB =>
+    simp only [Formula.renameF, Formula.interpret, ihA r envΔ envΓ h, ihB r envΔ envΓ h]
+  | imp _ _ ihA ihB =>
+    simp only [Formula.renameF, Formula.interpret, ihA r envΔ envΓ h, ihB r envΔ envΓ h]
+  | all σ A ih =>
+    have hstep : ∀ x : Ty.interpret X σ,
+        Formula.interpret si (A.renameF (Term.Renaming.ext r)) (x, envΔ) =
+        Formula.interpret si A (x, envΓ) := fun x =>
+      ih (Term.Renaming.ext r) (x, envΔ) (x, envΓ)
+        (fun {_} v => match v with | .vz => rfl | .vs w => h w)
+    simp only [Formula.renameF, Formula.interpret, hstep]
+  | ex σ A ih =>
+    have hstep : ∀ x : Ty.interpret X σ,
+        Formula.interpret si (A.renameF (Term.Renaming.ext r)) (x, envΔ) =
+        Formula.interpret si A (x, envΓ) := fun x =>
+      ih (Term.Renaming.ext r) (x, envΔ) (x, envΓ)
+        (fun {_} v => match v with | .vz => rfl | .vs w => h w)
+    simp only [Formula.renameF, Formula.interpret, hstep]
+
+-- ============================================================================
 -- Prenexification: (∀u B₀ → ∃v C₀) → ∃u ∃v (B₀ → C₀)  [classical]
 -- ============================================================================
 
@@ -292,9 +364,32 @@ def prenexify
 
 /-- **General Metatheorem from classical proof** (Theorem 6.1).
 
-Takes a classical derivation (with LEM + QF-AC) and composes
-`nd_soundness` with witness extraction. The ¬¬ layers from the
-negative translation are eliminated using `Classical.not_not`. -/
+Takes a classical derivation (with LEM + QF-AC) and produces a bound, via the
+**prenexified** route — the one the paper takes, and the one CLAUDE.md note 2 prescribes:
+
+1. `prenexify` under `∀x` (`forall_map`), turning `∀x(∀u B₀ → ∃v C₀)` into
+   `∀x ∃u ∃v (B₀' → C₀')`. This is the LEM-using step.
+2. `negTrans_sound`, giving `⊢ ¬¬(∀x ¬¬ ∃u∃v(B₀' → C₀'))` in `Allowed.nt_target`
+   (`kurodaInner` is the identity on the QF body).
+3. `nn_all_nn` pushes the outer `¬¬` inside the `∀` (FEASIBILITY decision D-1).
+4. `castAllowed` into `Allowed.extended` and apply Dialectica soundness.
+
+The remaining single `¬¬` is discharged **semantically**, by `Classical.not_not` on the
+matrix, rather than by an object-level Markov step. That is sound and cheap here precisely
+*because* of the prenexification: the body `∃u∃v(B₀' → C₀')` has a quantifier-free ∨-free
+matrix, so `dialecticaMatrix_iff_interpFormula` reduces its matrix to the formula's
+interpretation **for every counter**, and the counter the `¬¬` layer hands us is therefore
+irrelevant. This is exactly what fails on the unprenexified route, where the witness depends
+on a challenge that genuinely matters (FEASIBILITY R1).
+
+An object-level Markov step is *not* available at this shape without new machinery: Markov
+needs a quantifier-free body, and `∃v(B₀' → C₀')` is not one. Collapsing `∃u∃v` to a single
+`∃w` over `nat ×ₜ nat` would need `Term.fst (Term.mkPair a b) = a` as a *derivable* equation,
+and the proof system has no product β-rules (only `beta_eq` for `lam`); the Cantor-pairing
+route has the equations but drags in `RationalNumbers` (the 43 s module). Both are avoidable:
+Markov's principle is *true in the model*, and `Classical.not_not` is precisely its semantic
+content. Note that `dialectica_soundness_ctx'` already uses `Classical.choice` (via the
+Markov case), so nothing is lost. -/
 def general_metatheorem_classical
     {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     (si : SpaceInterp X F)
@@ -317,44 +412,85 @@ def general_metatheorem_classical
         mj.maj ρ x_star x →
         (∀ u : Nat, u ≤ Φ x_star → Formula.interpret si B₀ (u, (x, ()))) →
         ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret si C₀ (v, (x, ())) } := by
-  -- Step 1: Apply ND-interpretation (NT + Dialectica)
-  let r := nd_soundness_closed si eqxi adm nts premise_realizer prf
-  let w := r.val
-  let h := r.property
-  -- h : ∀ y, dialecticaMatrix si NT(∀x(∀u B₀ → ∃v C₀)) () w y
-  -- NT introduces ¬¬ layers. Extract through them using Classical.not_not.
-  -- Step 2: Extract U, V (same projections as extended version, through ¬¬)
-  let ki_w := (w.2 (dialecticaDefaultWitness si _) ()).1
-  let imp_w := fun x => ((ki_w x).2 (dialecticaDefaultWitness si _) ()).1
-  let V : Ty.interpret X ρ → Nat := fun x =>
-    ((imp_w x).1 (dialecticaDefaultWitness si _)).1
-  let U : Ty.interpret X ρ → Nat := fun x =>
-    ((imp_w x).2 (dialecticaDefaultWitness si _) (dialecticaDefaultCounter si _)).1
-  -- Step 3: Prove B(x, U(x)) → C(x, V(x))
-  -- Unfold h through the ¬¬ layers using Classical.not_not
+  classical
+  -- The prenexified matrix, in context [nat, nat, ρ]: variable 0 is `v`, 1 is `u`, 2 is `x`.
+  let B₀' : Formula F [Ty.nat, Ty.nat, ρ] := B₀.weakenBy Ty.nat
+  let C₀' : Formula F [Ty.nat, Ty.nat, ρ] :=
+    C₀.renameF (Term.Renaming.ext Term.Renaming.shift)
+  have hB'_qf : B₀'.isQF = true := by rw [show B₀'.isQF = B₀.isQF from isQF_weakenBy B₀, hB_qf]
+  have hB'_vf : B₀'.isVFree = true := by
+    rw [show B₀'.isVFree = B₀.isVFree from isVFree_weakenBy B₀, hB_vf]
+  have hC'_qf : C₀'.isQF = true := by
+    rw [show C₀'.isQF = C₀.isQF from isQF_renameF _ C₀, hC_qf]
+  have hC'_vf : C₀'.isVFree = true := by
+    rw [show C₀'.isVFree = C₀.isVFree from isVFree_renameF _ C₀, hC_vf]
+  have hP_qf : (B₀' →ᶠ C₀').isQF = true := by
+    simp only [Formula.isQF, hB'_qf, hC'_qf, Bool.and_self]
+  have hP_vf : (B₀' →ᶠ C₀').isVFree = true := by
+    simp only [Formula.isVFree, hB'_vf, hC'_vf, Bool.and_self]
+  -- ── Step 1: prenexify under ∀x ─────────────────────────────────────────────
+  let pren : Derivable F EqX Allowed.classical Premises
+      (((Formula.all Ty.nat B₀) →ᶠ (Formula.ex Ty.nat C₀)) →ᶠ
+        Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀'))) :=
+    prenexify hB_qf hB_vf hC_qf hC_vf
+  let prf' : Derivable F EqX Allowed.classical Premises
+      (Formula.all ρ (Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀')))) :=
+    Derivable.mp prf (forall_map pren)
+  -- ── Step 2: negative translation ───────────────────────────────────────────
+  -- NT(∀x E) = ¬¬(∀x ¬¬ E.kurodaInner) and E.kurodaInner = E, since E's matrix is QF.
+  have hEki :
+      (Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀'))).kurodaInner =
+        Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀')) := by
+    change Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀').kurodaInner) = _
+    rw [kurodaInner_qf (B₀' →ᶠ C₀') hP_qf]
+  let nt := negTrans_sound adm nts prf'
+  have hNT : (Formula.all ρ (Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀'))))ᴺᵀ =
+      (¬ᶠ¬ᶠ(Formula.all ρ (¬ᶠ¬ᶠ(Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀')))))) := by
+    change (¬ᶠ¬ᶠ(Formula.all ρ (¬ᶠ¬ᶠ
+      (Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀'))).kurodaInner))) = _
+    rw [hEki]
+  let nt' : Derivable F EqX Allowed.nt_target Premises
+      (¬ᶠ¬ᶠ(Formula.all ρ (¬ᶠ¬ᶠ(Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀')))))) :=
+    Eq.mp (congrArg (Derivable F EqX Allowed.nt_target Premises ·) hNT) nt
+  -- ── Step 3: push the outer ¬¬ inside the ∀ (D-1) ───────────────────────────
+  let stripped : Derivable F EqX Allowed.nt_target Premises
+      (Formula.all ρ (¬ᶠ¬ᶠ(Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀'))))) :=
+    Derivable.mp nt' nn_all_nn
+  -- ── Step 4: into the extended system ───────────────────────────────────────
+  let extd : Derivable F EqX Allowed.extended Premises
+      (Formula.all ρ (¬ᶠ¬ᶠ(Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀'))))) :=
+    stripped.castAllowed (by constructor <;> decide)
+  -- ── Step 5: Dialectica, then read off U and V ──────────────────────────────
+  -- Destructed with `obtain`, not `let`: the realizer is a huge term, and leaving it as a
+  -- let-value makes every later defeq check try to `whnf` it (a heartbeat timeout).
+  obtain ⟨w, hw⟩ :=
+    (@dialectica_soundness_ctx' ι X F si EqX eqxi Premises premise_realizer _ _ extd) ()
+  -- The counter for the inner `¬¬` is a witness for `¬E`; any one will do, because the
+  -- E-counter it produces is only ever fed to a QF ∨-free matrix.
+  let aW : 𝕎 X (¬ᶠ(Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀')))) :=
+    dialecticaDefaultWitness si _
+  let U : Ty.interpret X ρ → Nat := fun x => ((w x).2 aW ()).1.1
+  let V : Ty.interpret X ρ → Nat := fun x => ((w x).2 aW ()).1.2.1
   have hUV : ∀ x : Ty.interpret X ρ,
       Formula.interpret si B₀ (U x, (x, ())) → Formula.interpret si C₀ (V x, (x, ())) := by
-    -- **THIS SKELETON IS THE WRONG ROUTE. Do not try to finish it here.** (2026-09-02)
-    --
-    -- Everything above takes the *direct* ND interpretation of `∀x(∀u B₀ → ∃v C₀)`, which
-    -- CLAUDE.md note 2 says explicitly not to do: it produces entangled witness/counter
-    -- types, and FEASIBILITY R1 confirmed mechanically that the default challenge fed to
-    -- `imp_w`/`U`/`V` above ignores its argument, so those `U, V` are sound only against one
-    -- junk challenge. R1's conclusion was "the entry point must change", NOT that the
-    -- theorem is unprovable.
-    --
-    -- The prescribed route, per note 2 and R1's "route back (prenexify → Markov →
-    -- extended)":
-    --   1. `prenexify` under `∀x` (via `forall_map`) — PROVED at line 155, clean axioms,
-    --      and currently called from nowhere. It is the LEM-using step, i.e. the hard part.
-    --   2. `negTrans_sound` on the prenexified `∀x ∃u∃v(B₀' → C₀')`.
-    --   3. Dialectica: the matrix is now an implication between two QF formulas, so its
-    --      witness/counter types are singletons and `dialecticaMatrix_iff_interpFormula`
-    --      reduces it.
-    -- Unverified: the `∃u∃v` under NT's `¬¬` needs Markov (available in the extended
-    -- system). R1 calls this "a fresh probe, not a fix" and that is still right.
-    sorry
-  -- Step 4: Construct Φ (same as extended version)
+    intro x hBx
+    have hb : Formula.interpret si B₀' (V x, (U x, (x, ()))) =
+        Formula.interpret si B₀ (U x, (x, ())) :=
+      Formula.interpret_renameF_gen si (Term.Renaming.shift (σ := Ty.nat)) B₀
+        (V x, (U x, (x, ()))) (U x, (x, ())) (fun {_} _ => rfl)
+    have hc : Formula.interpret si C₀' (V x, (U x, (x, ()))) =
+        Formula.interpret si C₀ (V x, (x, ())) :=
+      Formula.interpret_renameF_gen si
+        (Term.Renaming.ext (σ := Ty.nat) (Term.Renaming.shift (σ := Ty.nat))) C₀
+        (V x, (U x, (x, ()))) (V x, (x, ()))
+        (fun {_} v => match v with | .vz => rfl | .vs _ => rfl)
+    have key := hw (x, (aW, ()))
+    simp only [Formula.neg, dialecticaMatrix] at key
+    rw [dialecticaMatrix_iff_interpFormula si B₀' hB'_qf hB'_vf,
+        dialecticaMatrix_iff_interpFormula si C₀' hC'_qf hC'_vf] at key
+    -- key : ¬¬(‖B₀'‖ → ‖C₀'‖) at the environment (V x, (U x, (x, ())))
+    by_contra hCn
+    exact key (fun himp => hCn (Eq.mp hc (himp (Eq.mpr hb hBx))))
   exact ⟨fun x_star =>
     Nat.max (mj.majorizer (ρ := ρ →ₜ .nat) U x_star)
             (mj.majorizer (ρ := ρ →ₜ .nat) V x_star),
@@ -365,6 +501,9 @@ def general_metatheorem_classical
         mj.maj_le (mj.maj_app (mj.majorizer_maj (ρ := ρ →ₜ .nat) U) hx)
       exact ⟨V x, Nat.le_trans hV_le (Nat.le_max_right ..),
              hUV x (hB (U x) (Nat.le_trans hU_le (Nat.le_max_left ..)))⟩⟩
+
+#print axioms general_metatheorem
+#print axioms general_metatheorem_classical
 
 -- ============================================================================
 -- Core bound construction (Theorem 6.1, step 3–5)
