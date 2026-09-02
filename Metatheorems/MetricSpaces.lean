@@ -393,7 +393,11 @@ theorem MetricSpace.premises_pu :
 -- Before the `Premises` parameter was added to `AdmissibleEqX` these fields quantified
 -- over *every* premise set, including the empty one, and were therefore unsatisfiable:
 -- `d_X` is an uninterpreted constant, so `metric x y = fun _ => 1` refutes `d(t,t) =ℝ 0ℝ`.
--- The three `sorry`s below now stand for unfinished work rather than for a false claim.
+-- The `sorry`s below now stand for unfinished work rather than for a false claim.
+-- `eqx_refl` was proved 2026-09-02 (see `MetricSpace.d_self_derivable`); two remain, and they
+-- differ from it in kind: `eqx_refl` is a direct instance of `ax_refl`, while these two need
+-- *reasoning about* `=ℝ` and so pull in the ℚ/ℝ tower, which takes an `AdmissibleEqX` — the
+-- record being defined. See `ARCHITECTURE.md` §1 and §8.
 
 /-- `ax_refl` instantiated at an arbitrary term: `⊢ d(t,t) =ℝ 0ℝ`.
 
