@@ -12948,6 +12948,256 @@ def abs_Q_triangle (a b : Term F Γ Ty.nat) :
   prw (rat_num_add_Q_le adm a b)
   pthm (mul_zero_l adm Dab)
 
+-- ── Additions for the real-number layer (Class C) ──────────────────────────
+--
+-- Everything below was forced by `eq_R_trans`. The two that are not bookkeeping are
+-- `eq_Q_imp_le_Q` — the middle case of `lt_Q_trichotomy`, without which the trichotomy
+-- cannot be used to *prove* a `≤_ℚ` — and `pow2neg_Q_le_add`, the dyadic monotonicity
+-- that turns `pow2neg_rat_den_le`'s index into a usable one.
+
+/-- `a <_ℚ b → a +_ℚ c <_ℚ b +_ℚ c`, at explicit terms. -/
+def lt_Q_add_inst (a b c : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (lt_Q a b →ᶠ lt_Q (Term.app2 Term.add_Q a c) (Term.app2 Term.add_Q b c)) := by
+  have h := Derivable.mp (Derivable.mp (Derivable.mp
+    (lt_Q_add (adm := adm) (al := al) (Premises := Premises) (Γ := Γ)) (.forall_ax a))
+    (.forall_ax b)) (.forall_ax c)
+  q_norm_ord using h
+
+/-- `<_ℚ` is compatible with adding a common term on the *left*. -/
+def lt_Q_add_l (c a b : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (lt_Q a b →ᶠ lt_Q (Term.app2 Term.add_Q c a) (Term.app2 Term.add_Q c b)) :=
+  Derivable.syllogism (lt_Q_add_inst adm a b c)
+    (lt_Q_congr adm (Term.app2 Term.add_Q a c) (Term.app2 Term.add_Q b c)
+      (Term.app2 Term.add_Q c a) (Term.app2 Term.add_Q c b)
+      (add_Q_comm_inst adm a c) (add_Q_comm_inst adm b c))
+
+/-- `≤_ℚ` is compatible with adding a common term on the *left*. -/
+def le_Q_add_l (c a b : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (le_Q a b →ᶠ le_Q (Term.app2 Term.add_Q c a) (Term.app2 Term.add_Q c b)) :=
+  Derivable.syllogism (le_Q_add adm a b c)
+    (le_Q_congr adm (Term.app2 Term.add_Q a c) (Term.app2 Term.add_Q b c)
+      (Term.app2 Term.add_Q c a) (Term.app2 Term.add_Q c b)
+      (add_Q_comm_inst adm a c) (add_Q_comm_inst adm b c))
+
+/-- Two strict summands. -/
+def lt_Q_add_both (a b A B : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (lt_Q a A ∧ᶠ lt_Q b B →ᶠ
+        lt_Q (Term.app2 Term.add_Q a b) (Term.app2 Term.add_Q A B)) := by
+  pmode
+  pintro hyp
+  pdestruct hyp with h1 h2
+  papplym (lt_le_Q_add adm a b A B)
+  psplit
+  · pexact h1
+  · papplym (lt_Q_imp_le_Q adm b B)
+    pexact h2
+
+/-- `y +_ℚ (x −_ℚ y) =_ℚ x`. -/
+def add_Q_sub_cancel (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (eq_Q (Term.app2 Term.add_Q y (Term.app2 Term.sub_Q x y)) x) :=
+  eqQsym adm
+    (eqQtrans adm (eqQsym adm (sub_Q_zero_Q adm x))
+      (eqQtrans adm (sub_Q_trans_split adm Term.zero_Q y x)
+        (addQl adm (sub_Q_zero_Q adm y) (Term.app2 Term.sub_Q x y))))
+
+/-- **`=_ℚ` implies `≤_ℚ`.**
+
+Without this `lt_Q_trichotomy` cannot be used to *prove* a `≤_ℚ`: its middle case delivers
+`eq_Q` and there was no way to spend it. `eq_Q` is not `=₀`, so the ordinary congruence
+combinators do not apply; the derivation runs through the *hypothesis-level* `eq_Q` calculus
+(`eqQhtrans`/`eqQhconst`/`addQl_imp`) to reach `y −_ℚ x =_ℚ 0_ℚ`, and then through
+`le_Q_of_num_zero`. -/
+def eq_Q_imp_le_Q (x y : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (eq_Q x y →ᶠ le_Q x y) :=
+  let nx : Term F Γ Ty.nat := .app Term.neg_Q x
+  let h1 : Derivable F EqX al Premises
+      (eq_Q x y →ᶠ eq_Q (Term.app2 Term.add_Q y nx) (Term.app2 Term.add_Q x nx)) :=
+    .syllogism (addQl_imp adm nx)
+      (eq_Q_sym_inst adm (Term.app2 Term.add_Q x nx) (Term.app2 Term.add_Q y nx))
+  let h2 : Derivable F EqX al Premises
+      (eq_Q x y →ᶠ eq_Q (Term.app2 Term.add_Q y nx) Term.zero_Q) :=
+    eqQhtrans adm h1 (eqQhconst (add_Q_neg_inst adm x))
+  let h3 : Derivable F EqX al Premises
+      (eq_Q x y →ᶠ eq_Q (Term.app2 Term.sub_Q y x) Term.zero_Q) :=
+    eqQhtrans adm (eqQhconst (sub_Q_eq_add_neg adm y x)) h2
+  let hnum : Derivable F EqX al Premises
+      (eq_Q (Term.app2 Term.sub_Q y x) Term.zero_Q →ᶠ
+        Formula.eq0 (.app Term.rat_num (Term.app2 Term.sub_Q y x)) .zero) := by
+    pmode
+    pintro he
+    papplym (eq_Q_sym_inst adm (Term.app2 Term.sub_Q y x) Term.zero_Q) in he with he2
+    papplym (eq_Q_num_zero adm Term.zero_Q (Term.app2 Term.sub_Q y x)) in he2 with he3
+    papply he3
+    pthm (rat_num_zero_Q (adm := adm))
+  .syllogism (.syllogism h3 hnum) (le_Q_of_num_zero adm x y)
+
+/-- `lt_Q_trichotomy` at explicit terms. -/
+def lt_Q_trichotomy_inst (a b : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (lt_Q a b ∨ᶠ eq_Q a b ∨ᶠ lt_Q b a) := by
+  have h := Derivable.mp (Derivable.mp
+    (lt_Q_trichotomy (adm := adm) (al := al) (Premises := Premises) (Γ := Γ))
+    (.forall_ax a)) (.forall_ax b)
+  q_norm_ord using h
+
+/-- The dichotomy the tightness estimates actually use. -/
+def le_Q_or_lt_Q (a b : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises (le_Q a b ∨ᶠ lt_Q b a) := by
+  pmode
+  pfrom htri := lt_Q_trichotomy_inst adm a b
+  -- `∨ᶠ` is left-associative: the trichotomy is `(lt ∨ eq) ∨ gt`.
+  pcases htri with hleft | hgt
+  · pcases hleft with hlt | heq
+    · pleft
+      papplym (lt_Q_imp_le_Q adm a b)
+      pexact hlt
+    · pleft
+      papplym (eq_Q_imp_le_Q adm a b)
+      pexact heq
+  · pright
+    pexact hgt
+
+/-- The dyadic scale is strictly decreasing: `⟨2^{-(n+1)}⟩_ℚ <_ℚ ⟨2^{-n}⟩_ℚ`. -/
+def pow2neg_Q_lt_succ (n : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (lt_Q (.app Term.pow2neg_Q (.app .succ n)) (.app Term.pow2neg_Q n)) :=
+  let p : Term F Γ Ty.nat := .app Term.pow2neg_Q (.app .succ n)
+  let h1 : Derivable F EqX al Premises
+      (lt_Q (Term.app2 Term.add_Q Term.zero_Q p) (Term.app2 Term.add_Q p p)) :=
+    Derivable.mp (zero_lt_pow2neg_Q adm (.app .succ n))
+      (lt_Q_add_inst adm Term.zero_Q p p)
+  Derivable.mp h1
+    (lt_Q_congr adm (Term.app2 Term.add_Q Term.zero_Q p) (Term.app2 Term.add_Q p p)
+      p (.app Term.pow2neg_Q n)
+      (eqQtrans adm (add_Q_comm_inst adm Term.zero_Q p) (add_Q_zero_inst adm p))
+      (pow2neg_Q_halve adm n))
+
+/-- The non-strict form. -/
+def pow2neg_Q_le_succ (n : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (le_Q (.app Term.pow2neg_Q (.app .succ n)) (.app Term.pow2neg_Q n)) :=
+  Derivable.mp (pow2neg_Q_lt_succ adm n) (lt_Q_imp_le_Q adm _ _)
+
+/-- Name the composite a *weakened* `∀`-instantiation leaves behind. -/
+macro "q_cons_norm" : tactic =>
+  `(tactic| simp only [
+      Formula.subst0_renameF_ext, Formula.substF_subst0_map_renameF_ext,
+      Formula.substF_cons_renameF_ext,
+      Term.subst_subst0_map_rename_ext, Term.subst_cons_rename_ext,
+      Term.subst_cons_weaken, Term.Subst.cons_vz, Term.Subst.cons_vs,
+      Term.rename_comp, Term.rename_shift, Term.Renaming.comp_apply,
+      Term.Renaming.shift])
+
+/-- The substitution normaliser for order goals inside a proof-mode induction: the
+`closed_subst` set folded in, so no ℚ constant is ever delta-expanded. -/
+macro "q_ord_norm" : tactic =>
+  `(tactic| (try q_cons_norm
+             simp only [lt_Q, le_Q, eq_Q,
+               Formula.subst0, Formula.substVar0, Formula.substF, Formula.neg,
+               Term.subst,
+               Term.subst0_map_vz, Term.subst0_map_vs,
+               Term.substVar0_map_vz, Term.substVar0_map_vs,
+               Term.Subst.ext_vz, Term.Subst.ext_vs, Term.weaken_var, Term.app2,
+               Term.weaken_subst0, subst_subst0_map_weaken, Term.weaken_subst_ext,
+               weaken_substVar0, ProofMode.succVar0, closed_subst]
+             try q_cons_norm))
+
+/-- `⟨2^{-(a +ℕ k)}⟩_ℚ ≤_ℚ ⟨2^{-a}⟩_ℚ`, for every `k`. -/
+def pow2neg_Q_le_add_all (a : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (Formula.all Ty.nat
+        (le_Q (.app Term.pow2neg_Q (Term.app2 Term.add a.weaken (.var .vz)))
+              (.app Term.pow2neg_Q a.weaken))) := by
+  pmode
+  pinduction
+  · q_ord_norm
+    prw (add_zero_r adm a)
+    pthm (le_Q_refl adm (.app Term.pow2neg_Q a))
+  · pforall
+    pintro ih
+    q_ord_norm
+    prw (add_succ adm _ _)
+    papplym (le_Q_trans adm
+      (.app Term.pow2neg_Q (.app .succ (Term.app2 Term.add a.weaken (.var .vz))))
+      (.app Term.pow2neg_Q (Term.app2 Term.add a.weaken (.var .vz)))
+      (.app Term.pow2neg_Q a.weaken))
+    psplit
+    · pthm (pow2neg_Q_le_succ adm (Term.app2 Term.add a.weaken (.var .vz)))
+    · pexact ih
+
+/-- `⟨2^{-(a +ℕ k)}⟩_ℚ ≤_ℚ ⟨2^{-a}⟩_ℚ` at an explicit `k`. -/
+def pow2neg_Q_le_add (a k : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (le_Q (.app Term.pow2neg_Q (Term.app2 Term.add a k))
+            (.app Term.pow2neg_Q a)) := by
+  have h := Derivable.mp (pow2neg_Q_le_add_all (al := al)
+    (Premises := Premises) adm a) (.forall_ax k)
+  q_norm_ord using h
+
+/-- The same, decreasing in the *second* summand — the orientation the telescoping estimate
+produces. -/
+def pow2neg_Q_le_add_r (a k : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (le_Q (.app Term.pow2neg_Q (Term.app2 Term.add a k))
+            (.app Term.pow2neg_Q k)) := by
+  pmode
+  prw (add_comm adm a k)
+  pthm (pow2neg_Q_le_add adm k a)
+
+/-- **The triangle inequality in difference form**: `|a −ℚ c|ℚ ≤ℚ |a −ℚ b|ℚ +ℚ |b −ℚ c|ℚ`. -/
+def abs_Q_sub_triangle (a b c : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (le_Q (.app Term.abs_Q (Term.app2 Term.sub_Q a c))
+        (Term.app2 Term.add_Q
+          (.app Term.abs_Q (Term.app2 Term.sub_Q a b))
+          (.app Term.abs_Q (Term.app2 Term.sub_Q b c)))) :=
+  let bc : Term F Γ Ty.nat := Term.app2 Term.sub_Q b c
+  let ab : Term F Γ Ty.nat := Term.app2 Term.sub_Q a b
+  let h1 : Derivable F EqX al Premises
+      (eq_Q (.app Term.abs_Q (Term.app2 Term.sub_Q a c))
+            (.app Term.abs_Q (Term.app2 Term.add_Q bc ab))) :=
+    abs_Q_congr adm (sub_Q_trans_split adm c b a)
+  Derivable.mp (abs_Q_triangle adm bc ab)
+    (le_Q_congr adm (.app Term.abs_Q (Term.app2 Term.add_Q bc ab))
+      (Term.app2 Term.add_Q (.app Term.abs_Q bc) (.app Term.abs_Q ab))
+      (.app Term.abs_Q (Term.app2 Term.sub_Q a c))
+      (Term.app2 Term.add_Q (.app Term.abs_Q ab) (.app Term.abs_Q bc))
+      (eqQsym adm h1)
+      (add_Q_comm_inst adm (.app Term.abs_Q bc) (.app Term.abs_Q ab)))
+
+/-- The triangle inequality for a difference of *sums*: `|(A+B) −ℚ (a+b)| ≤ℚ |A−a| +ℚ |B−b|`.
+This is what makes a sum of two Cauchy sequences Cauchy. -/
+def abs_Q_sub_add_split (a b A B : Term F Γ Ty.nat) :
+    Derivable F EqX al Premises
+      (le_Q (.app Term.abs_Q (Term.app2 Term.sub_Q
+              (Term.app2 Term.add_Q A B) (Term.app2 Term.add_Q a b)))
+        (Term.app2 Term.add_Q
+          (.app Term.abs_Q (Term.app2 Term.sub_Q A a))
+          (.app Term.abs_Q (Term.app2 Term.sub_Q B b)))) :=
+  Derivable.mp (abs_Q_triangle adm (Term.app2 Term.sub_Q A a) (Term.app2 Term.sub_Q B b))
+    (le_Q_congr adm
+      (.app Term.abs_Q (Term.app2 Term.add_Q
+        (Term.app2 Term.sub_Q A a) (Term.app2 Term.sub_Q B b)))
+      (Term.app2 Term.add_Q (.app Term.abs_Q (Term.app2 Term.sub_Q A a))
+        (.app Term.abs_Q (Term.app2 Term.sub_Q B b)))
+      (.app Term.abs_Q (Term.app2 Term.sub_Q
+        (Term.app2 Term.add_Q A B) (Term.app2 Term.add_Q a b)))
+      (Term.app2 Term.add_Q (.app Term.abs_Q (Term.app2 Term.sub_Q A a))
+        (.app Term.abs_Q (Term.app2 Term.sub_Q B b)))
+      (eqQsym adm (abs_Q_congr adm (sub_Q_add_split adm a b A B)))
+      (eq_Q_refl_inst adm _))
+
+#print axioms abs_Q_sub_add_split
+#print axioms eq_Q_imp_le_Q
+#print axioms le_Q_or_lt_Q
+#print axioms pow2neg_Q_le_add
+#print axioms abs_Q_sub_triangle
+#print axioms add_Q_sub_cancel
+
 #print axioms le_Q_trans
 #print axioms lt_le_Q_add
 #print axioms le_Q_add_both
