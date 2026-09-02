@@ -94,6 +94,36 @@ does real arithmetic will want them — but they do not gate the metatheorem.
 
 Found 2026-09-02 while doing §5 step 3, which is exactly what that step was for.
 
+> **Measured and fixed on branch `bezem-twoclause` (2026-09-02).** The widening works and
+> `prec_maj` goes through. The cost, precisely:
+>
+> * `hatMaj` — the relation at hat types, indexed by `ρ` rather than by `ρ̂`. That indexing is
+>   what makes the whole thing cast-free: `ρ̂.hat = ρ̂` is propositional, not definitional, so
+>   writing the second conjunct literally as `bezemMaj base ρ.hat` would put a transport at
+>   every use. `hatMaj` does not mention `base` at all.
+> * Four structural lemmas (`hatMaj_self`, `hatMaj_trans`, `hatMaj_of_bezemMaj`,
+>   `bezemMaj_of_hatMaj`) and a `maxT` (pointwise max at hat types) with four congruence
+>   lemmas. All by plain induction on `ρ`; no proof is longer than eight lines.
+> * `bezemMaj_of_hatMaj` — the bridge from equal-`n` to `n* ≥ n` — needs the base relation to
+>   be **monotone in its numeric argument** (`BaseMono`). That is a new hypothesis, and it is
+>   satisfied by the metric relation `base i n x :≡ n ≥ d(a, x)`. It is unavoidable: the
+>   composition `a ≽ᵃ_ρ̂ b`, `b ≽ᵃ_ρ c ⊢ a ≽ᵃ_ρ c` at type `X` *is* the statement that the
+>   base relation is upward closed.
+> * `AbstractMajorizability` gains a `selfMaj` field plus seven laws, and `arrow_intro` gains
+>   a second hypothesis. `all_terms_majorizable` correspondingly proves a **conjunction** —
+>   the majorant majorizes, *and* it is `selfMaj`-monotone in its environment — carried by a
+>   new `SelfMajEnv`. This is the only genuinely non-mechanical part, and the reason is
+>   structural: `arrow_intro`'s self obligation is a statement about the majorant alone, so
+>   the induction has to know how the majorant varies with the environment, which the old
+>   statement never tracked.
+> * `bezem_succ_maj` needs its clause duplicated; `bezem_zero_maj` is unchanged;
+>   `bezemRel` is unchanged except that `maj_app` now projects `.1`.
+> * `general_metatheorem` and everything under it are untouched — both `MajorizabilityRel`
+>   fields still come from the first conjunct.
+>
+> New: `bezem_prec_maj`, majorant `R*(y*, z*, n) = max(z*(R*(n−1))(n−1), R*(n−1))`. See
+> `recMaj_hatMaj` / `recMaj_bezemMaj` in `Majorizability.lean`.
+
 The document's `≽ᵃ` at arrow type (`particular-cases-metric-spaces.tex:19`) is a
 **conjunction**; `bezemMaj` (`StrongMajorizability.lean`) has only the first half:
 
