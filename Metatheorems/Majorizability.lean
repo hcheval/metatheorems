@@ -41,13 +41,49 @@ structure AbstractMajorizability {ι : Type} {X : ι → Type} {F : ι → Ty ι
     (f_star : Ty.interpret X (ρ →ₜ τ).hat) (f : Ty.interpret X (ρ →ₜ τ))
     (x_star : Ty.interpret X ρ.hat) (x : Ty.interpret X ρ),
     maj (ρ →ₜ τ) f_star f → maj ρ x_star x → maj τ (f_star x_star) (f x)
+  /-- **Self-majorization** (`≽ᵃ_ρ̂`), the second conjunct of Bezem's definition. Both
+      arguments are at the hat type; `bezemMaj`'s instance of this is `hatMaj`.
+
+      Added 2026-09-02 with the two-clause widening of `bezemMaj`. Before that, `arrow_intro`
+      was the converse of `app_compat` outright; with two clauses a majorization at an arrow
+      type carries strictly more information than the pointwise statement, and there is no way
+      to recover it, so the structure has to carry the notion. -/
+  selfMaj : (ρ : Ty ι) → Ty.interpret X ρ.hat → Ty.interpret X ρ.hat → Prop
+  /-- A majorant majorizes itself. -/
+  maj_selfMaj : ∀ {ρ : Ty ι} {x_star : Ty.interpret X ρ.hat} {x : Ty.interpret X ρ},
+    maj ρ x_star x → selfMaj ρ x_star x_star
+  /-- `selfMaj` entails self-majorization on the left. -/
+  selfMaj_self : ∀ {ρ : Ty ι} {a b : Ty.interpret X ρ.hat}, selfMaj ρ a b → selfMaj ρ a a
+  /-- `selfMaj` respects application. -/
+  selfMaj_app : ∀ {ρ τ : Ty ι} {f g : Ty.interpret X (ρ →ₜ τ).hat}
+    {x y : Ty.interpret X ρ.hat},
+    selfMaj (ρ →ₜ τ) f g → selfMaj ρ x y → selfMaj τ (f x) (g y)
   /-- Property 2': arrow introduction (converse of app_compat).
-      Needed for primitive lambda abstractions. -/
+      Needed for primitive lambda abstractions.
+
+      The second hypothesis is the self-majorization obligation; it is what the widening
+      costs, and it is what `all_terms_majorizable` has to thread through the `lam` case. -/
   arrow_intro : ∀ {ρ τ : Ty ι}
     (f_star : Ty.interpret X (ρ →ₜ τ).hat) (f : Ty.interpret X (ρ →ₜ τ)),
     (∀ (x_star : Ty.interpret X ρ.hat) (x : Ty.interpret X ρ),
       maj ρ x_star x → maj τ (f_star x_star) (f x)) →
+    (∀ (x_star x : Ty.interpret X ρ.hat),
+      selfMaj ρ x_star x → selfMaj τ (f_star x_star) (f_star x)) →
     maj (ρ →ₜ τ) f_star f
+  /-- Arrow introduction for `selfMaj`. -/
+  selfMaj_arrow_intro : ∀ {ρ τ : Ty ι} (f g : Ty.interpret X (ρ →ₜ τ).hat),
+    (∀ (x y : Ty.interpret X ρ.hat), selfMaj ρ x y → selfMaj τ (f x) (g y)) →
+    (∀ (x y : Ty.interpret X ρ.hat), selfMaj ρ x y → selfMaj τ (f x) (f y)) →
+    selfMaj (ρ →ₜ τ) f g
+  /-- Product introduction for `selfMaj`. -/
+  selfMaj_prod_intro : ∀ {ρ τ : Ty ι} (p q : Ty.interpret X (ρ ×ₜ τ).hat),
+    selfMaj ρ p.1 q.1 → selfMaj τ p.2 q.2 → selfMaj (ρ ×ₜ τ) p q
+  /-- Product elimination for `selfMaj`, first component. -/
+  selfMaj_prod_fst : ∀ {ρ τ : Ty ι} (p q : Ty.interpret X (ρ ×ₜ τ).hat),
+    selfMaj (ρ ×ₜ τ) p q → selfMaj ρ p.1 q.1
+  /-- Product elimination for `selfMaj`, second component. -/
+  selfMaj_prod_snd : ∀ {ρ τ : Ty ι} (p q : Ty.interpret X (ρ ×ₜ τ).hat),
+    selfMaj (ρ ×ₜ τ) p q → selfMaj τ p.2 q.2
   /-- Product introduction: majorize componentwise. -/
   prod_intro : ∀ {ρ τ : Ty ι}
     (p_star : Ty.interpret X (ρ ×ₜ τ).hat) (p : Ty.interpret X (ρ ×ₜ τ)),
@@ -112,6 +148,39 @@ lemma MajEnv.lookup {ι : Type} {X : ι → Type} {F : ι → Ty ι}
   | vz => exact h.1
   | vs w ih => exact ih h.2
 
+/-- Two hat-environments are `selfMaj`-related componentwise. The `lam` case of
+`all_terms_majorizable` needs this: `arrow_intro`'s self-majorization obligation is a
+statement about the *majorant* alone, so the induction has to carry hat-level monotonicity of
+the majorant in its environment. -/
+def SelfMajEnv {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    {si : SpaceInterp X F} (am : AbstractMajorizability si) :
+    (Γ : Ctx ι) → Ctx.interpret X (Γ.map Ty.hat) → Ctx.interpret X (Γ.map Ty.hat) → Prop
+  | [],     (),          ()          => True
+  | _ :: Γ, (v₁, e₁), (v₂, e₂) => am.selfMaj _ v₁ v₂ ∧ SelfMajEnv am Γ e₁ e₂
+
+lemma SelfMajEnv.lookup {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    {si : SpaceInterp X F} {am : AbstractMajorizability si}
+    {Γ : Ctx ι} {τ : Ty ι} (v : Var Γ τ)
+    {e₁ e₂ : Ctx.interpret X (Γ.map Ty.hat)} (h : SelfMajEnv am Γ e₁ e₂) :
+    am.selfMaj τ (Ctx.lookupHat v e₁) (Ctx.lookupHat v e₂) := by
+  induction v with
+  | vz => exact h.1
+  | vs w ih => exact ih h.2
+
+lemma SelfMajEnv.self {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    {si : SpaceInterp X F} {am : AbstractMajorizability si} :
+    ∀ (Γ : Ctx ι) {e₁ e₂ : Ctx.interpret X (Γ.map Ty.hat)},
+      SelfMajEnv am Γ e₁ e₂ → SelfMajEnv am Γ e₁ e₁
+  | [],     _, _, _ => trivial
+  | _ :: Γ, _, _, h => ⟨am.selfMaj_self h.1, SelfMajEnv.self Γ h.2⟩
+
+lemma MajEnv.toSelfMajEnv {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    {si : SpaceInterp X F} {am : AbstractMajorizability si} :
+    ∀ (Γ : Ctx ι) {env_star : Ctx.interpret X (Γ.map Ty.hat)} {env : Ctx.interpret X Γ},
+      MajEnv am Γ env_star env → SelfMajEnv am Γ env_star env_star
+  | [],     _, _, _ => trivial
+  | _ :: Γ, _, _, h => ⟨am.maj_selfMaj h.1, MajEnv.toSelfMajEnv Γ h.2⟩
+
 -- ============================================================================
 -- All terms are majorizable (generalized Lemma 6.0.2)
 -- ============================================================================
@@ -137,61 +206,88 @@ theorem all_terms_majorizable {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     {Γ : Ctx ι} {ρ : Ty ι} (t : Term F Γ ρ) :
     ∃ t_star : ℕ → Ctx.interpret X (Γ.map Ty.hat) → Ty.interpret X ρ.hat,
       ∀ n ≥ am.N,
-        ∀ (env_star : Ctx.interpret X (Γ.map Ty.hat)) (env : Ctx.interpret X Γ),
-          MajEnv am Γ env_star env →
-          am.maj ρ (t_star n env_star) (Term.interpret si t env) := by
+        (∀ (env_star : Ctx.interpret X (Γ.map Ty.hat)) (env : Ctx.interpret X Γ),
+            MajEnv am Γ env_star env →
+            am.maj ρ (t_star n env_star) (Term.interpret si t env))
+        ∧ (∀ (e₁ e₂ : Ctx.interpret X (Γ.map Ty.hat)),
+            SelfMajEnv am Γ e₁ e₂ → am.selfMaj ρ (t_star n e₁) (t_star n e₂)) := by
   induction t with
   | var v =>
-    exact ⟨fun _ env_star => Ctx.lookupHat v env_star, fun _ _ _ _ h => MajEnv.lookup v h⟩
+    exact ⟨fun _ env_star => Ctx.lookupHat v env_star,
+      fun _ _ => ⟨fun _ _ h => MajEnv.lookup v h, fun _ _ h => SelfMajEnv.lookup v h⟩⟩
   | app f a ihf iha =>
     obtain ⟨f_star, hf⟩ := ihf
     obtain ⟨a_star, ha⟩ := iha
     exact ⟨fun n env_star => f_star n env_star (a_star n env_star),
-      fun n hn env_star env henv =>
-        am.app_compat _ _ _ _ (hf n hn env_star env henv) (ha n hn env_star env henv)⟩
+      fun n hn =>
+        ⟨fun env_star env henv =>
+            am.app_compat _ _ _ _ ((hf n hn).1 env_star env henv) ((ha n hn).1 env_star env henv),
+         fun e₁ e₂ he =>
+            am.selfMaj_app ((hf n hn).2 e₁ e₂ he) ((ha n hn).2 e₁ e₂ he)⟩⟩
   | lam body ih =>
     obtain ⟨body_star, hbody⟩ := ih
-    exact ⟨fun n env_star x_star => body_star n (x_star, env_star),
-      fun n hn env_star env henv =>
-        am.arrow_intro _ _ (fun x_star x hx =>
-          hbody n hn (x_star, env_star) (x, env) ⟨hx, henv⟩)⟩
+    refine ⟨fun n env_star x_star => body_star n (x_star, env_star), fun n hn => ⟨?_, ?_⟩⟩
+    · exact fun env_star env henv =>
+        am.arrow_intro _ _
+          (fun x_star x hx => (hbody n hn).1 (x_star, env_star) (x, env) ⟨hx, henv⟩)
+          (fun x_star x hx =>
+            (hbody n hn).2 (x_star, env_star) (x, env_star)
+              ⟨hx, MajEnv.toSelfMajEnv _ henv⟩)
+    · exact fun e₁ e₂ he =>
+        am.selfMaj_arrow_intro _ _
+          (fun x y hx => (hbody n hn).2 (x, e₁) (y, e₂) ⟨hx, he⟩)
+          (fun x y hx => (hbody n hn).2 (x, e₁) (y, e₁) ⟨hx, SelfMajEnv.self _ he⟩)
   | zero =>
     obtain ⟨z_star, hz⟩ := am.zero_maj
-    exact ⟨fun n _ => z_star n, fun n hn _ _ _ => hz n hn⟩
+    exact ⟨fun n _ => z_star n,
+      fun n hn => ⟨fun _ _ _ => hz n hn, fun _ _ _ => am.maj_selfMaj (hz n hn)⟩⟩
   | succ =>
     obtain ⟨s_star, hs⟩ := am.succ_maj
-    exact ⟨fun n _ => s_star n, fun n hn _ _ _ => hs n hn⟩
+    exact ⟨fun n _ => s_star n,
+      fun n hn => ⟨fun _ _ _ => hs n hn, fun _ _ _ => am.maj_selfMaj (hs n hn)⟩⟩
   | prec ρ =>
     obtain ⟨r_star, hr⟩ := am.prec_maj ρ
-    exact ⟨fun n _ => r_star n, fun n hn _ _ _ => hr n hn⟩
+    exact ⟨fun n _ => r_star n,
+      fun n hn => ⟨fun _ _ _ => hr n hn, fun _ _ _ => am.maj_selfMaj (hr n hn)⟩⟩
   | func f =>
     obtain ⟨f_star, hf⟩ := am.func_maj f
-    exact ⟨fun n _ => f_star n, fun n hn _ _ _ => hf n hn⟩
+    exact ⟨fun n _ => f_star n,
+      fun n hn => ⟨fun _ _ _ => hf n hn, fun _ _ _ => am.maj_selfMaj (hf n hn)⟩⟩
   | zeroX i =>
     obtain ⟨z_star, hz⟩ := am.zeroX_maj i
-    exact ⟨fun n _ => z_star n, fun n hn _ _ _ => hz n hn⟩
-  | unitI => exact ⟨fun _ _ => (), fun _ _ _ _ _ => am.unit_maj⟩
+    exact ⟨fun n _ => z_star n,
+      fun n hn => ⟨fun _ _ _ => hz n hn, fun _ _ _ => am.maj_selfMaj (hz n hn)⟩⟩
+  | unitI =>
+    exact ⟨fun _ _ => (),
+      fun _ _ => ⟨fun _ _ _ => am.unit_maj, fun _ _ _ => am.maj_selfMaj am.unit_maj⟩⟩
   | mkPair a b iha ihb =>
     obtain ⟨a_star, ha⟩ := iha
     obtain ⟨b_star, hb⟩ := ihb
     exact ⟨fun n env_star => (a_star n env_star, b_star n env_star),
-      fun n hn env_star env henv =>
-        am.prod_intro _ _ (ha n hn env_star env henv) (hb n hn env_star env henv)⟩
+      fun n hn =>
+        ⟨fun env_star env henv =>
+            am.prod_intro _ _ ((ha n hn).1 env_star env henv) ((hb n hn).1 env_star env henv),
+         fun e₁ e₂ he =>
+            am.selfMaj_prod_intro _ _ ((ha n hn).2 e₁ e₂ he) ((hb n hn).2 e₁ e₂ he)⟩⟩
   | fst p ih =>
     obtain ⟨p_star, hp⟩ := ih
     exact ⟨fun n env_star => (p_star n env_star).1,
-      fun n hn env_star env henv => am.prod_fst _ _ (hp n hn env_star env henv)⟩
+      fun n hn =>
+        ⟨fun env_star env henv => am.prod_fst _ _ ((hp n hn).1 env_star env henv),
+         fun e₁ e₂ he => am.selfMaj_prod_fst _ _ ((hp n hn).2 e₁ e₂ he)⟩⟩
   | snd p ih =>
     obtain ⟨p_star, hp⟩ := ih
     exact ⟨fun n env_star => (p_star n env_star).2,
-      fun n hn env_star env henv => am.prod_snd _ _ (hp n hn env_star env henv)⟩
+      fun n hn =>
+        ⟨fun env_star env henv => am.prod_snd _ _ ((hp n hn).1 env_star env henv),
+         fun e₁ e₂ he => am.selfMaj_prod_snd _ _ ((hp n hn).2 e₁ e₂ he)⟩⟩
 
 /-- **Corollary**: All closed terms are majorizable. -/
 theorem all_closed_terms_majorizable {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     {si : SpaceInterp X F} (am : AbstractMajorizability si)
     {ρ : Ty ι} (t : Term F ([] : Ctx ι) ρ) : IsMajorizable am t := by
   obtain ⟨t_star, ht⟩ := all_terms_majorizable am t
-  exact ⟨fun n => t_star n (), fun n hn => ht n hn () () True.intro⟩
+  exact ⟨fun n => t_star n (), fun n hn => (ht n hn).1 () () True.intro⟩
 
 -- ============================================================================
 -- Bridge to `MajorizabilityRel` (what the metatheorem consumes)
@@ -256,8 +352,16 @@ def bezemAbstract (si : SpaceInterp X F) (base : (i : ι) → Nat → X i → Pr
     AbstractMajorizability si where
   maj := bezemMaj base
   nat_order _ _ h := h
-  app_compat _ _ _ _ hf hx := hf _ _ hx
-  arrow_intro _ _ h := h
+  app_compat _ _ _ _ hf hx := hf.1 _ _ hx
+  selfMaj := hatMaj
+  maj_selfMaj h := hatMaj_of_bezemMaj _ _ _ h
+  selfMaj_self h := hatMaj_self _ _ _ h
+  selfMaj_app hf hx := hf.1 _ _ hx
+  arrow_intro _ _ h₁ h₂ := ⟨h₁, h₂⟩
+  selfMaj_arrow_intro _ _ h₁ h₂ := ⟨h₁, h₂⟩
+  selfMaj_prod_intro _ _ h₁ h₂ := ⟨h₁, h₂⟩
+  selfMaj_prod_fst _ _ h := h.1
+  selfMaj_prod_snd _ _ h := h.2
   prod_intro _ _ h₁ h₂ := ⟨h₁, h₂⟩
   prod_fst _ _ h := h.1
   prod_snd _ _ h := h.2
@@ -284,7 +388,129 @@ theorem bezem_zero_maj (base : (i : ι) → Nat → X i → Prop) (N : ℕ) :
 theorem bezem_succ_maj (base : (i : ι) → Nat → X i → Prop) (N : ℕ) :
     ∃ s_star : ℕ → Ty.interpret X (Ty.nat →ₜ Ty.nat).hat,
       ∀ n ≥ N, bezemMaj base (.nat →ₜ .nat) (s_star n) (Nat.succ : Nat → Nat) :=
-  ⟨fun _ => Nat.succ, fun _ _ _ _ h => Nat.succ_le_succ h⟩
+  ⟨fun _ => Nat.succ,
+    fun _ _ => ⟨fun _ _ h => Nat.succ_le_succ h, fun _ _ h => Nat.succ_le_succ h⟩⟩
+
+/-! ### The recursor
+
+`R` is the constant the two-clause relation was widened for. The document's induction
+(`particular-cases-metric-spaces.tex:82–96`) gives the mixed statement at *equal* `n`; the
+formal obligation is at `n* ≥ n`, and the gap is closed by `recMaj_hatMaj` (the majorant is
+`hatMaj`-monotone in its numeric argument) composed with `bezemMaj_of_hatMaj`. Neither is
+available from the one-clause relation.
+
+The majorant is the recursion with a running `maxT`, so it is monotone by construction. -/
+
+/-- The recursor's semantic value, spelled as `Nat.rec` so it matches
+`AbstractMajorizability.prec_maj`'s statement definitionally. -/
+def recSem (ρ : Ty ι) (y : Ty.interpret X ρ)
+    (z : Ty.interpret X ρ → Nat → Ty.interpret X ρ) (n : Nat) : Ty.interpret X ρ :=
+  Nat.rec (motive := fun _ => Ty.interpret X ρ) y (fun k ih => z ih k) n
+
+/-- The recursor's majorant: the same recursion with a running maximum. -/
+def recMaj (ρ : Ty ι) (y_star : Ty.interpret X ρ.hat)
+    (z_star : Ty.interpret X ρ.hat → Nat → Ty.interpret X ρ.hat) (n : Nat) :
+    Ty.interpret X ρ.hat :=
+  Nat.rec (motive := fun _ => Ty.interpret X ρ.hat) y_star
+    (fun k ih => maxT ρ (z_star ih k) ih) n
+
+theorem recSem_zero (ρ : Ty ι) (y : Ty.interpret X ρ) (z) : recSem ρ y z 0 = y := rfl
+
+theorem recSem_succ (ρ : Ty ι) (y : Ty.interpret X ρ) (z) (k : Nat) :
+    recSem ρ y z (k + 1) = z (recSem ρ y z k) k := rfl
+
+theorem recMaj_zero (ρ : Ty ι) (y : Ty.interpret X ρ.hat) (z) : recMaj ρ y z 0 = y := rfl
+
+theorem recMaj_succ (ρ : Ty ι) (y : Ty.interpret X ρ.hat) (z) (k : Nat) :
+    recMaj ρ y z (k + 1) = maxT ρ (z (recMaj ρ y z k) k) (recMaj ρ y z k) := rfl
+
+/-- The majorant is `hatMaj`-monotone in *all three* arguments, the numeric one included.
+This is the statement the second conjunct exists to make provable. -/
+theorem recMaj_hatMaj (ρ : Ty ι) {y₁ y₂ : Ty.interpret X ρ.hat}
+    {z₁ z₂ : Ty.interpret X (ρ →ₜ Ty.nat →ₜ ρ).hat}
+    (hy : hatMaj ρ y₁ y₂) (hz : hatMaj (ρ →ₜ Ty.nat →ₜ ρ) z₁ z₂) :
+    ∀ n₁ n₂ : Nat, n₁ ≥ n₂ → hatMaj ρ (recMaj ρ y₁ z₁ n₁) (recMaj ρ y₂ z₂ n₂) := by
+  intro n₁
+  induction n₁ with
+  | zero =>
+    intro n₂ h
+    have : n₂ = 0 := Nat.le_zero.mp h
+    subst this
+    exact hy
+  | succ k ih =>
+    intro n₂ h
+    cases n₂ with
+    | zero =>
+      have hk := ih 0 (Nat.zero_le k)
+      rw [recMaj_succ]
+      refine maxT_hatMaj_right ρ _ _ _ hk ?_
+      exact (hz.2 _ _ (hatMaj_self ρ _ _ hk)).1 k k (Nat.le_refl k)
+    | succ m =>
+      have hkm : k ≥ m := Nat.le_of_succ_le_succ h
+      have hk := ih m hkm
+      rw [recMaj_succ, recMaj_succ]
+      exact maxT_hatMaj ρ _ _ _ _ ((hz.1 _ _ hk).1 k m hkm) hk
+
+/-- The mixed statement, at `n* ≥ n` rather than at equal `n`. -/
+theorem recMaj_bezemMaj {base : (i : ι) → Nat → X i → Prop} (hbase : BaseMono base)
+    (ρ : Ty ι) {y_star : Ty.interpret X ρ.hat} {y : Ty.interpret X ρ}
+    {z_star : Ty.interpret X (ρ →ₜ Ty.nat →ₜ ρ).hat}
+    {z : Ty.interpret X (ρ →ₜ Ty.nat →ₜ ρ)}
+    (hy : bezemMaj base ρ y_star y) (hz : bezemMaj base (ρ →ₜ Ty.nat →ₜ ρ) z_star z) :
+    ∀ n_star n : Nat, n_star ≥ n →
+      bezemMaj base ρ (recMaj ρ y_star z_star n_star) (recSem ρ y z n) := by
+  intro n_star n
+  induction n generalizing n_star with
+  | zero =>
+    intro h
+    refine bezemMaj_of_hatMaj hbase ρ _ y_star _ ?_ hy
+    exact recMaj_hatMaj ρ (hatMaj_of_bezemMaj ρ _ _ hy)
+      (hatMaj_of_bezemMaj (ρ →ₜ Ty.nat →ₜ ρ) _ _ hz) n_star 0 (Nat.zero_le _)
+  | succ m ih =>
+    intro h
+    cases n_star with
+    | zero => exact absurd h (by omega)
+    | succ k =>
+      have hkm : k ≥ m := Nat.le_of_succ_le_succ h
+      have hrec := ih k hkm
+      rw [recMaj_succ, recSem_succ]
+      exact maxT_bezemMaj_left hbase ρ _ _ _ ((hz.1 _ _ hrec).1 k m hkm)
+        (hatMaj_of_bezemMaj ρ _ _ hrec)
+
+/-- **`R` is majorizable**, for any base relation that is monotone in its numeric argument.
+
+This is the obligation `METRIC_PLAN.md` §2.5 identified as unreachable with the one-clause
+relation; with the self-majorization conjunct it goes through. -/
+theorem bezem_prec_maj {base : (i : ι) → Nat → X i → Prop} (hbase : BaseMono base) (N : ℕ)
+    (ρ : Ty ι) :
+    ∃ r_star : ℕ → Ty.interpret X (recTy ρ).hat,
+      ∀ n ≥ N, bezemMaj base (recTy ρ) (r_star n)
+        (fun (y : Ty.interpret X ρ)
+             (z : Ty.interpret X ρ → Ty.interpret X Ty.nat → Ty.interpret X ρ)
+             (n : Nat) => Nat.rec y (fun n ih => z ih n) n) := by
+  refine ⟨fun _ => fun y_star z_star n => recMaj ρ y_star z_star n, fun _ _ => ⟨?_, ?_⟩⟩
+  · -- mixed clause
+    intro y_star y hy
+    refine ⟨?_, ?_⟩
+    · intro z_star z hz
+      exact ⟨fun n_star n hn => recMaj_bezemMaj hbase ρ hy hz n_star n hn,
+             fun n₁ n₂ hn => recMaj_hatMaj ρ (hatMaj_of_bezemMaj ρ _ _ hy)
+               (hatMaj_of_bezemMaj (ρ →ₜ Ty.nat →ₜ ρ) _ _ hz) n₁ n₂ hn⟩
+    · intro z₁ z₂ hz
+      exact ⟨fun n₁ n₂ hn => recMaj_hatMaj ρ (hatMaj_of_bezemMaj ρ _ _ hy) hz n₁ n₂ hn,
+             fun n₁ n₂ hn => recMaj_hatMaj ρ (hatMaj_of_bezemMaj ρ _ _ hy)
+               (hatMaj_self _ _ _ hz) n₁ n₂ hn⟩
+  · -- self-majorization clause
+    intro y₁ y₂ hy
+    refine ⟨?_, ?_⟩
+    · intro z₁ z₂ hz
+      exact ⟨fun n₁ n₂ hn => recMaj_hatMaj ρ hy hz n₁ n₂ hn,
+             fun n₁ n₂ hn => recMaj_hatMaj ρ (hatMaj_self _ _ _ hy)
+               (hatMaj_self _ _ _ hz) n₁ n₂ hn⟩
+    · intro z₁ z₂ hz
+      exact ⟨fun n₁ n₂ hn => recMaj_hatMaj ρ (hatMaj_self _ _ _ hy) hz n₁ n₂ hn,
+             fun n₁ n₂ hn => recMaj_hatMaj ρ (hatMaj_self _ _ _ hy)
+               (hatMaj_self _ _ _ hz) n₁ n₂ hn⟩
 
 /-- `bezemAbstract` and `bezemRel` agree, so a space built the per-constant way still feeds
 anything stated against `MajorizabilityRel`. -/
