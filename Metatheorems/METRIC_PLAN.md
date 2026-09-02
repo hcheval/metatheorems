@@ -19,6 +19,12 @@ The chapter's entire content is:
    Lemma 17.80), `R` (by induction on `n`), `0_X`, and `d_X`.
 4. **Theorem** — the metric metatheorem, by applying the general metatheorem to the above.
 
+**Careful when reading item 3 as a to-do list — it is the document's constants, not ours.**
+`Π` and `Σ` are constants *there* because that presentation compiles λ away. Here `lam` is
+primitive, so they do not exist and there is nothing to majorize; their content is
+`arrow_intro`. Our five obligations are listed in §5.4. Reading the document's list as our
+work-list is a mistake that has already been made once in this file.
+
 **Consequence: most of `RealNumbers.lean` is not on the critical path.** The ordered-field
 package is what makes ℝ *an ordered field*; the metric-space metatheorem does not consume it.
 
@@ -222,8 +228,10 @@ and builds green at 8063 jobs with `mct_p1`/`mct_p2`/ℚ unregressed.
 So the metric-space work should target `syntactic_general_metatheorem` +
 `AbstractMajorizability`, not `general_metatheorem` + `Majorizability`. §3's hard part — a
 total majoriser for arbitrary set-theoretic functions at arrow types — **disappears**; what
-replaces it is the document's own per-constant obligations (`0`, `S`, `Π`, `Σ`, `R`, `0_X`,
-`d_X`), which is what §1's Proposition actually proves.
+replaces it is the per-constant obligations, which is what §1's Proposition proves. **Ours are
+not the document's list**: `AbstractMajorizability` asks for `zero_maj`, `succ_maj`,
+`prec_maj`, `func_maj`, `zeroX_maj` — five, with no `Π`/`Σ`, because those are not `Term`
+constructors here. Their content is `arrow_intro`, discharged by `bezemAbstract`. See §5.4.
 
 ## 5. Suggested order
 
@@ -243,10 +251,21 @@ replaces it is the document's own per-constant obligations (`0`, `S`, `Π`, `Σ`
    definitional unfolding (`arrow_intro` is `fun _ _ h => h`), plus `bezem_zero_maj` /
    `bezem_succ_maj` for the two ℕ constants, which are `base`-independent. **Blocked on §2.5**
    before the metric `base` itself is worth writing.
-4. **The per-constant obligations** — `0` ✅, `S` ✅, `Π`, `Σ` self-majorising via Lemma 17.80,
-   `R` by induction (needs §2.5), `0_X`, `d_X` (needs §2.5). This is §1's Proposition,
-   transcribed. Note Lemma 17.80 is `\solution{}`-empty in the document, so it must be proved,
-   not transcribed.
+4. **The per-constant obligations.** `AbstractMajorizability` asks for exactly five:
+   `zero_maj` ✅, `succ_maj` ✅, `prec_maj` ✅ (`bezem_prec_maj`, 2026-09-02), and the two that
+   remain — `zeroX_maj` for `0_X` and `func_maj` for `d_X`.
+
+   **There is no `Π` or `Σ` obligation.** An earlier version of this list had them, copied from
+   the document's constant list; that was a transcription error of exactly the kind §2 warns
+   about. `Π` and `Σ` are not `Term` constructors here — we took `lam` primitive — and their
+   majorization obligations are `arrow_intro`, already discharged once and for all by
+   `bezemAbstract`. See CLAUDE.md, "Lambda vs. combinators": the document justifies `Π ≽ Π` /
+   `Σ ≽ Σ` *by* Lemma 17.80, and Lemma 17.80's ⟸ direction *is* `arrow_intro`. Same content,
+   different place — so this row is done, not pending.
+
+   Lemma 17.80 is `\solution{}`-empty in the document. For `bezemMaj` its single-arrow case
+   holds definitionally (`fun _ _ h₁ h₂ => ⟨h₁, h₂⟩`); the iterated `ρ₁→…→ρₖ→τ` form would
+   follow by induction if it is ever needed explicitly.
 5. **The three `admissibleEqX` sorries**, needing the three Class C real facts — the only place
    the ℝ obstruction actually bites, and it can proceed in parallel with 2–4.
 
