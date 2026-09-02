@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Horatiu
 -/
 import Metatheorems.QVal
-import Metatheorems.Terms.Rational
+import Metatheorems.Terms.Real
 
 namespace Metatheorems
 
@@ -351,6 +351,252 @@ theorem interpret_snd_pair_fun {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.i
   simp only [Term.snd_pair, Term.app2, Term.interpret,
     interpret_monus_fun, interpret_inv_triag_fun, interpret_fst_pair_fun]
   rfl
+
+-- ============================================================================
+-- Section 5: division by two
+--
+-- `Term.div2` runs a `prec` whose state is the *code* `pair(⌈k/2⌉, isEven k)`.
+-- The content is the invariant `state k = pairN ((k + 1) / 2) (1 - k % 2)`, which
+-- is where `fstN_pairN` / `sndN_pairN` earn their keep.
+--
+-- **`Term.div2` is misnamed**: it computes the ceiling `⌈n/2⌉ = (n+1)/2`, not the
+-- floor. Its own docstring claims the state is `pair(div2 k, isEven k)`, but the
+-- step adds `snd` *before* flipping the parity flag, so `div2 1 = 1`. Nothing
+-- downstream is wrong — `Term.rat_num` is `div2 (j + isOdd j)`, and that is
+-- `⌈j/2⌉` on the nose either way, which is what the encoding wants — but the
+-- mirror below states the ceiling, because that is what the term computes.
+-- ============================================================================
+
+private theorem rec_div2_state :
+    ∀ n : ℕ,
+      (Nat.rec (pairN 0 1) (fun _ ih => pairN (fstN ih + sndN ih) (1 - sndN ih)) n : ℕ)
+        = pairN ((n + 1) / 2) (1 - n % 2)
+  | 0 => rfl
+  | m + 1 => by
+      change pairN (fstN (Nat.rec (pairN 0 1)
+                (fun _ ih => pairN (fstN ih + sndN ih) (1 - sndN ih)) m : ℕ)
+              + sndN (Nat.rec (pairN 0 1)
+                (fun _ ih => pairN (fstN ih + sndN ih) (1 - sndN ih)) m : ℕ))
+            (1 - sndN (Nat.rec (pairN 0 1)
+                (fun _ ih => pairN (fstN ih + sndN ih) (1 - sndN ih)) m : ℕ))
+          = pairN ((m + 1 + 1) / 2) (1 - (m + 1) % 2)
+      rw [rec_div2_state m, fstN_pairN, sndN_pairN]
+      congr 1 <;> omega
+
+theorem interpret_div2_fun {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpret X Δ) :
+    Term.interpret si (Term.div2 (F := F) (Γ := Δ)) env = fun n => (n + 1) / 2 := by
+  funext n
+  simp only [Term.div2, Term.app3, Term.app2, Term.interpret,
+    interpret_add_fun, interpret_pair_fun, interpret_sg_bar_fun,
+    interpret_fst_pair_fun, interpret_snd_pair_fun]
+  -- the residual `Ctx.lookup`s are definitional; `change` clears them in one step
+  change fstN (Nat.rec (pairN 0 1) (fun _ ih => pairN (fstN ih + sndN ih) (1 - sndN ih)) n)
+      = (n + 1) / 2
+  rw [rec_div2_state n, fstN_pairN]
+
+-- ============================================================================
+-- Section 6: the rational accessors — the checkpoint
+--
+-- These sit on top of the whole pairing + `div2` layer, so if they compose the
+-- method scales.
+-- ============================================================================
+
+theorem interpret_rat_num_fun {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpret X Δ) :
+    Term.interpret si (Term.rat_num (F := F) (Γ := Δ)) env = ratNumN := by
+  funext n
+  simp only [Term.rat_num, Term.app2, Term.interpret,
+    interpret_add_fun, interpret_div2_fun, interpret_isOdd_fun, interpret_fst_pair_fun]
+  change (fstN n + fstN n % 2 + 1) / 2 = ratNumN n
+  simp only [ratNumN]
+  omega
+
+theorem interpret_rat_den_fun {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpret X Δ) :
+    Term.interpret si (Term.rat_den (F := F) (Γ := Δ)) env = ratDenN := by
+  funext n
+  simp only [Term.rat_den, Term.interpret, interpret_snd_pair_fun]
+  rfl
+
+theorem interpret_rat_sign_fun {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpret X Δ) :
+    Term.interpret si (Term.rat_sign (F := F) (Γ := Δ)) env = ratSignN := by
+  funext n
+  simp only [Term.rat_sign, Term.interpret, interpret_isEven_fun, interpret_fst_pair_fun]
+  rfl
+
+theorem interpret_rat_encode_fun {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpret X Δ) :
+    Term.interpret si (Term.rat_encode (F := F) (Γ := Δ)) env = ratEncodeN := by
+  funext s p d
+  simp only [Term.rat_encode, Term.app2, Term.interpret,
+    interpret_pair_fun, interpret_mul_fun, interpret_monus_fun,
+    interpret_isEven_fun, interpret_ofNat]
+  rfl
+
+-- ============================================================================
+-- Section 7: the accessors against `qval`
+--
+-- The point of the mirrors: they really are the sign/numerator/denominator of
+-- the rational `qval` names.
+-- ============================================================================
+
+theorem qval_eq_of_parts (n : ℕ) :
+    qval n = (if ratSignN n = 1 then (ratNumN n : ℚ) else -(ratNumN n)) / (ratDenN n : ℚ) := by
+  have hden : ((ratDenN n : ℕ) : ℚ) = (sndN n : ℚ) + 1 := by
+    simp only [ratDenN]; push_cast; ring
+  rw [qval, hden]
+  congr 1
+  simp only [ratSignN, ratNumN, isEvenN, qnumZ]
+  rcases Nat.even_or_odd (fstN n) with he | ho
+  · obtain ⟨k, hk⟩ := he
+    have h2 : fstN n % 2 = 0 := by omega
+    rw [if_pos h2, if_pos (by omega : 1 - fstN n % 2 = 1),
+      (by omega : (fstN n + 1) / 2 = fstN n / 2)]
+    norm_cast
+  · obtain ⟨k, hk⟩ := ho
+    have h2 : fstN n % 2 = 1 := by omega
+    rw [if_neg (by omega : ¬ fstN n % 2 = 0), if_neg (by omega : ¬ 1 - fstN n % 2 = 1)]
+    simp only [Int.cast_neg, Int.cast_natCast]
+
+-- ============================================================================
+-- Section 8: the S1 tail — the constants that are one unfold over the above
+--
+-- `neg_Q`, `abs_Q`, `pow2neg_Q`, `zero_Q`, `one_Q` introduce no new recursion:
+-- each is `rat_encode` or `pair` applied to already-interpreted pieces. The real
+-- ℚ arithmetic — `add_Q`, `sub_Q`, `lt_Q_dec` — is *not* here; that is S2.
+-- ============================================================================
+
+theorem interpret_neg_Q_fun {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpret X Δ) :
+    Term.interpret si (Term.neg_Q (F := F) (Γ := Δ)) env
+      = fun n => ratEncodeN (1 - ratSignN n) (ratNumN n) (sndN n) := by
+  funext n
+  simp only [Term.neg_Q, Term.app3, Term.app2, Term.interpret,
+    interpret_rat_encode_fun, interpret_monus_fun, interpret_rat_sign_fun,
+    interpret_rat_num_fun, interpret_snd_pair_fun]
+  rfl
+
+theorem interpret_abs_Q_fun {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpret X Δ) :
+    Term.interpret si (Term.abs_Q (F := F) (Γ := Δ)) env
+      = fun n => pairN (2 * ratNumN n) (sndN n) := by
+  funext n
+  simp only [Term.abs_Q, Term.app3, Term.interpret,
+    interpret_rat_encode_fun, interpret_rat_num_fun, interpret_snd_pair_fun]
+  change ratEncodeN 1 (ratNumN n) (sndN n) = _
+  simp only [ratEncodeN, isEvenN]
+  norm_num
+
+theorem interpret_pow2neg_Q_fun {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpret X Δ) :
+    Term.interpret si (Term.pow2neg_Q (F := F) (Γ := Δ)) env
+      = fun n => pairN 2 (2 ^ n - 1) := by
+  funext n
+  simp only [Term.pow2neg_Q, Term.app2, Term.interpret,
+    interpret_pair_fun, interpret_pd_fun', interpret_exp2_fun, interpret_ofNat]
+  change pairN 2 (Nat.pred (2 ^ n)) = pairN 2 (2 ^ n - 1)
+  rfl
+
+theorem interpret_zero_Q {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpret X Δ) :
+    Term.interpret si (Term.zero_Q (F := F) (Γ := Δ)) env = pairN 0 0 := by
+  simp only [Term.zero_Q, Term.app2, Term.interpret, interpret_pair_fun]
+
+theorem interpret_one_Q {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpret X Δ) :
+    Term.interpret si (Term.one_Q (F := F) (Γ := Δ)) env = pairN 2 0 := by
+  simp only [Term.one_Q, Term.app2, Term.interpret, interpret_pair_fun, interpret_ofNat]
+
+-- ============================================================================
+-- Section 9: the payoff — object-level constants denote the right rationals
+--
+-- These are the first statements in the project relating `Term.interpret` of a
+-- ℚ-constant to `qval`. They are exactly what `QVal.lean`'s header said it did
+-- not do.
+-- ============================================================================
+
+theorem qval_interpret_zero_Q {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpret X Δ) :
+    qval (Term.interpret si (Term.zero_Q (F := F) (Γ := Δ)) env) = 0 := by
+  rw [interpret_zero_Q]; exact qval_zero_code
+
+theorem qval_interpret_one_Q {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpret X Δ) :
+    qval (Term.interpret si (Term.one_Q (F := F) (Γ := Δ)) env) = 1 := by
+  rw [interpret_one_Q]; exact qval_one_code
+
+theorem qval_interpret_pow2neg_Q {si : SpaceInterp X F} {Δ : Ctx ι} (n : ℕ)
+    (env : Ctx.interpret X Δ) :
+    qval (Term.interpret si (Term.pow2neg_Q (F := F) (Γ := Δ)) env n) = 1 / 2 ^ n := by
+  rw [interpret_pow2neg_Q_fun]; exact qval_pow2neg_code n
+
+/-- `Term.abs_Q` really denotes `|·|` on the rationals. -/
+theorem qval_interpret_abs_Q {si : SpaceInterp X F} {Δ : Ctx ι} (n : ℕ)
+    (env : Ctx.interpret X Δ) :
+    qval (Term.interpret si (Term.abs_Q (F := F) (Γ := Δ)) env n) = |qval n| := by
+  rw [interpret_abs_Q_fun, qval_pairN_even, qval_eq_of_parts]
+  have hden : (0 : ℚ) < (ratDenN n : ℚ) := by
+    have : 0 < ratDenN n := by simp only [ratDenN]; omega
+    exact_mod_cast this
+  rw [abs_div, abs_of_pos hden]
+  congr 1
+  · split <;> simp
+  · simp only [ratDenN]; push_cast; ring
+
+-- ============================================================================
+-- Section 10: interpretation congruence for `eq_R` / `le_R_pu`
+--
+-- The eventual target of this file is `Formula.interpret` of `eq_R` and
+-- `le_R_pu`, and both mention their arguments only as `.weaken`ed terms under a
+-- single `∀n`. So their interpretation factors through the *values* of those
+-- terms, which is what lets a bridge lemma about the ℕ-level be transported to
+-- the formula level.
+--
+-- These were developed in `Probes/SoundnessProbe.lean` and are hoisted here (not
+-- into `Semantics.lean`) so that the core semantics file does not have to import
+-- the whole ℚ/ℝ term layer. The probe keeps its own copies; it is not built.
+-- ============================================================================
+
+theorem eq_R_interp_congr (si : SpaceInterp X F) {Γ : Ctx ι}
+    (f f' g g' : Term F Γ (realTy ι)) (env : Ctx.interpret X Γ)
+    (hf : Term.interpret si f env = Term.interpret si f' env)
+    (hg : Term.interpret si g env = Term.interpret si g' env) :
+    Formula.interpret si (eq_R f g) env ↔ Formula.interpret si (eq_R f' g') env := by
+  have hfw : ∀ n : Ty.interpret X Ty.nat,
+      Term.interpret si f.weaken (n, env) = Term.interpret si f'.weaken (n, env) := by
+    intro n; rw [Term.interpret_weaken, Term.interpret_weaken]; exact hf
+  have hgw : ∀ n : Ty.interpret X Ty.nat,
+      Term.interpret si g.weaken (n, env) = Term.interpret si g'.weaken (n, env) := by
+    intro n; rw [Term.interpret_weaken, Term.interpret_weaken]; exact hg
+  simp only [eq_R, Formula.interpret, Term.app2, Term.interpret, hfw, hgw]
+
+theorem le_R_pu_interp_congr (si : SpaceInterp X F) {Γ : Ctx ι}
+    (f f' g g' : Term F Γ (realTy ι)) (env : Ctx.interpret X Γ)
+    (hf : Term.interpret si f env = Term.interpret si f' env)
+    (hg : Term.interpret si g env = Term.interpret si g' env) :
+    Formula.interpret si (le_R_pu f g) env ↔ Formula.interpret si (le_R_pu f' g') env := by
+  have hfw : ∀ n : Ty.interpret X Ty.nat,
+      Term.interpret si f.weaken (n, env) = Term.interpret si f'.weaken (n, env) := by
+    intro n; rw [Term.interpret_weaken, Term.interpret_weaken]; exact hf
+  have hgw : ∀ n : Ty.interpret X Ty.nat,
+      Term.interpret si g.weaken (n, env) = Term.interpret si g'.weaken (n, env) := by
+    intro n; rw [Term.interpret_weaken, Term.interpret_weaken]; exact hg
+  simp only [le_R_pu, Formula.interpret, Term.app2, Term.interpret, hfw, hgw]
+
+-- ============================================================================
+-- Axiom audit. `Classical.choice` is expected: `invTriagN` is a
+-- `Nat.findGreatest`, and `qval` lands in Mathlib's `ℚ`. What matters is the
+-- absence of `sorryAx`.
+-- ============================================================================
+
+#print axioms interpret_add_fun
+#print axioms interpret_monus_fun
+#print axioms interpret_triag_fun
+#print axioms interpret_inv_triag_fun
+#print axioms interpret_fst_pair_fun
+#print axioms interpret_snd_pair_fun
+#print axioms interpret_div2_fun
+#print axioms interpret_rat_num_fun
+#print axioms interpret_rat_den_fun
+#print axioms interpret_rat_sign_fun
+#print axioms interpret_rat_encode_fun
+#print axioms qval_eq_of_parts
+#print axioms qval_interpret_pow2neg_Q
+#print axioms qval_interpret_abs_Q
+#print axioms eq_R_interp_congr
+#print axioms le_R_pu_interp_congr
+#print axioms Formula.interpret_substF
+#print axioms Formula.interpret_subst0
 
 end QBridge
 
