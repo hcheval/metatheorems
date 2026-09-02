@@ -362,6 +362,77 @@ def prenexify
 -- Classical version (Theorem 6.1 as in the paper)
 -- ============================================================================
 
+/-- **The proof-theoretic half of the classical metatheorem**, on its own.
+
+Steps 1–4 of `general_metatheorem_classical`: no semantics, no majorizability, no
+Dialectica — just
+
+1. `prenexify` under `∀x` (`forall_map`), the LEM-using step;
+2. `negTrans_sound` (`kurodaInner` is the identity on the QF body);
+3. `nn_all_nn`, pushing the outer `¬¬` inside the `∀`;
+4. `castAllowed` into `Allowed.extended`.
+
+**The surviving inner `¬¬` is real** and every consumer must go through it — semantically
+(`Classical.not_not`, as `general_metatheorem_classical` does) or otherwise. It is not
+strippable here: `Derivable.markov` wants a quantifier-free body and `∃v(B₀' → C₀')` is not
+one.
+
+Factored out so that both the semantic (`general_metatheorem_classical`) and the syntactic
+(`syntactic_general_metatheorem_classical`) entry points share it. -/
+def classical_to_prenex_extended
+    {ι : Type} {F : ι → Ty ι}
+    {EqX : (i : ι) → {Γ : Ctx ι} → Term F Γ (Ty.base i) → Term F Γ (Ty.base i) → Formula F Γ}
+    (adm : AdmissibleEqX EqX)
+    {Premises : PremiseSet F}
+    (nts : NTStableD EqX Premises)
+    {ρ : Ty ι}
+    {B₀ C₀ : Formula F [Ty.nat, ρ]}
+    (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
+    (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
+    (prf : @Derivable ι F EqX Allowed.classical Premises []
+      (all ρ (imp (all .nat B₀) (ex .nat C₀)))) :
+    @Derivable ι F EqX Allowed.extended Premises []
+      (all ρ (¬ᶠ¬ᶠ(ex Ty.nat (ex Ty.nat
+        (B₀.weakenBy Ty.nat →ᶠ
+          C₀.renameF (Term.Renaming.ext Term.Renaming.shift)))))) := by
+  let B₀' : Formula F [Ty.nat, Ty.nat, ρ] := B₀.weakenBy Ty.nat
+  let C₀' : Formula F [Ty.nat, Ty.nat, ρ] :=
+    C₀.renameF (Term.Renaming.ext Term.Renaming.shift)
+  have hB'_qf : B₀'.isQF = true := by rw [show B₀'.isQF = B₀.isQF from isQF_weakenBy B₀, hB_qf]
+  have hC'_qf : C₀'.isQF = true := by
+    rw [show C₀'.isQF = C₀.isQF from isQF_renameF _ C₀, hC_qf]
+  have hP_qf : (B₀' →ᶠ C₀').isQF = true := by
+    simp only [Formula.isQF, hB'_qf, hC'_qf, Bool.and_self]
+  -- ── Step 1: prenexify under ∀x ─────────────────────────────────────────────
+  let pren : Derivable F EqX Allowed.classical Premises
+      (((Formula.all Ty.nat B₀) →ᶠ (Formula.ex Ty.nat C₀)) →ᶠ
+        Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀'))) :=
+    prenexify hB_qf hB_vf hC_qf hC_vf
+  let prf' : Derivable F EqX Allowed.classical Premises
+      (Formula.all ρ (Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀')))) :=
+    Derivable.mp prf (forall_map pren)
+  -- ── Step 2: negative translation ───────────────────────────────────────────
+  have hEki :
+      (Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀'))).kurodaInner =
+        Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀')) := by
+    change Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀').kurodaInner) = _
+    rw [kurodaInner_qf (B₀' →ᶠ C₀') hP_qf]
+  let nt := negTrans_sound adm nts prf'
+  have hNT : (Formula.all ρ (Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀'))))ᴺᵀ =
+      (¬ᶠ¬ᶠ(Formula.all ρ (¬ᶠ¬ᶠ(Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀')))))) := by
+    change (¬ᶠ¬ᶠ(Formula.all ρ (¬ᶠ¬ᶠ
+      (Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀'))).kurodaInner))) = _
+    rw [hEki]
+  let nt' : Derivable F EqX Allowed.nt_target Premises
+      (¬ᶠ¬ᶠ(Formula.all ρ (¬ᶠ¬ᶠ(Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀')))))) :=
+    Eq.mp (congrArg (Derivable F EqX Allowed.nt_target Premises ·) hNT) nt
+  -- ── Step 3: push the outer ¬¬ inside the ∀ (D-1) ───────────────────────────
+  let stripped : Derivable F EqX Allowed.nt_target Premises
+      (Formula.all ρ (¬ᶠ¬ᶠ(Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀'))))) :=
+    Derivable.mp nt' nn_all_nn
+  -- ── Step 4: into the extended system ───────────────────────────────────────
+  exact stripped.castAllowed (by constructor <;> decide)
+
 /-- **General Metatheorem from classical proof** (Theorem 6.1).
 
 Takes a classical derivation (with LEM + QF-AC) and produces a bound, via the
@@ -428,38 +499,10 @@ def general_metatheorem_classical
     simp only [Formula.isQF, hB'_qf, hC'_qf, Bool.and_self]
   have hP_vf : (B₀' →ᶠ C₀').isVFree = true := by
     simp only [Formula.isVFree, hB'_vf, hC'_vf, Bool.and_self]
-  -- ── Step 1: prenexify under ∀x ─────────────────────────────────────────────
-  let pren : Derivable F EqX Allowed.classical Premises
-      (((Formula.all Ty.nat B₀) →ᶠ (Formula.ex Ty.nat C₀)) →ᶠ
-        Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀'))) :=
-    prenexify hB_qf hB_vf hC_qf hC_vf
-  let prf' : Derivable F EqX Allowed.classical Premises
-      (Formula.all ρ (Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀')))) :=
-    Derivable.mp prf (forall_map pren)
-  -- ── Step 2: negative translation ───────────────────────────────────────────
-  -- NT(∀x E) = ¬¬(∀x ¬¬ E.kurodaInner) and E.kurodaInner = E, since E's matrix is QF.
-  have hEki :
-      (Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀'))).kurodaInner =
-        Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀')) := by
-    change Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀').kurodaInner) = _
-    rw [kurodaInner_qf (B₀' →ᶠ C₀') hP_qf]
-  let nt := negTrans_sound adm nts prf'
-  have hNT : (Formula.all ρ (Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀'))))ᴺᵀ =
-      (¬ᶠ¬ᶠ(Formula.all ρ (¬ᶠ¬ᶠ(Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀')))))) := by
-    change (¬ᶠ¬ᶠ(Formula.all ρ (¬ᶠ¬ᶠ
-      (Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀'))).kurodaInner))) = _
-    rw [hEki]
-  let nt' : Derivable F EqX Allowed.nt_target Premises
-      (¬ᶠ¬ᶠ(Formula.all ρ (¬ᶠ¬ᶠ(Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀')))))) :=
-    Eq.mp (congrArg (Derivable F EqX Allowed.nt_target Premises ·) hNT) nt
-  -- ── Step 3: push the outer ¬¬ inside the ∀ (D-1) ───────────────────────────
-  let stripped : Derivable F EqX Allowed.nt_target Premises
-      (Formula.all ρ (¬ᶠ¬ᶠ(Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀'))))) :=
-    Derivable.mp nt' nn_all_nn
-  -- ── Step 4: into the extended system ───────────────────────────────────────
+  -- ── Steps 1–4: the proof-theoretic reduction, factored out ─────────────────
   let extd : Derivable F EqX Allowed.extended Premises
       (Formula.all ρ (¬ᶠ¬ᶠ(Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀'))))) :=
-    stripped.castAllowed (by constructor <;> decide)
+    classical_to_prenex_extended adm nts hB_qf hB_vf hC_qf hC_vf prf
   -- ── Step 5: Dialectica, then read off U and V ──────────────────────────────
   -- Destructed with `obtain`, not `let`: the realizer is a huge term, and leaving it as a
   -- let-value makes every later defeq check try to `whnf` it (a heartbeat timeout).

@@ -362,6 +362,51 @@ theorem MetricModel.metric_metatheorem (M : MetricModel)
   syntactic_general_metatheorem eqxi spremise M.abstractMajorizability
     hB_qf hB_vf hC_qf hC_vf prf
 
+/-- Every metric-space premise is purely universal — `eq_R` and `le_R_pu` are Π₁⁰ by
+construction, and the axioms only prefix them with `∀x^X`. -/
+theorem MetricSpace.premises_pu :
+    ∀ (Γ' : Ctx MetricSpace.ι) (B : Formula MetricSpace.F Γ'),
+      MetricSpace.Premises ⟨Γ', B⟩ → B.isPurelyUniversal = true := by
+  rintro Γ' B (rfl | rfl | rfl)
+  · exact MetricSpace.ax_refl_pu
+  · exact MetricSpace.ax_sym_pu
+  · exact MetricSpace.ax_triangle_pu
+
+/-- **The metric-space metatheorem, from a classical proof.**
+
+`MetricModel.metric_metatheorem` takes an `Allowed.extended` derivation; this one takes a
+genuinely classical one (LEM + QF-AC), which is what an actual proof-mining application
+produces. It is `syntactic_general_metatheorem_classical` at this model.
+
+This is the combination that `general_metatheorem_classical` cannot deliver: that theorem
+asks for a `Majorizability`, i.e. a total majorizer on every semantic value, and a metric
+model supplies only an `AbstractMajorizability` (`MetricModel.abstractMajorizability`).
+
+`adm` is a parameter rather than `MetricSpace.admissibleEqX` because the latter is still
+`sorry`-ed on `eqx_refl`/`eqx_sym`/`eqx_trans`, which wait on the ℝ ordered-field axioms.
+`nts` is *not* a parameter: the premises are purely universal, so `ntStable_of_pu` supplies
+it. -/
+theorem MetricModel.metric_metatheorem_classical (M : MetricModel)
+    (eqxi : EqXInterp (fun () => M.carrier) MetricSpace.F M.si MetricSpace.EqX)
+    (adm : AdmissibleEqX MetricSpace.EqX)
+    (spremise : ∀ (Γ' : Ctx MetricSpace.ι) (B : Formula MetricSpace.F Γ'),
+      MetricSpace.Premises ⟨Γ', B⟩ → SRealizer M.si B)
+    {ρ : Ty MetricSpace.ι} {B₀ C₀ : Formula MetricSpace.F [Ty.nat, ρ]}
+    (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
+    (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
+    (prf : @Derivable MetricSpace.ι MetricSpace.F MetricSpace.EqX Allowed.classical
+      MetricSpace.Premises []
+      (Formula.all ρ (Formula.imp (Formula.all .nat B₀) (Formula.ex .nat C₀)))) :
+    ∃ Φ : Ty.interpret (fun () => M.carrier) ρ.hat → Nat,
+      ∀ (x : Ty.interpret (fun () => M.carrier) ρ)
+        (x_star : Ty.interpret (fun () => M.carrier) ρ.hat),
+        M.abstractMajorizability.toRel.maj ρ x_star x →
+        (∀ u : Nat, u ≤ Φ x_star → Formula.interpret M.si B₀ (u, (x, ()))) →
+        ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret M.si C₀ (v, (x, ())) :=
+  syntactic_general_metatheorem_classical eqxi adm
+    (ntStable_of_pu adm MetricSpace.premises_pu) spremise M.abstractMajorizability
+    hB_qf hB_vf hC_qf hC_vf prf
+
 -- ============================================================================
 -- AdmissibleEqX for the metric space EqX
 -- ============================================================================

@@ -121,6 +121,83 @@ theorem extract_majorants {X : ι → Type} {si : SpaceInterp X F}
 
 end Extract
 
+section ExtractPrenex
+
+variable {ρ : Ty ι} {P : Formula F [Ty.nat, Ty.nat, ρ]}
+
+/-- The **prenexified** statement, which is what a *classical* derivation reduces to:
+`∀x ¬¬ ∃u ∃v P`. See `classical_to_prenex_extended`. -/
+private abbrev pstmt : Formula F ([] : Ctx ι) :=
+  .all ρ (¬ᶠ¬ᶠ(.ex Ty.nat (.ex Ty.nat P)))
+
+/-- The witness type of `pstmt`, spelled out. With `E := ∃u∃v P`:
+
+* `wTy E = nat ×ₜ (nat ×ₜ wTy P)` and `cTy E = cTy P`;
+* `wTy ¬E = (wTy E →ₜ unit) ×ₜ (wTy E →ₜ unit →ₜ cTy E)`, `cTy ¬E = wTy E ×ₜ unit`;
+* `wTy ¬¬E = (wTy ¬E →ₜ unit) ×ₜ (wTy ¬E →ₜ unit →ₜ cTy ¬E)`.
+
+So the second component of `w x`, fed any `¬E`-witness and the unique `unit`, returns a
+`cTy ¬E = wTy E ×ₜ unit`, whose first projection is the `∃u∃v` witness pair.
+
+**Why the *default* `¬E`-witness is legitimate here**, unlike on the unprenexified route:
+`P` is quantifier-free and ∨-free, so `wTy P` and `cTy P` are built from `unit` and `×ₜ`
+alone — the challenge is fed only to a QF ∨-free matrix, which
+`dialecticaMatrix_iff_interpFormula` reduces *for every* challenge. -/
+private abbrev negE : Formula F [ρ] :=
+  ¬ᶠ(Formula.ex Ty.nat (Formula.ex Ty.nat P))
+
+/-- The `∃u∃v` witness pair, extracted from a realizer of the prenexified statement. -/
+private def pairTerm (w : Term F ([] : Ctx ι) (wTy (pstmt (ρ := ρ) (P := P)))) :
+    Term F [ρ] (Ty.nat ×ₜ (Ty.nat ×ₜ wTy P)) :=
+  .fst (.app (.app (.snd (.app (Term.weaken w) (.var .vz)))
+    (defaultWTerm (negE (P := P)))) Term.unitI)
+
+/-- `U` for the prenexified shape, as a **closed term** of type `ρ →ₜ nat`. -/
+def extractUTermP (w : Term F ([] : Ctx ι) (wTy (pstmt (ρ := ρ) (P := P)))) :
+    Term F ([] : Ctx ι) (ρ →ₜ Ty.nat) :=
+  .lam (.fst (pairTerm w))
+
+/-- `V` for the prenexified shape, as a **closed term** of type `ρ →ₜ nat`. -/
+def extractVTermP (w : Term F ([] : Ctx ι) (wTy (pstmt (ρ := ρ) (P := P)))) :
+    Term F ([] : Ctx ι) (ρ →ₜ Ty.nat) :=
+  .lam (.fst (.snd (pairTerm w)))
+
+/-- What `extractUTermP` computes: the `u`-component of the `∃u∃v` witness the double
+negation hands out when challenged with the default `¬E`-witness. -/
+theorem interpret_extractUTermP {X : ι → Type} {si : SpaceInterp X F}
+    (w : Term F ([] : Ctx ι) (wTy (pstmt (ρ := ρ) (P := P)))) (x : Ty.interpret X ρ) :
+    Term.interpret si (extractUTermP w) () x =
+      ((Term.interpret si w () x).2
+        (Ty.interpret_default si
+          (wTy (¬ᶠ(Formula.ex Ty.nat (Formula.ex Ty.nat P))))) ()).1.1 := by
+  simp only [extractUTermP, pairTerm, defaultWTerm, Term.interpret, Term.interpret_weaken,
+    interpret_defaultOf]
+  rfl
+
+/-- What `extractVTermP` computes: the `v`-component. -/
+theorem interpret_extractVTermP {X : ι → Type} {si : SpaceInterp X F}
+    (w : Term F ([] : Ctx ι) (wTy (pstmt (ρ := ρ) (P := P)))) (x : Ty.interpret X ρ) :
+    Term.interpret si (extractVTermP w) () x =
+      ((Term.interpret si w () x).2
+        (Ty.interpret_default si
+          (wTy (¬ᶠ(Formula.ex Ty.nat (Formula.ex Ty.nat P))))) ()).1.2.1 := by
+  simp only [extractVTermP, pairTerm, defaultWTerm, Term.interpret, Term.interpret_weaken,
+    interpret_defaultOf]
+  rfl
+
+/-- Both prenexified extractors are closed terms, so `all_closed_terms_majorizable`
+supplies their majorants — the classical counterpart of `extract_majorants`. -/
+theorem extract_majorants_prenex {X : ι → Type} {si : SpaceInterp X F}
+    (am : AbstractMajorizability si)
+    (w : Term F ([] : Ctx ι) (wTy (pstmt (ρ := ρ) (P := P)))) :
+    (∃ U_star : Ty.interpret X (ρ →ₜ Ty.nat).hat,
+      am.toRel.maj (ρ →ₜ Ty.nat) U_star (Term.interpret si (extractUTermP w) ())) ∧
+    (∃ V_star : Ty.interpret X (ρ →ₜ Ty.nat).hat,
+      am.toRel.maj (ρ →ₜ Ty.nat) V_star (Term.interpret si (extractVTermP w) ())) :=
+  ⟨majorant_of_closed_term am _, majorant_of_closed_term am _⟩
+
+end ExtractPrenex
+
 -- ============================================================================
 -- The matrix, on object-level witness/counter types
 -- ============================================================================
