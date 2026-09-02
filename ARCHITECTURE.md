@@ -458,6 +458,37 @@ counter-transformer instead of being a singleton (§8). Axiomatising `dist_comm`
 `d` — and *deriving* symmetry keeps the whole theory inside the fragment where the
 interpretation is trivial. The axiomatisation is chosen for that, not for elegance.
 
+### Could models be pseudometric after all?
+
+Yes, with work — and the reason they currently can't is worth knowing, because "models must
+be metric" reads like a mathematical necessity when it is an implementation choice.
+
+`EqXInterp.extract` has **exactly one consumer**: `eqAtType_to_semEq`
+(`Dialectica/Lemmas.lean:255`), used in exactly one place — the **`.qfer` soundness case**
+(`Lemmas.lean:335`, mirrored at `Syntactic.lean:969`). It turns a realizer of `s =ρ t` into
+Lean equality of interpretations so the proof can rewrite inside `r`.
+
+In a pseudometric model that step is *false*: take `d(x,y) = 0` with `x ≠ y` and an `r` whose
+interpretation separates them — QF-ER derives `r[x] =σ r[y]` and the model refutes it. So
+pseudometric models would make **the rule unsound**, not merely be inconvenient.
+
+Two ways to have them:
+
+- **Quotient.** Any pseudometric space quotients to a metric one (Mathlib's
+  `SeparationQuotient`), and `=_X`-invariant statements — exactly the QF-ER-derivable ones —
+  transfer back. Costs the user a construction, gains nothing mathematically. This is why the
+  restriction is cheap.
+- **Setoid semantics.** Replace Lean `Eq` in `extract` by a model-supplied equivalence and
+  require every interpretation — `funcInterp`, `distInterp`, `Term.interpret` at every type
+  former — to be a congruence for it. Strictly more general, and arguably the faithful reading
+  of *weak* extensionality. But it is setoid-ifying the whole semantics for something the
+  quotient already gives.
+
+So: **Lean `Eq` in `extract` is doing the setoid's job, cheaply.** Deliberate, with a known
+escape hatch. Note this is purely semantic — the *theory* stays pseudometric, so derivations
+and extracted bounds are valid over pseudometric structures; you just cannot interpret in one
+without quotienting first.
+
 ## 10. Scope decisions
 
 - **`general_metatheorem` may narrow to theories whose base types are pointed pseudometric
