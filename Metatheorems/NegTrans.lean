@@ -160,6 +160,28 @@ theorem kurodaInner_qf {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι}
   | all => simp [Formula.isQF] at hqf
   | ex => simp [Formula.isQF] at hqf
 
+/-- `kurodaInner` is the identity on purely existential formulas: it only touches `∀`, and a
+purely existential formula has none. This is what makes the ∃-formula conclusion matrix of
+Kohlenbach 17.52 pass through the negative translation untouched
+(`classical_to_prenex_extended_gen`). -/
+theorem kurodaInner_pe {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι}
+    (A : Formula F Γ) (hpe : A.isPurelyExistential = true) : A.kurodaInner = A := by
+  induction A with
+  | bot | eq0 => rfl
+  | and _ _ ihA ihB =>
+    simp only [Formula.isPurelyExistential, Bool.and_eq_true] at hpe
+    simp [Formula.kurodaInner, ihA hpe.1, ihB hpe.2]
+  | or A B _ _ =>
+    have hqf : (A.or B).isQF = true := hpe
+    simp only [Formula.isQF, Bool.and_eq_true] at hqf
+    simp [Formula.kurodaInner, kurodaInner_qf A hqf.1, kurodaInner_qf B hqf.2]
+  | imp A B _ _ =>
+    have hqf : (A.imp B).isQF = true := hpe
+    simp only [Formula.isQF, Bool.and_eq_true] at hqf
+    simp [Formula.kurodaInner, kurodaInner_qf A hqf.1, kurodaInner_qf B hqf.2]
+  | all _ _ _ => exact absurd hpe (by simp [Formula.isPurelyExistential, Formula.isQF])
+  | ex _ _ ih => simp [Formula.kurodaInner, ih hpe]
+
 -- ============================================================================
 -- Hilbert-system building blocks (in Derivable)
 -- ============================================================================

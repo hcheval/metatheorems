@@ -876,6 +876,120 @@ def interp_of_realizer_pu {ι κ : Type} {X : ι → Type} {F : κ → Ty ι} (s
         (r.property (dialecticaDefaultCounter si _))
 
 -- ============================================================================
+-- The matrix of a ∀-formula / an ∃-formula against its truth (Kohlenbach 17.52 shapes)
+-- ============================================================================
+
+/-- **A true purely universal ∨-free formula has a true matrix at EVERY witness and every
+counter.** Sharper than `realizer_of_pu_at`, which only produces *some* witness: the witness
+type of a ∀-formula is built from `unit`, `×ₜ` and `→ₜ unit`-shaped arrows, so no witness
+carries information and the matrix at counter `(b, y)` is just the instance of the body at
+`b`, which `htrue` supplies.
+
+This is the lemma that lets the metatheorem take a premise matrix `B∀` that is a ∀-formula
+rather than quantifier-free (Kohlenbach 17.52): the realizer's `U`-component hands back a
+counter `(u, (b, …))`, and this lemma turns the *assumed* truth of `∀b B₀(x,u,b)` into the
+matrix at exactly that counter. -/
+theorem dialecticaMatrix_of_interp_pu {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
+    (si : SpaceInterp X F) :
+    {Γ : Ctx ι} → (B : Formula F Γ) →
+      B.isPurelyUniversal = true → B.isVFree = true →
+      (env : Ctx.interpret X Γ) → Formula.interpret si B env →
+      ∀ (w : 𝕎 X B) (y : ℂ X B), dialecticaMatrix si B env w y
+  | _, .all _ A, hpu, hvf, env, htrue, w, y =>
+      dialecticaMatrix_of_interp_pu si A hpu hvf (y.1, env) (htrue y.1) (w y.1) y.2
+  | _, .and A B, hpu, hvf, env, htrue, w, y =>
+      have hpuA : A.isPurelyUniversal = true := by
+        simp only [Formula.isPurelyUniversal, Bool.and_eq_true] at hpu; exact hpu.1
+      have hpuB : B.isPurelyUniversal = true := by
+        simp only [Formula.isPurelyUniversal, Bool.and_eq_true] at hpu; exact hpu.2
+      have hvfA : A.isVFree = true := by
+        simp only [Formula.isVFree, Bool.and_eq_true] at hvf; exact hvf.1
+      have hvfB : B.isVFree = true := by
+        simp only [Formula.isVFree, Bool.and_eq_true] at hvf; exact hvf.2
+      ⟨dialecticaMatrix_of_interp_pu si A hpuA hvfA env htrue.1 w.1 y.1,
+       dialecticaMatrix_of_interp_pu si B hpuB hvfB env htrue.2 w.2 y.2⟩
+  | _, .bot, hpu, hvf, env, htrue, w, y =>
+      (dialecticaMatrix_iff_interp_qf si _ hpu hvf env w y).mpr htrue
+  | _, .eq0 _ _, hpu, hvf, env, htrue, w, y =>
+      (dialecticaMatrix_iff_interp_qf si _ hpu hvf env w y).mpr htrue
+  | _, .or _ _, hpu, hvf, env, htrue, w, y =>
+      (dialecticaMatrix_iff_interp_qf si _ hpu hvf env w y).mpr htrue
+  | _, .imp _ _, hpu, hvf, env, htrue, w, y =>
+      (dialecticaMatrix_iff_interp_qf si _ hpu hvf env w y).mpr htrue
+  | _, .ex _ _, hpu, hvf, env, htrue, w, y =>
+      (dialecticaMatrix_iff_interp_qf si _ hpu hvf env w y).mpr htrue
+
+/-- **A purely existential ∨-free formula whose matrix holds at some witness, against ANY
+counter, is true.** The dual of `dialecticaMatrix_of_interp_pu`: the witness of an ∃-formula
+is the tuple of existential witnesses (plus `unit`-shaped padding), its counter carries no
+information, and the matrix at witness `(c, …)` is the body at `c`, which is exactly what the
+∃ asks for.
+
+This is the lemma that lets the metatheorem's conclusion matrix `C∃` be an ∃-formula rather
+than quantifier-free (Kohlenbach 17.52). -/
+theorem interp_of_dialecticaMatrix_pe {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
+    (si : SpaceInterp X F) :
+    {Γ : Ctx ι} → (C : Formula F Γ) →
+      C.isPurelyExistential = true → C.isVFree = true →
+      (env : Ctx.interpret X Γ) → (w : 𝕎 X C) → (y : ℂ X C) →
+      dialecticaMatrix si C env w y → Formula.interpret si C env
+  | _, .ex _ A, hpe, hvf, env, w, y, hm =>
+      ⟨w.1, interp_of_dialecticaMatrix_pe si A hpe hvf (w.1, env) w.2 y hm⟩
+  | _, .and A B, hpe, hvf, env, w, y, hm =>
+      have hpeA : A.isPurelyExistential = true := by
+        simp only [Formula.isPurelyExistential, Bool.and_eq_true] at hpe; exact hpe.1
+      have hpeB : B.isPurelyExistential = true := by
+        simp only [Formula.isPurelyExistential, Bool.and_eq_true] at hpe; exact hpe.2
+      have hvfA : A.isVFree = true := by
+        simp only [Formula.isVFree, Bool.and_eq_true] at hvf; exact hvf.1
+      have hvfB : B.isVFree = true := by
+        simp only [Formula.isVFree, Bool.and_eq_true] at hvf; exact hvf.2
+      ⟨interp_of_dialecticaMatrix_pe si A hpeA hvfA env w.1 y.1 hm.1,
+       interp_of_dialecticaMatrix_pe si B hpeB hvfB env w.2 y.2 hm.2⟩
+  | _, .bot, hpe, hvf, env, w, y, hm =>
+      (dialecticaMatrix_iff_interp_qf si _ hpe hvf env w y).mp hm
+  | _, .eq0 _ _, hpe, hvf, env, w, y, hm =>
+      (dialecticaMatrix_iff_interp_qf si _ hpe hvf env w y).mp hm
+  | _, .or _ _, hpe, hvf, env, w, y, hm =>
+      (dialecticaMatrix_iff_interp_qf si _ hpe hvf env w y).mp hm
+  | _, .imp _ _, hpe, hvf, env, w, y, hm =>
+      (dialecticaMatrix_iff_interp_qf si _ hpe hvf env w y).mp hm
+  | _, .all _ _, hpe, hvf, env, w, y, hm =>
+      (dialecticaMatrix_iff_interp_qf si _ hpe hvf env w y).mp hm
+
+/-- Quantifier-free formulas are purely universal — the old `hB_qf` hypothesis is an instance
+of the new `hB_pu` one. -/
+theorem Formula.isPurelyUniversal_of_qf {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι}
+    (A : Formula F Γ) (hqf : A.isQF = true) : A.isPurelyUniversal = true := by
+  cases A with
+  | and A B =>
+    simp only [Formula.isQF, Bool.and_eq_true] at hqf
+    simp only [Formula.isPurelyUniversal, Bool.and_eq_true]
+    exact ⟨Formula.isPurelyUniversal_of_qf A hqf.1, Formula.isPurelyUniversal_of_qf B hqf.2⟩
+  | all _ _ => exact absurd hqf (by simp [Formula.isQF])
+  | bot => exact hqf
+  | eq0 _ _ => exact hqf
+  | or _ _ => exact hqf
+  | imp _ _ => exact hqf
+  | ex _ _ => exact hqf
+
+/-- Quantifier-free formulas are purely existential — the old `hC_qf` hypothesis is an instance
+of the new `hC_pe` one. -/
+theorem Formula.isPurelyExistential_of_qf {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι}
+    (A : Formula F Γ) (hqf : A.isQF = true) : A.isPurelyExistential = true := by
+  cases A with
+  | and A B =>
+    simp only [Formula.isQF, Bool.and_eq_true] at hqf
+    simp only [Formula.isPurelyExistential, Bool.and_eq_true]
+    exact ⟨Formula.isPurelyExistential_of_qf A hqf.1, Formula.isPurelyExistential_of_qf B hqf.2⟩
+  | ex _ _ => exact absurd hqf (by simp [Formula.isQF])
+  | bot => exact hqf
+  | eq0 _ _ => exact hqf
+  | or _ _ => exact hqf
+  | imp _ _ => exact hqf
+  | all _ _ => exact hqf
+
+-- ============================================================================
 -- EqX interface for the Dialectica proof (Def. of "purely universal" EqX)
 -- ============================================================================
 

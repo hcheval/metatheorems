@@ -177,6 +177,39 @@ theorem isQF_weakenBy {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι} {ρ : Ty �
 theorem isVFree_weakenBy {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι} {ρ : Ty ι} (A : Formula F Γ) :
     (A.weakenBy ρ).isVFree = A.isVFree := isVFree_renameF _ A
 
+/-- `renameF` preserves pure universality (the general-matrix classical route renames the
+premise matrix under the prenexified `∃u∃v`). -/
+theorem isPurelyUniversal_renameF {ι κ : Type} {F : κ → Ty ι} {Γ Δ : Ctx ι}
+    (r : Term.Renaming Γ Δ) (A : Formula F Γ) :
+    (A.renameF r).isPurelyUniversal = A.isPurelyUniversal := by
+  induction A generalizing Δ with
+  | bot => rfl
+  | eq0 _ _ => rfl
+  | and _ _ ihA ihB => simp only [Formula.renameF, Formula.isPurelyUniversal, ihA r, ihB r]
+  | or A B _ _ =>
+    exact isQF_renameF r _
+  | imp A B _ _ =>
+    exact isQF_renameF r _
+  | all _ _ ih =>
+    simp only [Formula.renameF, Formula.isPurelyUniversal, ih (Term.Renaming.ext r)]
+  | ex _ _ _ => rfl
+
+/-- `renameF` preserves pure existentiality. -/
+theorem isPurelyExistential_renameF {ι κ : Type} {F : κ → Ty ι} {Γ Δ : Ctx ι}
+    (r : Term.Renaming Γ Δ) (A : Formula F Γ) :
+    (A.renameF r).isPurelyExistential = A.isPurelyExistential := by
+  induction A generalizing Δ with
+  | bot => rfl
+  | eq0 _ _ => rfl
+  | and _ _ ihA ihB => simp only [Formula.renameF, Formula.isPurelyExistential, ihA r, ihB r]
+  | or A B _ _ =>
+    exact isQF_renameF r _
+  | imp A B _ _ =>
+    exact isQF_renameF r _
+  | ex _ _ ih =>
+    simp only [Formula.renameF, Formula.isPurelyExistential, ih (Term.Renaming.ext r)]
+  | all _ _ _ => rfl
+
 /-- Semantic counterpart of `Term.interpret_rename_gen`: a renamed formula evaluated in
 `envΔ` means the same as the original evaluated in `envΓ`, provided the two environments
 agree on variable lookups through the renaming. -/
@@ -227,15 +260,21 @@ theorem Formula.interpret_renameF_gen {ι κ : Type} {X : ι → Type} {F : κ �
     Proof by LEM on the conclusion:
     - Positive case: done
     - Negative case: ¬∃u∃v(B₀'→C₀') gives ∀u∀v ¬(B₀'→C₀'). From ¬(P→Q) and
-      qf_lem on P: B₀ holds for all u (→ ∃v C₀ from hypothesis) and ¬C₀ holds
-      for all v (→ contradiction). -/
-def prenexify
+      LEM on P: B₀ holds for all u (→ ∃v C₀ from hypothesis) and ¬C₀ holds
+      for all v (→ contradiction).
+
+    **`prenexify_gen` is the general form (2026-09-04): no hypothesis on `B₀`, `C₀` at all.**
+    The argument is pure classical predicate logic — `Derivable.lem` on arbitrary formulas —
+    and never inspected the matrices; `prenexify`'s four QF/∨-free hypotheses were always
+    unused, and it is now a wrapper. This is what lets the general-matrix metatheorem
+    (Kohlenbach 17.52: `B∀` a ∀-formula, `C∃` an ∃-formula) reuse the classical route:
+    with `B₀ := ∀b̲ B₀₀` and `C₀ := ∃c̲ C₀₀` the prenexified body `B₀' →ᶠ C₀'` is not
+    quantifier-free, and that is fine here. -/
+def prenexify_gen
     {ι κ : Type} {F : κ → Ty ι}
     {Premises : PremiseSet F}
     {Γ : Ctx ι} {ρ : Ty ι}
-    {B₀ C₀ : Formula F (Ty.nat :: ρ :: Γ)}
-    (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
-    (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true) :
+    {B₀ C₀ : Formula F (Ty.nat :: ρ :: Γ)} :
     let B₀' := B₀.weakenBy Ty.nat
     let C₀' := C₀.renameF (Term.Renaming.ext Term.Renaming.shift)
     @Derivable ι κ F Allowed.classical Premises (ρ :: Γ)
@@ -362,6 +401,23 @@ def prenexify
     (.exportation (.and_weak (A := G) (B := H)))
     (.exportation (.syllogism .and_perm neg_case)))
 
+/-- `prenexify_gen` at quantifier-free ∨-free matrices. The hypotheses are unused (see
+`prenexify_gen`); kept so that every existing call site is unchanged. -/
+def prenexify
+    {ι κ : Type} {F : κ → Ty ι}
+    {Premises : PremiseSet F}
+    {Γ : Ctx ι} {ρ : Ty ι}
+    {B₀ C₀ : Formula F (Ty.nat :: ρ :: Γ)}
+    (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
+    (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true) :
+    let B₀' := B₀.weakenBy Ty.nat
+    let C₀' := C₀.renameF (Term.Renaming.ext Term.Renaming.shift)
+    @Derivable ι κ F Allowed.classical Premises (ρ :: Γ)
+      ((all Ty.nat B₀ →ᶠ ex Ty.nat C₀) →ᶠ
+       ex Ty.nat (ex Ty.nat (B₀' →ᶠ C₀'))) :=
+  let _ := hB_qf; let _ := hB_vf; let _ := hC_qf; let _ := hC_vf
+  prenexify_gen
+
 -- ============================================================================
 -- Classical version (Theorem 6.1 as in the paper)
 -- ============================================================================
@@ -434,6 +490,85 @@ def classical_to_prenex_extended
     Derivable.mp nt' nn_all_nn
   -- ── Step 4: into the extended system ───────────────────────────────────────
   exact stripped.castAllowed (by constructor <;> decide)
+
+section GeneralMatricesPrenex
+open ProofMode
+
+/-- `(A → B)` lifts to `(B → C) → (A → C)`: precomposition, as a derivable implication. -/
+private def imp_precomp {ι κ : Type} {F : κ → Ty ι} {a : Allowed} {Premises : PremiseSet F}
+    {Γ : Ctx ι} {A B C : Formula F Γ}
+    (h : Derivable F a Premises (A →ᶠ B)) :
+    Derivable F a Premises ((B →ᶠ C) →ᶠ (A →ᶠ C)) := by
+  pmode
+  pintro f ha
+  papplym h in ha with hb
+  papply f in hb with hc
+  pexact hc
+
+/-- **`classical_to_prenex_extended` for a ∀-formula premise and an ∃-formula conclusion**
+(Kohlenbach 17.52's `B∀`, `C∃`). Same four steps, with two differences forced by the
+matrices no longer being quantifier-free:
+
+1. `prenexify_gen` — the hypothesis-free prenexification (it never needed QF).
+2. After the negative translation the body is `B'ₙₜ →ᶠ C'ₙₜ`, not `B' →ᶠ C'`.
+   `C'ₙₜ = C'` outright (`kurodaInner_pe`: Kuroda only touches `∀`), and `B' →ᶠ B'ₙₜ` is
+   derivable for a ∀-formula (`kurodaInner_iff_pu`), so precomposing under `∃u∃v` and `¬¬`
+   restores `B' →ᶠ C'`. Both are intuitionistic; the only classical step is still
+   `prenexify_gen`.
+
+The output has the same shape as `classical_to_prenex_extended`'s, so `extractUTermP` /
+`extractVTermP` apply unchanged. -/
+def classical_to_prenex_extended_gen
+    {ι κ : Type} {F : κ → Ty ι}
+    {Premises : PremiseSet F}
+    (nts : NTStableD Premises)
+    {ρ : Ty ι}
+    {B C : Formula F [Ty.nat, ρ]}
+    (hB_pu : B.isPurelyUniversal = true) (hC_pe : C.isPurelyExistential = true)
+    (prf : @Derivable ι κ F Allowed.classical Premises []
+      (all ρ (imp (all .nat B) (ex .nat C)))) :
+    @Derivable ι κ F Allowed.extended Premises []
+      (all ρ (¬ᶠ¬ᶠ(ex Ty.nat (ex Ty.nat
+        (B.weakenBy Ty.nat →ᶠ
+          C.renameF (Term.Renaming.ext Term.Renaming.shift)))))) := by
+  let B' : Formula F [Ty.nat, Ty.nat, ρ] := B.weakenBy Ty.nat
+  let C' : Formula F [Ty.nat, Ty.nat, ρ] :=
+    C.renameF (Term.Renaming.ext Term.Renaming.shift)
+  have hB'_pu : B'.isPurelyUniversal = true := by
+    rw [show B'.isPurelyUniversal = B.isPurelyUniversal from isPurelyUniversal_renameF _ B, hB_pu]
+  have hC'_pe : C'.isPurelyExistential = true := by
+    rw [show C'.isPurelyExistential = C.isPurelyExistential from
+      isPurelyExistential_renameF _ C, hC_pe]
+  -- ── Step 1: prenexify under ∀x (no hypothesis on the matrices) ─────────────
+  let prf' : Derivable F Allowed.classical Premises
+      (Formula.all ρ (Formula.ex Ty.nat (Formula.ex Ty.nat (B' →ᶠ C')))) :=
+    Derivable.mp prf (forall_map prenexify_gen)
+  -- ── Step 2: negative translation; `C'ₙₜ = C'`, `B'ₙₜ` stays ────────────────
+  let nt := negTrans_sound nts prf'
+  have hNT : (Formula.all ρ (Formula.ex Ty.nat (Formula.ex Ty.nat (B' →ᶠ C'))))ᴺᵀ =
+      (¬ᶠ¬ᶠ(Formula.all ρ (¬ᶠ¬ᶠ(Formula.ex Ty.nat (Formula.ex Ty.nat
+        (B'.kurodaInner →ᶠ C')))))) := by
+    change (¬ᶠ¬ᶠ(Formula.all ρ (¬ᶠ¬ᶠ
+      (Formula.ex Ty.nat (Formula.ex Ty.nat (B'.kurodaInner →ᶠ C'.kurodaInner)))))) = _
+    rw [kurodaInner_pe C' hC'_pe]
+  let nt' : Derivable F Allowed.nt_target Premises
+      (¬ᶠ¬ᶠ(Formula.all ρ (¬ᶠ¬ᶠ(Formula.ex Ty.nat (Formula.ex Ty.nat
+        (B'.kurodaInner →ᶠ C')))))) :=
+    Eq.mp (congrArg (Derivable F Allowed.nt_target Premises ·) hNT) nt
+  -- ── Step 3: push the outer ¬¬ inside the ∀ (D-1) ───────────────────────────
+  let stripped : Derivable F Allowed.nt_target Premises
+      (Formula.all ρ (¬ᶠ¬ᶠ(Formula.ex Ty.nat (Formula.ex Ty.nat
+        (B'.kurodaInner →ᶠ C'))))) :=
+    Derivable.mp nt' nn_all_nn
+  -- ── Step 3': `B'ₙₜ →ᶠ C'` back to `B' →ᶠ C'`, under ∃u∃v and ¬¬ ─────────────
+  let restored : Derivable F Allowed.nt_target Premises
+      (Formula.all ρ (¬ᶠ¬ᶠ(Formula.ex Ty.nat (Formula.ex Ty.nat (B' →ᶠ C'))))) :=
+    Derivable.mp stripped (forall_map (contrapositive (contrapositive
+      (exist_map (exist_map (imp_precomp (kurodaInner_iff_pu B' hB'_pu).1))))))
+  -- ── Step 4: into the extended system ───────────────────────────────────────
+  exact restored.castAllowed (by constructor <;> decide)
+
+end GeneralMatricesPrenex
 
 /-- **General Metatheorem from classical proof** (Theorem 6.1).
 

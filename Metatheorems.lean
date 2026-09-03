@@ -30,3 +30,4 @@ import Metatheorems.Probes.P1
 import Metatheorems.Probes.R1
 import Metatheorems.Probes.RwBase
 import Metatheorems.Probes.RwArrow
+import Metatheorems.Probes.GeneralMatricesDemo

@@ -239,4 +239,246 @@ theorem syntactic_general_metatheorem_classical
 
 end Metatheorem
 
+-- ============================================================================
+-- General matrices: a ∀-formula premise and an ∃-formula conclusion (Kohlenbach 17.52)
+-- ============================================================================
+
+/-!
+## The metatheorem with general matrices — Kohlenbach, Theorem 17.52
+
+Kohlenbach's statement (Applied Proof Theory, Thm. 17.52, p. 403) reads: *let `B∀(x,u)`,
+resp. `C∃(x,v)`, be ∀- resp. ∃-formulas … from a proof of `∀x^ρ (∀u⁰ B∀(x,u) → ∃v⁰ C∃(x,v))`
+one can extract `Φ` such that `∀u ≤ Φ(x*) B∀(x,u) → ∃v ≤ Φ(x*) C∃(x,v)`.* The reference
+document transcribes `B∀` as `∀b̲ B₀` and `C∃` as `∃c̲ C₀` with `B₀`, `C₀` quantifier-free.
+
+`syntactic_general_metatheorem` above demands `B₀.isQF` and `C₀.isQF` — i.e. `b̲`, `c̲`
+empty — which is a genuine restriction against both sources (`ARCHITECTURE.md` §13). The
+theorems in this section remove it: the premise matrix may be any **purely universal**
+formula (`isPurelyUniversal`) and the conclusion matrix any **purely existential** one
+(`isPurelyExistential`), both ∨-free. The QF versions are the instances
+`Formula.isPurelyUniversal_of_qf` / `Formula.isPurelyExistential_of_qf`.
+
+**Single quantifier block = the book's tuple, because `Ty` has products.** Kohlenbach needs
+a tuple `b̲ = b₁,…,bₙ` only because his type system has no product types. Ours does (`Ty.prod`,
+since the `syntactic-witnesses` merge), and `Formula.all` binds a variable of *any*
+`ρ : Ty ι`, so `∀b₁^ρ₁ … ∀bₙ^ρₙ B₀` is `∀b^(ρ₁ ×ₜ … ×ₜ ρₙ) B₀[fst/snd projections]`. So a
+`∀b^σ B₀` with `σ` arbitrary — `syntactic_general_metatheorem_block` below — is *equivalent
+to* 17.52's `∀b̲ B₀`, not a weaker special case; and `isPurelyUniversal` allows any nesting
+anyway. `degree (.prod ρ τ) = max ρ.degree τ.degree`, so products never raise the type
+degree. Only `u` and `v` stay at `Ty.nat`: `Φ` bounds them numerically, exactly as in 17.52.
+
+**What replaced `dialecticaMatrix_iff_interpFormula`.** That lemma says a QF ∨-free matrix
+equals its interpretation *at every witness and counter*; it is what let the old extraction
+ignore the realizer's challenge. For a ∀-formula that is false — the matrix at counter
+`(b, …)` is the *instance* at `b`, not the ∀ — so it is replaced by the pair
+`dialecticaMatrix_of_interp_pu` (a true ∀-formula has a true matrix at every witness and
+counter) and `interp_of_dialecticaMatrix_pe` (an ∃-formula whose matrix holds is true), in
+`Dialectica/Defs.lean`. Nothing else in the pipeline changed: `extractUTerm`/`extractVTerm`,
+`syntactic_soundness`, `closedMajorizer` and `metatheorem_core_of_majorants` never looked at
+the matrices' shape.
+
+**Prenexification was not needed for the extended route.** The book and the document expand
+`∀u∀b̲ B₀ → ∃v∃c̲ C₀` to the prenex `∃u,v,b̲,c̲ (B₀ → C₀)` because they interpret a *classical*
+proof. For an `Allowed.extended` input, Dialectica interprets `∀u B∀ → ∃v C∃` directly: the
+realizer's counter component already returns `(u, (b, …))`, and the witness component
+`(v, (c, …))`. The classical route (`syntactic_general_metatheorem_classical_gen`) does go
+through `classical_to_prenex_extended_gen`, where the only new work is restoring `B'` from
+`B'ₙₜ` after the negative translation.
+-/
+
+section GeneralMatrices
+
+variable {si : SpaceInterp X F} {Premises : PremiseSet F}
+
+/-- **The extracted content, with general matrices**: `B` purely universal, `C` purely
+existential, both ∨-free. Challenged at `U`, the premise yields the conclusion at `V`. The
+extractors are the *same* `extractedUTerm` / `extractedVTerm` — they never depended on the
+matrices being quantifier-free. -/
+theorem syntactic_extraction_gen
+    (eqxi : EqXInterp X F si)
+    (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B)
+    {ρ : Ty ι} {B C : Formula F [Ty.nat, ρ]}
+    (hB_pu : B.isPurelyUniversal = true) (hB_vf : B.isVFree = true)
+    (hC_pe : C.isPurelyExistential = true) (hC_vf : C.isVFree = true)
+    (prf : @Derivable ι κ F Allowed.extended Premises []
+      (Formula.all ρ (Formula.imp (Formula.all .nat B) (Formula.ex .nat C)))) :
+    ∀ x : Ty.interpret X ρ,
+      Formula.interpret si B
+        (Term.interpret si (extractedUTerm eqxi spremise prf) () x, (x, ())) →
+      Formula.interpret si C
+        (Term.interpret si (extractedVTerm eqxi spremise prf) () x, (x, ())) := by
+  intro x hBx
+  have h_spec := (syntactic_soundness eqxi spremise prf).property ()
+    (x, (Ty.interpret_default si (wTy (Formula.all Ty.nat B)),
+         Ty.interpret_default si (cTy (Formula.ex Ty.nat C))))
+  simp only [dialecticaMatrix] at h_spec
+  simp only [extractedUTerm, extractedVTerm, extractUTerm, extractVTerm, defaultWTerm,
+    defaultCTerm, Term.interpret, Term.interpret_weaken, interpret_defaultOf,
+    Ctx.lookup] at hBx ⊢
+  exact interp_of_dialecticaMatrix_pe si C hC_pe hC_vf _ _ _
+    (h_spec (dialecticaMatrix_of_interp_pu si B hB_pu hB_vf _ hBx _ _))
+
+/-- **The metatheorem with general matrices, bound as data.** `syntactic_general_metatheorem_at`
+with `B∀` purely universal and `C∃` purely existential (Kohlenbach 17.52). -/
+def syntactic_general_metatheorem_at_gen
+    (eqxi : EqXInterp X F si)
+    (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B)
+    {am : AbstractMajorizability si} (cm : ConstMajorants am)
+    {ρ : Ty ι} {B C : Formula F [Ty.nat, ρ]}
+    (hB_pu : B.isPurelyUniversal = true) (hB_vf : B.isVFree = true)
+    (hC_pe : C.isPurelyExistential = true) (hC_vf : C.isVFree = true)
+    (prf : @Derivable ι κ F Allowed.extended Premises []
+      (Formula.all ρ (Formula.imp (Formula.all .nat B) (Formula.ex .nat C)))) :
+    { Φ : Ty.interpret X ρ.hat → Nat //
+      ∀ (x : Ty.interpret X ρ) (x_star : Ty.interpret X ρ.hat),
+        am.toRel.maj ρ x_star x →
+        (∀ u : Nat, u ≤ Φ x_star → Formula.interpret si B (u, (x, ()))) →
+        ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret si C (v, (x, ())) } :=
+  ⟨coreBound (closedMajorizer cm (extractedUTerm eqxi spremise prf))
+             (closedMajorizer cm (extractedVTerm eqxi spremise prf)),
+   metatheorem_core_of_majorants_at am.toRel
+     (fun x u => Formula.interpret si B (u, (x, ())))
+     (fun x v => Formula.interpret si C (v, (x, ())))
+     _ _ _ _
+     (closedMajorizer_maj cm (extractedUTerm eqxi spremise prf))
+     (closedMajorizer_maj cm (extractedVTerm eqxi spremise prf))
+     (syntactic_extraction_gen eqxi spremise hB_pu hB_vf hC_pe hC_vf prf)⟩
+
+/-- **The metatheorem with general matrices** — Kohlenbach 17.52's shape: from a derivation
+of `∀x (∀u B∀ → ∃v C∃)` with `B∀` a ∀-formula and `C∃` an ∃-formula (both ∨-free), a bound
+`Φ` on `u` and `v` depending only on a majorant of `x`. Extended input; the same statement
+as `syntactic_general_metatheorem`, which is the instance where both matrices are QF. -/
+theorem syntactic_general_metatheorem_gen
+    (eqxi : EqXInterp X F si)
+    (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B)
+    (am : AbstractMajorizability si)
+    {ρ : Ty ι} {B C : Formula F [Ty.nat, ρ]}
+    (hB_pu : B.isPurelyUniversal = true) (hB_vf : B.isVFree = true)
+    (hC_pe : C.isPurelyExistential = true) (hC_vf : C.isVFree = true)
+    (prf : @Derivable ι κ F Allowed.extended Premises []
+      (Formula.all ρ (Formula.imp (Formula.all .nat B) (Formula.ex .nat C)))) :
+    ∃ Φ : Ty.interpret X ρ.hat → Nat,
+      ∀ (x : Ty.interpret X ρ) (x_star : Ty.interpret X ρ.hat),
+        am.toRel.maj ρ x_star x →
+        (∀ u : Nat, u ≤ Φ x_star → Formula.interpret si B (u, (x, ()))) →
+        ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret si C (v, (x, ())) := by
+  obtain ⟨U_star, hU⟩ := majorant_of_closed_term am (extractedUTerm eqxi spremise prf)
+  obtain ⟨V_star, hV⟩ := majorant_of_closed_term am (extractedVTerm eqxi spremise prf)
+  exact metatheorem_core_of_majorants am.toRel
+    (fun x u => Formula.interpret si B (u, (x, ())))
+    (fun x v => Formula.interpret si C (v, (x, ())))
+    _ _ U_star V_star hU hV
+    (syntactic_extraction_gen eqxi spremise hB_pu hB_vf hC_pe hC_vf prf)
+
+/-- **The single-block form**, spelled out: `∀x (∀u ∀b^σ B₀ → ∃v ∃c^τ C₀)` with `B₀`, `C₀`
+quantifier-free and ∨-free, `σ τ : Ty ι` arbitrary. Because `Ty` has products this *is* the
+book's `∀b̲` / `∃c̲` (see the section header), and the conclusion reads exactly as 17.52's:
+`∀u ≤ Φ(x*) ∀b B₀(x,u,b) → ∃v ≤ Φ(x*) ∃c C₀(x,v,c)`. An instance of
+`syntactic_general_metatheorem_gen`. -/
+theorem syntactic_general_metatheorem_block
+    (eqxi : EqXInterp X F si)
+    (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B)
+    (am : AbstractMajorizability si)
+    {ρ σ τ : Ty ι} {B₀ : Formula F [σ, Ty.nat, ρ]} {C₀ : Formula F [τ, Ty.nat, ρ]}
+    (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
+    (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
+    (prf : @Derivable ι κ F Allowed.extended Premises []
+      (Formula.all ρ (Formula.imp (Formula.all .nat (Formula.all σ B₀))
+                                  (Formula.ex .nat (Formula.ex τ C₀))))) :
+    ∃ Φ : Ty.interpret X ρ.hat → Nat,
+      ∀ (x : Ty.interpret X ρ) (x_star : Ty.interpret X ρ.hat),
+        am.toRel.maj ρ x_star x →
+        (∀ u : Nat, u ≤ Φ x_star →
+          ∀ b : Ty.interpret X σ, Formula.interpret si B₀ (b, (u, (x, ())))) →
+        ∃ v : Nat, v ≤ Φ x_star ∧
+          ∃ c : Ty.interpret X τ, Formula.interpret si C₀ (c, (v, (x, ()))) :=
+  syntactic_general_metatheorem_gen eqxi spremise am
+    (B := Formula.all σ B₀) (C := Formula.ex τ C₀)
+    (Formula.isPurelyUniversal_of_qf B₀ hB_qf) hB_vf
+    (Formula.isPurelyExistential_of_qf C₀ hC_qf) hC_vf prf
+
+/-- **The classical metatheorem with general matrices.** `syntactic_general_metatheorem_classical`
+with `B∀` purely universal and `C∃` purely existential — Kohlenbach 17.52 for classical
+input, which is how the book states it. The route is the same five steps; step 1 is
+`classical_to_prenex_extended_gen`, and in step 5 `dialecticaMatrix_iff_interpFormula` is
+replaced by `dialecticaMatrix_of_interp_pu` / `interp_of_dialecticaMatrix_pe`. -/
+theorem syntactic_general_metatheorem_classical_gen
+    (eqxi : EqXInterp X F si)
+    (nts : NTStableD Premises)
+    (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B)
+    (am : AbstractMajorizability si)
+    {ρ : Ty ι} {B C : Formula F [Ty.nat, ρ]}
+    (hB_pu : B.isPurelyUniversal = true) (hB_vf : B.isVFree = true)
+    (hC_pe : C.isPurelyExistential = true) (hC_vf : C.isVFree = true)
+    (prf : @Derivable ι κ F Allowed.classical Premises []
+      (Formula.all ρ (Formula.imp (Formula.all .nat B) (Formula.ex .nat C)))) :
+    ∃ Φ : Ty.interpret X ρ.hat → Nat,
+      ∀ (x : Ty.interpret X ρ) (x_star : Ty.interpret X ρ.hat),
+        am.toRel.maj ρ x_star x →
+        (∀ u : Nat, u ≤ Φ x_star → Formula.interpret si B (u, (x, ()))) →
+        ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret si C (v, (x, ())) := by
+  classical
+  let B' : Formula F [Ty.nat, Ty.nat, ρ] := B.weakenBy Ty.nat
+  let C' : Formula F [Ty.nat, Ty.nat, ρ] :=
+    C.renameF (Term.Renaming.ext Term.Renaming.shift)
+  have hB'_pu : B'.isPurelyUniversal = true := by
+    rw [show B'.isPurelyUniversal = B.isPurelyUniversal from isPurelyUniversal_renameF _ B, hB_pu]
+  have hB'_vf : B'.isVFree = true := by
+    rw [show B'.isVFree = B.isVFree from isVFree_weakenBy B, hB_vf]
+  have hC'_pe : C'.isPurelyExistential = true := by
+    rw [show C'.isPurelyExistential = C.isPurelyExistential from
+      isPurelyExistential_renameF _ C, hC_pe]
+  have hC'_vf : C'.isVFree = true := by
+    rw [show C'.isVFree = C.isVFree from isVFree_renameF _ C, hC_vf]
+  -- Steps 1–2: the closed realizing term for the prenexified, doubly-negated statement.
+  -- `obtain`, not `let` (hard rule 4).
+  obtain ⟨w, hw⟩ :=
+    syntactic_soundness eqxi spremise
+      (classical_to_prenex_extended_gen nts hB_pu hC_pe prf)
+  -- Step 3: the two extractors, as closed terms
+  let Ut := extractUTermP (P := B' →ᶠ C') w
+  let Vt := extractVTermP (P := B' →ᶠ C') w
+  -- Step 4: majorants, free
+  obtain ⟨U_star, hU⟩ := majorant_of_closed_term am Ut
+  obtain ⟨V_star, hV⟩ := majorant_of_closed_term am Vt
+  have hUV : ∀ x : Ty.interpret X ρ,
+      Formula.interpret si B (Term.interpret si Ut () x, (x, ())) →
+      Formula.interpret si C (Term.interpret si Vt () x, (x, ())) := by
+    intro x hBx
+    rw [show Term.interpret si Ut () x = _ from interpret_extractUTermP w x] at hBx
+    rw [show Term.interpret si Vt () x = _ from interpret_extractVTermP w x]
+    -- the ¬¬-challenge: any `¬E`-witness will do, for the same reason as in the QF case —
+    -- the matrix of `B' →ᶠ C'` is discharged for EVERY witness/counter by the two lemmas
+    have key := hw ()
+      (x, (Ty.interpret_default si
+             (wTy (¬ᶠ(Formula.ex Ty.nat (Formula.ex Ty.nat (B' →ᶠ C'))))), ()))
+    simp only [Formula.neg, dialecticaMatrix] at key
+    -- back from B'/C' to B/C
+    have hb : ∀ u v : Nat, Formula.interpret si B' (v, (u, (x, ()))) =
+        Formula.interpret si B (u, (x, ())) := fun u v =>
+      Formula.interpret_renameF_gen si (Term.Renaming.shift (σ := Ty.nat)) B
+        (v, (u, (x, ()))) (u, (x, ())) (fun {_} _ => rfl)
+    have hc : ∀ u v : Nat, Formula.interpret si C' (v, (u, (x, ()))) =
+        Formula.interpret si C (v, (x, ())) := fun u v =>
+      Formula.interpret_renameF_gen si
+        (Term.Renaming.ext (σ := Ty.nat) (Term.Renaming.shift (σ := Ty.nat))) C
+        (v, (u, (x, ()))) (v, (x, ()))
+        (fun {_} vv => match vv with | .vz => rfl | .vs _ => rfl)
+    by_contra hCn
+    exact key (fun himp => hCn (Eq.mp (hc _ _)
+      (interp_of_dialecticaMatrix_pe si C' hC'_pe hC'_vf _ _ _
+        (himp (dialecticaMatrix_of_interp_pu si B' hB'_pu hB'_vf _
+          (Eq.mpr (hb _ _) hBx) _ _)))))
+  exact metatheorem_core_of_majorants am.toRel
+    (fun x u => Formula.interpret si B (u, (x, ())))
+    (fun x v => Formula.interpret si C (v, (x, ())))
+    (Term.interpret si Ut ()) (Term.interpret si Vt ()) U_star V_star hU hV hUV
+
+end GeneralMatrices
+
+#print axioms syntactic_general_metatheorem_gen
+#print axioms syntactic_general_metatheorem_at_gen
+#print axioms syntactic_general_metatheorem_block
+#print axioms syntactic_general_metatheorem_classical_gen
+
 end Metatheorems

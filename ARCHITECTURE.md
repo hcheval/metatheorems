@@ -636,16 +636,55 @@ proof mining: the abstract metric and hyperbolic case", Gerhardy–Kohlenbach):
 
 | | Kohlenbach 17.52 | reference document | **ours** |
 |---|---|---|---|
-| premise matrix | `B∀`, a ∀-formula | `∀b̲ B₀` | `B₀` **quantifier-free** |
-| conclusion matrix | `C∃`, an ∃-formula | `∃c̲ C₀` | `C₀` **quantifier-free** |
+| premise matrix | `B∀`, a ∀-formula | `∀b̲ B₀` | `B₀` **quantifier-free** (QF entry points); **`isPurelyUniversal`** in the `_gen` entry points since 2026-09-04 |
+| conclusion matrix | `C∃`, an ∃-formula | `∃c̲ C₀` | `C₀` **quantifier-free** (QF entry points); **`isPurelyExistential`** in the `_gen` entry points |
 | connectives | unrestricted | unrestricted | **∨-free** |
 | type `ρ` | degree `(1,X)` or `≤ 2` | any | any |
 | `0_X` in the matrices | **excluded** | — | allowed, majorized |
 
-### The one real gap: QF matrices
+### The one real gap: QF matrices — CLOSED 2026-09-04 (branch `general-matrices`)
+
+**Status.** `syntactic_general_metatheorem_gen`, `_at_gen`, `_classical_gen` and the
+spelled-out `syntactic_general_metatheorem_block` (`SyntacticMetatheorem.lean`, section
+"General matrices") take `B.isPurelyUniversal` / `C.isPurelyExistential` (+ ∨-free) in place
+of `isQF`, which is 17.52's "`B∀` a ∀-formula, `C∃` an ∃-formula" verbatim. All four are
+`[propext, Classical.choice, Quot.sound]`; the QF theorems are untouched and are instances
+(`Formula.isPurelyUniversal_of_qf` / `isPurelyExistential_of_qf`). The demo
+`Probes/GeneralMatricesDemo.lean` runs a `le_R_pu` premise — `demoB.isQF = false` by `rfl`,
+so the old entry point cannot be stated on it — through both the extended and the classical
+entry points. **No hypothesis 17.52 lacks was added**, and no type-degree restriction.
+
+What the closing found, in order of surprise:
+
+1. **The extended route needed no prenexification.** The book and the document expand
+   `∀u∀b̲ B₀ → ∃v∃c̲ C₀` and prenexify because their input is *classical*. For an
+   `Allowed.extended` derivation, Dialectica interprets `∀u B∀ → ∃v C∃` directly and the
+   realizer's counter component already returns `(u, (b, …))`, its witness component
+   `(v, (c, …))`. `extractUTerm`/`extractVTerm` never depended on the matrices being QF — the
+   *only* place the restriction lived was `dialecticaMatrix_iff_interpFormula`, which says a
+   QF ∨-free matrix equals its interpretation at every witness/counter. That is false for a
+   ∀-formula (the matrix at counter `(b, …)` is the instance at `b`), so it is *replaced by a
+   pair*, `dialecticaMatrix_of_interp_pu` and `interp_of_dialecticaMatrix_pe`
+   (`Dialectica/Defs.lean`): a true ∀-formula has a true matrix at every witness and counter;
+   an ∃-formula with a true matrix is true. Each is a five-line structural recursion.
+2. **`prenexify` never used its four QF hypotheses.** The body is LEM on arbitrary formulas.
+   It is now a wrapper around `prenexify_gen`, which has no hypothesis at all — the
+   classical route reuses it as-is.
+3. **The classical route's one new step is restoring `B'` from `B'ₙₜ`.** After the negative
+   translation the prenex body is `B'ₙₜ →ᶠ C'ₙₜ`. `C'ₙₜ = C'` outright (`kurodaInner_pe`:
+   Kuroda touches only `∀`), and `B' →ᶠ B'ₙₜ` is derivable for a ∀-formula
+   (`kurodaInner_iff_pu`, already present), so precomposing under `∃u∃v` and `¬¬` gives back
+   `B' →ᶠ C'` (`classical_to_prenex_extended_gen`). Intuitionistic; LEM is still spent only
+   in `prenexify_gen`.
+4. **The book's tuple is our single block, because we have products** — see the coordinator
+   note recorded in the section header of `SyntacticMetatheorem.lean`. `Formula.all` binds any
+   `ρ : Ty ι`, so `∀b̲` is `∀b^(ρ₁ ×ₜ … ×ₜ ρₙ)`; `degree (.prod ρ τ) = max …`, so nothing
+   changes at the type level. `isPurelyUniversal` allows arbitrary nesting anyway.
+
+The pre-closing analysis is kept below for the record.
 
 `syntactic_general_metatheorem` requires `B₀.isQF = true` and `C₀.isQF = true`, i.e. `b̲` and
-`c̲` **empty**. This is a genuine restriction against *both* sources.
+`c̲` **empty**. This was a genuine restriction against *both* sources.
 
 **It probably costs nothing mathematically.** Fuse `∀u∀b̲` into one `∀u'` by Cantor pairing (we
 have it). We then get `∀u' ≤ Φ B₀' → ∃v ≤ Φ C₀`, and to *use* it you must supply

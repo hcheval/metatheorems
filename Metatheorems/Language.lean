@@ -91,6 +91,19 @@ def isPurelyUniversal : Formula F Γ → Bool
   | .and A B => A.isPurelyUniversal && B.isPurelyUniversal
   | A        => A.isQF
 
+/-- A formula is purely existential: a nesting of ∃ around a QF core — Kohlenbach's
+"∃-formula" (`C∃` in Theorem 17.52). The mirror image of `isPurelyUniversal`, closed under
+`∧` for the same reason (the Dialectica witness of `∃c C₀ ∧ ∃c' C₀'` is still just the pair
+of witnesses, with nothing to challenge).
+
+Added 2026-09-04 for the general-matrix metatheorem, `syntactic_general_metatheorem_gen`,
+which takes a purely universal premise matrix and a purely existential conclusion matrix,
+as 17.52 does. -/
+def isPurelyExistential : Formula F Γ → Bool
+  | .ex _ A  => A.isPurelyExistential
+  | .and A B => A.isPurelyExistential && B.isPurelyExistential
+  | A        => A.isQF
+
 -- ============================================================================
 -- ∨-free predicate (needed for Markov and IP Dialectica proofs)
 -- ============================================================================
