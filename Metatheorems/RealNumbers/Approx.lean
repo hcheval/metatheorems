@@ -223,6 +223,23 @@ theorem const_R_weaken {Δ : Ctx ι} {ρ : Ty ι} (q : Term F Δ Ty.nat) :
   rw [Term.rename_rename, Term.rename_rename]
   congr 1
 
+/-- `const_R` commutes with substitution. -/
+@[simp] theorem const_R_subst {Δ Δ' : Ctx ι} (q : Term F Δ Ty.nat)
+    (σ : Term.Subst F Δ Δ') :
+    (const_R q).subst σ = const_R (q.subst σ) := by
+  show Term.lam (Term.subst _ q.weaken) = Term.lam (q.subst σ).weaken
+  rw [Term.weaken_subst_ext]
+
+/-- `le_R` commutes with substitution (the `le_R_pu_substF` of `Terms/ClosedSubst.lean`,
+for the `¬∃` spelling). -/
+theorem le_R_substF {Δ Δ' : Ctx ι} (f g : Term F Δ (realTy ι))
+    (σ : Term.Subst F Δ Δ') :
+    (le_R f g).substF σ = le_R (f.subst σ) (g.subst σ) := by
+  simp only [le_R, lt_R, Formula.neg, Formula.substF, Term.subst, Term.Subst.ext,
+    Term.app2, Term.weaken_subst_ext,
+    le_Q_dec_closed_subst, sub_Q_closed_subst, cauchyfy_closed_subst,
+    pow2neg_Q_closed_subst]
+
 /-- `(const_R q)(x) =₀ q`. -/
 def const_R_apply (q : Term F Γ Ty.nat) (x : Term F Γ Ty.nat) :
     Derivable F al Premises (Formula.eq0 (.app (const_R q) x) q) :=
@@ -333,7 +350,7 @@ def sub_R_apply (f g : Term F Γ (realTy ι)) (x : Term F Γ Ty.nat) :
     rw [app_weaken_vz_subst0', app_weaken_vz_subst0']
   heq ▸ inst
 
-private theorem sub_R_weaken {Δ : Ctx ι} {ρ : Ty ι} :
+theorem sub_R_weaken {Δ : Ctx ι} {ρ : Ty ι} :
     (Term.sub_R : Term F Δ _).weaken (σ := ρ) = Term.sub_R := by
   rw [Term.weaken, Term.rename_eq_subst]; exact sub_R_closed_subst _
 
@@ -516,9 +533,23 @@ def bound_of_abs_sub_le_const (u v : Term F Γ (realTy ι)) (q m : Term F Γ Ty.
 
 -- ── Weakening pushes through the closed constants involved ─────────────────
 
-private theorem cauchyfy_weaken' {Δ : Ctx ι} {ρ : Ty ι} :
+/-- Weakening distributes over application — definitional, but `canorm` has no rule for
+it, and a folded `Term.weaken` around an application spine is invisible to `prw` and to
+`pexact` alike (display-hiding family, CLAUDE.md note 12). -/
+theorem weaken_app {Δ : Ctx ι} {ρ σ' τ' : Ty ι}
+    (a : Term F Δ (ρ →ₜ σ')) (b : Term F Δ ρ) :
+    (Term.app a b).weaken (σ := τ') = Term.app a.weaken b.weaken := rfl
+
+theorem weaken_succ {Δ : Ctx ι} {ρ : Ty ι} :
+    (Term.succ : Term F Δ _).weaken (σ := ρ) = Term.succ := rfl
+
+theorem cauchyfy_weaken' {Δ : Ctx ι} {ρ : Ty ι} :
     (Term.cauchyfy : Term F Δ _).weaken (σ := ρ) = Term.cauchyfy := by
   rw [Term.weaken, Term.rename_eq_subst]; exact cauchyfy_closed_subst _
+
+theorem abs_R_weaken' {Δ : Ctx ι} {ρ : Ty ι} :
+    (Term.abs_R : Term F Δ _).weaken (σ := ρ) = Term.abs_R := by
+  rw [Term.weaken, Term.rename_eq_subst]; exact abs_R_closed_subst _
 
 theorem cauchyfy_app2_weaken {Δ : Ctx ι} {ρ : Ty ι}
     (f : Term F Δ (realTy ι)) (k : Term F Δ Ty.nat) :
@@ -527,7 +558,7 @@ theorem cauchyfy_app2_weaken {Δ : Ctx ι} {ρ : Ty ι}
   show Term.app2 (Term.weaken Term.cauchyfy) f.weaken k.weaken = _
   rw [cauchyfy_weaken']
 
-private theorem pow2neg_Q_weaken' {Δ : Ctx ι} {ρ : Ty ι} :
+theorem pow2neg_Q_weaken' {Δ : Ctx ι} {ρ : Ty ι} :
     (Term.pow2neg_Q : Term F Δ _).weaken (σ := ρ) = Term.pow2neg_Q := by
   rw [Term.weaken, Term.rename_eq_subst]; exact pow2neg_Q_closed_subst _
 
@@ -908,7 +939,7 @@ def Term.diag_seq {Γ : Ctx ι} : Term F Γ ((Ty.nat →ₜ realTy ι) →ₜ re
 
 attribute [closed_subst] diag_seq_closed_subst
 
-private theorem diag_seq_weaken {Δ : Ctx ι} {ρ : Ty ι} :
+theorem diag_seq_weaken {Δ : Ctx ι} {ρ : Ty ι} :
     (Term.diag_seq : Term F Δ _).weaken (σ := ρ) = Term.diag_seq := by
   rw [Term.weaken, Term.rename_eq_subst]; exact diag_seq_closed_subst _
 
