@@ -892,6 +892,64 @@ theorem interpret_lt_Q_dec_eq_zero_iff {si : SpaceInterp X F} {Δ : Ctx ι}
   rw [interpret_lt_Q_dec_fun]
   exact ltQdecN_eq_zero_iff m n
 
+-- ---- `le_Q_dec`, needed by `le_R_pu` ----
+
+/-! An earlier scope note said `le_Q_dec` was not needed. That was **wrong**: `le_R_pu` — the
+formula `Derivable.dist_tri` asserts, and hence what `EqXInterp.dist_tri_holds` must discharge
+— is built on `le_Q_dec`, not `lt_Q_dec`. -/
+
+/-- Non-negativity of the denoted rational, through the parts. The `≤` counterpart of
+`qval_pos_iff`; note the disjunct for the degenerate encoding of `0`, which carries either
+sign. -/
+theorem qval_nonneg_iff (k : ℕ) : 0 ≤ qval k ↔ (ratSignN k = 1 ∨ ratNumN k = 0) := by
+  have hden : (0:ℚ) < (ratDenN k : ℚ) := by exact_mod_cast ratDenN_pos k
+  rcases ratSignN_cases k with h | h
+  · rw [qval_of_sign_zero h, h]
+    constructor
+    · intro hnn
+      right
+      rw [neg_div] at hnn
+      have h1 : (ratNumN k : ℚ) / (ratDenN k : ℚ) ≤ 0 := neg_nonneg.mp hnn
+      have h2 : (0:ℚ) ≤ (ratNumN k : ℚ) / (ratDenN k : ℚ) :=
+        div_nonneg (Nat.cast_nonneg _) (le_of_lt hden)
+      have h4 := (div_eq_zero_iff.mp (le_antisymm h1 h2)).resolve_right hden.ne'
+      exact_mod_cast h4
+    · rintro (h1 | h1)
+      · exact absurd h1 (by omega)
+      · rw [h1]; norm_num
+  · rw [qval_of_sign_one h, h]
+    exact ⟨fun _ => Or.inl rfl,
+      fun _ => div_nonneg (Nat.cast_nonneg _) (le_of_lt hden)⟩
+
+/-- Mirror of `Term.le_Q_dec`: `|sign(d) − 1| · num(d)` with `d = sub_Q n m`. -/
+def leQdecN (m n : ℕ) : ℕ :=
+  ((ratSignN (subQN n m) - 1) + (1 - ratSignN (subQN n m)))
+    * ratNumN (subQN n m)
+
+theorem interpret_le_Q_dec_fun {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpret X Δ) :
+    Term.interpret si (Term.le_Q_dec (F := F) (Γ := Δ)) env = leQdecN := by
+  funext m n
+  simp only [Term.le_Q_dec, Term.app2, Term.interpret,
+    interpret_mul_fun, interpret_abs_diff_fun,
+    interpret_rat_sign_fun, interpret_rat_num_fun, interpret_sub_Q_fun]
+  rfl
+
+theorem leQdecN_eq_zero_iff (m n : ℕ) : leQdecN m n = 0 ↔ qval m ≤ qval n := by
+  have hs := ratSignN_cases (subQN n m)
+  have hkey : leQdecN m n = 0
+      ↔ (ratSignN (subQN n m) = 1 ∨ ratNumN (subQN n m) = 0) := by
+    simp only [leQdecN, Nat.mul_eq_zero]
+    omega
+  rw [hkey, ← qval_nonneg_iff, qval_subQN]
+  constructor <;> intro h <;> linarith
+
+/-- The object-level decision term `le_Q_dec` decides `≤` on `ℚ`. -/
+theorem interpret_le_Q_dec_eq_zero_iff {si : SpaceInterp X F} {Δ : Ctx ι}
+    (env : Ctx.interpret X Δ) (m n : ℕ) :
+    Term.interpret si (Term.le_Q_dec (F := F) (Γ := Δ)) env m n = 0 ↔ qval m ≤ qval n := by
+  rw [interpret_le_Q_dec_fun]
+  exact leQdecN_eq_zero_iff m n
+
 -- ============================================================================
 -- Section 12: S3 — `cauchyfy` is the identity on sequences that pass the check
 --
@@ -994,10 +1052,87 @@ theorem interpret_cauchyfy_id {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.in
   exact cauchyfyN_id_of_cauchy g hg n
 
 -- ============================================================================
+-- Section 13. The formula-level payoff: `=ℝ` and `≤ℝ` in the standard model
+-- ============================================================================
+
+/-! Everything above evaluates *terms*. These two turn the object-level formulas `eq_R` and
+`le_R_pu` into plain statements about Mathlib rationals, which is what
+`MetricModel.eqXInterp` actually needs. -/
+
+/-- `f =ℝ g` holds in the model iff the two cauchyfied code sequences agree to within `2^{-n}`
+at index `n+1`, as *rationals*. -/
+theorem interpret_eq_R {si : SpaceInterp X F} {Γ : Ctx ι}
+    (f g : Term F Γ (realTy ι)) (env : Ctx.interpret X Γ) :
+    Formula.interpret si (eq_R f g) env ↔
+      ∀ n : ℕ,
+        |qval (cauchyfyN (Term.interpret si f env) (n + 1))
+          - qval (cauchyfyN (Term.interpret si g env) (n + 1))| < 1 / 2 ^ n := by
+  -- Expose the application spine but do NOT unfold the ℚ constants into their mirrors:
+  -- the `qval_interpret_*` lemmas apply directly to `Term.interpret` applications, and
+  -- unfolding first would leave `pairN`-shaped terms that no `rw` pattern matches.
+  -- `Ctx.lookup Var.vz (x, env)` and `Nat.succ` are definitional but never fire as simp
+  -- lemmas here (CLAUDE.md, bridge section).  A whole-goal `change` blows `maxRecDepth`,
+  -- so name the two reductions as local `rfl` facts and rewrite with those instead.
+  have hlk : ∀ x : Ty.interpret X Ty.nat, Ctx.lookup (X := X) (Γ := Ty.nat :: Γ) .vz (x, env) = x :=
+    fun _ => rfl
+  simp only [eq_R, Formula.interpret, Term.app2, Term.interpret, hlk, Nat.succ_eq_add_one,
+    interpret_cauchyfy_fun]
+  -- The bound variable still carries type `Ty.interpret X Ty.nat`, which is only *reducibly*
+  -- `ℕ`, so the `qval_interpret_*` rules (stated at `ℕ`) will not match against it.  This
+  -- one-line `change` retypes the binder and costs nothing.
+  change (∀ x : ℕ, _) ↔ _
+  -- The equation itself still lives at `Ty.interpret X Ty.nat`, so `simp only` will not match
+  -- `interpret_lt_Q_dec_eq_zero_iff` (stated at `ℕ`) against it.  Term-level application does
+  -- see through the reducible defeq, so apply it explicitly, naming `Δ`.
+  constructor
+  · intro h n
+    have h2 := (interpret_lt_Q_dec_eq_zero_iff (Δ := Ty.nat :: Γ) (n, env) _ _).mp (h n)
+    rwa [qval_interpret_abs_Q, qval_interpret_sub_Q, qval_interpret_pow2neg_Q,
+      Term.interpret_weaken, Term.interpret_weaken] at h2
+  · intro h n
+    refine (interpret_lt_Q_dec_eq_zero_iff (Δ := Ty.nat :: Γ) (n, env) _ _).mpr ?_
+    rw [qval_interpret_abs_Q, qval_interpret_sub_Q, qval_interpret_pow2neg_Q,
+      Term.interpret_weaken, Term.interpret_weaken]
+    exact h n
+
+-- ============================================================================
 -- Axiom audit. `Classical.choice` is expected: `invTriagN` is a
 -- `Nat.findGreatest`, and `qval` lands in Mathlib's `ℚ`. What matters is the
 -- absence of `sorryAx`.
 -- ============================================================================
+
+/-- `f ≤ℝ g` in its Π⁰₁ spelling, in the model.  `le_R_pu` is `∀n ¬(2^{-n} ≤ℚ f̂ −ℚ ĝ)`;
+stated positively it is the obvious bound. -/
+theorem interpret_le_R_pu {si : SpaceInterp X F} {Γ : Ctx ι}
+    (f g : Term F Γ (realTy ι)) (env : Ctx.interpret X Γ) :
+    Formula.interpret si (le_R_pu f g) env ↔
+      ∀ n : ℕ,
+        qval (cauchyfyN (Term.interpret si f env) (n + 1))
+          - qval (cauchyfyN (Term.interpret si g env) (n + 1)) < 1 / 2 ^ n := by
+  have hlk : ∀ x : Ty.interpret X Ty.nat,
+      Ctx.lookup (X := X) (Γ := Ty.nat :: Γ) .vz (x, env) = x := fun _ => rfl
+  simp only [le_R_pu, Formula.interpret, Term.app2, Term.interpret, hlk, Nat.succ_eq_add_one,
+    interpret_cauchyfy_fun]
+  change (∀ x : ℕ, _) ↔ _
+  constructor
+  · intro h n
+    by_contra hc
+    push_neg at hc
+    refine h n ?_
+    refine (interpret_le_Q_dec_eq_zero_iff (Δ := Ty.nat :: Γ) (n, env) _ _).mpr ?_
+    rw [qval_interpret_pow2neg_Q, qval_interpret_sub_Q,
+      Term.interpret_weaken, Term.interpret_weaken]
+    exact hc
+  · intro h n hle
+    have h2 := (interpret_le_Q_dec_eq_zero_iff (Δ := Ty.nat :: Γ) (n, env) _ _).mp hle
+    rw [qval_interpret_pow2neg_Q, qval_interpret_sub_Q,
+      Term.interpret_weaken, Term.interpret_weaken] at h2
+    exact absurd h2 (not_le.mpr (h n))
+
+#print axioms interpret_eq_R
+#print axioms qval_nonneg_iff
+#print axioms interpret_le_Q_dec_eq_zero_iff
+#print axioms interpret_le_R_pu
 
 #print axioms interpret_add_fun
 #print axioms interpret_monus_fun
