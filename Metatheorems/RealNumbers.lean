@@ -30,6 +30,10 @@ order:
 | `Order` | `lt_irrefl_R`, `lt_add_R`/`lt_mul_pos_R`/`archimedean_R` (sorried), `zero_lt_one_R`, `lt_shift*`, `lt_trans_R` |
 | `Metric` | `add_eq_zero_R`, `le_zero_eq_zero_R`, `nonneg_of_add_self_nonneg`, Kohlenbach §4.1 |
 
+The import graph is deliberately flat below `Field`: `Negation → Mul` is a real dependency
+(`mul_comm_R_core` needs `cauchyfy_congr`), but `Order` and `Metric` import only `Field`, so an
+edit to `Negation` (the 14 s module) does not cascade into them.
+
 Importing `Metatheorems.RealNumbers` still brings the whole layer into scope, so no other file
 in the project changed. Everything is in the `Metatheorems` namespace, as before.
 -/
