@@ -38,6 +38,171 @@ def lt_irrefl_R :
 -- `lt_trans_R` is PROVED, further down: it rests on `lt_shift`, which needs
 -- `cauchyfy_cauchy` and the `≤ℚ`/`<ℚ` toolkit stated below.
 
+/-- The inner implication of `lt_add_R`, with the hypothesis's witness a bound variable.
+
+The witness for the conclusion is `w := n + rat_den e`, where
+`e := 2^{-(n+1)} −ℚ (|f̂(n+1)−f̂(n+2)| +ℚ |ĝ(n+1)−ĝ(n+2)|)` is the **Cauchy slack at the
+hypothesis's own index** — positive for every `f`, `g` because `cauchyState_cauchy`'s check
+is strict. A crude telescope is short by a factor of two at every index (REALS_PLAN §0.03);
+keeping the first step's slack out of the telescope is what closes the gap:
+`D(w+2) ≥ D(n+1) − (cf + 2^{-(n+2)}) − (cg + 2^{-(n+2)}) ≥ 2^{-(n+1)} − (cf+cg) = e ≥ 2^{-w}`,
+the last step by `pow2neg_rat_den_le`. The `+ℝ h` on both sides cancels exactly
+(`sub_Q_add_cancel`), so `h` never enters the estimate. -/
+private def lt_add_inner (f g h : Term F Γ (realTy ι)) :
+    Derivable F al Premises (Γ := Ty.nat :: Γ)
+      (le_Q (.app Term.pow2neg_Q (.var .vz))
+        (Term.app2 Term.sub_Q
+          (Term.app2 Term.cauchyfy g.weaken (.app .succ (.var .vz)))
+          (Term.app2 Term.cauchyfy f.weaken (.app .succ (.var .vz))))
+       →ᶠ
+       lt_R (Term.app2 Term.add_R f.weaken h.weaken)
+            (Term.app2 Term.add_R g.weaken h.weaken)) :=
+  let Γ' := Ty.nat :: Γ
+  let n : Term F Γ' Ty.nat := .var .vz
+  let fw : Term F Γ' (realTy ι) := f.weaken
+  let gw : Term F Γ' (realTy ι) := g.weaken
+  let hw : Term F Γ' (realTy ι) := h.weaken
+  let A1 : Term F Γ' Ty.nat := Term.app2 Term.cauchyfy fw (.app .succ n)
+  let A2 : Term F Γ' Ty.nat := Term.app2 Term.cauchyfy fw (.app .succ (.app .succ n))
+  let B1 : Term F Γ' Ty.nat := Term.app2 Term.cauchyfy gw (.app .succ n)
+  let B2 : Term F Γ' Ty.nat := Term.app2 Term.cauchyfy gw (.app .succ (.app .succ n))
+  let cf : Term F Γ' Ty.nat := .app Term.abs_Q (Term.app2 Term.sub_Q A1 A2)
+  let cg : Term F Γ' Ty.nat := .app Term.abs_Q (Term.app2 Term.sub_Q B1 B2)
+  let P1 : Term F Γ' Ty.nat := .app Term.pow2neg_Q (.app .succ n)
+  let P2 : Term F Γ' Ty.nat := .app Term.pow2neg_Q (.app .succ (.app .succ n))
+  let s : Term F Γ' Ty.nat := Term.app2 Term.add_Q cf cg
+  let e : Term F Γ' Ty.nat := Term.app2 Term.sub_Q P1 s
+  let r : Term F Γ' Ty.nat := .app Term.rat_den e
+  let w : Term F Γ' Ty.nat := Term.app2 Term.add n r
+  let As : Term F Γ' Ty.nat :=
+    Term.app2 Term.cauchyfy fw (Term.app2 Term.add (.app .succ (.app .succ n)) r)
+  let Bs : Term F Γ' Ty.nat :=
+    Term.app2 Term.cauchyfy gw (Term.app2 Term.add (.app .succ (.app .succ n)) r)
+  let Asw : Term F Γ' Ty.nat := Term.app2 Term.cauchyfy fw (.app .succ (.app .succ w))
+  let Bsw : Term F Γ' Ty.nat := Term.app2 Term.cauchyfy gw (.app .succ (.app .succ w))
+  let Hsw : Term F Γ' Ty.nat := Term.app2 Term.cauchyfy hw (.app .succ (.app .succ w))
+  let D1 : Term F Γ' Ty.nat := Term.app2 Term.sub_Q B1 A1
+  let D2 : Term F Γ' Ty.nat := Term.app2 Term.sub_Q Bs As
+  let aa : Term F Γ' Ty.nat := Term.app2 Term.sub_Q B1 Bs
+  let nb : Term F Γ' Ty.nat := Term.app2 Term.sub_Q As A1
+  -- cf + cg <ℚ 2^{-(n+1)}, strictly, hence 0 <ℚ e
+  let hs : Derivable F al Premises (Γ := Γ')
+      (lt_Q s (Term.app2 Term.add_Q P2 P2)) :=
+    Derivable.mp
+      (Derivable.mp (cauchyfy_cauchy gw (.app .succ n))
+        (Derivable.mp (cauchyfy_cauchy fw (.app .succ n)) and_intro))
+      (lt_Q_add_both cf cg P2 P2)
+  let hsP1 : Derivable F al Premises (Γ := Γ') (lt_Q s P1) :=
+    Derivable.mp hs
+      (lt_Q_congr s (Term.app2 Term.add_Q P2 P2) s P1
+        (eq_Q_refl_inst s) (pow2neg_Q_halve (.app .succ n)))
+  let hpos : Derivable F al Premises (Γ := Γ') (lt_Q Term.zero_Q e) :=
+    Derivable.mp hsP1 (lt_Q_to_zero_sub s P1)
+  -- 2^{-w} ≤ℚ e
+  let hwe : Derivable F al Premises (Γ := Γ') (le_Q (.app Term.pow2neg_Q w) e) :=
+    leQt (pow2neg_Q_le_add_r n r) (Derivable.mp hpos (pow2neg_rat_den_le e))
+  -- the exact split D1 =ℚ D2 + (nb + aa), as in `lt_shift1`
+  let hDid : Derivable F al Premises (Γ := Γ')
+      (eq_Q D1 (Term.app2 Term.add_Q D2 (Term.app2 Term.add_Q nb aa))) :=
+    eqQtrans (sub_Q_trans_split A1 Bs B1)
+      (eqQtrans (addQl (sub_Q_trans_split A1 As Bs) aa)
+        (eqQtrans (addQl (add_Q_comm_inst nb D2) aa)
+          (add_Q_assoc_inst D2 nb aa)))
+  -- aa ≤ cg + 2^{-(n+2)} : one strict step kept out, then the telescope
+  let haa : Derivable F al Premises (Γ := Γ')
+      (le_Q aa (Term.app2 Term.add_Q cg P2)) :=
+    leQt (le_Q_self_abs aa)
+      (leQt (abs_Q_sub_triangle B1 B2 Bs)
+        (Derivable.mp (cauchyfy_shift_le gw (.app .succ (.app .succ n)) r)
+          (le_Q_add_l cg (.app Term.abs_Q (Term.app2 Term.sub_Q B2 Bs)) P2)))
+  -- nb ≤ cf + 2^{-(n+2)}, mirrored through `abs_diff_Q_comm`
+  let hnb : Derivable F al Premises (Γ := Γ')
+      (le_Q nb (Term.app2 Term.add_Q cf P2)) :=
+    leQt (le_Q_self_abs nb)
+      (Derivable.mp
+        (leQt (abs_Q_sub_triangle A1 A2 As)
+          (Derivable.mp (cauchyfy_shift_le fw (.app .succ (.app .succ n)) r)
+            (le_Q_add_l cf (.app Term.abs_Q (Term.app2 Term.sub_Q A2 As)) P2)))
+        (le_Q_congr (.app Term.abs_Q (Term.app2 Term.sub_Q A1 As))
+          (Term.app2 Term.add_Q cf P2)
+          (.app Term.abs_Q (Term.app2 Term.sub_Q As A1))
+          (Term.app2 Term.add_Q cf P2)
+          (abs_diff_Q_comm A1 As) (eq_Q_refl_inst (Term.app2 Term.add_Q cf P2))))
+  -- nb + aa ≤ s + 2^{-(n+1)}
+  let hsum : Derivable F al Premises (Γ := Γ')
+      (le_Q (Term.app2 Term.add_Q nb aa) (Term.app2 Term.add_Q s P1)) :=
+    Derivable.mp
+      (Derivable.mp
+        (Derivable.mp haa (Derivable.mp hnb and_intro))
+        (le_Q_add_both nb aa (Term.app2 Term.add_Q cf P2) (Term.app2 Term.add_Q cg P2)))
+      (le_Q_congr (Term.app2 Term.add_Q nb aa)
+        (Term.app2 Term.add_Q (Term.app2 Term.add_Q cf P2) (Term.app2 Term.add_Q cg P2))
+        (Term.app2 Term.add_Q nb aa) (Term.app2 Term.add_Q s P1)
+        (eq_Q_refl_inst (Term.app2 Term.add_Q nb aa))
+        (eqQtrans (add_Q_shuffle cf P2 cg P2)
+          (addQr s (pow2neg_Q_halve (.app .succ n)))))
+  -- D1 ≤ D2 + (s + 2^{-(n+1)})
+  let hD1b : Derivable F al Premises (Γ := Γ')
+      (le_Q D1 (Term.app2 Term.add_Q D2 (Term.app2 Term.add_Q s P1))) :=
+    Derivable.mp
+      (Derivable.mp hsum (le_Q_add_l D2 (Term.app2 Term.add_Q nb aa)
+        (Term.app2 Term.add_Q s P1)))
+      (le_Q_congr (Term.app2 Term.add_Q D2 (Term.app2 Term.add_Q nb aa))
+        (Term.app2 Term.add_Q D2 (Term.app2 Term.add_Q s P1))
+        D1 (Term.app2 Term.add_Q D2 (Term.app2 Term.add_Q s P1))
+        (eqQsym hDid)
+        (eq_Q_refl_inst (Term.app2 Term.add_Q D2 (Term.app2 Term.add_Q s P1))))
+  -- (n+2)+r =₀ w+2, and the goal-side difference is D2 with `h` cancelled
+  let hIdx : Derivable F al Premises (Γ := Γ')
+      (Formula.eq0 (Term.app2 Term.add (.app .succ (.app .succ n)) r)
+        (.app .succ (.app .succ w))) :=
+    qtrans (add_succ_l (.app .succ n) r) (succ_congr_o (add_succ_l n r))
+  let hyEq : Derivable F al Premises (Γ := Γ')
+      (eq_Q D2
+        (Term.app2 Term.sub_Q
+          (Term.app2 Term.cauchyfy (Term.app2 Term.add_R gw hw) (.app .succ w))
+          (Term.app2 Term.cauchyfy (Term.app2 Term.add_R fw hw) (.app .succ w)))) :=
+    eqQtrans
+      (sub_Q_congr (eqQ_of_nat_eq' (cauchyfy_idx_nat' gw hIdx))
+        (eqQ_of_nat_eq' (cauchyfy_idx_nat' fw hIdx)))
+      (eqQtrans (eqQsym (sub_Q_add_cancel Asw Bsw Hsw))
+        (sub_Q_congr
+          (eqQsym (eqQ_of_nat_eq' (cauchyfy_add_R gw hw (.app .succ w))))
+          (eqQsym (eqQ_of_nat_eq' (cauchyfy_add_R fw hw (.app .succ w))))))
+  by
+  pmode
+  pintro a
+  pexists w
+  canorm
+  papplym (le_Q_congr (.app Term.pow2neg_Q w) D2 (.app Term.pow2neg_Q w)
+    (Term.app2 Term.sub_Q
+      (Term.app2 Term.cauchyfy (Term.app2 Term.add_R gw hw) (.app .succ w))
+      (Term.app2 Term.cauchyfy (Term.app2 Term.add_R fw hw) (.app .succ w)))
+    (eq_Q_refl_inst (.app Term.pow2neg_Q w)) hyEq)
+  papplym (le_Q_trans_l D2 hwe)
+  papplym (le_Q_sub_of_le_add P1 D2 s)
+  papplym (le_Q_add_cancel P1 (Term.app2 Term.add_Q D2 s) P1)
+  papplym (le_Q_congr (.app Term.pow2neg_Q n)
+    (Term.app2 Term.add_Q D2 (Term.app2 Term.add_Q s P1))
+    (Term.app2 Term.add_Q P1 P1)
+    (Term.app2 Term.add_Q (Term.app2 Term.add_Q D2 s) P1)
+    (eqQsym (pow2neg_Q_halve n)) (eqQsym (add_Q_assoc_inst D2 s P1)))
+  papplym (le_Q_trans (.app Term.pow2neg_Q n) D1
+    (Term.app2 Term.add_Q D2 (Term.app2 Term.add_Q s P1)))
+  psplit
+  · pexact a
+  · pthm hD1b
+
+/-- `f <ℝ g → f +ℝ h <ℝ g +ℝ h`, at explicit reals. The single `∃`-elimination is a
+Lean-level `Derivable.exist_rule`. -/
+def lt_add_R_core (f g h : Term F Γ (realTy ι)) :
+    Derivable F al Premises
+      (lt_R f g →ᶠ
+        lt_R (Term.app2 Term.add_R f h) (Term.app2 Term.add_R g h)) := by
+  refine Derivable.exist_rule ?_
+  rw [lt_R_weakenBy, add_R_app_weaken, add_R_app_weaken]
+  exact lt_add_inner f g h
+
 /-- ⊢ ∀f,g,h : ℝ. f <_ℝ g → f +_ℝ h <_ℝ g +_ℝ h -/
 def lt_add_R :
     Derivable F al Premises (Γ := Γ)
@@ -46,7 +211,8 @@ def lt_add_R :
           →ᶠ lt_R
             (Term.app2 Term.add_R (.var (.vs (.vs .vz))) (.var .vz))
             (Term.app2 Term.add_R (.var (.vs .vz)) (.var .vz)))))) :=
-  sorry
+  univ_gen (univ_gen (univ_gen
+    (lt_add_R_core (.var (.vs (.vs .vz))) (.var (.vs .vz)) (.var .vz))))
 
 /-- The core of `lt_mul_pos_R`, at the two witnesses as bound variables: `n₂ = vz` from
 `0 <ℝ g`, `n₁ = vs vz` from `0 <ℝ f`.
