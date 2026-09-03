@@ -180,7 +180,7 @@ private def lt_add_inner (f g h : Term F Γ (realTy ι)) :
       (Term.app2 Term.cauchyfy (Term.app2 Term.add_R fw hw) (.app .succ w)))
     (eq_Q_refl_inst (.app Term.pow2neg_Q w)) hyEq)
   papplym (le_Q_trans_l D2 hwe)
-  papplym (le_Q_sub_of_le_add P1 D2 s)
+  papplym (le_Q_sub_of_le_add_r P1 D2 s)
   papplym (le_Q_add_cancel P1 (Term.app2 Term.add_Q D2 s) P1)
   papplym (le_Q_congr (.app Term.pow2neg_Q n)
     (Term.app2 Term.add_Q D2 (Term.app2 Term.add_Q s P1))

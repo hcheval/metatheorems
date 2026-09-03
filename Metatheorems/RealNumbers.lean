@@ -12,6 +12,7 @@ import Metatheorems.RealNumbers.Field
 import Metatheorems.RealNumbers.Negation
 import Metatheorems.RealNumbers.Mul
 import Metatheorems.RealNumbers.OrderBounds
+import Metatheorems.RealNumbers.Approx
 import Metatheorems.RealNumbers.Order
 import Metatheorems.RealNumbers.Metric
 
@@ -95,7 +96,11 @@ namespace Metatheorems
 #print axioms cauchyfy_lb_imp
 #print axioms le_Q_mul_o
 #print axioms le_Q_add_cancel
-#print axioms le_Q_sub_of_le_add
+-- Two genuinely different lemmas, one per lane, that collided on a name at merge time
+-- (2026-09-03): `_r` subtracts the right summand, `_l` the left. See the note in CLAUDE.md's
+-- parallel-agent recipe — a name collision across lanes builds cleanly and then fails.
+#print axioms le_Q_sub_of_le_add_r
+#print axioms le_Q_sub_of_le_add_l
 #print axioms neg_Q_antitone
 #print axioms cauchyfy_add_R
 #print axioms cauchy_pair_step
@@ -151,5 +156,21 @@ namespace Metatheorems
 #print axioms mul_assoc_R_core
 #print axioms distrib_R
 #print axioms distrib_R_core
+-- Kohlenbach §4.1, Lemmas 4.2 and 4.3 (2026-09-03): the approximation layer
+-- (`RealNumbers/Approx.lean`) and the two `Metric.lean` results built on it.
+#print axioms abs_Q_rev_triangle
+#print axioms cauchyfy_const
+#print axioms cauchyfy_abs_R
+#print axioms cauchyfy_sub_R
+#print axioms abs_sub_le_const_R
+#print axioms bound_of_abs_sub_le_const
+#print axioms approx_le_R
+#print axioms approx_le_R_core
+#print axioms diag_seq_apply
+#print axioms diag_check_bound
+#print axioms diag_goal_bound
+#print axioms approx_R
+#print axioms approx_R_core
+#print axioms cauchy_complete_R
 
 end Metatheorems

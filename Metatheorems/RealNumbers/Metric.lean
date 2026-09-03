@@ -5,6 +5,7 @@ Authors: Horatiu
 -/
 import Metatheorems.RealNumbers.Field
 import Metatheorems.RealNumbers.Bounds
+import Metatheorems.RealNumbers.Approx
 
 namespace Metatheorems
 
@@ -312,6 +313,20 @@ def nonneg_R_of_double_bound (f : Term F Γ (realTy ι))
       pthm h))
     (nonneg_of_add_self_nonneg_core f)
 
+/-- `canorm` extended with the `le_R`/`const_R`/`diag_seq` naturality lemmas: `canorm`
+cannot push a substitution through the named `le_R`/`const_R` wrappers, and
+`cauchy_complete_R`'s hypothesis is a `∀`-nest of exactly those. -/
+macro "rnorm" : tactic =>
+  `(tactic| (canorm
+             try simp only [le_R_substF, const_R_subst, Term.subst,
+               Term.subst0_map_vz, Term.subst0_map_vs,
+               Term.Subst.ext_vz, Term.Subst.ext_vs, Term.weaken_var,
+               abs_R_closed_subst, sub_R_closed_subst, diag_seq_app_weaken,
+               weaken_app, weaken_succ, abs_R_weaken', sub_R_weaken,
+               diag_seq_weaken, const_R_weaken, pow2neg_Q_weaken', cauchyfy_weaken',
+               closed_subst]
+             try canorm))
+
 -- ── From Kohlenbach, *Applied Proof Theory*, §4.1 ───────────────────────────
 --
 -- Three facts the book states and uses but does not prove. They are NOT in
@@ -323,10 +338,8 @@ def nonneg_R_of_double_bound (f : Term F Γ (realTy ι))
 -- `RationalNumbers.lean` — and asserts the ℝ package in one parenthesis
 -- (p. 80) with no proof at all.
 
-/-- The constant real sequence at a rational code — the book's `r ↦ λn.⟨r⟩` embedding
-    of ℚ into ℝ (p. 80). `⟨2^{-k}⟩_ℝ` is `const_R (pow2neg_Q k)`. -/
-def const_R {Γ : Ctx ι} (q : Term F Γ Ty.nat) : Term F Γ (realTy ι) :=
-  Term.lam q.weaken
+-- `const_R` MOVED to `RealNumbers/Approx.lean` (2026-09-03, unchanged), so that its
+-- `cauchyfy` theory (`cauchyfy_const`) can sit beside it.
 
 /-- **Lemma 4.2** (Kohlenbach p. 80). `f̂(k)` is a rational `2^{-k}`-approximation of `f`:
 
@@ -336,15 +349,139 @@ def const_R {Γ : Ctx ι} (q : Term F Γ Ty.nat) : Term F Γ (realTy ι) :=
     lets a proof move between a real and a rational approximation of it at a chosen
     index, which is exactly what the five-term split needs.
 
-    **Worked out 2026-09-01; see `REALS_PLAN.md` §0.8.** The goal reduces to
-    `∃n. 2^{-k} −ℚ |f̂(n+2) −ℚ f̂(k)| ≥ℚ 2^{-n}`, and the crude telescoping bound falls short
-    by a factor of 4 *at every `n`*. The witness has to be `n := max(k, rat_den d)` with
-    `d := 2^{-(k+1)} −ℚ |f̂(k) −ℚ f̂(k+1)|` — the Cauchy slack at index `k`, positive for
-    every `f` because `cauchyState_cauchy` is strict. `pow2neg_rat_den_le` (proved) is the
-    Archimedean step that makes that witness work; what is still missing is the triangle
-    inequality (forward *and* reverse), the refined telescoping induction, and
-    `cauchyfy_const` at an arbitrary constant. Note that with `le_R` in place of `lt_R` the
-    statement is Π₁⁰ and needs no witness at all. -/
+    **Worked out 2026-09-01 (`REALS_PLAN.md` §0.8), PROVED 2026-09-03.** The goal reduces
+    to `∃n. 2^{-k} −ℚ |f̂(n+2) −ℚ f̂(k)| ≥ℚ 2^{-n}`, and the crude telescoping bound falls
+    short by a factor of 4 *at every `n`*. The witness must depend on `f` through the
+    Cauchy slack at index `k` — `d := 2^{-(k+1)} −ℚ |f̂(k) −ℚ f̂(k+1)|`, positive for every
+    `f` because `cauchyState_cauchy` is strict — and `pow2neg_rat_den_le` is the
+    Archimedean step. Two corrections to §0.8's plan, found in the proving:
+
+    * the witness is **`n := k +ℕ rat_den d`**, not `max(k, rat_den d)` — the sum
+      dominates both (`pow2neg_Q_le_add_r`), so no object-level `max` lemmas and no case
+      split are needed;
+    * §0.8's "refined telescope keeping the `k`-th step's slack out of the sum" (item 2)
+      is exactly `cauchyfy_tele_at` at `p = k+1`, which existed by 2026-09-03: the carried
+      slack `2^{-((k+1)+(D+1))}` lands, after the index identity
+      `(k+1)+(D+1) =₀ n+2`, on precisely the `2^{-(n+2)}` piece of the split
+      `2^{-n} = 2^{-(n+2)} + (2^{-(n+1)} + 2^{-(n+2)})`, and the remaining
+      `2^{-(n+1)} + 2^{-(n+2)} ≤ 2^{-n} ≤ 2^{-D} ≤ d` is what the witness buys.
+
+    `approx_le_R` (`Approx.lean`) is the `≤ℝ` form — Π₁⁰, witness-free, and all that
+    `cauchy_complete_R` needs; the `<ℝ` spelling here carries the Archimedean content. -/
+def approx_R_core (f : Term F Γ (realTy ι)) (k : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (lt_R
+        (.app Term.abs_R
+          (Term.app2 Term.sub_R f (const_R (Term.app2 Term.cauchyfy f k))))
+        (const_R (.app Term.pow2neg_Q k))) :=
+  let s0 : Term F Γ Ty.nat := Term.app2 Term.cauchyfy f k
+  let s1 : Term F Γ Ty.nat := Term.app2 Term.cauchyfy f (.app .succ k)
+  let Y0 : Term F Γ Ty.nat := .app Term.abs_Q (Term.app2 Term.sub_Q s0 s1)
+  let Pk1 : Term F Γ Ty.nat := .app Term.pow2neg_Q (.app .succ k)
+  let d : Term F Γ Ty.nat := Term.app2 Term.sub_Q Pk1 Y0
+  let D : Term F Γ Ty.nat := .app Term.rat_den d
+  let n : Term F Γ Ty.nat := Term.app2 Term.add k D
+  let a : Term F Γ Ty.nat := Term.app2 Term.cauchyfy f (.app .succ (.app .succ n))
+  let X : Term F Γ Ty.nat := .app Term.abs_Q (Term.app2 Term.sub_Q a s0)
+  let T' : Term F Γ Ty.nat := .app Term.abs_Q (Term.app2 Term.sub_Q a s1)
+  let Y : Term F Γ Ty.nat := .app Term.abs_Q (Term.app2 Term.sub_Q s1 s0)
+  let Pk : Term F Γ Ty.nat := .app Term.pow2neg_Q k
+  let Pn : Term F Γ Ty.nat := .app Term.pow2neg_Q n
+  let Pn1 : Term F Γ Ty.nat := .app Term.pow2neg_Q (.app .succ n)
+  let Pn2 : Term F Γ Ty.nat := .app Term.pow2neg_Q (.app .succ (.app .succ n))
+  let PD : Term F Γ Ty.nat := .app Term.pow2neg_Q D
+  -- `(k+1) +ℕ (D+1) =₀ n+2`
+  let hidx : Derivable F al Premises
+      (Formula.eq0 (Term.app2 Term.add (.app .succ k) (.app .succ D))
+        (.app .succ (.app .succ n))) :=
+    qtrans (add_succ (.app .succ k) D) (succ_congrA (add_succ_l k D))
+  -- the refined telescope: `|f̂(n+2) −ℚ f̂(k+1)| +ℚ 2^{-(n+2)} ≤ℚ 2^{-(k+1)}`
+  let cT : Derivable F al Premises
+      (Formula.eq0
+        (Term.app2 Term.cauchyfy f
+          (Term.app2 Term.add (.app .succ k) (.app .succ D)))
+        a) :=
+    cauchyfy_idx_nat' f hidx
+  let tEq : Derivable F al Premises
+      (eq_Q (.app Term.abs_Q (Term.app2 Term.sub_Q s1
+          (Term.app2 Term.cauchyfy f
+            (Term.app2 Term.add (.app .succ k) (.app .succ D)))))
+        T') :=
+    eqQtrans (eqQ_of_nat_eq' (abs_Q_congr_nat (subQ_r_nat s1 cT)))
+      (abs_diff_Q_comm s1 a)
+  let pEq : Derivable F al Premises
+      (eq_Q (.app Term.pow2neg_Q
+          (Term.app2 Term.add (.app .succ k) (.app .succ D)))
+        Pn2) :=
+    eqQ_of_nat_eq' (pow2neg_idx_nat' hidx)
+  let hT : Derivable F al Premises (le_Q (Term.app2 Term.add_Q T' Pn2) Pk1) :=
+    Derivable.mp (cauchyfy_tele_at f (.app .succ k) (.app .succ D))
+      (le_Q_congr _ Pk1 (Term.app2 Term.add_Q T' Pn2) Pk1
+        (eqQtrans
+          (addQl tEq (.app Term.pow2neg_Q
+            (Term.app2 Term.add (.app .succ k) (.app .succ D))))
+          (addQr T' pEq))
+        (eq_Q_refl_inst Pk1))
+  -- the Archimedean step: `2^{-(n+1)} +ℚ 2^{-(n+2)} ≤ℚ 2^{-n} ≤ℚ 2^{-D} ≤ℚ d`
+  let hd_pos : Derivable F al Premises (lt_Q Term.zero_Q d) :=
+    Derivable.mp (cauchyfy_cauchy f k) (lt_Q_to_zero_sub Y0 Pk1)
+  let hy1 : Derivable F al Premises (le_Q (Term.app2 Term.add_Q Pn1 Pn2) d) :=
+    leQt
+      (leQt
+        (Derivable.mp (pow2neg_Q_le_succ (.app .succ n)) (le_Q_add_l Pn1 Pn2 Pn1))
+        (Derivable.mp (pow2neg_Q_halve n) (eq_Q_imp_le_Q _ _)))
+      (leQt (pow2neg_Q_le_add_r k D)
+        (Derivable.mp hd_pos (pow2neg_rat_den_le d)))
+  -- `Y +ℚ (2^{-(n+1)} +ℚ 2^{-(n+2)}) ≤ℚ Y +ℚ d =ℚ 2^{-(k+1)}`
+  let hY : Derivable F al Premises
+      (le_Q (Term.app2 Term.add_Q Y (Term.app2 Term.add_Q Pn1 Pn2)) Pk1) :=
+    leQt
+      (Derivable.mp hy1 (le_Q_add_l Y (Term.app2 Term.add_Q Pn1 Pn2) d))
+      (Derivable.mp
+        (eqQtrans (addQl (abs_diff_Q_comm s1 s0) d) (add_Q_sub_cancel Pk1 Y0))
+        (eq_Q_imp_le_Q _ _))
+  -- `2^{-n} =ℚ 2^{-(n+2)} +ℚ (2^{-(n+1)} +ℚ 2^{-(n+2)})`
+  let hsplit : Derivable F al Premises
+      (eq_Q Pn (Term.app2 Term.add_Q Pn2 (Term.app2 Term.add_Q Pn1 Pn2))) :=
+    eqQtrans (eqQsym (pow2neg_Q_halve n))
+      (eqQtrans (addQr Pn1 (eqQsym (pow2neg_Q_halve (.app .succ n))))
+        (eqQtrans (eqQsym (add_Q_assoc_inst Pn1 Pn2 Pn2))
+          (add_Q_comm_inst (Term.app2 Term.add_Q Pn1 Pn2) Pn2)))
+  -- assembly: `X +ℚ 2^{-n} ≤ℚ 2^{-k}`
+  let est : Derivable F al Premises (le_Q (Term.app2 Term.add_Q X Pn) Pk) :=
+    leQt
+      (leQt
+        (Derivable.mp (abs_Q_sub_triangle a s1 s0)
+          (le_Q_add X (Term.app2 Term.add_Q T' Y) Pn))
+        (Derivable.mp
+          (eqQtrans (addQr (Term.app2 Term.add_Q T' Y) hsplit)
+            (add_Q_shuffle T' Y Pn2 (Term.app2 Term.add_Q Pn1 Pn2)))
+          (eq_Q_imp_le_Q _ _)))
+      (leQt
+        (Derivable.mp (Derivable.mp hY (Derivable.mp hT and_intro))
+          (le_Q_add_both (Term.app2 Term.add_Q T' Pn2)
+            (Term.app2 Term.add_Q Y (Term.app2 Term.add_Q Pn1 Pn2)) Pk1 Pk1))
+        (Derivable.mp (pow2neg_Q_halve k) (eq_Q_imp_le_Q _ _)))
+  by
+  pmode
+  pexists n
+  rnorm
+  prw (cauchyfy_const (.app Term.pow2neg_Q k) (.app .succ n))
+  prw (cauchyfy_abs_R
+    (Term.app2 Term.sub_R f (const_R (Term.app2 Term.cauchyfy f k))) (.app .succ n))
+  prw (cauchyfy_sub_R f (const_R (Term.app2 Term.cauchyfy f k)) (.app .succ n))
+  prw (cauchyfy_const (Term.app2 Term.cauchyfy f k) (.app .succ (.app .succ n)))
+  papplym (le_Q_congr Pn (Term.app2 Term.sub_Q Pk X) Pn
+    (Term.app2 Term.sub_Q Pk
+      (.app Term.abs_Q (Term.app2 Term.add_Q a (.app Term.neg_Q s0))))
+    (eq_Q_refl_inst Pn)
+    (sub_Q_congr (eq_Q_refl_inst Pk) (abs_Q_congr (sub_Q_eq_add_neg a s0))))
+  papplym (le_Q_sub_of_add_le X Pn Pk)
+  pthm est
+
+/-- **Lemma 4.2** (Kohlenbach p. 80), in its strict `<ℝ` form; see `approx_R_core` for the
+witness and the estimate, and `approx_le_R` (`Approx.lean`) for the witness-free `≤ℝ`
+form. -/
 def approx_R :
     Derivable F al Premises (Γ := Γ)
       (Formula.all rTy (Formula.all Ty.nat
@@ -354,7 +491,7 @@ def approx_R :
               (.var (.vs .vz))
               (const_R (Term.app (Term.app Term.cauchyfy (.var (.vs .vz))) (.var .vz)))))
           (const_R (.app Term.pow2neg_Q (.var .vz)))))) :=
-  sorry
+  univ_gen (univ_gen (approx_R_core (.var (.vs .vz)) (.var .vz)))
 
 /-- **Lemma 4.3** (Kohlenbach p. 80). Cauchy completeness of ℝ:
 
@@ -384,7 +521,178 @@ def cauchy_complete_R :
                     (Term.app (.var (.vs (.vs .vz))) (.var .vz))
                     (.var (.vs .vz))))
                 (const_R (.app Term.pow2neg_Q (.var .vz))))))) :=
-  sorry
+  univ_gen (by
+    pmode
+    pintro hyp
+    pexists (Term.app Term.diag_seq (.var .vz))
+    canorm
+    simp only [le_R_substF, const_R_subst, Term.subst, Term.subst0_map_vz,
+      Term.subst0_map_vs, Term.Subst.ext_vz, Term.Subst.ext_vs, Term.weaken_var,
+      Term.app2, abs_R_closed_subst, sub_R_closed_subst, diag_seq_app_weaken,
+      closed_subst]
+    phave hid : Formula.all Ty.nat
+      (Formula.eq0
+          (.app Term.snd_pair
+            (Term.cauchyState (.app Term.diag_seq (.var (.vs .vz))) (.var .vz)))
+          Term.zero
+        ∧ᶠ Formula.eq0
+          (.app Term.fst_pair
+            (Term.cauchyState (.app Term.diag_seq (.var (.vs .vz))) (.var .vz)))
+          (.app (.app Term.diag_seq (.var (.vs .vz))) (.var .vz)))
+    · pinduction
+      · canorm
+        psplit
+        · pthm (cFlag_zero (.app Term.diag_seq (.var .vz)))
+        · pthm (cVal_zero (.app Term.diag_seq (.var .vz)))
+      · pforall
+        pintro ih
+        canorm
+        pdestruct ih with ihf ihv
+        -- the two hypothesis instances the check needs, at `(x+3, x+3, x+4)`
+        pinst hyp (.app .succ (.app .succ (.app .succ (.var .vz)))) with u1
+        rnorm
+        pinst u1 (.app .succ (.app .succ (.app .succ (.var .vz)))) with u2
+        rnorm
+        pinst u2 (.app .succ (.app .succ (.app .succ (.app .succ (.var .vz))))) with u3
+        rnorm
+        pdestruct_imp u3 with u4
+        · pthm (monus_self (.app .succ (.app .succ (.app .succ (.var .vz)))))
+        pdestruct_imp u4 with u5
+        · pthm (monus_succ_self (.app .succ (.app .succ (.app .succ (.var .vz)))))
+        papplym (diag_check_bound
+          (.app (.var (.vs .vz)) (.app .succ (.app .succ (.app .succ (.var .vz)))))
+          (.app (.var (.vs .vz))
+            (.app .succ (.app .succ (.app .succ (.app .succ (.var .vz))))))
+          (.var .vz)) in u5 with hchk
+        -- the check, as a `=₀ 0` fact about the diagonal itself
+        phave hc0 : Formula.eq0
+            (Term.app2 Term.lt_Q_dec
+              (.app Term.abs_Q (Term.app2 Term.sub_Q
+                (.app (.app Term.diag_seq (.var (.vs .vz))) (.var .vz))
+                (.app (.app Term.diag_seq (.var (.vs .vz))) (.app .succ (.var .vz)))))
+              (.app Term.pow2neg_Q (.app .succ (.var .vz))))
+            Term.zero
+        · prw (diag_seq_apply (.var (.vs .vz)) (.var .vz))
+          prw (diag_seq_apply (.var (.vs .vz)) (.app .succ (.var .vz)))
+          pexact hchk
+        phave hsg : Formula.eq0
+            (.app Term.sg_bar
+              (Term.app2 Term.lt_Q_dec
+                (.app Term.abs_Q (Term.app2 Term.sub_Q
+                  (.app (.app Term.diag_seq (.var (.vs .vz))) (.var .vz))
+                  (.app (.app Term.diag_seq (.var (.vs .vz))) (.app .succ (.var .vz)))))
+                (.app Term.pow2neg_Q (.app .succ (.var .vz)))))
+            (.app .succ .zero)
+        · papplym (sg_bar_of_zero
+            (Term.app2 Term.lt_Q_dec
+              (.app Term.abs_Q (Term.app2 Term.sub_Q
+                (.app (.app Term.diag_seq (.var (.vs .vz))) (.var .vz))
+                (.app (.app Term.diag_seq (.var (.vs .vz))) (.app .succ (.var .vz)))))
+              (.app Term.pow2neg_Q (.app .succ (.var .vz)))))
+          pexact hc0
+        pconj ihf hsg with hboth
+        papplym (cauchyState_advance (.app Term.diag_seq (.var (.vs .vz))) (.var .vz))
+          in hboth with hst
+        psplit
+        · prwby hst
+          pthm (snd_pair_pair
+            (.app (.app Term.diag_seq (.var (.vs .vz))) (.app .succ (.var .vz)))
+            Term.zero)
+        · prwby hst
+          pthm (fst_pair_pair
+            (.app (.app Term.diag_seq (.var (.vs .vz))) (.app .succ (.var .vz)))
+            Term.zero)
+    pforall
+    pintro hex
+    pobtain hex with hn
+    rnorm
+    -- refute the witness `x₂` with the strict pointwise bound
+    phave hlt : lt_Q
+        (Term.app2 Term.sub_Q
+          (Term.app2 Term.cauchyfy
+            (.app Term.abs_R (Term.app2 Term.sub_R
+              (.app (.var (.vs (.vs .vz))) (.var (.vs .vz)))
+              (.app Term.diag_seq (.var (.vs (.vs .vz))))))
+            (.app .succ (.var .vz)))
+          (Term.app2 Term.cauchyfy (const_R (.app Term.pow2neg_Q (.var (.vs .vz))))
+            (.app .succ (.var .vz))))
+        (.app Term.pow2neg_Q (.var .vz))
+    · prw (cauchyfy_abs_R (Term.app2 Term.sub_R
+        (.app (.var (.vs (.vs .vz))) (.var (.vs .vz)))
+        (.app Term.diag_seq (.var (.vs (.vs .vz))))) (.app .succ (.var .vz)))
+      prw (cauchyfy_sub_R
+        (.app (.var (.vs (.vs .vz))) (.var (.vs .vz)))
+        (.app Term.diag_seq (.var (.vs (.vs .vz)))) (.app .succ (.var .vz)))
+      prw (cauchyfy_const (.app Term.pow2neg_Q (.var (.vs .vz))) (.app .succ (.var .vz)))
+      -- replace the diagonal's cauchyfication by its value, via the invariant
+      pinst hid (.app .succ (.app .succ (.var .vz))) with hid2
+      rnorm
+      pdestruct hid2 with hfl2 hval2
+      phave hcf : Formula.eq0
+          (Term.app2 Term.cauchyfy (.app Term.diag_seq (.var (.vs (.vs .vz))))
+            (.app .succ (.app .succ (.var .vz))))
+          (Term.app2 Term.cauchyfy
+            (.app (.var (.vs (.vs .vz)))
+              (.app .succ (.app .succ (.app .succ (.app .succ (.app .succ (.var .vz)))))))
+            (.app .succ (.app .succ (.app .succ (.app .succ (.app .succ (.var .vz)))))))
+      · prw (cauchyfy_unfold (.app Term.diag_seq (.var (.vs (.vs .vz))))
+          (.app .succ (.app .succ (.var .vz))))
+        prwby hval2
+        prw (diag_seq_apply (.var (.vs (.vs .vz))) (.app .succ (.app .succ (.var .vz))))
+        prefl
+      prwby hcf
+      papplym (diag_goal_bound
+        (.app (.var (.vs (.vs .vz))) (.var (.vs .vz)))
+        (.app (.var (.vs (.vs .vz)))
+          (Term.app2 Term.add (.var (.vs .vz))
+            (.app .succ (.app .succ (.app .succ (.app .succ (.app .succ (.var .vz))))))))
+        (.app (.var (.vs (.vs .vz)))
+          (.app .succ (.app .succ (.app .succ (.app .succ (.app .succ (.var .vz)))))))
+        (.var (.vs .vz)) (.var .vz))
+      · -- `|Φn −ℝ ΦN|ℝ ≤ℝ ⟨2^{-n}⟩ℝ`, from the hypothesis at `(n, n, N)`
+        pinst hyp (.var (.vs .vz)) with a1
+        rnorm
+        pinst a1 (.var (.vs .vz)) with a2
+        rnorm
+        pinst a2 (Term.app2 Term.add (.var (.vs .vz))
+          (.app .succ (.app .succ (.app .succ (.app .succ (.app .succ (.var .vz))))))) with a3
+        rnorm
+        pdestruct_imp a3 with a4
+        · pthm (monus_self (.var (.vs .vz)))
+        pdestruct_imp a4 with a5
+        · pthm (monus_add_r (.var (.vs .vz))
+            (.app .succ (.app .succ (.app .succ (.app .succ (.app .succ (.var .vz)))))))
+        pexact a5
+      · -- `|ΦN −ℝ Φ(j+5)|ℝ ≤ℝ ⟨2^{-(j+5)}⟩ℝ`, from the hypothesis at `(j+5, N, j+5)`
+        pinst hyp (.app .succ (.app .succ (.app .succ (.app .succ
+          (.app .succ (.var .vz)))))) with b1
+        rnorm
+        pinst b1 (Term.app2 Term.add (.var (.vs .vz))
+          (.app .succ (.app .succ (.app .succ (.app .succ (.app .succ (.var .vz))))))) with b2
+        rnorm
+        pinst b2 (.app .succ (.app .succ (.app .succ (.app .succ
+          (.app .succ (.var .vz)))))) with b3
+        rnorm
+        pdestruct_imp b3 with b4
+        · pthm (monus_add_l (.var (.vs .vz))
+            (.app .succ (.app .succ (.app .succ (.app .succ (.app .succ (.var .vz)))))))
+        pdestruct_imp b4 with b5
+        · pthm (monus_self (.app .succ (.app .succ (.app .succ (.app .succ
+            (.app .succ (.var .vz)))))))
+        pexact b5
+    papplym (lt_Q_le_Q_absurd
+      (Term.app2 Term.sub_Q
+        (Term.app2 Term.cauchyfy
+          (.app Term.abs_R (Term.app2 Term.sub_R
+            (.app (.var (.vs (.vs .vz))) (.var (.vs .vz)))
+            (.app Term.diag_seq (.var (.vs (.vs .vz))))))
+          (.app .succ (.var .vz)))
+        (Term.app2 Term.cauchyfy (const_R (.app Term.pow2neg_Q (.var (.vs .vz))))
+          (.app .succ (.var .vz))))
+      (.app Term.pow2neg_Q (.var .vz)))
+    psplit
+    · pexact hlt
+    · pexact hn)
 
 /-- The estimate behind `abs_R_bound`, at the bound index `x₀` of the context `nat :: Γ'`:
 `(|β|_ℝ)^(x₀+1) −_ℚ ((β(0)+1)_ℝ)^(x₀+1) <_ℚ 2^{-x₀}`.

@@ -70,7 +70,7 @@ def neg_Q_antitone (y y' : Term F Γ Ty.nat) :
     (eqQsym (sub_Q_neg_neg y y'))
 
 /-- `a ≤ℚ b +ℚ s → a −ℚ s ≤ℚ b`. -/
-def le_Q_sub_of_le_add (a b s : Term F Γ Ty.nat) :
+def le_Q_sub_of_le_add_r (a b s : Term F Γ Ty.nat) :
     Derivable F al Premises
       (le_Q a (Term.app2 Term.add_Q b s) →ᶠ le_Q (Term.app2 Term.sub_Q a s) b) :=
   let ns : Term F Γ Ty.nat := .app Term.neg_Q s
