@@ -615,3 +615,85 @@ original); the "out of scope for the month" note protecting the `general_metathe
 sorry — *that sorry was closed 2026-09-02*; D-4.1's "ℚ and ℝ are both off the critical path
 this cycle" — the ℚ/ℝ tower is complete with zero sorries; and the entire schedule, budget,
 claims-calibration and abort-state apparatus. Full text remains in git history.
+
+## 13. How our metatheorem differs from Kohlenbach 17.52 (2026-09-04)
+
+**Read this before claiming the project "formalizes Kohlenbach's metatheorem".** It does not,
+quite. The gap is narrow and probably costs nothing mathematically, but it was unrecorded until
+now, and an unrecorded deviation is how a wrong claim reaches a paper.
+
+Checked against the **primary source**, not the reference document:
+`Kohlenbach - Applied Proof Theory (2008)`, **Theorem 17.52, p. 403** ("General theorem on
+proof mining: the abstract metric and hyperbolic case", Gerhardy–Kohlenbach):
+
+> Let `ρ` be of degree `(1,X)` or `≤ 2` and let **`B∀(x,u)`, resp. `C∃(x,v)`, be ∀- resp.
+> ∃-formulas** that contain only `x,u` free, resp. `x,v` free. **Assume that `0X` does not
+> occur in `B∀`, `C∃`.** From a proof in `A^ω[X,d]^{−b}` of
+> `∀x^ρ (∀u⁰ B∀(x,u) → ∃v⁰ C∃(x,v))` one can extract a partial functional `Φ : S_ρ̂ ⇀ ℕ` …
+> such that … `∀u ≤ Φ(x*) B∀(x,u) → ∃v ≤ Φ(x*) C∃(x,v)`.
+
+`general-metatheorem.tex:63` transcribes this faithfully as `B ≡ ∀b̲ B₀`, `C ≡ ∃c̲ C₀`.
+
+| | Kohlenbach 17.52 | reference document | **ours** |
+|---|---|---|---|
+| premise matrix | `B∀`, a ∀-formula | `∀b̲ B₀` | `B₀` **quantifier-free** |
+| conclusion matrix | `C∃`, an ∃-formula | `∃c̲ C₀` | `C₀` **quantifier-free** |
+| connectives | unrestricted | unrestricted | **∨-free** |
+| type `ρ` | degree `(1,X)` or `≤ 2` | any | any |
+| `0_X` in the matrices | **excluded** | — | allowed, majorized |
+
+### The one real gap: QF matrices
+
+`syntactic_general_metatheorem` requires `B₀.isQF = true` and `C₀.isQF = true`, i.e. `b̲` and
+`c̲` **empty**. This is a genuine restriction against *both* sources.
+
+**It probably costs nothing mathematically.** Fuse `∀u∀b̲` into one `∀u'` by Cantor pairing (we
+have it). We then get `∀u' ≤ Φ B₀' → ∃v ≤ Φ C₀`, and to *use* it you must supply
+`∀u' ≤ Φ B₀'` — which any application has, since it holds the full `∀u∀b̲ B₀`, strictly
+stronger. Pairing is monotone, so a bound on the code bounds `u`. `c̲` is the same with `∃`.
+∨-freeness is likewise harmless for QF matrices over ℕ, where everything is decidable and
+`A ∨ B` is `¬A → B`. **This argument has not been formalised; treat it as a plausibility
+argument, not a theorem.**
+
+**It costs real ergonomics, and the cost lands on the flagship target.** `le_R_pu` — the
+purely-universal `≤ℝ` — *is* a `∀b̲ B₀`. The document and the book consume such a premise
+directly; we would have to pair-encode it and then reason about codes inside a proof-mode
+derivation. For ℝ-MCT that is the difference between a readable statement and one buried in
+`triag`/`inv_triag`. Ergonomics decides whether a large derivation gets written, so this is
+the reason to close the gap, not the mathematics.
+
+**Closing it may be cheap.** The book's and the document's proofs both handle `b̲`/`c̲` by
+*expanding the hidden quantifiers and prenexifying* (`general-metatheorem.tex:76–82`) — which
+is exactly what `classical_to_prenex_extended` already does for the `¬¬` route.
+
+### Where we are safely more general: the type degree
+
+17.52 restricts `ρ` to degree `(1,X)` or `≤ 2`; we restrict nothing. **This is safe because the
+restriction is attached to a claim we do not make.** Kohlenbach's Φ is "a partial functional
+`Φ : S_ρ̂ ⇀ ℕ` whose restriction to the strongly majorizable elements is a total computable
+functional of `M^ω`", sharpening to ordinary type-2 computability at degree `1*`. Our Φ is
+`Nat.max` of two `closedMajorizer`s — a total structural recursion — so there is nothing to
+classify, and **no bar recursion is involved anywhere in this project**. Do not "fix" this by
+adding a degree hypothesis; it would be a restriction with no purpose.
+
+### Where we are deliberately more general, and it is Kohlenbach's own suggestion
+
+17.52 assumes `0_X` does not occur in the matrices. The paragraph immediately preceding it
+(p. 402–403) gives the alternative:
+
+> `0X` just is an arbitrary Skolem constant which could have been replaced by any new variable
+> of type `X` which — taking the universal closure — would just add another input that had to
+> be a-majorized.
+
+That is exactly our arrangement: `zeroX` may occur, and `AbstractMajorizability.zeroX_maj` pays
+for it. In `MetricModel.constMajorants` that input is the parameter **`n₀ ≥ d(a, 0_X)`** — the
+"another input that had to be a-majorized", made concrete. Kohlenbach also notes that for
+normed spaces `0_X` is crucial and one takes `a := 0_X`, making it trivially majorized by `0⁰`;
+that is our `n₀ = 0` case, and it is why the normed instantiation should be *cheaper* than the
+metric one, not more expensive.
+
+### Related deviations recorded elsewhere
+
+The λ-vs-combinators trade (our `arrow_intro` = Lemma 17.80) is in `CLAUDE.md`, not here; it is
+a difference in *term language*, not in the metatheorem's statement. The `AbstractMajorizability`
+vs Def. 6.0.1 field count is discussed there too.
