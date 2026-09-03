@@ -76,6 +76,10 @@ namespace Metatheorems
 #print axioms eqR_tail
 #print axioms eqR_le
 #print axioms eqR_strict
+-- The symbolic-shift telescope (2026-09-03) — what `mul_one_R` is built on.
+#print axioms cauchyfy_tele
+#print axioms cauchyfy_tele_at
+#print axioms cauchyfy_shift_le
 #print axioms lt_irrefl_R
 #print axioms zero_lt_one_R
 #print axioms le_zero_eq_zero_R

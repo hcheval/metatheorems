@@ -787,6 +787,258 @@ def cauchyfy_two_step (f : Term F Γ (realTy ι)) (m : Term F Γ Ty.nat) :
     · pexact hX
     · pexact hY
 
+-- ── The symbolic-shift telescope ───────────────────────────────────────────
+--
+-- `cauchyfy_two_step` is a *fixed* two-step estimate.  What `mul_one_R` (and, with
+-- `mul_R_check`, `distrib_R` / `mul_assoc_R`) needs is the same estimate over *symbolically
+-- many* steps: `mul_R`'s index shift `b = f(0) +ℕ g(0) +ℕ 2` depends on the arguments, so
+-- comparing `(f ·ℝ 1ℝ)^(n+1) = f̂(n+1+b)` with `f̂(n+1)` is a telescope of `b` steps.
+--
+-- The statement has to **carry the remaining slack**, or the induction step has none:
+--
+--     ∀k ∀p.  |f̂(p) −ℚ f̂(p+k)|  +ℚ  2^{-(p+k)}  ≤ℚ  2^{-p}
+--
+-- Base `k = 0`: `0 +ℚ 2^{-p} ≤ℚ 2^{-p}`.  Step: split off `|f̂(p+k) −ℚ f̂(p+k+1)| <ℚ
+-- `2^{-(p+k+1)}` by `cauchyfy_cauchy`, and pay for it with the carried `2^{-(p+k)}` — which is
+-- exactly `2^{-(p+k+1)} +ℚ 2^{-(p+k+1)}` (`pow2neg_Q_halve`), so one half funds the new step
+-- and the other becomes the new carried slack.  Nothing is spent, which is why the conclusion
+-- stays `≤ℚ 2^{-p}` at every `k`.
+--
+-- The `+ℚ`-form is used rather than REALS_PLAN §0.5 item 3's `≤ℚ 2^{-p} −ℚ 2^{-(p+k)}`: the
+-- two say the same thing, but the difference form needs `sub_Q` cancellation lemmas at every
+-- step, while the `+ℚ` form is pure `le_Q_add_both` / `add_Q_assoc_inst` bookkeeping.
+
+/-- `e =ℚ |a −ℚ a| +ℚ e` — the telescope's base case, as pure ℚ algebra. -/
+private def tele_base_eq (a e : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (eq_Q e (Term.app2 Term.add_Q
+        (.app Term.abs_Q (Term.app2 Term.sub_Q a a)) e)) :=
+  eqQsym (eqQtrans (addQl (abs_Q_sub_self a) e)
+    (eqQtrans (add_Q_comm_inst Term.zero_Q e) (add_Q_zero_inst e)))
+
+/-- `(D +ℚ 2^{-(m+1)}) +ℚ 2^{-(m+1)} =ℚ D +ℚ 2^{-m}` — the telescope's carried slack, which
+funds the new `cauchyfy` step *and* the next round's slack. -/
+private def tele_carry_eq (d m : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (eq_Q
+        (Term.app2 Term.add_Q
+          (Term.app2 Term.add_Q d (.app Term.pow2neg_Q (.app .succ m)))
+          (.app Term.pow2neg_Q (.app .succ m)))
+        (Term.app2 Term.add_Q d (.app Term.pow2neg_Q m))) :=
+  eqQtrans
+    (add_Q_assoc_inst d (.app Term.pow2neg_Q (.app .succ m))
+      (.app Term.pow2neg_Q (.app .succ m)))
+    (addQr d (pow2neg_Q_halve m))
+
+/-- **The symbolic-shift telescope**: `∀k ∀p. |f̂(p) −ℚ f̂(p+k)| +ℚ 2^{-(p+k)} ≤ℚ 2^{-p}`.
+
+Unlike `eqR_tail` this mentions a *single* sequence and states the estimate on
+`f̂(p) −ℚ f̂(p+k)` itself, which is what a symbolic index shift needs. -/
+def cauchyfy_tele (f : Term F Γ (realTy ι)) :
+    Derivable F al Premises
+      (Formula.all Ty.nat (Formula.all Ty.nat
+        (le_Q
+          (Term.app2 Term.add_Q
+            (.app Term.abs_Q (Term.app2 Term.sub_Q
+              (Term.app2 Term.cauchyfy f.weaken.weaken (.var .vz))
+              (Term.app2 Term.cauchyfy f.weaken.weaken
+                (Term.app2 Term.add (.var .vz) (.var (.vs .vz))))))
+            (.app Term.pow2neg_Q (Term.app2 Term.add (.var .vz) (.var (.vs .vz)))))
+          (.app Term.pow2neg_Q (.var .vz))))) := by
+  pmode
+  pinduction
+  · -- base: `p +ℕ 0` is `p`, and `|f̂(p) −ℚ f̂(p)| =ℚ 0ℚ`
+    canorm
+    pforall
+    prw (add_zero_r (.var .vz))
+    papplym (le_Q_congr
+      (.app Term.pow2neg_Q (.var .vz)) (.app Term.pow2neg_Q (.var .vz))
+      (Term.app2 Term.add_Q
+        (.app Term.abs_Q (Term.app2 Term.sub_Q
+          (Term.app2 Term.cauchyfy f.weaken (.var .vz))
+          (Term.app2 Term.cauchyfy f.weaken (.var .vz))))
+        (.app Term.pow2neg_Q (.var .vz)))
+      (.app Term.pow2neg_Q (.var .vz))
+      (tele_base_eq (Term.app2 Term.cauchyfy f.weaken (.var .vz))
+        (.app Term.pow2neg_Q (.var .vz)))
+      (eq_Q_refl_inst (.app Term.pow2neg_Q (.var .vz))))
+    pthm (le_Q_refl (.app Term.pow2neg_Q (.var .vz)))
+  · pforall
+    pintro ih
+    canorm
+    pforall
+    pinst ih (.var .vz) with ihp
+    canorm
+    prw (add_succ (.var .vz) (.var (.vs .vz)))
+    papplym (le_Q_trans
+      (Term.app2 Term.add_Q
+        (.app Term.abs_Q (Term.app2 Term.sub_Q
+          (Term.app2 Term.cauchyfy f.weaken.weaken (.var .vz))
+          (Term.app2 Term.cauchyfy f.weaken.weaken
+            (.app .succ (Term.app2 Term.add (.var .vz) (.var (.vs .vz)))))))
+        (.app Term.pow2neg_Q
+          (.app .succ (Term.app2 Term.add (.var .vz) (.var (.vs .vz))))))
+      (Term.app2 Term.add_Q
+        (.app Term.abs_Q (Term.app2 Term.sub_Q
+          (Term.app2 Term.cauchyfy f.weaken.weaken (.var .vz))
+          (Term.app2 Term.cauchyfy f.weaken.weaken
+            (Term.app2 Term.add (.var .vz) (.var (.vs .vz))))))
+        (.app Term.pow2neg_Q (Term.app2 Term.add (.var .vz) (.var (.vs .vz)))))
+      (.app Term.pow2neg_Q (.var .vz)))
+    psplit
+    · -- `|f̂(p) − f̂(m+1)| +ℚ 2^{-(m+1)} ≤ℚ |f̂(p) − f̂(m)| +ℚ 2^{-m}`, `m := p +ℕ k`
+      papplym (le_Q_congr
+        (Term.app2 Term.add_Q
+          (.app Term.abs_Q (Term.app2 Term.sub_Q
+            (Term.app2 Term.cauchyfy f.weaken.weaken (.var .vz))
+            (Term.app2 Term.cauchyfy f.weaken.weaken
+              (.app .succ (Term.app2 Term.add (.var .vz) (.var (.vs .vz)))))))
+          (.app Term.pow2neg_Q
+            (.app .succ (Term.app2 Term.add (.var .vz) (.var (.vs .vz))))))
+        (Term.app2 Term.add_Q
+          (Term.app2 Term.add_Q
+            (.app Term.abs_Q (Term.app2 Term.sub_Q
+              (Term.app2 Term.cauchyfy f.weaken.weaken (.var .vz))
+              (Term.app2 Term.cauchyfy f.weaken.weaken
+                (Term.app2 Term.add (.var .vz) (.var (.vs .vz))))))
+            (.app Term.pow2neg_Q
+              (.app .succ (Term.app2 Term.add (.var .vz) (.var (.vs .vz))))))
+          (.app Term.pow2neg_Q
+            (.app .succ (Term.app2 Term.add (.var .vz) (.var (.vs .vz))))))
+        (Term.app2 Term.add_Q
+          (.app Term.abs_Q (Term.app2 Term.sub_Q
+            (Term.app2 Term.cauchyfy f.weaken.weaken (.var .vz))
+            (Term.app2 Term.cauchyfy f.weaken.weaken
+              (.app .succ (Term.app2 Term.add (.var .vz) (.var (.vs .vz)))))))
+          (.app Term.pow2neg_Q
+            (.app .succ (Term.app2 Term.add (.var .vz) (.var (.vs .vz))))))
+        (Term.app2 Term.add_Q
+          (.app Term.abs_Q (Term.app2 Term.sub_Q
+            (Term.app2 Term.cauchyfy f.weaken.weaken (.var .vz))
+            (Term.app2 Term.cauchyfy f.weaken.weaken
+              (Term.app2 Term.add (.var .vz) (.var (.vs .vz))))))
+          (.app Term.pow2neg_Q (Term.app2 Term.add (.var .vz) (.var (.vs .vz)))))
+        (eq_Q_refl_inst _)
+        (tele_carry_eq
+          (.app Term.abs_Q (Term.app2 Term.sub_Q
+            (Term.app2 Term.cauchyfy f.weaken.weaken (.var .vz))
+            (Term.app2 Term.cauchyfy f.weaken.weaken
+              (Term.app2 Term.add (.var .vz) (.var (.vs .vz))))))
+          (Term.app2 Term.add (.var .vz) (.var (.vs .vz)))))
+      papplym (le_Q_add_both
+        (.app Term.abs_Q (Term.app2 Term.sub_Q
+          (Term.app2 Term.cauchyfy f.weaken.weaken (.var .vz))
+          (Term.app2 Term.cauchyfy f.weaken.weaken
+            (.app .succ (Term.app2 Term.add (.var .vz) (.var (.vs .vz)))))))
+        (.app Term.pow2neg_Q
+          (.app .succ (Term.app2 Term.add (.var .vz) (.var (.vs .vz)))))
+        (Term.app2 Term.add_Q
+          (.app Term.abs_Q (Term.app2 Term.sub_Q
+            (Term.app2 Term.cauchyfy f.weaken.weaken (.var .vz))
+            (Term.app2 Term.cauchyfy f.weaken.weaken
+              (Term.app2 Term.add (.var .vz) (.var (.vs .vz))))))
+          (.app Term.pow2neg_Q
+            (.app .succ (Term.app2 Term.add (.var .vz) (.var (.vs .vz))))))
+        (.app Term.pow2neg_Q
+          (.app .succ (Term.app2 Term.add (.var .vz) (.var (.vs .vz))))))
+      psplit
+      · -- the triangle inequality, with the new step bounded by `cauchyfy_cauchy`
+        papplym (le_Q_trans
+          (.app Term.abs_Q (Term.app2 Term.sub_Q
+            (Term.app2 Term.cauchyfy f.weaken.weaken (.var .vz))
+            (Term.app2 Term.cauchyfy f.weaken.weaken
+              (.app .succ (Term.app2 Term.add (.var .vz) (.var (.vs .vz)))))))
+          (Term.app2 Term.add_Q
+            (.app Term.abs_Q (Term.app2 Term.sub_Q
+              (Term.app2 Term.cauchyfy f.weaken.weaken (.var .vz))
+              (Term.app2 Term.cauchyfy f.weaken.weaken
+                (Term.app2 Term.add (.var .vz) (.var (.vs .vz))))))
+            (.app Term.abs_Q (Term.app2 Term.sub_Q
+              (Term.app2 Term.cauchyfy f.weaken.weaken
+                (Term.app2 Term.add (.var .vz) (.var (.vs .vz))))
+              (Term.app2 Term.cauchyfy f.weaken.weaken
+                (.app .succ (Term.app2 Term.add (.var .vz) (.var (.vs .vz))))))))
+          (Term.app2 Term.add_Q
+            (.app Term.abs_Q (Term.app2 Term.sub_Q
+              (Term.app2 Term.cauchyfy f.weaken.weaken (.var .vz))
+              (Term.app2 Term.cauchyfy f.weaken.weaken
+                (Term.app2 Term.add (.var .vz) (.var (.vs .vz))))))
+            (.app Term.pow2neg_Q
+              (.app .succ (Term.app2 Term.add (.var .vz) (.var (.vs .vz)))))))
+        psplit
+        · pthm (abs_Q_sub_triangle
+            (Term.app2 Term.cauchyfy f.weaken.weaken (.var .vz))
+            (Term.app2 Term.cauchyfy f.weaken.weaken
+              (Term.app2 Term.add (.var .vz) (.var (.vs .vz))))
+            (Term.app2 Term.cauchyfy f.weaken.weaken
+              (.app .succ (Term.app2 Term.add (.var .vz) (.var (.vs .vz))))))
+        · papplym (le_Q_add_l
+            (.app Term.abs_Q (Term.app2 Term.sub_Q
+              (Term.app2 Term.cauchyfy f.weaken.weaken (.var .vz))
+              (Term.app2 Term.cauchyfy f.weaken.weaken
+                (Term.app2 Term.add (.var .vz) (.var (.vs .vz))))))
+            (.app Term.abs_Q (Term.app2 Term.sub_Q
+              (Term.app2 Term.cauchyfy f.weaken.weaken
+                (Term.app2 Term.add (.var .vz) (.var (.vs .vz))))
+              (Term.app2 Term.cauchyfy f.weaken.weaken
+                (.app .succ (Term.app2 Term.add (.var .vz) (.var (.vs .vz)))))))
+            (.app Term.pow2neg_Q
+              (.app .succ (Term.app2 Term.add (.var .vz) (.var (.vs .vz))))))
+          papplym (lt_Q_imp_le_Q
+            (.app Term.abs_Q (Term.app2 Term.sub_Q
+              (Term.app2 Term.cauchyfy f.weaken.weaken
+                (Term.app2 Term.add (.var .vz) (.var (.vs .vz))))
+              (Term.app2 Term.cauchyfy f.weaken.weaken
+                (.app .succ (Term.app2 Term.add (.var .vz) (.var (.vs .vz)))))))
+            (.app Term.pow2neg_Q
+              (.app .succ (Term.app2 Term.add (.var .vz) (.var (.vs .vz))))))
+          pthm (cauchyfy_cauchy f.weaken.weaken
+            (Term.app2 Term.add (.var .vz) (.var (.vs .vz))))
+      · pthm (le_Q_refl (.app Term.pow2neg_Q
+          (.app .succ (Term.app2 Term.add (.var .vz) (.var (.vs .vz))))))
+    · pexact ihp
+
+/-- `cauchyfy_tele` at explicit `p` and `k`. -/
+def cauchyfy_tele_at (f : Term F Γ (realTy ι)) (p k : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (le_Q
+        (Term.app2 Term.add_Q
+          (.app Term.abs_Q (Term.app2 Term.sub_Q
+            (Term.app2 Term.cauchyfy f p)
+            (Term.app2 Term.cauchyfy f (Term.app2 Term.add p k))))
+          (.app Term.pow2neg_Q (Term.app2 Term.add p k)))
+        (.app Term.pow2neg_Q p)) := by
+  have h := Derivable.mp (Derivable.mp
+    (cauchyfy_tele (al := al) (Premises := Premises) f) (.forall_ax k)) (.forall_ax p)
+  simpa only [lt_Q, le_Q, eq_Q, Formula.subst0, Formula.substF, Term.subst,
+    Term.subst0_map_vz, Term.subst0_map_vs, Term.Subst.ext_vz, Term.Subst.ext_vs,
+    Term.weaken_var, Term.app2, Term.weaken_subst0, subst_subst0_map_weaken,
+    Term.weaken_subst_ext, cauchyfy_closed_subst, closed_subst] using h
+
+/-- **The telescope, in the form the multiplicative axioms use**:
+`|f̂(p) −ℚ f̂(p +ℕ k)| ≤ℚ 2^{-p}`, for a *symbolic* shift `k`.
+
+The carried slack `2^{-(p+k)}` is non-negative, so it can simply be dropped. -/
+def cauchyfy_shift_le (f : Term F Γ (realTy ι)) (p k : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (le_Q (.app Term.abs_Q (Term.app2 Term.sub_Q
+              (Term.app2 Term.cauchyfy f p)
+              (Term.app2 Term.cauchyfy f (Term.app2 Term.add p k))))
+            (.app Term.pow2neg_Q p)) := by
+  let D : Term F Γ Ty.nat := .app Term.abs_Q (Term.app2 Term.sub_Q
+    (Term.app2 Term.cauchyfy f p)
+    (Term.app2 Term.cauchyfy f (Term.app2 Term.add p k)))
+  let e : Term F Γ Ty.nat := .app Term.pow2neg_Q (Term.app2 Term.add p k)
+  pmode
+  papplym (le_Q_trans D (Term.app2 Term.add_Q D e) (.app Term.pow2neg_Q p))
+  psplit
+  · papplym (le_Q_congr (Term.app2 Term.add_Q D Term.zero_Q) (Term.app2 Term.add_Q D e)
+      D (Term.app2 Term.add_Q D e) (add_Q_zero_inst D) (eq_Q_refl_inst _))
+    papplym (le_Q_add_l D Term.zero_Q e)
+    papplym (lt_Q_imp_le_Q Term.zero_Q e)
+    pthm (zero_lt_pow2neg_Q (Term.app2 Term.add p k))
+  · pthm (cauchyfy_tele_at f p k)
+
 end OrderedFieldAxioms
 
 end Metatheorems
