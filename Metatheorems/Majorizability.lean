@@ -302,6 +302,155 @@ theorem all_closed_terms_majorizable {ι : Type} {X : ι → Type} {F : ι → T
   exact ⟨fun n => t_star n (), fun n hn => (ht n hn).1 () () True.intro⟩
 
 -- ============================================================================
+-- The majorant as DATA: `ConstMajorants` and `termMajorizer`
+-- ============================================================================
+
+/-! `IsMajorizable` is a `Prop`, so `all_closed_terms_majorizable` proves a majorant *exists*
+and then discards it. That is the wrong side of the `Prop`/`Type` line for this project: the
+Dialectica layer deliberately uses `Subtype` rather than `∃` precisely because "`∃` in `Prop`
+prevents computational extraction", and the majorizability layer then undoes that at the last
+step — the bound `Φ` a metatheorem produces is provably there but cannot be computed.
+
+Nothing about the mathematics forces this. `all_terms_majorizable`'s proof is structural on the
+term and entirely constructive; the only genuinely `∃`-shaped inputs are
+`AbstractMajorizability`'s six per-constant majorant fields. `ConstMajorants` is exactly those
+six, as **data**, and `termMajorizer` is the same recursion written as a function.
+
+The existing `Prop` API is untouched — `all_terms_majorizable` and `majorant_of_closed_term`
+still say what they said, and the metatheorems still call them. This is an additional, sharper
+route for callers who need the number rather than its existence. -/
+
+/-- The six per-constant majorants of an `AbstractMajorizability`, as data rather than as
+existential statements. Everything else in the structure is already `Prop`-valued and stays
+there; these are the only fields carrying computational content. -/
+structure ConstMajorants {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    {si : SpaceInterp X F} (am : AbstractMajorizability si) : Type where
+  /-- Majorant for `0`. -/
+  zeroM : ℕ → Nat
+  zeroM_maj : ∀ n ≥ am.N, am.maj .nat (zeroM n) (0 : Nat)
+  /-- Majorant for `S`. -/
+  succM : ℕ → Ty.interpret X (Ty.nat →ₜ Ty.nat).hat
+  succM_maj : ∀ n ≥ am.N, am.maj (.nat →ₜ .nat) (succM n) (Nat.succ : Nat → Nat)
+  /-- Majorant for the recursor at each type. -/
+  precM : (ρ : Ty ι) → ℕ → Ty.interpret X (recTy ρ).hat
+  precM_maj : ∀ (ρ : Ty ι), ∀ n ≥ am.N, am.maj (recTy ρ) (precM ρ n)
+    (fun (y : Ty.interpret X ρ)
+         (z : Ty.interpret X ρ → Ty.interpret X Ty.nat → Ty.interpret X ρ)
+         (n : Nat) => Nat.rec y (fun n ih => z ih n) n)
+  /-- Majorant for each function constant. -/
+  funcM : (f : ι) → ℕ → Ty.interpret X (F f).hat
+  funcM_maj : ∀ (f : ι), ∀ n ≥ am.N, am.maj (F f) (funcM f n) (si.funcInterp f)
+  /-- Majorant for each base-type zero element. -/
+  zeroXM : (i : ι) → ℕ → Nat
+  zeroXM_maj : ∀ (i : ι), ∀ n ≥ am.N, am.maj (.base i) (zeroXM i n) (si.zeroInterp i)
+  /-- Majorant for each base type's distance. -/
+  distM : (i : ι) → ℕ → Ty.interpret X (Ty.base i →ₜ Ty.base i →ₜ realTy ι).hat
+  distM_maj : ∀ (i : ι), ∀ n ≥ am.N,
+    am.maj (Ty.base i →ₜ Ty.base i →ₜ realTy ι) (distM i n) (si.distInterp i)
+
+/-- **The majorant of a term, as a function.** This is `all_terms_majorizable`'s witness,
+written out: the same structural recursion, but computing rather than asserting. Compare the
+proof of `all_terms_majorizable` case by case — they agree constructor for constructor. -/
+def termMajorizer {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    {si : SpaceInterp X F} {am : AbstractMajorizability si} (cm : ConstMajorants am) :
+    {Γ : Ctx ι} → {ρ : Ty ι} → Term F Γ ρ → ℕ →
+      Ctx.interpret X (Γ.map Ty.hat) → Ty.interpret X ρ.hat
+  | _, _, .var v,      _, env_star => Ctx.lookupHat v env_star
+  | _, _, .app f a,    n, env_star =>
+      termMajorizer cm f n env_star (termMajorizer cm a n env_star)
+  | _, _, .lam body,   n, env_star => fun x_star => termMajorizer cm body n (x_star, env_star)
+  | _, _, .zero,       n, _        => cm.zeroM n
+  | _, _, .succ,       n, _        => cm.succM n
+  | _, _, .prec ρ,     n, _        => cm.precM ρ n
+  | _, _, .func f,     n, _        => cm.funcM f n
+  | _, _, .zeroX i,    n, _        => cm.zeroXM i n
+  | _, _, .dist i,     n, _        => cm.distM i n
+  | _, _, .unitI,      _, _        => ()
+  | _, _, .mkPair a b, n, env_star =>
+      (termMajorizer cm a n env_star, termMajorizer cm b n env_star)
+  | _, _, .fst p,      n, env_star => (termMajorizer cm p n env_star).1
+  | _, _, .snd p,      n, env_star => (termMajorizer cm p n env_star).2
+
+/-- **`termMajorizer` is correct.** Identical in content to `all_terms_majorizable`; the
+difference is only that the witness is now named in the statement instead of bound by `∃`. -/
+theorem termMajorizer_maj {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    {si : SpaceInterp X F} {am : AbstractMajorizability si} (cm : ConstMajorants am)
+    {Γ : Ctx ι} {ρ : Ty ι} (t : Term F Γ ρ) :
+    ∀ n ≥ am.N,
+      (∀ (env_star : Ctx.interpret X (Γ.map Ty.hat)) (env : Ctx.interpret X Γ),
+          MajEnv am Γ env_star env →
+          am.maj ρ (termMajorizer cm t n env_star) (Term.interpret si t env))
+      ∧ (∀ (e₁ e₂ : Ctx.interpret X (Γ.map Ty.hat)),
+          SelfMajEnv am Γ e₁ e₂ →
+          am.selfMaj ρ (termMajorizer cm t n e₁) (termMajorizer cm t n e₂)) := by
+  induction t with
+  | var v =>
+    exact fun _ _ => ⟨fun _ _ h => MajEnv.lookup v h, fun _ _ h => SelfMajEnv.lookup v h⟩
+  | app f a ihf iha =>
+    exact fun n hn =>
+      ⟨fun env_star env henv =>
+          am.app_compat _ _ _ _ ((ihf n hn).1 env_star env henv) ((iha n hn).1 env_star env henv),
+       fun e₁ e₂ he => am.selfMaj_app ((ihf n hn).2 e₁ e₂ he) ((iha n hn).2 e₁ e₂ he)⟩
+  | lam body ih =>
+    refine fun n hn => ⟨?_, ?_⟩
+    · exact fun env_star env henv =>
+        am.arrow_intro _ _
+          (fun x_star x hx => (ih n hn).1 (x_star, env_star) (x, env) ⟨hx, henv⟩)
+          (fun x_star x hx =>
+            (ih n hn).2 (x_star, env_star) (x, env_star) ⟨hx, MajEnv.toSelfMajEnv _ henv⟩)
+    · exact fun e₁ e₂ he =>
+        am.selfMaj_arrow_intro _ _
+          (fun x y hx => (ih n hn).2 (x, e₁) (y, e₂) ⟨hx, he⟩)
+          (fun x y hx => (ih n hn).2 (x, e₁) (y, e₁) ⟨hx, SelfMajEnv.self _ he⟩)
+  | zero =>
+    exact fun n hn => ⟨fun _ _ _ => cm.zeroM_maj n hn,
+      fun _ _ _ => am.maj_selfMaj (cm.zeroM_maj n hn)⟩
+  | succ =>
+    exact fun n hn => ⟨fun _ _ _ => cm.succM_maj n hn,
+      fun _ _ _ => am.maj_selfMaj (cm.succM_maj n hn)⟩
+  | prec ρ =>
+    exact fun n hn => ⟨fun _ _ _ => cm.precM_maj ρ n hn,
+      fun _ _ _ => am.maj_selfMaj (cm.precM_maj ρ n hn)⟩
+  | func f =>
+    exact fun n hn => ⟨fun _ _ _ => cm.funcM_maj f n hn,
+      fun _ _ _ => am.maj_selfMaj (cm.funcM_maj f n hn)⟩
+  | zeroX i =>
+    exact fun n hn => ⟨fun _ _ _ => cm.zeroXM_maj i n hn,
+      fun _ _ _ => am.maj_selfMaj (cm.zeroXM_maj i n hn)⟩
+  | dist i =>
+    exact fun n hn => ⟨fun _ _ _ => cm.distM_maj i n hn,
+      fun _ _ _ => am.maj_selfMaj (cm.distM_maj i n hn)⟩
+  | unitI =>
+    exact fun _ _ => ⟨fun _ _ _ => am.unit_maj, fun _ _ _ => am.maj_selfMaj am.unit_maj⟩
+  | mkPair a b iha ihb =>
+    exact fun n hn =>
+      ⟨fun env_star env henv =>
+          am.prod_intro _ _ ((iha n hn).1 env_star env henv) ((ihb n hn).1 env_star env henv),
+       fun e₁ e₂ he =>
+          am.selfMaj_prod_intro _ _ ((iha n hn).2 e₁ e₂ he) ((ihb n hn).2 e₁ e₂ he)⟩
+  | fst p ih =>
+    exact fun n hn =>
+      ⟨fun env_star env henv => am.prod_fst _ _ ((ih n hn).1 env_star env henv),
+       fun e₁ e₂ he => am.selfMaj_prod_fst _ _ ((ih n hn).2 e₁ e₂ he)⟩
+  | snd p ih =>
+    exact fun n hn =>
+      ⟨fun env_star env henv => am.prod_snd _ _ ((ih n hn).1 env_star env henv),
+       fun e₁ e₂ he => am.selfMaj_prod_snd _ _ ((ih n hn).2 e₁ e₂ he)⟩
+
+/-- **The majorant of a closed term, computed.** The `Type`-valued counterpart of
+`majorant_of_closed_term`: same value, but available rather than erased. -/
+def closedMajorizer {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    {si : SpaceInterp X F} {am : AbstractMajorizability si} (cm : ConstMajorants am)
+    {ρ : Ty ι} (t : Term F ([] : Ctx ι) ρ) : Ty.interpret X ρ.hat :=
+  termMajorizer cm t am.N ()
+
+theorem closedMajorizer_maj {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    {si : SpaceInterp X F} {am : AbstractMajorizability si} (cm : ConstMajorants am)
+    {ρ : Ty ι} (t : Term F ([] : Ctx ι) ρ) :
+    am.maj ρ (closedMajorizer cm t) (Term.interpret si t ()) :=
+  (termMajorizer_maj cm t am.N (Nat.le_refl _)).1 () () trivial
+
+-- ============================================================================
 -- Bridge to `MajorizabilityRel` (what the metatheorem consumes)
 -- ============================================================================
 
@@ -494,18 +643,20 @@ theorem recMaj_bezemMaj {base : (i : ι) → Nat → X i → Prop} (hbase : Base
       exact maxT_bezemMaj_left hbase ρ _ _ _ ((hz.1 _ _ hrec).1 k m hkm)
         (hatMaj_of_bezemMaj ρ _ _ hrec)
 
-/-- **`R` is majorizable**, for any base relation that is monotone in its numeric argument.
+/-- **`R` is majorizable**, for any base relation that is monotone in its numeric argument,
+with the majorant `recMaj` **named** rather than existentially bound.
 
 This is the obligation `METRIC_PLAN.md` §2.5 identified as unreachable with the one-clause
-relation; with the self-majorization conjunct it goes through. -/
-theorem bezem_prec_maj {base : (i : ι) → Nat → X i → Prop} (hbase : BaseMono base) (N : ℕ)
+relation; with the self-majorization conjunct it goes through. `bezem_prec_maj` below is the
+`∃` form; `ConstMajorants` needs this one, since it carries the majorant as data. -/
+theorem bezem_prec_maj_at {base : (i : ι) → Nat → X i → Prop} (hbase : BaseMono base) (N : ℕ)
     (ρ : Ty ι) :
-    ∃ r_star : ℕ → Ty.interpret X (recTy ρ).hat,
-      ∀ n ≥ N, bezemMaj base (recTy ρ) (r_star n)
+    ∀ n ≥ N, bezemMaj base (recTy ρ)
+        (fun y_star z_star n => recMaj ρ y_star z_star n)
         (fun (y : Ty.interpret X ρ)
              (z : Ty.interpret X ρ → Ty.interpret X Ty.nat → Ty.interpret X ρ)
              (n : Nat) => Nat.rec y (fun n ih => z ih n) n) := by
-  refine ⟨fun _ => fun y_star z_star n => recMaj ρ y_star z_star n, fun _ _ => ⟨?_, ?_⟩⟩
+  refine fun _ _ => ⟨?_, ?_⟩
   · -- mixed clause
     intro y_star y hy
     refine ⟨?_, ?_⟩
@@ -529,6 +680,100 @@ theorem bezem_prec_maj {base : (i : ι) → Nat → X i → Prop} (hbase : BaseM
              fun n₁ n₂ hn => recMaj_hatMaj ρ (hatMaj_self _ _ _ hy)
                (hatMaj_self _ _ _ hz) n₁ n₂ hn⟩
 
+/-- **`R` is majorizable**, existential form — `bezem_prec_maj_at` with the witness bound. -/
+theorem bezem_prec_maj {base : (i : ι) → Nat → X i → Prop} (hbase : BaseMono base) (N : ℕ)
+    (ρ : Ty ι) :
+    ∃ r_star : ℕ → Ty.interpret X (recTy ρ).hat,
+      ∀ n ≥ N, bezemMaj base (recTy ρ) (r_star n)
+        (fun (y : Ty.interpret X ρ)
+             (z : Ty.interpret X ρ → Ty.interpret X Ty.nat → Ty.interpret X ρ)
+             (n : Nat) => Nat.rec y (fun n ih => z ih n) n) :=
+  ⟨fun _ => fun y_star z_star n => recMaj ρ y_star z_star n, bezem_prec_maj_at hbase N ρ⟩
+
+-- ============================================================================
+-- Pure WE-HA^ω (`ι = Empty`): the majorizability structure, with its data
+-- ============================================================================
+
+/-! With no base types every space-dependent obligation is vacuous, so the structure is
+determined outright — and, unlike the metric case, **everything here computes**: `Ty.interpret`
+is built from `ℕ` alone, so `closedMajorizer` at `ι = Empty` produces an actual number.
+
+That is the setting the MCT bounds live in, and the reason `ι = Empty` rather than `ι = Unit`
+is the right first target for evaluating an extracted bound: at `ι = Unit` the carrier is an
+abstract metric space and no majorant can be computed even in principle. -/
+
+/-- The majorizability structure for pure `WE-HA^ω`. -/
+def bezemAbstractEmpty {X : Empty → Type} {F : Empty → Ty Empty} (si : SpaceInterp X F) :
+    AbstractMajorizability si :=
+  bezemAbstract si (fun i => i.elim) 0
+    (bezem_zero_maj _ 0) (bezem_succ_maj _ 0)
+    (fun ρ => bezem_prec_maj (fun i => i.elim) 0 ρ)
+    (fun f => f.elim) (fun i => i.elim) (fun i => i.elim)
+
+/-- Its constant majorants, as data. `0 ↦ 0`, `S ↦ S`, `R ↦ recMaj`; the three space-dependent
+families are vacuous. This is what makes `termMajorizer` run. -/
+def bezemConstMajorantsEmpty {X : Empty → Type} {F : Empty → Ty Empty}
+    (si : SpaceInterp X F) : ConstMajorants (bezemAbstractEmpty si) where
+  zeroM := fun _ => 0
+  zeroM_maj := fun _ _ => Nat.le_refl 0
+  succM := fun _ => Nat.succ
+  succM_maj := fun _ _ =>
+    ⟨fun _ _ h => Nat.succ_le_succ h, fun _ _ h => Nat.succ_le_succ h⟩
+  precM := fun ρ _ => fun y_star z_star n => recMaj ρ y_star z_star n
+  precM_maj := fun ρ => bezem_prec_maj_at (fun i => i.elim) 0 ρ
+  funcM := fun f => f.elim
+  funcM_maj := fun f => f.elim
+  zeroXM := fun i => i.elim
+  zeroXM_maj := fun i => i.elim
+  distM := fun i => i.elim
+  distM_maj := fun i => i.elim
+
+/-! ### The majorant computes
+
+These are the point of the whole `ConstMajorants` layer: before it, the majorant of a closed
+term was `∃`-bound in a `Prop`, and the numbers below could not be written down at all. They
+are kernel-checked, not `#eval`ed — the project bans `#eval` on composed interpretations.
+
+`rfl` alone does **not** close them, and the reason is worth knowing: the goal has to unfold
+`closedMajorizer → termMajorizer` *and* the projection chain
+`(bezemAbstractEmpty si).N → (bezemAbstract …).N`, and bare `rfl` gets stuck on the latter.
+`simp` with those four definitions named succeeds, because it uses `termMajorizer`'s equation
+lemmas rather than raw whnf. So the recursion really does compute; it is the structure
+projections that are opaque, which is the ordinary `Ty.interpret`-reducibility story again. -/
+
+section ComputesDemo
+
+/-- The carrier family for pure `WE-HA^ω`: no base types. -/
+def XEmpty : Empty → Type := fun i => i.elim
+/-- The function-constant signature for pure `WE-HA^ω`: none. -/
+def FEmpty : Empty → Ty Empty := fun i => i.elim
+
+/-- The numeral `3` majorizes itself: `S(S(S 0)) ↦ Nat.succ (Nat.succ (Nat.succ 0))`.
+
+The interpretation `si` is left as a variable — the majorant does not depend on it, which is
+the point: `termMajorizer` consumes only `ConstMajorants`, so it reduces without knowing
+anything about the model.
+
+Stated with `ℕ` on the **left**, deliberately: `Ty.interpret X Ty.nat` is only *reducibly* `ℕ`,
+so a numeral on the right has no `OfNat` instance to synthesise against and fails to elaborate.
+Putting the numeral first fixes its type before unification reaches the stuck side. Same
+reducibility trap as the `qval` bridge; see CLAUDE.md. -/
+example (si : SpaceInterp XEmpty FEmpty) : (3 : ℕ) =
+    closedMajorizer (bezemConstMajorantsEmpty si)
+      (Term.app Term.succ (Term.app Term.succ
+        (Term.app (Term.succ (F := FEmpty) (Γ := [])) Term.zero))) := by
+  simp [closedMajorizer, termMajorizer, bezemConstMajorantsEmpty, bezemAbstractEmpty,
+    bezemAbstract]
+
+/-- And the majorant of `S` is `Nat.succ`, so it majorizes every numeral pointwise. -/
+example (si : SpaceInterp XEmpty FEmpty) : (8 : ℕ) =
+    closedMajorizer (bezemConstMajorantsEmpty si)
+      (Term.succ (F := FEmpty) (Γ := [])) ((7 : ℕ)) := by
+  simp [closedMajorizer, termMajorizer, bezemConstMajorantsEmpty, bezemAbstractEmpty,
+    bezemAbstract]
+
+end ComputesDemo
+
 /-- `bezemAbstract` and `bezemRel` agree, so a space built the per-constant way still feeds
 anything stated against `MajorizabilityRel`. -/
 theorem bezemAbstract_toRel_maj (si : SpaceInterp X F) (base : (i : ι) → Nat → X i → Prop)
@@ -536,5 +781,18 @@ theorem bezemAbstract_toRel_maj (si : SpaceInterp X F) (base : (i : ι) → Nat 
     (bezemAbstract si base N hz hs hp hf hx hd).toRel.maj = (bezemRel si base).maj := rfl
 
 end BezemAbstract
+
+-- ============================================================================
+-- Axiom hygiene (CLAUDE.md note 5)
+-- ============================================================================
+
+#print axioms all_terms_majorizable
+#print axioms all_closed_terms_majorizable
+#print axioms majorant_of_closed_term
+#print axioms termMajorizer_maj
+#print axioms closedMajorizer_maj
+#print axioms bezem_prec_maj_at
+#print axioms bezem_prec_maj
+#print axioms bezemConstMajorantsEmpty
 
 end Metatheorems
