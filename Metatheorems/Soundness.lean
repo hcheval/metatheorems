@@ -48,26 +48,9 @@ variable {ι : Type} {X : ι → Type} {F : ι → Ty ι}
 -- Semantics of formula substitution / weakening
 -- ============================================================================
 
-/-- Formula-level counterpart of `Term.interpret_substF`.  Needed by `forall_ax`,
-`exist_ax`, `qfer`, `induction`, `ac`, `qfac`. -/
-theorem Formula.interpret_substF (si : SpaceInterp X F) {Γ Δ : Ctx ι}
-    (A : Formula F Γ) (σ : Term.Subst F Γ Δ) (env : Ctx.interpret X Δ) :
-    Formula.interpret si (A.substF σ) env
-      = Formula.interpret si A (Ctx.interpretSubst si σ env) := by
-  induction A generalizing Δ with
-  | bot => rfl
-  | eq0 a b => simp only [Formula.substF, Formula.interpret, Term.interpret_substF]
-  | and _ _ ihA ihB => simp only [Formula.substF, Formula.interpret, ihA, ihB]
-  | or _ _ ihA ihB => simp only [Formula.substF, Formula.interpret, ihA, ihB]
-  | imp _ _ ihA ihB => simp only [Formula.substF, Formula.interpret, ihA, ihB]
-  | all _ _ ih => simp only [Formula.substF, Formula.interpret, ih, Ctx.interpretSubst_ext]
-  | ex _ _ ih => simp only [Formula.substF, Formula.interpret, ih, Ctx.interpretSubst_ext]
-
-theorem Formula.interpret_subst0 (si : SpaceInterp X F) {Γ : Ctx ι} {ρ : Ty ι}
-    (A : Formula F (ρ :: Γ)) (u : Term F Γ ρ) (env : Ctx.interpret X Γ) :
-    Formula.interpret si (A.subst0 u) env
-      = Formula.interpret si A (Term.interpret si u env, env) := by
-  simp only [Formula.subst0, Formula.interpret_substF, Ctx.interpretSubst_subst0_map]
+-- `Formula.interpret_substF` and `Formula.interpret_subst0` were developed here and have
+-- since been hoisted into `Semantics.lean`, where they belong: they are pure core semantics
+-- and need no imports beyond it.  They are used below exactly as before.
 
 theorem Formula.interpret_substVar0 (si : SpaceInterp X F) {Γ : Ctx ι} {ρ : Ty ι}
     (A : Formula F (ρ :: Γ)) (u : Term F (ρ :: Γ) ρ)
