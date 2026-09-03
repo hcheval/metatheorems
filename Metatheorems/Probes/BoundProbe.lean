@@ -81,7 +81,7 @@ def spremiseE : ∀ (Γ' : Ctx Empty) (B : Formula FEmpty Γ'), PremE ⟨Γ', B�
 -- ============================================================================
 
 /-- The MCT derivation, at `ι = Empty` with an empty premise set. -/
-def mctE : @Derivable Empty FEmpty Allowed.extended PremE [] mctStatement :=
+def mctE : @Derivable Empty Empty FEmpty Allowed.extended PremE [] mctStatement :=
   ProofMode.mct_p2 (al := Allowed.extended)
 
 /-- Its syntactic realizer. -/

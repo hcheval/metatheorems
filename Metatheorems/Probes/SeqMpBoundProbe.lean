@@ -106,7 +106,7 @@ abbrev B : Formula FEmpty ([] : Ctx Empty) :=
   Formula.ex Ty.nat (Formula.eq0 (Term.var Var.vz) Term.zero)
 
 abbrev D (Γ : Ctx Empty) (A : Formula FEmpty Γ) : Type :=
-  @Derivable Empty FEmpty Allowed.extended PremE Γ A
+  @Derivable Empty Empty FEmpty Allowed.extended PremE Γ A
 
 def hT : D [] T := .refl0
 def hB : D [] B := .mp .refl0 (.exist_ax Term.zero (Formula.eq0 (Term.var Var.vz) Term.zero))
