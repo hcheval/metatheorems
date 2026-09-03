@@ -43,6 +43,21 @@ macro "qb_nf" "[" ts:Lean.Parser.Tactic.simpLemma,* "]" : tactic =>
       Term.weaken_subst0, Term.weaken_subst0_eta, subst_subst0_map_weaken,
       Term.app2, Term.app3, Term.ofNat, closed_subst])
 
+/-- `canorm` (from `RealNumbers/Estimates.lean`) minus the `cauchyState` pieces — this file
+sits below `Cauchyfy.lean`, so it carries its own copy of the normaliser. -/
+macro "qb_canorm" : tactic =>
+  `(tactic| (try q_cons_norm
+             simp only [lt_Q, le_Q, eq_Q,
+               Formula.subst0, Formula.substVar0, Formula.substF, Formula.neg,
+               Term.subst,
+               Term.subst0_map_vz, Term.subst0_map_vs,
+               Term.substVar0_map_vz, Term.substVar0_map_vs,
+               Term.Subst.ext_vz, Term.Subst.ext_vs, Term.weaken_var, Term.app2,
+               Term.weaken_subst0, subst_subst0_map_weaken, Term.weaken_subst_ext,
+               weaken_substVar0, ProofMode.succVar0, closed_subst,
+               ← Formula.substF_shift_eq_weakenBy, Term.subst_shift_eq_weaken]
+             try q_cons_norm))
+
 section QBounds
 
 variable {Γ : Ctx ι}
@@ -365,29 +380,27 @@ def double_or_succ (j : Term F Γ Ty.nat) :
               (.app .succ (Term.app2 Term.add (.var .vz) (.var .vz)))))) := by
     pmode
     pinduction
-    · canorm
+    · qb_canorm
       pexists Term.zero
-      canorm
+      qb_canorm
       pleft
       pthm (Derivable.mp (add_zero_r (Term.zero : Term F Γ Ty.nat)) Derivable.sym0)
     · pforall
       pintro ih
-      canorm
+      qb_canorm
       pobtain ih with hm
-      canorm
+      qb_canorm
       pcases hm with h1 | h2
       · pexists (.var .vz)
-        canorm
+        qb_canorm
         pright
         prwby h1
         prefl
       · pexists (.app .succ (.var .vz))
-        canorm
+        qb_canorm
         pleft
-        prw (Derivable.mp
-          (qtrans (add_succ (.app .succ (.var .vz)) (.var .vz))
-            (succ_congr' (add_succ_l (.var .vz) (.var .vz))))
-          Derivable.sym0)
+        prw (qtrans (add_succ (.app .succ (.var .vz)) (.var .vz))
+          (succ_congr' (add_succ_l (.var .vz) (.var .vz))))
         prwby h2
         prefl
   by
@@ -404,7 +417,7 @@ def div2_add_isOdd_le (j : Term F Γ Ty.nat) :
   pmode
   pfrom hex := double_or_succ j
   pobtain hex with hcase
-  canorm
+  qb_canorm
   pcases hcase with h1 | h2
   · prwby h1
     prw (isOdd_add_self (.var .vz))
@@ -455,6 +468,433 @@ def rat_num_le_self (z : Term F Γ Ty.nat) :
         (monus_le_trans d2 j z))
       I_comb
   qtrans h1 h2
+
+-- ── More congruence helpers ─────────────────────────────────────────────────
+
+private def snd_pair_congr' {s t : Term F Γ Ty.nat}
+    (h : Derivable F al Premises (Formula.eq0 s t)) :
+    Derivable F al Premises (Formula.eq0 (.app Term.snd_pair s) (.app Term.snd_pair t)) :=
+  qfer_no_premise_nat_nf h (r := .app Term.snd_pair (.var .vz))
+    (by qb_nf) (by qb_nf)
+
+private def rat_den_congr' {s t : Term F Γ Ty.nat}
+    (h : Derivable F al Premises (Formula.eq0 s t)) :
+    Derivable F al Premises (Formula.eq0 (.app Term.rat_den s) (.app Term.rat_den t)) :=
+  qfer_no_premise_nat_nf h (r := .app Term.rat_den (.var .vz))
+    (by qb_nf) (by qb_nf)
+
+private def rat_sign_congr' {s t : Term F Γ Ty.nat}
+    (h : Derivable F al Premises (Formula.eq0 s t)) :
+    Derivable F al Premises (Formula.eq0 (.app Term.rat_sign s) (.app Term.rat_sign t)) :=
+  qfer_no_premise_nat_nf h (r := .app Term.rat_sign (.var .vz))
+    (by qb_nf) (by qb_nf)
+
+private def fst_pair_congr'' {s t : Term F Γ Ty.nat}
+    (h : Derivable F al Premises (Formula.eq0 s t)) :
+    Derivable F al Premises (Formula.eq0 (.app Term.fst_pair s) (.app Term.fst_pair t)) :=
+  qfer_no_premise_nat_nf h (r := .app Term.fst_pair (.var .vz))
+    (by qb_nf) (by qb_nf)
+
+private def abs_diff_congr_fst' (u : Term F Γ Ty.nat) {s t : Term F Γ Ty.nat}
+    (h : Derivable F al Premises (Formula.eq0 s t)) :
+    Derivable F al Premises
+      (Formula.eq0 (Term.app2 Term.abs_diff s u) (Term.app2 Term.abs_diff t u)) :=
+  qfer_no_premise_nat_nf h (r := Term.app2 Term.abs_diff (.var .vz) u.weaken)
+    (by qb_nf) (by qb_nf)
+
+private def abs_diff_congr_snd' (u : Term F Γ Ty.nat) {s t : Term F Γ Ty.nat}
+    (h : Derivable F al Premises (Formula.eq0 s t)) :
+    Derivable F al Premises
+      (Formula.eq0 (Term.app2 Term.abs_diff u s) (Term.app2 Term.abs_diff u t)) :=
+  qfer_no_premise_nat_nf h (r := Term.app2 Term.abs_diff u.weaken (.var .vz))
+    (by qb_nf) (by qb_nf)
+
+-- ── Parts of `⟨c⟩_ℚ` ────────────────────────────────────────────────────────
+
+/-- `rat_den z =₀ S (snd_pair z)`. -/
+def rat_den_unfold' (z : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (Formula.eq0 (.app Term.rat_den z) (.app .succ (.app Term.snd_pair z))) :=
+  lam_correct_nf
+    (.app .succ (.app Term.snd_pair (.var .vz)) : Term F (Ty.nat :: Γ) Ty.nat) z
+    (by qb_nf)
+
+/-- `rat_sign z =₀ isEven (j₁ z)`. -/
+def rat_sign_unfold' (z : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (Formula.eq0 (.app Term.rat_sign z) (.app Term.isEven (.app Term.fst_pair z))) :=
+  lam_correct_nf
+    (.app Term.isEven (.app Term.fst_pair (.var .vz)) : Term F (Ty.nat :: Γ) Ty.nat) z
+    (by qb_nf)
+
+/-- `rat_num ⟨c⟩ =₀ c`. -/
+def rat_num_encode (c : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (Formula.eq0 (.app Term.rat_num (.app Term.encode_nat_Q c)) c) :=
+  let twoC : Term F Γ Ty.nat := Term.app2 Term.mul (Term.ofNat 2) c
+  let enc : Term F Γ Ty.nat := Term.app3 Term.rat_encode (.app .succ .zero) c Term.zero
+  let pairT : Term F Γ Ty.nat := Term.app2 Term.pair twoC Term.zero
+  let h_enc : Derivable F al Premises (Formula.eq0 enc pairT) :=
+    qtrans (rat_encode_unfold' (.app .succ .zero) c Term.zero)
+      (pair_congr_l Term.zero
+        (qtrans (monus_congr_snd twoC isEven_one') (monus_zero twoC)))
+  let h_rt : Derivable F al Premises (Formula.eq0 (.app Term.rat_num enc) c) :=
+    rat_num_rat_encode (.app .succ .zero) c Term.zero (isEven_cases (.app .succ .zero))
+  qtrans (rat_num_congr' (encode_nat_Q_unfold c))
+    (qtrans (rat_num_congr' (Derivable.mp h_enc Derivable.sym0)) h_rt)
+
+/-- `rat_den ⟨c⟩ =₀ 1`. -/
+def rat_den_encode (c : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (Formula.eq0 (.app Term.rat_den (.app Term.encode_nat_Q c)) (.app .succ .zero)) :=
+  let twoC : Term F Γ Ty.nat := Term.app2 Term.mul (Term.ofNat 2) c
+  qtrans (rat_den_congr' (encode_nat_Q_unfold c))
+    (qtrans (rat_den_unfold' (Term.app2 Term.pair twoC Term.zero))
+      (succ_congr' (snd_pair_pair twoC Term.zero)))
+
+/-- `rat_sign ⟨c⟩ =₀ 1`. -/
+def rat_sign_encode (c : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (Formula.eq0 (.app Term.rat_sign (.app Term.encode_nat_Q c)) (.app .succ .zero)) :=
+  let twoC : Term F Γ Ty.nat := Term.app2 Term.mul (Term.ofNat 2) c
+  let pairT : Term F Γ Ty.nat := Term.app2 Term.pair twoC Term.zero
+  qtrans (rat_sign_congr' (encode_nat_Q_unfold c))
+    (qtrans (rat_sign_unfold' pairT)
+      (qtrans (isEven_congr' (qtrans (fst_pair_pair twoC Term.zero) (two_mul_eq_add' c)))
+        (isEven_add_self c)))
+
+/-- `posN z =₀ rat_num z` for a positively-signed code. -/
+def posN_of_sign_one (z : Term F Γ Ty.nat)
+    (hs : Derivable F al Premises
+      (Formula.eq0 (.app Term.rat_sign z) (.app .succ .zero))) :
+    Derivable F al Premises (Formula.eq0 (posN z) (.app Term.rat_num z)) :=
+  qtrans (mul_congr_l hs (.app Term.rat_num z)) (mul_one_l (.app Term.rat_num z))
+
+/-- `negN z =₀ 0` for a positively-signed code. -/
+def negN_of_sign_one (z : Term F Γ Ty.nat)
+    (hs : Derivable F al Premises
+      (Formula.eq0 (.app Term.rat_sign z) (.app .succ .zero))) :
+    Derivable F al Premises (Formula.eq0 (negN z) .zero) :=
+  qtrans (mul_congr_l
+      (qtrans (monus_congr_snd (.app .succ .zero) hs) (monus_self (.app .succ .zero)))
+      (.app Term.rat_num z))
+    (mul_zero_l (.app Term.rat_num z))
+
+/-- `posN ⟨c⟩ =₀ c`. -/
+def posN_encode (c : Term F Γ Ty.nat) :
+    Derivable F al Premises (Formula.eq0 (posN (.app Term.encode_nat_Q c)) c) :=
+  qtrans (posN_of_sign_one _ (rat_sign_encode c)) (rat_num_encode c)
+
+/-- `negN ⟨c⟩ =₀ 0`. -/
+def negN_encode (c : Term F Γ Ty.nat) :
+    Derivable F al Premises (Formula.eq0 (negN (.app Term.encode_nat_Q c)) .zero) :=
+  negN_of_sign_one _ (rat_sign_encode c)
+
+-- ── `≤_ℚ` between codes with denominator 1 ──────────────────────────────────
+
+/-- `≤_ℚ` between two positively-signed, denominator-1 codes reduces to a plain ℕ
+inequality between their numerators. -/
+def le_Q_of_parts_le (x y : Term F Γ Ty.nat)
+    (hnx : Derivable F al Premises (Formula.eq0 (negN x) .zero))
+    (hny : Derivable F al Premises (Formula.eq0 (negN y) .zero))
+    (hdx : Derivable F al Premises
+      (Formula.eq0 (.app Term.rat_den x) (.app .succ .zero)))
+    (hdy : Derivable F al Premises
+      (Formula.eq0 (.app Term.rat_den y) (.app .succ .zero)))
+    (h : Derivable F al Premises
+      (Formula.eq0 (Term.app2 Term.monus (posN x) (posN y)) .zero)) :
+    Derivable F al Premises (le_Q x y) :=
+  let dx : Term F Γ Ty.nat := .app Term.rat_den x
+  let dy : Term F Γ Ty.nat := .app Term.rat_den y
+  let L : Term F Γ Ty.nat :=
+    Term.app2 Term.add (Term.app2 Term.mul (negN y) dx) (Term.app2 Term.mul (posN x) dy)
+  let R : Term F Γ Ty.nat :=
+    Term.app2 Term.add (Term.app2 Term.mul (posN y) dx) (Term.app2 Term.mul (negN x) dy)
+  -- L =₀ posN x, R': posN y ≤ R
+  let hL : Derivable F al Premises (Formula.eq0 L (posN x)) :=
+    qtrans
+      (add_congr_l (qtrans (mul_congr_l hny dx) (mul_zero_l dx))
+        (Term.app2 Term.mul (posN x) dy))
+    (qtrans (add_zero_l (Term.app2 Term.mul (posN x) dy))
+      (qtrans (mul_congr_r (posN x) hdy) (mul_one_r (posN x))))
+  let hR : Derivable F al Premises (Formula.eq0 R (posN y)) :=
+    qtrans
+      (add_congr_r (Term.app2 Term.mul (posN y) dx)
+        (qtrans (mul_congr_l hnx dy) (mul_zero_l dy)))
+    (qtrans (add_zero_r (Term.app2 Term.mul (posN y) dx))
+      (qtrans (mul_congr_r (posN y) hdx) (mul_one_r (posN y))))
+  let hcross : Derivable F al Premises
+      (Formula.eq0 (Term.app2 Term.monus L R) .zero) :=
+    qtrans (monus_congr_fst hL R) (qtrans (monus_congr_snd (posN x) hR) h)
+  Derivable.mp hcross (le_Q_of_cross x y)
+
+/-- `⟨c⟩ ≤_ℚ ⟨d⟩` from `c ≤ d` at ℕ. -/
+def encode_le (c d : Term F Γ Ty.nat)
+    (h : Derivable F al Premises (Formula.eq0 (Term.app2 Term.monus c d) .zero)) :
+    Derivable F al Premises
+      (le_Q (.app Term.encode_nat_Q c) (.app Term.encode_nat_Q d)) :=
+  le_Q_of_parts_le _ _ (negN_encode c) (negN_encode d) (rat_den_encode c)
+    (rat_den_encode d)
+    (qtrans (monus_congr_fst (posN_encode c) (posN (.app Term.encode_nat_Q d)))
+      (qtrans (monus_congr_snd c (posN_encode d)) h))
+
+/-- **A ℚ-code dominates the magnitude it encodes**: `|c|_ℚ ≤_ℚ ⟨c⟩_ℚ`.
+Kohlenbach p. 430's `rmrk:bound-on-real`, at the level of a single code:
+`num c ≤ j₁ c ≤ c ≤ c · den c`, and the cross criterion does the rest. -/
+def abs_le_encode (c : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (le_Q (.app Term.abs_Q c) (.app Term.encode_nat_Q c)) :=
+  let dabs : Term F Γ Ty.nat := .app Term.rat_den (.app Term.abs_Q c)
+  let dc : Term F Γ Ty.nat := .app Term.rat_den c
+  let dy : Term F Γ Ty.nat := .app Term.rat_den (.app Term.encode_nat_Q c)
+  let L : Term F Γ Ty.nat :=
+    Term.app2 Term.add
+      (Term.app2 Term.mul (negN (.app Term.encode_nat_Q c)) dabs)
+      (Term.app2 Term.mul (posN (.app Term.abs_Q c)) dy)
+  let R : Term F Γ Ty.nat :=
+    Term.app2 Term.add
+      (Term.app2 Term.mul (posN (.app Term.encode_nat_Q c)) dabs)
+      (Term.app2 Term.mul (negN (.app Term.abs_Q c)) dy)
+  -- L =₀ num c
+  let hL : Derivable F al Premises (Formula.eq0 L (.app Term.rat_num c)) :=
+    qtrans
+      (add_congr_l (qtrans (mul_congr_l (negN_encode c) dabs) (mul_zero_l dabs))
+        (Term.app2 Term.mul (posN (.app Term.abs_Q c)) dy))
+    (qtrans (add_zero_l (Term.app2 Term.mul (posN (.app Term.abs_Q c)) dy))
+      (qtrans (mul_congr_l (posN_abs_Q c) dy)
+        (qtrans (mul_congr_r (.app Term.rat_num c) (rat_den_encode c))
+          (mul_one_r (.app Term.rat_num c)))))
+  -- R =₀ c · den c
+  let hR : Derivable F al Premises
+      (Formula.eq0 R (Term.app2 Term.mul c dc)) :=
+    qtrans
+      (add_congr_r (Term.app2 Term.mul (posN (.app Term.encode_nat_Q c)) dabs)
+        (qtrans (mul_congr_l (negN_abs_Q c) dy) (mul_zero_l dy)))
+    (qtrans (add_zero_r (Term.app2 Term.mul (posN (.app Term.encode_nat_Q c)) dabs))
+      (qtrans (mul_congr_l (posN_encode c) dabs)
+        (mul_congr_r c (rat_den_abs_Q c))))
+  -- num c ≤ c ≤ c·den c
+  let h_c_le : Derivable F al Premises
+      (Formula.eq0 (Term.app2 Term.monus c (Term.app2 Term.mul c dc)) .zero) :=
+    let hdc : Derivable F al Premises
+        (Formula.eq0 (Term.app2 Term.mul c dc)
+          (Term.app2 Term.add (Term.app2 Term.mul c (.app Term.snd_pair c)) c)) :=
+      qtrans (mul_congr_r c (rat_den_unfold' c)) (mul_succ c (.app Term.snd_pair c))
+    qtrans (monus_congr_snd c hdc)
+      (monus_add_self c (Term.app2 Term.mul c (.app Term.snd_pair c)))
+  let h_num_le : Derivable F al Premises
+      (Formula.eq0 (Term.app2 Term.monus (.app Term.rat_num c)
+        (Term.app2 Term.mul c dc)) .zero) :=
+    Derivable.mp
+      (Derivable.mp (Derivable.mp h_c_le
+        (Derivable.mp (rat_num_le_self c) and_intro))
+        (monus_le_trans (.app Term.rat_num c) c (Term.app2 Term.mul c dc)))
+      I_comb
+  let hcross : Derivable F al Premises
+      (Formula.eq0 (Term.app2 Term.monus L R) .zero) :=
+    qtrans (monus_congr_fst hL R)
+      (qtrans (monus_congr_snd (.app Term.rat_num c) hR) h_num_le)
+  Derivable.mp hcross (le_Q_of_cross (.app Term.abs_Q c) (.app Term.encode_nat_Q c))
+
+-- ── Sums of positively-signed codes ─────────────────────────────────────────
+
+/-- The same-sign bit is set when both signs are `1`. -/
+def addQ_same_pos (x y : Term F Γ Ty.nat)
+    (hsx : Derivable F al Premises
+      (Formula.eq0 (.app Term.rat_sign x) (.app .succ .zero)))
+    (hsy : Derivable F al Premises
+      (Formula.eq0 (.app Term.rat_sign y) (.app .succ .zero))) :
+    Derivable F al Premises (Formula.eq0 (addQ_same x y) (.app .succ .zero)) :=
+  qtrans
+    (sg_bar_congr
+      (qtrans (abs_diff_congr_fst' (.app Term.rat_sign y) hsx)
+        (qtrans (abs_diff_congr_snd' (.app .succ .zero) hsy)
+          (abs_diff_self (.app .succ .zero)))))
+    sg_bar_zero
+
+/-- The sign read back from a same-positive-sign sum is `1` — unconditionally, numerator
+zero included, because `isEven (2·N) =₀ 1` for every `N`. -/
+def rat_sign_add_Q_pos (x y : Term F Γ Ty.nat)
+    (hsx : Derivable F al Premises
+      (Formula.eq0 (.app Term.rat_sign x) (.app .succ .zero)))
+    (hsy : Derivable F al Premises
+      (Formula.eq0 (.app Term.rat_sign y) (.app .succ .zero))) :
+    Derivable F al Premises
+      (Formula.eq0 (.app Term.rat_sign (Term.app2 Term.add_Q x y)) (.app .succ .zero)) :=
+  let N : Term F Γ Ty.nat := addQ_num x y
+  let hE : Derivable F al Premises
+      (Formula.eq0 (.app Term.isEven (addQ_sign x y)) .zero) :=
+    qtrans (isEven_congr' (qtrans (addQ_sign_same x y (addQ_same_pos x y hsx hsy)) hsx))
+      isEven_one'
+  qtrans (rat_sign_add_Q x y)
+    (qtrans (isEven_congr'
+        (qtrans (monus_congr_snd (Term.app2 Term.mul (Term.ofNat 2) N) hE)
+          (monus_zero (Term.app2 Term.mul (Term.ofNat 2) N))))
+      (qtrans (isEven_congr' (two_mul_eq_add' N)) (isEven_add_self N)))
+
+/-- The sign read back from a product of positively-signed codes is `1`. -/
+def rat_sign_mul_Q_pos (x y : Term F Γ Ty.nat)
+    (hsx : Derivable F al Premises
+      (Formula.eq0 (.app Term.rat_sign x) (.app .succ .zero)))
+    (hsy : Derivable F al Premises
+      (Formula.eq0 (.app Term.rat_sign y) (.app .succ .zero))) :
+    Derivable F al Premises
+      (Formula.eq0 (.app Term.rat_sign (Term.app2 Term.mul_Q x y)) (.app .succ .zero)) :=
+  let N : Term F Γ Ty.nat :=
+    Term.app2 Term.mul (.app Term.rat_num x) (.app Term.rat_num y)
+  let hSame : Derivable F al Premises
+      (Formula.eq0 (.app Term.sg_bar (Term.app2 Term.abs_diff
+        (.app Term.rat_sign x) (.app Term.rat_sign y))) (.app .succ .zero)) :=
+    addQ_same_pos x y hsx hsy
+  let hE : Derivable F al Premises
+      (Formula.eq0 (.app Term.isEven (.app Term.sg_bar (Term.app2 Term.abs_diff
+        (.app Term.rat_sign x) (.app Term.rat_sign y)))) .zero) :=
+    qtrans (isEven_congr' hSame) isEven_one'
+  qtrans (rat_sign_mul_Q x y)
+    (qtrans (isEven_congr'
+        (qtrans (monus_congr_snd (Term.app2 Term.mul (Term.ofNat 2) N) hE)
+          (monus_zero (Term.app2 Term.mul (Term.ofNat 2) N))))
+      (qtrans (isEven_congr' (two_mul_eq_add' N)) (isEven_add_self N)))
+
+/-- The parts of `1_ℚ`, once and for all. -/
+def rat_sign_one_Q' :
+    Derivable F al Premises (Γ := Γ)
+      (Formula.eq0 (.app Term.rat_sign Term.one_Q) (.app .succ .zero)) :=
+  rat_sign_pair_two .zero
+
+def rat_num_one_Q' :
+    Derivable F al Premises (Γ := Γ)
+      (Formula.eq0 (.app Term.rat_num Term.one_Q) (.app .succ .zero)) :=
+  rat_num_pair_two .zero
+
+def rat_den_one_Q' :
+    Derivable F al Premises (Γ := Γ)
+      (Formula.eq0 (.app Term.rat_den Term.one_Q) (.app .succ .zero)) :=
+  qtrans (rat_den_unfold' Term.one_Q) (succ_congr' (snd_pair_pair (Term.ofNat 2) .zero))
+
+/-- `⟨S m⟩ =_ℚ ⟨m⟩ +_ℚ 1_ℚ` — the additive step of the ℕ ↪ ℚ embedding. -/
+def encode_succ (m : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (eq_Q (.app Term.encode_nat_Q (.app .succ m))
+        (Term.app2 Term.add_Q (.app Term.encode_nat_Q m) Term.one_Q)) :=
+  let em : Term F Γ Ty.nat := .app Term.encode_nat_Q m
+  let v : Term F Γ Ty.nat := Term.app2 Term.add_Q em Term.one_Q
+  let sv : Derivable F al Premises
+      (Formula.eq0 (.app Term.rat_sign v) (.app .succ .zero)) :=
+    rat_sign_add_Q_pos em Term.one_Q (rat_sign_encode m) rat_sign_one_Q'
+  -- num v =₀ S m
+  let hcross1 : Derivable F al Premises
+      (Formula.eq0 (addQ_cross em Term.one_Q) m) :=
+    qtrans (mul_congr_l (rat_num_encode m) (.app Term.rat_den Term.one_Q))
+      (qtrans (mul_congr_r m rat_den_one_Q') (mul_one_r m))
+  let hcross2 : Derivable F al Premises
+      (Formula.eq0 (addQ_cross Term.one_Q em) (.app .succ .zero)) :=
+    qtrans (mul_congr_l rat_num_one_Q' (.app Term.rat_den em))
+      (qtrans (mul_congr_r (.app .succ .zero) (rat_den_encode m))
+        (mul_one_r (.app .succ .zero)))
+  let hnum_v : Derivable F al Premises (Formula.eq0 (.app Term.rat_num v) (.app .succ m)) :=
+    qtrans (rat_num_add_Q em Term.one_Q)
+      (qtrans (addQ_num_same em Term.one_Q
+          (addQ_same_pos em Term.one_Q (rat_sign_encode m) rat_sign_one_Q'))
+        (qtrans (add_congr_l hcross1 (addQ_cross Term.one_Q em))
+          (qtrans (add_congr_r m hcross2)
+            (qtrans (add_succ m .zero) (succ_congr' (add_zero_r m))))))
+  let hd_v : Derivable F al Premises
+      (Formula.eq0 (.app Term.rat_den v) (.app .succ .zero)) :=
+    qtrans (rat_den_add_Q em Term.one_Q)
+      (qtrans (mul_congr_l (rat_den_encode m) (.app Term.rat_den Term.one_Q))
+        (qtrans (mul_congr_r (.app .succ .zero) rat_den_one_Q')
+          (mul_one_r (.app .succ .zero))))
+  eq_Q_of_pos_neg _ _
+    (qtrans (posN_encode (.app .succ m))
+      (Derivable.mp (qtrans (posN_of_sign_one v sv) hnum_v) Derivable.sym0))
+    (qtrans (negN_encode (.app .succ m))
+      (Derivable.mp (negN_of_sign_one v sv) Derivable.sym0))
+    (qtrans (rat_den_encode (.app .succ m)) (Derivable.mp hd_v Derivable.sym0))
+
+-- ── Order plumbing for the estimates ────────────────────────────────────────
+
+/-- `x ≤_ℚ y` and `0 <_ℚ P` give `x −_ℚ y <_ℚ P` — the shape a `≤` between cauchyfied
+values must take to refute a `lt_R` witness. -/
+def sub_lt_of_le (x y P : Term F Γ Ty.nat)
+    (hxy : Derivable F al Premises (le_Q x y))
+    (hP : Derivable F al Premises (lt_Q Term.zero_Q P)) :
+    Derivable F al Premises (lt_Q (Term.app2 Term.sub_Q x y) P) :=
+  let d : Term F Γ Ty.nat := Term.app2 Term.sub_Q y x
+  let h1 : Derivable F al Premises (le_Q Term.zero_Q d) :=
+    Derivable.mp hxy (le_Q_to_zero_sub x y)
+  let h2 : Derivable F al Premises (lt_Q Term.zero_Q (Term.app2 Term.add_Q P d)) :=
+    Derivable.mp (Derivable.mp h1 (Derivable.mp hP and_intro)) (lt_Q_zero_add_le P d)
+  let h3 : Derivable F al Premises
+      (eq_Q (Term.app2 Term.add_Q P d)
+        (Term.app2 Term.sub_Q P (Term.app2 Term.sub_Q x y))) :=
+    eqQsym (eqQtrans (sub_Q_eq_add_neg P (Term.app2 Term.sub_Q x y))
+      (addQr P (neg_Q_sub_Q y x)))
+  Derivable.mp (Derivable.mp h2 (lt_Q_zero_congr _ _ h3))
+    (lt_Q_of_zero_sub (Term.app2 Term.sub_Q x y) P)
+
+/-- `| |z| |_ℚ =_ℚ |z|_ℚ`. -/
+def abs_Q_abs_Q (z : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (eq_Q (.app Term.abs_Q (.app Term.abs_Q z)) (.app Term.abs_Q z)) :=
+  eq_Q_of_pos_neg _ _
+    (qtrans (posN_abs_Q (.app Term.abs_Q z))
+      (qtrans (rat_num_abs_Q z) (Derivable.mp (posN_abs_Q z) Derivable.sym0)))
+    (qtrans (negN_abs_Q (.app Term.abs_Q z))
+      (Derivable.mp (negN_abs_Q z) Derivable.sym0))
+    (rat_den_abs_Q (.app Term.abs_Q z))
+
+/-- `0 ≤_ℚ |z|_ℚ`. -/
+def le_Q_zero_abs (z : Term F Γ Ty.nat) :
+    Derivable F al Premises (le_Q Term.zero_Q (.app Term.abs_Q z)) :=
+  Derivable.mp (negN_abs_Q z) (le_Q_zero_of_parts (.app Term.abs_Q z))
+
+/-- `|x| ≤_ℚ |y| +_ℚ |y −_ℚ x|` — magnitude moves by at most the distance moved. -/
+def abs_Q_le_add_diff (x y : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (le_Q (.app Term.abs_Q x)
+        (Term.app2 Term.add_Q (.app Term.abs_Q y)
+          (.app Term.abs_Q (Term.app2 Term.sub_Q y x)))) :=
+  let h := abs_Q_sub_triangle x y Term.zero_Q
+  Derivable.mp h
+    (le_Q_congr
+      (.app Term.abs_Q (Term.app2 Term.sub_Q x Term.zero_Q))
+      (Term.app2 Term.add_Q
+        (.app Term.abs_Q (Term.app2 Term.sub_Q x y))
+        (.app Term.abs_Q (Term.app2 Term.sub_Q y Term.zero_Q)))
+      (.app Term.abs_Q x)
+      (Term.app2 Term.add_Q (.app Term.abs_Q y)
+        (.app Term.abs_Q (Term.app2 Term.sub_Q y x)))
+      (abs_Q_congr (sub_Q_zero_Q x))
+      (eqQtrans
+        (add_Q_comm_inst (.app Term.abs_Q (Term.app2 Term.sub_Q x y))
+          (.app Term.abs_Q (Term.app2 Term.sub_Q y Term.zero_Q)))
+        (eqQtrans
+          (addQr (.app Term.abs_Q (Term.app2 Term.sub_Q y Term.zero_Q))
+            (abs_diff_Q_comm x y))
+          (addQl (abs_Q_congr (sub_Q_zero_Q y))
+            (.app Term.abs_Q (Term.app2 Term.sub_Q y x))))))
+
+private def pd_congr'' {s t : Term F Γ Ty.nat}
+    (h : Derivable F al Premises (Formula.eq0 s t)) :
+    Derivable F al Premises (Formula.eq0 (.app Term.pd s) (.app Term.pd t)) :=
+  qfer_no_premise_nat_nf h (r := .app Term.pd (.var .vz))
+    (by qb_nf) (by qb_nf)
+
+private def pair_congr_r (u : Term F Γ Ty.nat) {s t : Term F Γ Ty.nat}
+    (h : Derivable F al Premises (Formula.eq0 s t)) :
+    Derivable F al Premises
+      (Formula.eq0 (Term.app2 Term.pair u s) (Term.app2 Term.pair u t)) :=
+  qfer_no_premise_nat_nf h (r := Term.app2 Term.pair u.weaken (.var .vz))
+    (by qb_nf) (by qb_nf)
+
+/-- `⟨2^{-0}⟩_ℚ =₀ 1_ℚ`. -/
+def pow2neg_zero_eq_one :
+    Derivable F al Premises (Γ := Γ)
+      (Formula.eq0 (.app Term.pow2neg_Q Term.zero) Term.one_Q) :=
+  qtrans (pow2neg_Q_unfold Term.zero)
+    (pair_congr_r (Term.ofNat 2)
+      (qtrans (pd_congr'' exp2_zero) (pd_succ .zero)))
 
 end QBounds
 

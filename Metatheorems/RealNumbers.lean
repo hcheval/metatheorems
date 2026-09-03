@@ -5,7 +5,9 @@ Authors: Horatiu
 -/
 import Metatheorems.RealNumbers.Defs
 import Metatheorems.RealNumbers.Cauchyfy
+import Metatheorems.RealNumbers.QBounds
 import Metatheorems.RealNumbers.Estimates
+import Metatheorems.RealNumbers.Bounds
 import Metatheorems.RealNumbers.Field
 import Metatheorems.RealNumbers.Negation
 import Metatheorems.RealNumbers.Mul
@@ -28,7 +30,9 @@ order:
 | `Negation` | `cauchyState_neg`/`cauchyfy_neg`, `add_neg_R`, `cauchyState_congr`/`cauchyfy_congr` |
 | `Mul` | `mul_assoc_R`/`mul_one_R`/`distrib_R` (sorried), `mul_R_apply`, `mul_comm_R` |
 | `Order` | `lt_irrefl_R`, `lt_add_R`/`lt_mul_pos_R`/`archimedean_R` (sorried), `zero_lt_one_R`, `lt_shift*`, `lt_trans_R` |
-| `Metric` | `add_eq_zero_R`, `le_zero_eq_zero_R`, `nonneg_of_add_self_nonneg`, Kohlenbach §4.1 |
+| `QBounds` | ℚ-code bounds: `abs_le_encode` (a code dominates its magnitude), `rat_num_le_self`, the encode-parts cluster, `exp2_add`, `sub_lt_of_le` — pure ℚ/ℕ, sits beside `Defs` |
+| `Bounds` | `cauchyfy_mag_le`, `abs_R_apply`/`embed_nat_R_apply`, `cauchyfy_embed` — the cauchyfy-level magnitude layer |
+| `Metric` | `add_eq_zero_R`, `le_zero_eq_zero_R`, `nonneg_of_add_self_nonneg`, `abs_R_bound`, Kohlenbach §4.1 |
 
 The import graph is deliberately flat below `Field`: `Negation → Mul` is a real dependency
 (`mul_comm_R_core` needs `cauchyfy_congr`), but `Order` and `Metric` import only `Field`, so an
@@ -109,5 +113,14 @@ namespace Metatheorems
 #print axioms cauchyState_id_of_cauchy
 #print axioms cauchyfy_zero_R
 #print axioms cauchyfy_one_R
+-- The code-dominates chain and `abs_R_bound` (2026-09-03):
+#print axioms rat_num_le_self
+#print axioms abs_le_encode
+#print axioms encode_succ
+#print axioms exp2_add
+#print axioms succ_succ_le_exp2_succ
+#print axioms cauchyfy_mag_le
+#print axioms cauchyfy_embed
+#print axioms abs_R_bound
 
 end Metatheorems
