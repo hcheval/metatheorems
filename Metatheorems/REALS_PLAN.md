@@ -9,6 +9,11 @@
 > **Revision 2026-09-03 — §0.2 is now the newest state: `add_comm_R` and `mul_comm_R` are
 > PROVED, and its own "blocked on `seq_induction`" verdict is retracted there with the reason.
 > §0.7's work order items 4 (and its framing of 1–3) are overtaken accordingly.**
+>
+> **Revision 2026-09-03, evening (`reals-order`) — §0.24: the four order axioms are PROVED
+> (`lt_add_R`, `lt_mul_pos_R`, `archimedean_R`, `lt_trans_R`). The running totals below
+> (§0, §0.23) that say 6 sorried declarations are overtaken: `RealNumbers/` carries 2, both
+> in `Metric.lean`.**
 
 ## 0. What the 2026-09-01 session established
 
@@ -433,6 +438,55 @@ the delta-expansion trap is a `prw`/subst phenomenon, not a term-size one. The t
 points `le_R_of_bound` and the new `eq_R_of_lt_bound` (`Bounds.lean`) fold a pointwise
 `lt_Q` bound at context `nat :: Γ` into `≤_ℝ` / `=_ℝ`, with `simp only [mul_R_app_weaken]`
 as the only tactic step.
+
+### 0.24 The order axioms — DONE 2026-09-03 (`reals-order`)
+
+**`lt_add_R`, `lt_mul_pos_R`, `archimedean_R`, `lt_trans_R_core`/`lt_trans_R` all closed**,
+`[propext, Quot.sound]`, verified by name after a completed `lake build` and recorded in the
+umbrella's hygiene block. `RealNumbers/` is down to **2** sorried declarations, both in
+`Metric.lean` (`approx_R`, `cauchy_complete_R`, the other lane's). Statements byte-identical
+to before. Findings, in decreasing order of importance:
+
+- **Exit 3 works, is cheap, and closed THREE of the four.** The blocker at
+  `lt_trans_R_core` was never the single `pobtain` but the *nested* one; doing every
+  `∃`-elimination at the Lean level with `Derivable.exist_rule` (+ `flip_comb` to swap
+  antecedents between the two peels) means no hypothesis is ever `weakenBy`-wrapped and no
+  large packed goal is ever `canorm`ed. The enabling lemmas are five *propositional*
+  weakening equations in the new `RealNumbers/OrderBounds.lean` — `lt_R_ex`,
+  `lt_R_zero_ex`, `lt_R_weakenBy`, `ltBody_weakenBy`, `Formula.weakenBy_imp` (plus
+  `lt_R_substF`, the `eq_R_substF` twin) — all proved by `rw`/`simp only` with
+  `closed_subst`, never by defeq. **Never let the elaborator defeq-check
+  `zero_R.weaken ≡ zero_R`**: rename over a closed ℚ constant is the delta-expansion
+  pathology; `rw [lt_R_zero_ex …]` before `exist_rule` is what avoids it. With the
+  antecedents as plain bound variables, the cores are ordinary scripts (`pintro` +
+  `papplym … in h with h'` + one `pexists`/`canorm`) and every one compiled on the first
+  or second try.
+- **The §0.03/§0.8 "one job" analysis of `lt_add_R` held exactly.** Witness
+  `w := n + rat_den e` with `e := 2^{-(n+1)} −ℚ (cf +ℚ cg)`,
+  `cf/cg` the two one-step Cauchy drifts at the hypothesis's own index — positive by the
+  strictness of `cauchyState_cauchy`, spent through `pow2neg_rat_den_le`. One correction
+  of emphasis: the slack `d` is best taken as the *sum* of both sequences' drifts
+  (`2^{-(n+1)} − (cf+cg)`), not §0.8's single-sequence form — the identity
+  `D1 =ℚ D2 +ℚ (nb +ℚ aa)` (the `lt_shift1` split at distance `r` instead of `1`) then
+  gives `D(w+2) ≥ e` in one `le_Q_add_cancel` + one subtraction move, with no `max`:
+  `n + rat_den e` majorises both requirements at once.
+- **`lt_mul_pos_R` needed two genuinely new pieces**, both in `OrderBounds.lean`:
+  `pow2neg_Q_mul` (`2^{-a}·ℚ 2^{-b} =ℚ 2^{-(a+b)}`, by the parts, in `encode_pow2_mul`'s
+  style) and `le_Q_mul_o` — the multiplication monotonicity with **all four order facts as
+  object formulas**. The QBounds monos (`le_Q_mul_mono_l` etc.) take Lean-level premises
+  and cannot consume a `pintro`'d hypothesis; expect the same conversion to be needed
+  whenever a QBounds fact meets a proof-mode hypothesis. The lower bound persists *halved*
+  at every later index (`cauchyfy_lb_imp`: `2^{-n} ≤ f̂(n+1)` gives
+  `2^{-(n+1)} ≤ f̂((n+1)+j)`), so witness `m := (n₁+n₂)+2` is exact.
+- **`archimedean_R` is witness `S(S(f 0))`, inner witness `0`,** entirely Lean-level:
+  `cauchyfy_mag_le` + `le_Q_self_abs` bound `f̂(1)` by `⟨f 0⟩+1`, `encode_succ` twice
+  values the witness at `(⟨f 0⟩+1)+1`, and the gap is `1 =ℚ 2^{-0}` on the nose
+  (`add_Q_sub_cancel_l` + `pow2neg_zero_eq_one`). §0.7's guess that it needs `round_nat` +
+  the §1 majorization argument was wrong — `cauchyfy_mag_le` (built for `mul_R_check`)
+  already is the majorization argument.
+- **Cost**: `Order.lean` now imports `Mul` (via `OrderBounds`), because `lt_mul_pos_R`
+  needs `cauchyfy_mul_R`. The umbrella note's "Order imports only Field" is stale; `Order`
+  remains a leaf, so its edit cost does not cascade.
 
 ### 0.3 `cauchyfy` is open — the invariant and the Cauchy property are proved
 

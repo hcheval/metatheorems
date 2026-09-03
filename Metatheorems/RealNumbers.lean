@@ -76,11 +76,26 @@ namespace Metatheorems
 #print axioms mul_one_R_check
 #print axioms cauchyfy_mul_one_R
 #print axioms mul_Q_one_inst
--- The `<_ℝ` shift estimate. `lt_trans_R` itself is NOT here: it is still `sorryAx`, through
--- `lt_trans_R_core`, and the note there says why. These three are the mathematics of it.
+-- The `<_ℝ` shift estimate — the mathematics of `lt_trans_R`.
 #print axioms lt_shift1
 #print axioms lt_shift
 #print axioms lt_shift_at
+-- The order axioms (closed 2026-09-03, branch `reals-order`): both `∃`-eliminations at the
+-- Lean level via `Derivable.exist_rule` (exit 3 of the old note at `lt_trans_R_core`).
+#print axioms lt_trans_R
+#print axioms lt_trans_R_core
+#print axioms lt_add_R
+#print axioms lt_add_R_core
+#print axioms lt_mul_pos_R
+#print axioms lt_mul_pos_R_core
+#print axioms archimedean_R
+-- ...and the `OrderBounds.lean` kit they rest on:
+#print axioms pow2neg_Q_mul
+#print axioms cauchyfy_lb_imp
+#print axioms le_Q_mul_o
+#print axioms le_Q_add_cancel
+#print axioms le_Q_sub_of_le_add
+#print axioms neg_Q_antitone
 #print axioms cauchyfy_add_R
 #print axioms cauchy_pair_step
 #print axioms eqR_tail
