@@ -44,10 +44,23 @@ structure MajorizabilityRel {ι : Type} {X : ι → Type} {F : ι → Ty ι}
 
 /-- Majorizability with a total majorizer on all semantic values.
 
+**VESTIGIAL — this structure has no instances and cannot have any.** It is kept because it is
+the faithful transcription of the document's Def. 6.0.1 and matches the Lean 3 formalization,
+so the fact that it is uninhabitable is a finding *about that presentation*, worth recording
+rather than deleting. But nothing in the project constructs one, and the two metatheorems that
+take it (`general_metatheorem`, `general_metatheorem_classical`) are consequently inapplicable
+and are themselves vestigial.
+
+**The live route is the syntactic one.** Since the `syntactic-witnesses` merge (2026-09-01) the
+Dialectica witness/counter *types* are object-level `Ty ι`, so realizers are closed `Term`s and
+`all_closed_terms_majorizable` produces their majorants outright. That needs only
+`AbstractMajorizability` (inhabited by `bezemAbstract`) and no total majorizer at all. Use
+`syntactic_general_metatheorem` / `syntactic_general_metatheorem_classical`; both metric
+metatheorems already do.
+
 This is the "strong" version: instead of proving each constant is majorizable
 and deriving closed terms, we directly assume every element of the type
-structure has a majorant. This matches the Lean 3 formalization and makes
-the general metatheorem straightforward to state.
+structure has a majorant.
 
 **Caution.** Over the full set-theoretic type structure the `majorizer` field is not
 satisfiable for any relation that is genuinely a majorization: at type `(nat →ₜ nat) →ₜ nat`
@@ -303,11 +316,5 @@ theorem maxT_bezemMaj_left {base : (i : ι) → Nat → X i → Prop} (hbase : B
     exact ⟨ihρ _ _ _ h₁.1 h₂.1, ihτ _ _ _ h₁.2 h₂.2⟩
 
 end MaxT
-
-/-- For pure `WE-HA^ω` (`ι = Empty`) there are no base types, so the relation is
-determined outright. -/
-def bezemRelEmpty {X : Empty → Type} {F : Empty → Ty Empty} (si : SpaceInterp X F) :
-    MajorizabilityRel si :=
-  bezemRel si (fun i => i.elim)
 
 end Metatheorems

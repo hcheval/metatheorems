@@ -65,6 +65,12 @@ theorem dialecticaMatrix_iff_interpFormula
 
 /-- **General Metatheorem** (Theorem 6.1), Dialectica step.
 
+**VESTIGIAL — cannot be applied.** It takes a `Majorizability`, i.e. a *total* majorizer, and
+that structure has no instances and cannot have any (see its docstring for the refutation).
+Kept as the faithful transcription of the document's Def. 6.0.1. **Use
+`syntactic_general_metatheorem`**, which needs only `AbstractMajorizability` and gets the
+majorants free from `all_closed_terms_majorizable`.
+
 Takes a derivation in the extended system (post-NT) and applies Dialectica
 directly. The matrix has no ¬¬ layers, making extraction clean.
 The full metatheorem composes `negTrans_sound` (external) with this. -/
@@ -430,6 +436,15 @@ def classical_to_prenex_extended
   exact stripped.castAllowed (by constructor <;> decide)
 
 /-- **General Metatheorem from classical proof** (Theorem 6.1).
+
+**VESTIGIAL as an entry point — cannot be applied**, for the same reason as
+`general_metatheorem`: the `Majorizability` argument has no instances. **Use
+`syntactic_general_metatheorem_classical`.**
+
+It is *not* wasted work, and this is worth knowing: proving it is what produced
+`classical_to_prenex_extended` (steps 1–4 below), and the syntactic classical metatheorem
+calls exactly that. So this theorem is the origin of the shared proof-theoretic factor, even
+though the theorem itself is now superseded.
 
 Takes a classical derivation (with LEM + QF-AC) and produces a bound, via the
 **prenexified** route — the one the paper takes, and the one CLAUDE.md note 2 prescribes:
