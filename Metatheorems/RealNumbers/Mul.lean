@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Horatiu
 -/
 import Metatheorems.RealNumbers.Negation
+import Metatheorems.RealNumbers.Bounds
 
 namespace Metatheorems
 
@@ -196,6 +197,191 @@ def mul_comm_R :
         (eq_R (Term.app2 Term.mul_R (.var (.vs .vz)) (.var .vz))
               (Term.app2 Term.mul_R (.var .vz) (.var (.vs .vz)))))) :=
   univ_gen (univ_gen (mul_comm_R_core (.var (.vs .vz)) (.var .vz)))
+
+-- ── `mul_R_check`: the product of two reals is provably Cauchy ─────────────
+--
+-- REALS_PLAN §1's majorization argument, cashed. The raw sequence is
+-- `M(k) = f̂(k+b) ·ℚ ĝ(k+b)` with `b = f(0) + g(0) + 2`, and one step costs
+--
+--     |M(k) − M(k+1)| ≤ |f̂(k+b) − f̂(k+b+1)|·|ĝ(k+b)| + |ĝ(k+b) − ĝ(k+b+1)|·|f̂(k+b+1)|
+--                     ≤ (Bg + Bf) · 2^{-(k+b+1)}   with  B· = ⟨·(0)⟩ + 1
+--                     = ⟨b⟩ · 2^{-(k+b+1)}  <  ⟨2^b⟩ · 2^{-(k+b+1)}  =  2^{-(k+1)}
+--
+-- — the code-dominates magnitude bound (`cauchyfy_mag_le`) making the operand bounds
+-- `⟨f(0)⟩+1`, `⟨g(0)⟩+1`, encode arithmetic collecting them into `⟨b⟩`, and the strict step
+-- `b < 2^b` (`succ_succ_le_exp2_succ`) buying the strictness the check demands. This is why
+-- `b` has the shape it does.
+
+/-- The Cauchy check passes for `f ·_ℝ g` at every index. Spelled out rather than written
+with `Term.cauchy_check_at`, for the usual `prw` reason. -/
+def mul_R_check (f g : Term F Γ (realTy ι)) :
+    Derivable F al Premises (Γ := Ty.nat :: Γ)
+      (Formula.eq0
+        (Term.app2 Term.lt_Q_dec
+          (.app Term.abs_Q (Term.app2 Term.sub_Q
+            (.app (Term.app2 Term.mul_R f.weaken g.weaken) (.var .vz))
+            (.app (Term.app2 Term.mul_R f.weaken g.weaken) (.app .succ (.var .vz)))))
+          (.app Term.pow2neg_Q (.app .succ (.var .vz))))
+        .zero) :=
+  let k : Term F (Ty.nat :: Γ) Ty.nat := .var .vz
+  let fw : Term F (Ty.nat :: Γ) (realTy ι) := f.weaken
+  let gw : Term F (Ty.nat :: Γ) (realTy ι) := g.weaken
+  let f0 : Term F (Ty.nat :: Γ) Ty.nat := .app fw .zero
+  let g0 : Term F (Ty.nat :: Γ) Ty.nat := .app gw .zero
+  let B : Term F (Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.add (Term.app2 Term.add f0 g0) (Term.ofNat 2)
+  let I : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.add k B
+  let I' : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.add (.app .succ k) B
+  let A : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.cauchyfy fw I
+  let A' : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.cauchyfy fw I'
+  let C : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.cauchyfy gw I
+  let C' : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.cauchyfy gw I'
+  let Bf : Term F (Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.add_Q (.app Term.encode_nat_Q f0) Term.one_Q
+  let Bg : Term F (Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.add_Q (.app Term.encode_nat_Q g0) Term.one_Q
+  let P : Term F (Ty.nat :: Γ) Ty.nat := .app Term.pow2neg_Q (.app .succ I)
+  -- `I' =₀ S I`, so each factor moves by one `cauchyfy` step
+  let hI : Derivable F al Premises (Formula.eq0 I' (.app .succ I)) := add_succ_l k B
+  let hA' : Derivable F al Premises
+      (eq_Q (Term.app2 Term.cauchyfy fw (.app .succ I)) A') :=
+    eqQ_of_nat_eq' (Derivable.mp (cauchyfy_idx_nat' fw hI) Derivable.sym0)
+  let hC' : Derivable F al Premises
+      (eq_Q (Term.app2 Term.cauchyfy gw (.app .succ I)) C') :=
+    eqQ_of_nat_eq' (Derivable.mp (cauchyfy_idx_nat' gw hI) Derivable.sym0)
+  let hdA : Derivable F al Premises
+      (le_Q (.app Term.abs_Q (Term.app2 Term.sub_Q A A')) P) :=
+    Derivable.mp
+      (Derivable.mp (cauchyfy_cauchy fw I)
+        (lt_Q_congr _ _ _ _
+          (abs_Q_congr (sub_Q_congr (eq_Q_refl_inst A) hA'))
+          (eq_Q_refl_inst P)))
+      (lt_Q_imp_le_Q _ _)
+  let hdC : Derivable F al Premises
+      (le_Q (.app Term.abs_Q (Term.app2 Term.sub_Q C C')) P) :=
+    Derivable.mp
+      (Derivable.mp (cauchyfy_cauchy gw I)
+        (lt_Q_congr _ _ _ _
+          (abs_Q_congr (sub_Q_congr (eq_Q_refl_inst C) hC'))
+          (eq_Q_refl_inst P)))
+      (lt_Q_imp_le_Q _ _)
+  -- magnitudes, by code-dominates
+  let hmagC : Derivable F al Premises (le_Q (.app Term.abs_Q C) Bg) :=
+    cauchyfy_mag_le gw I
+  let hmagA' : Derivable F al Premises (le_Q (.app Term.abs_Q A') Bf) :=
+    cauchyfy_mag_le fw I'
+  -- the two moves and the triangle
+  let T1 : Derivable F al Premises
+      (le_Q (.app Term.abs_Q (Term.app2 Term.sub_Q
+        (Term.app2 Term.mul_Q A C) (Term.app2 Term.mul_Q A' C)))
+        (Term.app2 Term.mul_Q Bg P)) :=
+    mul_move_le A A' C P Bg hdA hmagC
+  let T2 : Derivable F al Premises
+      (le_Q (.app Term.abs_Q (Term.app2 Term.sub_Q
+        (Term.app2 Term.mul_Q A' C) (Term.app2 Term.mul_Q A' C')))
+        (Term.app2 Term.mul_Q Bf P)) :=
+    mul_move_le_l A' C C' P Bf hdC hmagA'
+  let hSum : Derivable F al Premises
+      (le_Q (.app Term.abs_Q (Term.app2 Term.sub_Q
+        (Term.app2 Term.mul_Q A C) (Term.app2 Term.mul_Q A' C')))
+        (Term.app2 Term.add_Q (Term.app2 Term.mul_Q Bg P) (Term.app2 Term.mul_Q Bf P))) :=
+    leQt (abs_Q_sub_triangle (Term.app2 Term.mul_Q A C)
+        (Term.app2 Term.mul_Q A' C) (Term.app2 Term.mul_Q A' C'))
+      (Derivable.mp (Derivable.mp T2 (Derivable.mp T1 and_intro))
+        (le_Q_add_both _ _ (Term.app2 Term.mul_Q Bg P) (Term.app2 Term.mul_Q Bf P)))
+  -- collect: Bg·P + Bf·P =ℚ (Bg + Bf)·P =ℚ ⟨B⟩·P
+  let e : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.add f0 g0
+  -- B =₀ S (S (f0 + g0))
+  let hB2 : Derivable F al Premises
+      (Formula.eq0 B (.app .succ (.app .succ e))) :=
+    qtrans (add_succ (Term.app2 Term.add f0 g0) (.app .succ .zero))
+      (succ_congr'' (qtrans (add_succ (Term.app2 Term.add f0 g0) .zero)
+        (succ_congr'' (add_zero_r (Term.app2 Term.add f0 g0)))))
+  -- (S g0) + (S f0) =₀ B
+  let hSum2B : Derivable F al Premises
+      (Formula.eq0 (Term.app2 Term.add (.app .succ g0) (.app .succ f0)) B) :=
+    qtrans
+      (qtrans (add_succ (.app .succ g0) f0)
+        (succ_congr'' (qtrans (add_succ_l g0 f0) (succ_congr'' (add_comm g0 f0)))))
+      (Derivable.mp hB2 Derivable.sym0)
+  let Henc : Derivable F al Premises
+      (eq_Q (Term.app2 Term.add_Q Bg Bf) (.app Term.encode_nat_Q B)) :=
+    eqQtrans (addQl (eqQsym (encode_succ g0)) Bf)
+      (eqQtrans (addQr (.app Term.encode_nat_Q (.app .succ g0)) (eqQsym (encode_succ f0)))
+        (eqQtrans (encode_add (.app .succ g0) (.app .succ f0))
+          (eqQ_of_nat_eq' (encode_congr' hSum2B))))
+  let hle2 : Derivable F al Premises
+      (le_Q (.app Term.abs_Q (Term.app2 Term.sub_Q
+        (Term.app2 Term.mul_Q A C) (Term.app2 Term.mul_Q A' C')))
+        (Term.app2 Term.mul_Q (.app Term.encode_nat_Q B) P)) :=
+    Derivable.mp hSum
+      (le_Q_congr _ _ _ _ (eq_Q_refl_inst _)
+        (eqQtrans (eqQsym (add_mul_Q Bg Bf P)) (mulQl Henc P)))
+  -- strict: ⟨B⟩ < ⟨2^B⟩, since B + 1 ≤ 2^B
+  let hBexp : Derivable F al Premises
+      (Formula.eq0 (Term.app2 Term.monus (.app .succ B) (.app Term.exp2 B)) .zero) :=
+    qtrans (monus_congr_fst (succ_congr'' hB2) (.app Term.exp2 B))
+      (qtrans (monus_congr_snd (.app .succ (.app .succ (.app .succ e))) (exp2_congr' hB2))
+        (succ_succ_le_exp2_succ (.app .succ e)))
+  let Hlt : Derivable F al Premises
+      (lt_Q (.app Term.encode_nat_Q B) (.app Term.encode_nat_Q (.app Term.exp2 B))) :=
+    encode_lt B (.app Term.exp2 B) hBexp
+  let Hmul_lt : Derivable F al Premises
+      (lt_Q (Term.app2 Term.mul_Q (.app Term.encode_nat_Q B) P)
+        (Term.app2 Term.mul_Q (.app Term.encode_nat_Q (.app Term.exp2 B)) P)) :=
+    lt_Q_mul_mono_l _ _ P Hlt (zero_lt_pow2neg_Q (.app .succ I))
+  -- ⟨2^B⟩ · 2^{-(I+1)} =ℚ 2^{-(k+1)}, since I+1 = B + (k+1)
+  let hidx : Derivable F al Premises
+      (Formula.eq0 (Term.app2 Term.add B (.app .succ k)) (.app .succ I)) :=
+    qtrans (add_succ B k) (succ_congr'' (add_comm B k))
+  let Hcoll2 : Derivable F al Premises
+      (eq_Q (Term.app2 Term.mul_Q (.app Term.encode_nat_Q (.app Term.exp2 B)) P)
+        (.app Term.pow2neg_Q (.app .succ k))) :=
+    eqQtrans
+      (mulQr (.app Term.encode_nat_Q (.app Term.exp2 B))
+        (eqQ_of_nat_eq' (Derivable.mp (pow2neg_idx_nat' hidx) Derivable.sym0)))
+      (encode_pow2_mul B (.app .succ k))
+  let hfin : Derivable F al Premises
+      (lt_Q (.app Term.abs_Q (Term.app2 Term.sub_Q
+        (Term.app2 Term.mul_Q A C) (Term.app2 Term.mul_Q A' C')))
+        (.app Term.pow2neg_Q (.app .succ k))) :=
+    Derivable.mp
+      (Derivable.mp (Derivable.mp Hmul_lt (Derivable.mp hle2 and_intro))
+        (le_lt_Q_trans _ _ _))
+      (lt_Q_congr _ _ _ _ (eq_Q_refl_inst _) Hcoll2)
+  -- transport to the raw `mul_R` applications
+  let hM : Derivable F al Premises
+      (eq_Q
+        (.app Term.abs_Q (Term.app2 Term.sub_Q
+          (.app (Term.app2 Term.mul_R fw gw) k)
+          (.app (Term.app2 Term.mul_R fw gw) (.app .succ k))))
+        (.app Term.abs_Q (Term.app2 Term.sub_Q
+          (Term.app2 Term.mul_Q A C) (Term.app2 Term.mul_Q A' C')))) :=
+    abs_Q_congr (sub_Q_congr
+      (eqQ_of_nat_eq' (mul_R_apply fw gw k))
+      (eqQ_of_nat_eq' (mul_R_apply fw gw (.app .succ k))))
+  Derivable.mp hfin (lt_Q_congr _ _ _ _ (eqQsym hM) (eq_Q_refl_inst _))
+where
+  succ_congr'' {Δ : Ctx ι} {s t : Term F Δ Ty.nat}
+      (h : Derivable F al Premises (Formula.eq0 s t)) :
+      Derivable F al Premises (Formula.eq0 (.app .succ s) (.app .succ t)) :=
+    qfer_no_premise_nat_nf h (r := .app .succ (.var .vz)) (by qb_nf) (by qb_nf)
+
+/-- `(f ·_ℝ g)^(s) =₀ f̂(s+b) ·_ℚ ĝ(s+b)`: `cauchyfy` is the identity on a product. -/
+def cauchyfy_mul_R (f g : Term F Γ (realTy ι)) (s : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (Formula.eq0 (Term.app2 Term.cauchyfy (Term.app2 Term.mul_R f g) s)
+        (Term.app2 Term.mul_Q
+          (Term.app2 Term.cauchyfy f
+            (Term.app2 Term.add s (Term.app2 Term.add
+              (Term.app2 Term.add (.app f .zero) (.app g .zero)) (Term.ofNat 2))))
+          (Term.app2 Term.cauchyfy g
+            (Term.app2 Term.add s (Term.app2 Term.add
+              (Term.app2 Term.add (.app f .zero) (.app g .zero)) (Term.ofNat 2)))))) :=
+  qtrans
+    (cauchyfy_id (Term.app2 Term.mul_R f g)
+      (mul_R_app_weaken f g ▸ mul_R_check f g) s)
+    (mul_R_apply f g s)
 
 -- ── `mul_one_R` ─────────────────────────────────────────────────────────────
 --

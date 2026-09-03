@@ -122,5 +122,12 @@ namespace Metatheorems
 #print axioms cauchyfy_mag_le
 #print axioms cauchyfy_embed
 #print axioms abs_R_bound
+-- `mul_R` is provably Cauchy (2026-09-03) — REALS_PLAN §1's majorization argument:
+#print axioms mul_R_check
+#print axioms cauchyfy_mul_R
+#print axioms encode_pow2_mul
+#print axioms encode_add
+#print axioms mul_move_le
+#print axioms abs_Q_mul
 
 end Metatheorems

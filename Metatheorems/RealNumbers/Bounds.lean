@@ -29,13 +29,6 @@ variable {Γ : Ctx ι}
 
 -- ── Small Lean-level plumbing ───────────────────────────────────────────────
 
-/-- `≤_ℚ` transitivity with Lean-level premises: the composition every chain below uses. -/
-def leQt {a b c : Term F Γ Ty.nat}
-    (h1 : Derivable F al Premises (le_Q a b))
-    (h2 : Derivable F al Premises (le_Q b c)) :
-    Derivable F al Premises (le_Q a c) :=
-  Derivable.mp (Derivable.mp h2 (Derivable.mp h1 and_intro)) (le_Q_trans a b c)
-
 /-- `=₀` implies `=_ℚ` (public version of the helper private to `Mul.lean`). -/
 def eqQ_of_nat_eq' {s t : Term F Γ Ty.nat}
     (h : Derivable F al Premises (Formula.eq0 s t)) :
