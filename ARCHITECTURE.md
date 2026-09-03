@@ -140,9 +140,38 @@ inductive Term {ι : Type} (F : ι → Ty ι) : Ctx ι → Ty ι → Type where
 ```
 
 `ι` indexes base types (`Ty.base`), function constants (`func`), and distinguished points
-(`zeroX`) — **one of each, in lockstep**. Metric spaces fit exactly (one `X`, one `d`). But
-W-hyperbolic needs one base type and **two** constants, `d` and `W`, and no `ι` gives that:
-`ι = Bool` buys a second base type, not a second constant.
+(`zeroX`) — **one of each, in lockstep**, so `|constants| = |base types|`, forced.
+
+**Count corrected 2026-09-04 — the diagnosis below stands, the example that motivated it no
+longer does.** This paragraph used to read "Metric spaces fit exactly (one `X`, one `d`). But
+W-hyperbolic needs one base type and **two** constants, `d` and `W`, and no `ι` gives that."
+Since the `Term.dist` refactor (2026-09-02) `d` is **not** a constant — it is the structural
+constructor `Term.dist`, carried by every base type at every `ι`, because `eqAtType` must name
+it without going through a signature. So:
+
+- **Metric spaces use ZERO function constants**: `MetricSpace.F () = Ty.unit`, and `d_X` is
+  `Term.dist ()`. The one available constant slot sits unused.
+- **W-hyperbolic now needs 1 base type + 1 constant** (`W` alone), which `ι = Unit` supplies.
+  **It fits — but by the numbers happening to line up, not because the indices were
+  decoupled.** W-hyperbolic can therefore be built *before* this refactor, which is a
+  sequencing convenience, not a reprieve.
+- **CAT(0) also fits**: it adds the CN inequality, an *axiom*, so it inherits W-hyperbolic's
+  signature and only extends `Premises` (cf. §6 below — most of the tower adds axioms).
+
+**The coupling is unchanged and still blocks the tower.** Anything wanting a ratio other than
+1:1 has no way to ask for it — in particular **normed and inner-product spaces, which are in
+scope** (`SPINOFFS.md`: Banach/Hilbert ⇝ CAT(0) ⇝ W-hyperbolic): one base type but several
+constants (`+`, scalar multiplication, `‖·‖`). Bumping `ι` to `Fin 3` buys the constants *and*
+two spurious base types, each dragging its own `dist` and `zeroX` that some model then owes an
+interpretation for, and each adding a `bezemMaj` case to majorizability. **So this refactor is
+still required; it is not optional and W-hyperbolic does not retire it.**
+
+One workaround this section predates, since it needs the products merge: bundle `n` constants
+into a single product-typed `F ()` and project. It expresses the right signature without
+touching `Term`, but it is not obviously a substitute — how it interacts with
+`AbstractMajorizability`'s **per-constant** `func_maj` field is unexamined, and collapsing
+distinct constants into one product plausibly degrades exactly the per-constant structure that
+field is for.
 
 **Fix**: split the constant index from the base-type index.
 
