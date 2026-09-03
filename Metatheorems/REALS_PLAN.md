@@ -24,15 +24,14 @@ below was never checked.
 **Proved (4/19), `#print axioms` = `[propext, Quot.sound]` in-file:**
 `eq_R_refl`, `eq_R_sym`, `lt_irrefl_R`, `zero_lt_one_R`.
 
-> **Running total, 2026-09-03 (end of `reals-comm`): 12 proved.** The four above, plus
+> **Running total, 2026-09-03 (end of `reals-telescope`): 13 proved.** The four above, plus
 > `eq_R_trans` and `add_eq_zero_R` (§0.05), `le_zero_eq_zero_R` (§0.05(c), in its *repaired*
-> form), `add_zero_R` / `add_assoc_R` / `add_neg_R` (§0.02), and **`add_comm_R` /
-> `mul_comm_R`** (§0.2). Still open: `mul_assoc_R`, `mul_one_R`, `distrib_R`, `lt_trans_R`,
+> form), `add_zero_R` / `add_assoc_R` / `add_neg_R` (§0.02), **`add_comm_R` / `mul_comm_R`**
+> (§0.2), and **`mul_one_R`** (§0.22). Still open: `mul_assoc_R`, `distrib_R`, `lt_trans_R`,
 > `lt_add_R`, `lt_mul_pos_R`, `archimedean_R`, plus `approx_R`, `cauchy_complete_R`,
-> `abs_R_bound`. `RealNumbers.lean` carries **10** sorried declarations, verified by name
-> after a completed `lake build` (`mul_assoc_R`, `mul_one_R`, `distrib_R`, `lt_add_R`,
-> `lt_mul_pos_R`, `archimedean_R`, `lt_trans_R_core`, `approx_R`, `cauchy_complete_R`,
-> `abs_R_bound`).
+> `abs_R_bound`. The `RealNumbers/` modules carry **9** sorried declarations, verified by name
+> after a completed `lake build` (`mul_assoc_R`, `distrib_R`, `lt_add_R`, `lt_mul_pos_R`,
+> `archimedean_R`, `lt_trans_R_core`, `approx_R`, `cauchy_complete_R`, `abs_R_bound`).
 
 ### 0.02 The additive package, 2026-09-02 (branch `reals-additive`)
 
@@ -283,6 +282,9 @@ Only `eq_R_refl` and `eq_R_sym` were genuinely Class A; Class A as a class does 
 
 ### 0.21 Triage of `mul_one_R`, 2026-09-03 — **not** slack-only; do not budget it as small
 
+> **Superseded by §0.22 the same day: `mul_one_R` is PROVED, and this triage was correct in
+> every particular. Kept because it is the worked example of "not tight ⇏ no new induction".**
+
 Worked out but **not attempted**, and the reason is worth recording because it contradicts the
 natural guess that `mul_one_R` is the `add_zero_R` of the multiplicative side.
 
@@ -311,6 +313,70 @@ So the honest classification is: `mul_one_R` has a factor of two of slack, but i
 new `cauchyfy`-scale induction. `distrib_R` and `mul_assoc_R` are gated on the same one, plus
 `mul_R_check`. The tightness question (§0.02(a)) is the right one, but "not tight" does not
 imply "no new induction".
+
+### 0.22 The symbolic-shift telescope, and `mul_one_R` — DONE 2026-09-03 (`reals-telescope`)
+
+§0.21's triage was right in every detail, including the shape of the induction it asked for.
+Both landed, `[propext, Quot.sound]`, and `mul_one_R` fell out of the telescope with no
+surprises.
+
+**The form that worked is the `+ℚ` one**, exactly as §0.21 wrote it (`Estimates.lean`,
+`cauchyfy_tele`):
+
+    ∀k ∀p.  |f̂(p) −ℚ f̂(p+k)|  +ℚ  2^{-(p+k)}  ≤ℚ  2^{-p}
+
+The `−ℚ` form §0.5 item 3 asked for (`|f̂(p) − f̂(p+k)| ≤ℚ 2^{-p} −ℚ 2^{-(p+k)}`) was **not
+attempted**, and should not be: the two are equivalent, but the difference form needs a
+`sub_Q` cancellation at every step of the induction, while the `+ℚ` form is `le_Q_add_both`
+and `add_Q_assoc_inst` bookkeeping and nothing else. The whole induction is 130 lines and
+went through on the second try; the first failure was a *typing* slip (`f.weaken.weaken` in
+the base case, where after `pinduction`'s `k := 0` substitution the context is `nat :: Γ` and
+only one `weaken` typechecks), not a mathematical one.
+
+Note that carrying the slack is what makes the step free rather than merely cheap:
+`2^{-(p+k)} = 2^{-(p+k+1)} +ℚ 2^{-(p+k+1)}` (`pow2neg_Q_halve`), one half funds the new
+`cauchyfy_cauchy` step and the other becomes the next round's slack. **Nothing is spent**, so
+the conclusion stays `≤ℚ 2^{-p}` for every `k` — unlike `eqR_tail`, which spends a step per
+round and therefore needs the Archimedean squeeze of `eqR_le` afterwards. That is the
+structural difference between the two inductions, and it is why this one needs no squeeze.
+
+Three lemmas, all in `Estimates.lean`:
+
+| lemma | statement |
+|---|---|
+| `cauchyfy_tele` | `∀k ∀p. \|f̂(p) −ℚ f̂(p+k)\| +ℚ 2^{-(p+k)} ≤ℚ 2^{-p}` |
+| `cauchyfy_tele_at f p k` | the same at explicit `p`, `k` |
+| `cauchyfy_shift_le f p k` | `\|f̂(p) −ℚ f̂(p +ℕ k)\| ≤ℚ 2^{-p}` — the slack dropped, which is all the callers want |
+
+plus two private ℚ steps, `tele_base_eq` (`e =ℚ \|a −ℚ a\| +ℚ e`) and `tele_carry_eq`
+(`(D +ℚ 2^{-(m+1)}) +ℚ 2^{-(m+1)} =ℚ D +ℚ 2^{-m}`). Factoring those out was not cosmetic: as
+inline arguments to `papplym` they made the failure mode unreadable — a `papplym` whose term
+fails to elaborate reports `_inhabitedExprDummy` and then **panics inside the pretty-printer**
+(`index out of bounds`, with a C stack trace), so the actual type error is never shown. Keep
+`papplym` arguments small enough that a type error surfaces at the argument.
+
+**`mul_one_R` then fell out**, in `Mul.lean`, with one new mechanical piece and nothing else:
+
+- `mul_one_R_apply f x` — `(f ·ℝ 1ℝ)(x) =ℚ f̂(x +ℕ b)`, `b = f(0) +ℕ 1ℝ(0) +ℕ 2`. Only `=ℚ`:
+  `mul_Q q 1ℚ` is not `q` on the nose. Needs a new `mul_Q_one_inst` (the `∀`-version existed).
+- `mul_one_R_check f` — the Cauchy check, which is where §0.21's claim that the outer
+  `cauchyfy` *can* be discharged is cashed. The check goal **is** a `lt_Q`, so `lt_Q_congr`
+  carries the pointwise `=ℚ` across it directly; no `sg_bar_congr_iff` detour is needed (that
+  is only for `=₀` goals about the state, as in `cauchyState_neg`).
+- `cauchyfy_mul_one_R` — `cauchyfy_id` applied to the above.
+- `mul_one_R_gen f u bw hu` — `u =ℝ f` whenever `û(n+1) =ℚ f̂((n+1) +ℕ bw)`. The composed real
+  is a Lean parameter for the usual reason (`prw` must not see `Term.mul_R`), and **the shift
+  is taken directly in context `nat :: Γ`** rather than as `b.weaken`, which avoids needing a
+  weakening lemma for `b` at all.
+
+The estimate itself is two lines: `cauchyfy_shift_le f (n+1) b` gives `≤ℚ 2^{-(n+1)}` and
+`pow2neg_Q_lt_succ n` buys the strict `<ℚ 2^{-n}`. Index arithmetic never needed `prw` — every
+`add (succ k) b` ↔ `succ (add k b)` move went through `le_Q_congr`/`lt_Q_congr` with
+`add_succ_l` lifted by `cauchyfy_idx_nat` and a new `pow2neg_idx_nat`.
+
+**Not attempted, deliberately:** `distrib_R` and `mul_assoc_R`. They are gated on the same
+telescope, which now exists, *plus* `mul_R_check` — §1's majorization argument — and that is a
+separate job. `lt_trans_R`, `lt_add_R`, `approx_R` were out of scope per §0.03 / §0.4.
 
 ### 0.3 `cauchyfy` is open — the invariant and the Cauchy property are proved
 
