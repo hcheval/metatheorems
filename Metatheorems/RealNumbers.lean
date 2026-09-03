@@ -1006,7 +1006,13 @@ macro "canorm" : tactic =>
                Term.substVar0_map_vz, Term.substVar0_map_vs,
                Term.Subst.ext_vz, Term.Subst.ext_vs, Term.weaken_var, Term.app2,
                Term.weaken_subst0, subst_subst0_map_weaken, Term.weaken_subst_ext,
-               weaken_substVar0, ProofMode.succVar0, closed_subst]
+               weaken_substVar0, ProofMode.succVar0, closed_subst,
+               -- `pm_exE` maps `Formula.weakenBy` over the hypothesis context, so a
+               -- hypothesis obtained by an *earlier* `pobtain` carries that wrapper while
+               -- the goal carries hand-written `.weaken`s.  Turn the wrapper into a
+               -- substitution, let the rules above push it inward, then fold the terms
+               -- back to `.weaken` with `Term.subst_shift_eq_weaken`.
+               ← Formula.substF_shift_eq_weakenBy, Term.subst_shift_eq_weaken]
              try q_cons_norm))
 
 /-- The base of the telescoping induction: `∀p. |f̂(p+1) −ℚ ĥ(p+1)| <ℚ 2^{-p} +ℚ 2^{-p}`. -/
@@ -3023,6 +3029,19 @@ Three ways out, none attempted here:
    double weakening reaches. `Formula.renameF_eq_substF` gets partway and then leaves
    `Term.subst (Term.var ∘ shift) (Term.weaken g)`, which is *not* `g.weaken.weaken` — that
    last step is the missing lemma.
+
+   **TRIED 2026-09-03, NECESSARY BUT NOT SUFFICIENT.** The missing lemma is trivial:
+   `Term.subst_shift_eq_weaken` (`Subst.lean`) is `rename_eq_subst` read right-to-left at
+   `Renaming.shift`, one line, and `Formula.substF_shift_eq_weakenBy` (`Derivable.lean`) is
+   its formula-level counterpart. Both are proved, `canorm` now carries them, and the whole
+   library still builds — so they are kept. **But restoring the script below still fails**,
+   and the failure has *moved*: it is no longer `pexact a` running `isDefEq` on a mismatch,
+   it is `canorm` itself timing out at that point. Inserting `canorm` immediately before
+   `pexact a` reproduces the timeout on the `canorm` line. So the wrapper mismatch was real
+   but is not the whole story: at that point in the script the packed goal is large enough
+   that *any* substitution normalisation exhausts the budget. Exit 1 alone will not do it;
+   whatever lands must also keep the goal small — which points at exit 2 or 3, both of which
+   avoid ever having two `∃`-eliminations live at once.
 2. Convert the first witness into a `∀`-formula *before* the second `pobtain` (`pinst` does
    see through `weakenBy`, which is why the two `pobtain`s in `ProofMode/MCTLazy.lean` are
    never nested). This needs `lt_shift` restated as `∀p. (P p →ᶠ ∀k. Q p k)`, i.e. a

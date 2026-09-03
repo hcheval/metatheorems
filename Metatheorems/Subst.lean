@@ -264,6 +264,17 @@ rename back into the notation the user sees. -/
 theorem rename_shift {σ : Ty ι} (t : Term F Γ τ) :
     t.rename (Renaming.shift (σ := σ)) = t.weaken := rfl
 
+/-- Substituting the shift renaming *viewed as a substitution* is weakening.
+
+`rename_eq_subst` reads left-to-right, turning a rename into a subst; this is the
+right-to-left direction at `Renaming.shift`, which is the form a `Formula.weakenBy` leaves
+behind once `renameF_eq_substF` has been applied to it.  Without this, a weakened hypothesis
+and a hand-written `t.weaken.weaken` are equal but not syntactically so, and the proof mode
+cannot match them. -/
+theorem subst_shift_eq_weaken {σ : Ty ι} (t : Term F Γ τ) :
+    t.subst (fun {_} v => Term.var (Renaming.shift (σ := σ) v)) = t.weaken := by
+  rw [← rename_eq_subst]; rfl
+
 /-- Substitute `t` for variable 0 and rename every other variable by `r`.
 
 This is the normal form for a substitution composed with a renaming. -/

@@ -35,6 +35,17 @@ def Formula.weakenBy {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι}
     (ρ : Ty ι) (A : Formula F Γ) : Formula F (ρ :: Γ) :=
   A.weaken
 
+/-- `weakenBy` as a substitution, so that a substitution normaliser can push it inward.
+
+`Formula.weakenBy` is what `pm_exE` maps over the hypothesis context, so a hypothesis
+obtained by an earlier `pobtain` carries it while the goal carries hand-written
+`.weaken`s.  The two are equal but not syntactically so; this is the rewrite that closes
+the gap, together with `Term.subst_shift_eq_weaken` for the terms inside. -/
+theorem Formula.substF_shift_eq_weakenBy {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι} {σ : Ty ι}
+    (A : Formula F Γ) :
+    A.substF (fun {_} v => Term.var (Term.Renaming.shift (σ := σ) v)) = A.weakenBy σ := by
+  rw [Formula.weakenBy, Formula.weaken, Formula.renameF_eq_substF]
+
 -- ============================================================================
 -- Allowed principles
 -- ============================================================================
