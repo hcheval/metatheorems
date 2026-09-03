@@ -291,17 +291,6 @@ theorem MetricModel.zeroX_maj (M : MetricModel) (N : ℕ) :
         (M.si.zeroInterp ()) :=
   ⟨fun _ => ⌈M.d M.ref M.zeroX⌉₊, fun _ _ => Nat.le_ceil _⟩
 
-/-- The two monotonicity facts about `(·)◦` that both `bezemMaj` and `hatMaj` need at type
-`1 = nat →ₜ nat`. Stated once because at that type the two relations unfold to *the same*
-pair: `bezemMaj` at `.nat` and `hatMaj` at `.nat` are both `≥`. -/
-theorem Rounding.roundR_maj_pair {a b : ℝ} (hb : 0 ≤ b) (hab : a ≤ b) :
-    (∀ p q : ℕ, p ≥ q → Rounding.roundR b p ≥ Rounding.roundR a q) ∧
-    (∀ p q : ℕ, p ≥ q → Rounding.roundR b p ≥ Rounding.roundR b q) := by
-  have hmono : Monotone (Rounding.roundR b) :=
-    monotone_nat_of_le_succ (Rounding.roundR_mono hb)
-  exact ⟨fun p q h => Nat.le_trans (Rounding.roundR_le₁_of_le hab q) (hmono h),
-         fun p q h => hmono h⟩
-
 /-- **`d_X` is majorizable**, by `λx⁰,y⁰.(x + y)∘` — the document's majorant
 (`particular-cases-metric-spaces.tex:100`), justified by the triangle inequality.
 

@@ -31,11 +31,11 @@ ordered-field goals. See `METRIC_PLAN.md` §2 and §2.5.
 
 ## What is proved here
 
-Lemma 17.8, parts (ii), (iii), (v), (vi) — everything that is a statement about `(x)◦` as a
-`ℕ → ℕ` function under the pointwise order `≤₁`. These need only monotonicity of the Cantor
-pairing and of `Nat.floor`.
+Lemma 17.8, parts (ii), (iii), (iv), (v), (vi) — everything that is a statement about `(x)◦`
+as a `ℕ → ℕ` function under the pointwise order `≤₁`. These need only monotonicity of the
+Cantor pairing and of `Nat.floor`.
 
-Parts (i) and (iv) are **not** here, on purpose; see the note at the bottom of the file.
+Part (i) is **not** here, on purpose; see the note at the bottom of the file.
 -/
 
 namespace Rounding
@@ -146,6 +146,18 @@ theorem Mmaj_mono (b : ℕ) (n : ℕ) : Mmaj b n ≤ Mmaj b (n + 1) := by
   · have : (2:ℕ) ^ (n + 1) ≤ 2 ^ (n + 2) := Nat.pow_le_pow_right (by norm_num) (by omega)
     omega
 
+/-- **Lemma 17.8(4)**: `x ≤ y → (y)◦ s-maj₁ (x)◦`, stated as the two monotonicity facts about
+`(·)◦` that both `bezemMaj` and `hatMaj` need at type `1 = nat →ₜ nat`. Stated once because
+at that type the two relations unfold to *the same* pair: `bezemMaj` at `.nat` and `hatMaj`
+at `.nat` are both `≥`. Consumed by `MetricModel.dist_maj` in `MetricSpaces.lean`. -/
+theorem roundR_maj_pair {a b : ℝ} (hb : 0 ≤ b) (hab : a ≤ b) :
+    (∀ p q : ℕ, p ≥ q → roundR b p ≥ roundR a q) ∧
+    (∀ p q : ℕ, p ≥ q → roundR b p ≥ roundR b q) := by
+  have hmono : Monotone (roundR b) :=
+    monotone_nat_of_le_succ (roundR_mono hb)
+  exact ⟨fun p q h => Nat.le_trans (roundR_le₁_of_le hab q) (hmono h),
+         fun p q h => hmono h⟩
+
 /-! ## What is deliberately not here
 
 **Part (1)** — "`(x)◦` is a representative of `x`", i.e. `(x)◦` satisfies the Cauchy condition
@@ -156,13 +168,10 @@ defines `qval : ℕ → ℚ`, the missing Lean-level "meaning of a rational code
 relating it to the *object-level* decision term `Term.lt_Q_dec` under `Term.interpret` is
 still open, as is the `((x)◦)^b =₁ (x)◦` half, which needs `cauchyfy`.
 
-**Part (4)** — `x ≤ y → (y)◦ s-maj₁ (x)◦`. This one mentions strong majorizability, so it is
-blocked on the `bezemMaj` question recorded in `METRIC_PLAN.md` §2.5: the repo's `bezemMaj`
-is missing the self-majorization conjunct, and at type `1 = ℕ → ℕ` that conjunct is exactly
-what distinguishes `s-maj₁` from the pointwise `≤₁` proved above. Writing part (4) against
-the current one-clause definition would produce a lemma that says less than its name.
-
-Both are recorded in `METRIC_PLAN.md`. -/
+**Part (4)** used to be excluded too, blocked on the `bezemMaj` question in `METRIC_PLAN.md`
+§2.5 (the one-clause `bezemMaj` lacked the self-majorization conjunct, which at type
+`1 = ℕ → ℕ` is exactly what distinguishes `s-maj₁` from `≤₁`). The two-clause widening on
+2026-09-02 removed the blocker; it is `roundR_maj_pair` above. -/
 
 end Rounding
 
