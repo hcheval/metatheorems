@@ -281,4 +281,33 @@ lemma Term.interpret_subst0 {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     Term.interpret si (t.subst0 u) env = Term.interpret si t (Term.interpret si u env, env) := by
   simp [Term.subst0, Term.interpret_substF, Ctx.interpretSubst_subst0_map]
 
+-- ============================================================================
+-- Formula evaluation commutes with substitution
+--
+-- The formula-level counterparts of `Term.interpret_substF` / `Term.interpret_subst0`.
+-- Any semantic soundness theorem needs them (`forall_ax`, `exist_ax`, `qfer`,
+-- `induction`, `ac`, `qfac` all substitute into a formula).
+-- ============================================================================
+
+lemma Formula.interpret_substF {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    (si : SpaceInterp X F) {Γ Δ : Ctx ι} (A : Formula F Γ) (σ : Term.Subst F Γ Δ)
+    (env : Ctx.interpret X Δ) :
+    Formula.interpret si (A.substF σ) env
+      = Formula.interpret si A (Ctx.interpretSubst si σ env) := by
+  induction A generalizing Δ with
+  | bot => rfl
+  | eq0 a b => simp only [Formula.substF, Formula.interpret, Term.interpret_substF]
+  | and _ _ ihA ihB => simp only [Formula.substF, Formula.interpret, ihA, ihB]
+  | or _ _ ihA ihB => simp only [Formula.substF, Formula.interpret, ihA, ihB]
+  | imp _ _ ihA ihB => simp only [Formula.substF, Formula.interpret, ihA, ihB]
+  | all _ _ ih => simp only [Formula.substF, Formula.interpret, ih, Ctx.interpretSubst_ext]
+  | ex _ _ ih => simp only [Formula.substF, Formula.interpret, ih, Ctx.interpretSubst_ext]
+
+lemma Formula.interpret_subst0 {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    (si : SpaceInterp X F) {Γ : Ctx ι} {ρ : Ty ι} (A : Formula F (ρ :: Γ))
+    (u : Term F Γ ρ) (env : Ctx.interpret X Γ) :
+    Formula.interpret si (A.subst0 u) env
+      = Formula.interpret si A (Term.interpret si u env, env) := by
+  simp only [Formula.subst0, Formula.interpret_substF, Ctx.interpretSubst_subst0_map]
+
 end Metatheorems

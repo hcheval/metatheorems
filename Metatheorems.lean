@@ -16,6 +16,7 @@ import Metatheorems.Soundness
 import Metatheorems.Rounding
 import Metatheorems.MetricSpaces
 import Metatheorems.QVal
+import Metatheorems.QValBridge
 import Metatheorems.ProofMode.Packing
 import Metatheorems.ProofMode.Display
 import Metatheorems.ProofMode.Tactics
