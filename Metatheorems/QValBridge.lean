@@ -1051,6 +1051,19 @@ theorem interpret_cauchyfy_id {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.in
   rw [interpret_cauchyfy_fun]
   exact cauchyfyN_id_of_cauchy g hg n
 
+/-- `add_R` evaluated, with its arguments left as *terms* so that caller-side rewrites
+(`MetricModel.interp_dist`, say) still match them.  This is the one place the S3 sidestep does
+not apply on its own: `add_R f g` is a *constructed* sequence, so a caller who needs the outer
+`cauchyfy` to disappear must prove that sequence Cauchy separately. -/
+theorem interpret_add_R_app2 {si : SpaceInterp X F} {Δ : Ctx ι}
+    (f g : Term F Δ (realTy ι)) (env : Ctx.interpret X Δ) (n : ℕ) :
+    Term.interpret si (Term.app2 Term.add_R f g) env n
+      = addQN (cauchyfyN (Term.interpret si f env) (n + 1))
+          (cauchyfyN (Term.interpret si g env) (n + 1)) := by
+  simp only [Term.add_R, Term.app2, Term.interpret, interpret_add_Q_fun,
+    interpret_cauchyfy_fun]
+  rfl
+
 -- ============================================================================
 -- Section 13. The formula-level payoff: `=ℝ` and `≤ℝ` in the standard model
 -- ============================================================================

@@ -573,6 +573,89 @@ theorem MetricModel.dist_comm_interp (M : MetricModel) (i : MetricSpace.ι)
   rw [M.interp_dist x y env, M.interp_dist y x env, M.d_comm]
   simpa using (by positivity : (0:ℚ) < 1 / 2 ^ n)
 
+/-- **`dist_tri_holds`'s content.**
+
+This is the one field the S3 sidestep does not close by itself: `le_R_pu`'s right-hand side is
+`add_R (d x y) (d y z)`, so the outer `cauchyfy` wraps a *constructed* sum sequence rather than
+a rounding.  That sequence is Cauchy nonetheless, and at the sharp rate: by
+`interpret_add_R_app2` its `k`-th value is `(A)◦(k+1) + (B)◦(k+1)`, so consecutive values differ
+by at most twice `2^{-(k+2)}` — exactly `2^{-(k+1)}`, which is what the check tests.
+
+The estimate is then the triangle inequality with three rounding errors: `2^{-(n+2)}` on the
+left and `2^{-(n+3)}` on each summand, totalling `2^{-(n+1)} < 2^{-n}`. -/
+theorem MetricModel.dist_tri_interp (M : MetricModel) (i : MetricSpace.ι)
+    {Γ : Ctx MetricSpace.ι} (x y z : Term MetricSpace.F Γ (Ty.base i))
+    (env : Ctx.interpret (fun () => M.carrier) Γ) :
+    Formula.interpret M.si
+      (le_R_pu (Term.app2 (Term.dist i) x z)
+        (Term.app2 Term.add_R
+          (Term.app2 (Term.dist i) x y) (Term.app2 (Term.dist i) y z))) env := by
+  cases i
+  set A := M.d (Term.interpret M.si x env) (Term.interpret M.si y env) with hA
+  set B := M.d (Term.interpret M.si y env) (Term.interpret M.si z env) with hB
+  set C := M.d (Term.interpret M.si x env) (Term.interpret M.si z env) with hC
+  have hA0 : 0 ≤ A := M.d_nonneg _ _
+  have hB0 : 0 ≤ B := M.d_nonneg _ _
+  have hC0 : 0 ≤ C := M.d_nonneg _ _
+  -- The sum sequence, with both summands already known Cauchy so `cauchyfy` is the identity.
+  set S : ℕ → ℕ := fun m =>
+    QBridge.addQN (Rounding.roundR A (m + 1)) (Rounding.roundR B (m + 1)) with hS
+  have hgfun : Term.interpret M.si
+      (Term.app2 Term.add_R (Term.app2 (Term.dist ()) x y)
+        (Term.app2 (Term.dist ()) y z)) env = S := by
+    funext m
+    rw [QBridge.interpret_add_R_app2, M.interp_dist, M.interp_dist, ← hA, ← hB,
+      cauchyfyN_roundR A hA0, cauchyfyN_roundR B hB0]
+  -- `qval` of the sum sequence, once and for all.
+  have hSq : ∀ m : ℕ, Rounding.qval (S m)
+      = Rounding.qval (Rounding.roundR A (m + 1))
+        + Rounding.qval (Rounding.roundR B (m + 1)) := fun m => QBridge.qval_addQN _ _
+  -- `S` is Cauchy at the sharp rate: each summand drifts by `< 2^{-(k+2)}`.
+  have hScauchy : ∀ k : ℕ, |Rounding.qval (S k) - Rounding.qval (S (k + 1))|
+      < 1 / 2 ^ (k + 1) := by
+    intro k
+    have ha := Rounding.roundR_cauchy A hA0 (k + 1)
+    have hb := Rounding.roundR_cauchy B hB0 (k + 1)
+    have hhalf : (1:ℚ) / 2 ^ (k + 1 + 1) + 1 / 2 ^ (k + 1 + 1) = 1 / 2 ^ (k + 1) := by
+      rw [pow_succ]; ring
+    rw [hSq k, hSq (k + 1)]
+    calc |(Rounding.qval (Rounding.roundR A (k + 1)) + Rounding.qval (Rounding.roundR B (k + 1)))
+            - (Rounding.qval (Rounding.roundR A (k + 1 + 1))
+              + Rounding.qval (Rounding.roundR B (k + 1 + 1)))|
+        = |(Rounding.qval (Rounding.roundR A (k + 1))
+              - Rounding.qval (Rounding.roundR A (k + 1 + 1)))
+            + (Rounding.qval (Rounding.roundR B (k + 1))
+              - Rounding.qval (Rounding.roundR B (k + 1 + 1)))| := by congr 1; ring
+      _ ≤ _ := abs_add_le _ _
+      _ < 1 / 2 ^ (k + 1 + 1) + 1 / 2 ^ (k + 1 + 1) := by exact add_lt_add ha hb
+      _ = 1 / 2 ^ (k + 1) := hhalf
+  rw [QBridge.interpret_le_R_pu]
+  intro n
+  rw [M.interp_dist x z env, ← hC, cauchyfyN_roundR C hC0, hgfun,
+    QBridge.cauchyfyN_id_of_cauchy S hScauchy, hSq]
+  -- Now a purely real estimate, transported back to ℚ.
+  have key : ((Rounding.qval (Rounding.roundR C (n + 1)) : ℚ) : ℝ)
+      - (((Rounding.qval (Rounding.roundR A (n + 1 + 1)) : ℚ) : ℝ)
+        + ((Rounding.qval (Rounding.roundR B (n + 1 + 1)) : ℚ) : ℝ)) < 1 / 2 ^ n := by
+    have hc := abs_le.mp (Rounding.qval_roundR_dist_le C hC0 (n + 1))
+    have ha := abs_le.mp (Rounding.qval_roundR_dist_le A hA0 (n + 1 + 1))
+    have hb := abs_le.mp (Rounding.qval_roundR_dist_le B hB0 (n + 1 + 1))
+    have htri : C ≤ A + B := M.d_triangle _ _ _
+    have hu : (0:ℝ) < 1 / 2 ^ n := by positivity
+    have f2 : (1:ℝ) / 2 ^ (n + 1 + 1) = (1 / 2 ^ n) / 4 := by
+      rw [pow_succ, pow_succ]; ring
+    have f3 : (1:ℝ) / 2 ^ (n + 1 + 1 + 1) = (1 / 2 ^ n) / 8 := by
+      rw [pow_succ, pow_succ, pow_succ]; ring
+    rw [f2] at hc
+    rw [f3] at ha hb
+    linarith [hc.2, ha.1, hb.1]
+  have hcast : ((Rounding.qval (Rounding.roundR C (n + 1))
+      - (Rounding.qval (Rounding.roundR A (n + 1 + 1))
+        + Rounding.qval (Rounding.roundR B (n + 1 + 1))) : ℚ) : ℝ) < ((1 / 2 ^ n : ℚ) : ℝ) := by
+    push_cast
+    exact key
+  exact_mod_cast hcast
+
 /-- The `EqXInterp` a metric model induces. -/
 noncomputable def MetricModel.eqXInterp (M : MetricModel) :
     EqXInterp (fun () => M.carrier) MetricSpace.F M.si where
@@ -602,9 +685,9 @@ noncomputable def MetricModel.eqXInterp (M : MetricModel) :
     exact R.property y
   -- `M.d_comm` makes the two sides interpret to the same `ℕ → ℕ`; what is left is `0 < 2^{-n}`.
   dist_comm_holds := fun i {_Γ} x y env => M.dist_comm_interp i x y env
-  -- MISSING: `M.d_triangle` plus `Rounding.qval_roundR_dist_le` to control the rounding error
-  -- of `(·)◦` on the three distances. Needs the bridge.
-  dist_tri_holds := sorry
+  -- `M.d_triangle` plus `Rounding.qval_roundR_dist_le` on the three distances, and the
+  -- Cauchy-ness of the constructed sum sequence `add_R` builds.
+  dist_tri_holds := fun i {_Γ} x y z env => M.dist_tri_interp i x y z env
 
 -- ============================================================================
 -- The metric-space metatheorem
@@ -763,13 +846,19 @@ theorem MetricModel.metric_metatheorem_classical (M : MetricModel)
 -- ============================================================================
 -- Axiom hygiene
 -- ============================================================================
--- The majorizability side is clean; the two metatheorems are not, and the `sorryAx` is
--- `MetricModel.eqXInterp`'s five stalled fields — nothing else. Keeping these prints here is
--- what makes that visible rather than buried.
+-- `MetricModel.eqXInterp`'s five fields were `sorry` until 2026-09-03; all five are now
+-- constructed, so both metatheorems are `sorryAx`-free. `Classical.choice` is expected and
+-- unavoidable: `Rounding.qval` lands in Mathlib `ℚ` and `roundR` is a `Nat.floor`.
+-- These prints are the evidence — a falling `sorry` count is not (CLAUDE.md note 5).
 
 #print axioms MetricModel.abstractMajorizability
 #print axioms MetricModel.dist_maj
 #print axioms MetricModel.zeroX_maj
+#print axioms MetricModel.eqAtType_base_holds
+#print axioms MetricModel.eq_of_eqAtType_base
+#print axioms MetricModel.eqAtType_base_extract
+#print axioms MetricModel.dist_comm_interp
+#print axioms MetricModel.dist_tri_interp
 #print axioms MetricModel.eqXInterp
 #print axioms MetricModel.metric_metatheorem
 #print axioms MetricModel.metric_metatheorem_classical
