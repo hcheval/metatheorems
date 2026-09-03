@@ -28,7 +28,7 @@ order:
 | `Estimates` | `cauchy_pair_step`, the `canorm` macro, the `eqR_tail`/`eqR_le`/`eqR_strict` telescoping engine, `=_ℝ` as an equivalence, the ℚ helpers, `cauchyfy_cauchy`/`cauchyfy_two_step` |
 | `Field` | the additive axioms (`add_zero_R`, `add_comm_R`, `add_assoc_R`), the `le_R`/`le_R_pu` bridges, the ℚ rearrangements |
 | `Negation` | `cauchyState_neg`/`cauchyfy_neg`, `add_neg_R`, `cauchyState_congr`/`cauchyfy_congr` |
-| `Mul` | `mul_assoc_R`/`mul_one_R`/`distrib_R` (sorried), `mul_R_apply`, `mul_comm_R` |
+| `Mul` | `mul_R_apply`, `mul_comm_R`, `mul_one_R`, `mul_R_check`/`cauchyfy_mul_R`, `mul_assoc_R`, `distrib_R` — the multiplicative side, complete |
 | `Order` | `lt_irrefl_R`, `lt_add_R`/`lt_mul_pos_R`/`archimedean_R` (sorried), `zero_lt_one_R`, `lt_shift*`, `lt_trans_R` |
 | `QBounds` | ℚ-code bounds: `abs_le_encode` (a code dominates its magnitude), `rat_num_le_self`, the encode-parts cluster, `exp2_add`, `sub_lt_of_le` — pure ℚ/ℕ, sits beside `Defs` |
 | `Bounds` | `cauchyfy_mag_le`, `abs_R_apply`/`embed_nat_R_apply`, `cauchyfy_embed` — the cauchyfy-level magnitude layer |

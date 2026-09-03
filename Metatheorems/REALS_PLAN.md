@@ -24,14 +24,15 @@ below was never checked.
 **Proved (4/19), `#print axioms` = `[propext, Quot.sound]` in-file:**
 `eq_R_refl`, `eq_R_sym`, `lt_irrefl_R`, `zero_lt_one_R`.
 
-> **Running total, 2026-09-03 (end of `reals-telescope`): 13 proved.** The four above, plus
+> **Running total, 2026-09-03 (end of `reals-mul`): 16 proved.** The four above, plus
 > `eq_R_trans` and `add_eq_zero_R` (§0.05), `le_zero_eq_zero_R` (§0.05(c), in its *repaired*
 > form), `add_zero_R` / `add_assoc_R` / `add_neg_R` (§0.02), **`add_comm_R` / `mul_comm_R`**
-> (§0.2), and **`mul_one_R`** (§0.22). Still open: `mul_assoc_R`, `distrib_R`, `lt_trans_R`,
-> `lt_add_R`, `lt_mul_pos_R`, `archimedean_R`, plus `approx_R`, `cauchy_complete_R`,
-> `abs_R_bound`. The `RealNumbers/` modules carry **9** sorried declarations, verified by name
-> after a completed `lake build` (`mul_assoc_R`, `distrib_R`, `lt_add_R`, `lt_mul_pos_R`,
-> `archimedean_R`, `lt_trans_R_core`, `approx_R`, `cauchy_complete_R`, `abs_R_bound`).
+> (§0.2), **`mul_one_R`** (§0.22), and — §0.23 — **`abs_R_bound`, `mul_assoc_R`,
+> `distrib_R`** (via `mul_R_check`: `mul_R f g` is provably Cauchy). **The ring structure of
+> `=_ℝ` is now complete.** Still open: `lt_trans_R`, `lt_add_R`, `lt_mul_pos_R`,
+> `archimedean_R`, `approx_R`, `cauchy_complete_R`. The `RealNumbers/` modules carry **6**
+> sorried declarations, verified by name after a completed `lake build` (`lt_add_R`,
+> `lt_mul_pos_R`, `archimedean_R`, `lt_trans_R_core`, `approx_R`, `cauchy_complete_R`).
 
 ### 0.02 The additive package, 2026-09-02 (branch `reals-additive`)
 
@@ -262,9 +263,9 @@ The invariant is a **conjunction**, and that is the one genuine generalisation o
 the flags. `check_sg_congr` (the generic `neg_check_sg`) keeps the flags in step and is the
 only step that is not bookkeeping; it is still `sg_bar_congr_iff` that does the work.
 
-**`mul_comm_R` is where the congruence is actually spent**, because there is no
-`mul_R_check` — supplying one is §1's majorization argument — so `cauchyfy` cannot be
-evaluated away on either side. The extra wrinkle over `+ℝ` is that `mul_R`'s index depends on
+**`mul_comm_R` is where the congruence is actually spent**, because there was then no
+`mul_R_check` — supplying one is §1's majorization argument (since done: §0.23) — so
+`cauchyfy` could not be evaluated away on either side. The extra wrinkle over `+ℝ` is that `mul_R`'s index depends on
 its arguments (`b = f(0) +ℕ g(0) +ℕ 2`), so the swap permutes the summands inside `b`;
 `Arithmetic.add_comm` repairs that at ℕ, underneath `cauchyfy`, before `mul_Q_comm_inst` is
 spent (`mul_R_pointwise_comm`).
@@ -377,6 +378,61 @@ The estimate itself is two lines: `cauchyfy_shift_le f (n+1) b` gives `≤ℚ 2^
 **Not attempted, deliberately:** `distrib_R` and `mul_assoc_R`. They are gated on the same
 telescope, which now exists, *plus* `mul_R_check` — §1's majorization argument — and that is a
 separate job. `lt_trans_R`, `lt_add_R`, `approx_R` were out of scope per §0.03 / §0.4.
+**Done the next session — see §0.23.**
+
+### 0.23 The multiplicative package — DONE 2026-09-03 (`reals-mul`)
+
+**`abs_R_bound`, `mul_R_check`, `mul_assoc_R`, `distrib_R` all closed**, `[propext,
+Quot.sound]`, in that order — and the prescribed chain `abs_R_bound → mul_R_check →
+{mul_assoc_R, distrib_R}` was exactly the right decomposition, with one refinement: the
+shared nugget is one level below `abs_R_bound`, at the single-code fact
+**`abs_le_encode : |c|_ℚ ≤_ℚ ⟨c⟩_ℚ`** (a ℚ-code dominates the magnitude it encodes), which
+both `abs_R_bound` and the magnitude bound `cauchyfy_mag_le` (`|ŵ(y)| ≤ ⟨w 0⟩+1`, any `w`)
+consume. Two new modules: `RealNumbers/QBounds.lean` (pure ℚ/ℕ, beside `Defs`) and
+`RealNumbers/Bounds.lean` (the cauchyfy-level magnitude layer, beside `Estimates`).
+
+**The code-dominates chain** (`QBounds.lean`): `rat_num z = div2(j₁ z + isOdd (j₁ z)) ≤ j₁ z
+≤ z ≤ z · rat_den z`, then the `le_Q_of_cross` criterion. Two findings worth keeping:
+
+- **`div2_double` did not need re-deriving from the state machine** (it is `private` in
+  `RationalNumbers.lean`): the public roundtrip `rat_num_rat_encode` already contains the
+  analysis, and `rat_num (pair (2m) 0) = div2 (2m + isOdd 2m)` unfolds to it. The same trick
+  killed every other private dependence except tiny `isEven` computations, re-derived in ~40
+  lines with `pinduction` (`isEven_add_self` etc.).
+- The exact bound `div2 (j + isOdd j) ≤ j` needs the **existential** parity split
+  `∀j ∃m. j = m+m ∨ j = S(m+m)` (`double_or_succ`, a `pinduction` with `pexists`/`pcases`) —
+  `isEven_cases`' Boolean disjunction cannot supply the witness.
+
+**`mul_R_check`** is the paper estimate with the strictness moved: the two factor moves are
+spent as `≤` (not the strict `cauchyfy_cauchy`), and strictness is bought at the *encode*
+step `⟨b⟩ <_ℚ ⟨2^b⟩` from `b+1 ≤ 2^b` (`succ_succ_le_exp2_succ`, a 3-line `pinduction`).
+The collection `(⟨f0⟩+1)+(⟨g0⟩+1) =_ℚ ⟨b⟩` needs `encode_succ`/`encode_add` — same-sign
+`add_Q` is *not* relational, `addQ_num_same` computes it — and the dyadic cancellation
+`⟨2^e⟩·2^{-(e+m)} =_ℚ 2^{-m}` (`encode_pow2_mul`, on `exp2_add`).
+
+**`mul_assoc_R`/`distrib_R`: four moves onto a common index, then exact.** With
+`cauchyfy_mul_R` (= `cauchyfy_id` on `mul_R_check`) the outer cauchyfication evaluates on
+both sides; each side then travels to the triple product at the one index
+`N = s + b₁ + b₂ + b₃ + b₄` in two moves of the form `|a·r − a'·r| ≤ B·P`
+(`mul_move_le`: the moving factor takes a `cauchyfy_shift_le` telescope from its own base,
+the resident factor is bounded by `cauchyfy_mag_le`), and at `N` the two sides agree by
+`mul_Q_assoc_inst` / `distrib_Q_inst` **exactly** — no fifth comparison. Each move costs
+`≤ 2^{-(x₀+2)}` (`mag_dyadic_le`: `mul_R`'s own `b` pays for the resident magnitude — that
+is what the `b` in the index is *for*), one move strictly (`mag_dyadic_lt`), and
+`4·2^{-(x₀+2)} = 2^{-x₀}` is the budget with nothing to spare: the estimate is **exactly
+tight up to the single encode-strictness**, sharper than §0.21 anticipated. `distrib_R`'s
+one asymmetry: its right side is a *sum* of products, so its two moves sit inside `add_Q`
+(`abs_Q_sub_add_split`) and cost a bare `2^{-(x₀+2)}` each with no magnitude at all — but
+mind `add_R`'s `+1` shift, which puts the right side's summand indices at `s+1`, not `s`
+(forgetting it was the one build error of the session).
+
+**Method note.** Unlike every earlier `_gen`-style proof, *no proof-mode `prw` appears
+anywhere* in these four: everything is Lean-level `qtrans`/`eqQtrans`/`Derivable.mp` chains
+over congruence lemmas, so composed reals (`mul_R`, `add_R`) sit in the statements freely —
+the delta-expansion trap is a `prw`/subst phenomenon, not a term-size one. The two entry
+points `le_R_of_bound` and the new `eq_R_of_lt_bound` (`Bounds.lean`) fold a pointwise
+`lt_Q` bound at context `nat :: Γ` into `≤_ℝ` / `=_ℝ`, with `simp only [mul_R_app_weaken]`
+as the only tactic step.
 
 ### 0.3 `cauchyfy` is open — the invariant and the Cauchy property are proved
 
@@ -595,6 +651,8 @@ is not one:
 - `2^b ≥ b+1 ≥ f(0) + g(0) + 2`, which is the bound multiplication actually needs.
 
 So the code majorizes the magnitude for free. **Do not "fix" this.**
+(Proved 2026-09-03: `abs_le_encode` in `RealNumbers/QBounds.lean` is exactly this argument,
+and `mul_R_check`/`abs_R_bound` cash it. See §0.23.)
 
 ## 2. The structural fact that drives everything
 
