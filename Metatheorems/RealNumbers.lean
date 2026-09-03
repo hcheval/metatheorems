@@ -15,6 +15,7 @@ import Metatheorems.RealNumbers.OrderBounds
 import Metatheorems.RealNumbers.Approx
 import Metatheorems.RealNumbers.Order
 import Metatheorems.RealNumbers.Metric
+import Metatheorems.RealNumbers.Interval
 
 /-!
 # Real Numbers in WE-HA^{ω} — umbrella module
@@ -172,5 +173,20 @@ namespace Metatheorems
 #print axioms approx_R
 #print axioms approx_R_core
 #print axioms cauchy_complete_R
+-- The `[0,1]` representation (`RealNumbers/Interval.lean`, 2026-09-03): the retraction
+-- `clamp01` for CLAUDE.md Track C item C0, and the four results it needs.
+#print axioms clamp01_Q_lip
+#print axioms clamp01_Q_lip_core
+#print axioms sub_Q_mono
+#print axioms clamp01_Q_nonneg
+#print axioms clamp01_Q_le_one
+#print axioms clamp01_check
+#print axioms cauchyfy_clamp01
+#print axioms clamp01_nonneg
+#print axioms clamp01_nonneg_core
+#print axioms clamp01_le_one
+#print axioms clamp01_le_one_core
+#print axioms clamp01_eq
+#print axioms clamp01_eq_core
 
 end Metatheorems
