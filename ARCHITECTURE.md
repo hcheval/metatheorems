@@ -541,3 +541,48 @@ plus three applications feeding `M.d_self`/`d_comm`/`d_triangle`. It mentions no
 inherits to every extension verbatim — where hand-built `Term F_metric` realizers would have hit
 the `morphism(t)` problem of §6 at the worst possible place. **Unchecked**: whether `le_R_pu` is
 `isVFree`, which `dialecticaMatrix_iff_interpFormula` requires alongside QF.
+
+## 12. Decisions D-1, D-2, D-4 — salvaged from the deleted `HANDOFF.md` (2026-09-04)
+
+`HANDOFF.md` was a one-month *talk* plan (thesis, schedule, budgets, Q&A prep, abort states).
+That plan is moot and the file was deleted — but its §4 decisions are **enforced in code right
+now** and cited **by number in user-facing error messages**, so they are kept here verbatim in
+substance, under the same numbering, so those citations still resolve:
+
+- `ProofMode/Linter.lean` — the surface-recursor ban *is* D-2.
+- `ProofMode/Tactics.lean:440,453,803` — error text "extraction vacuous (HANDOFF D-2,
+  surface-recursor ban)"; `:825,837` — D-4 and D-1.
+- `ProofMode/TacticsTest.lean:181,189,242,256,270` — the same, as expected test output.
+- `CLAUDE.md` module table — `Linter.lean` (D-2), `MCT.lean` (A2), `MCTLazy.lean` (A3).
+
+**D-1 (¬¬-handling).** Witness-type/extraction is defined on Shoenfield-normal forms; the `¬¬`
+over Π₂ cores is collapsed via Markov (validated by Dialectica), never interpreted
+monolithically — monolithic Kuroda∘Dialectica is one exponential above Ψ. Literals are Π⁰₁
+atoms; normalization passes challenges through and never decides them. There is **no
+mechanized translation pass**: `mct_p1` is the *hand-translated* proof, formalized directly in
+the intuitionistic system + Markov. This is why `by_contra`'s error message asks "Is this proof
+translated?".
+
+**D-2 (linter).** Provenance ∪ identity tagging **and** the surface-recursor ban, both adopted.
+Checked against the corpus: honest MCT, Groetsch, and projection-uniqueness all survive the
+ban, because iteration lives only in *extracted* content, never in the surface term.
+**Standing check for any new input: verify its surface terms are recursor-free before
+accepting it as corpus.** The ban is on the *surface language as a whole*, so `pexists` and
+`pinst` carry it too.
+
+**D-4.2 (`p₂` before `p₁`), still the reason the two derivations differ.**
+`Allowed.extended = {markov, ip, ac, qfac}` has **`lem := false`**, so a `by_contra` reductio
+is *not* derivable in the metatheorem's input system. `mct_p2` (dichotomy) is constructive over
+decidable ℕ-comparisons via `qf_lem` and needs no translation; `mct_p1` is hand-translated per
+D-1. This is a fact about the systems, not a scheduling artifact, and it still holds.
+
+**D-4.4 (`by_contra` = the Markov rule, named as such).** `by_contra_markov`, with a shape
+check. Not a restriction suffered but the precise statement of what D-1's hand-translation
+produces: the lazy MCT proof's contradiction bottoms out in a Σ₁ statement over decidable
+primes, so after Kuroda its classical content is exactly `¬¬∃n(qf) → ∃n(qf)`.
+
+**Deliberately NOT salvaged, because it is now false or dead:** D-3 (superseded by D-4 in the
+original); the "out of scope for the month" note protecting the `general_metatheorem_classical`
+sorry — *that sorry was closed 2026-09-02*; D-4.1's "ℚ and ℝ are both off the critical path
+this cycle" — the ℚ/ℝ tower is complete with zero sorries; and the entire schedule, budget,
+claims-calibration and abort-state apparatus. Full text remains in git history.
