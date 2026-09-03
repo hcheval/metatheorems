@@ -281,6 +281,37 @@ be `psplit` *before* the state equations are rewritten in, not after — the opp
 
 Only `eq_R_refl` and `eq_R_sym` were genuinely Class A; Class A as a class does not exist.
 
+### 0.21 Triage of `mul_one_R`, 2026-09-03 — **not** slack-only; do not budget it as small
+
+Worked out but **not attempted**, and the reason is worth recording because it contradicts the
+natural guess that `mul_one_R` is the `add_zero_R` of the multiplicative side.
+
+With `1̂ℝ = 1ℚ` (`cauchyfy_one_R`) and a `mul_Q q 1ℚ =ℚ q`, the raw sequence is pointwise
+`(f ·ℝ 1ℝ)(x) =ℚ f̂(x +ℕ b)` with `b = f(0) +ℕ 1ℚ-code +ℕ 2`. That sequence *is* Cauchy —
+`|f̂(x+b) − f̂(x+1+b)| <ℚ 2^{-(x+b+1)} ≤ℚ 2^{-(x+1)}` by `cauchyState_cauchy` plus
+`pow2neg_Q_le_add` — and `lt_Q_congr` carries the check across the `=ℚ`, so `cauchyfy_id`
+applies and the outer cauchyfication *can* be evaluated, as for `+ℝ`. So far, easy.
+
+What is left is **not** a fixed-shift comparison:
+
+    |f̂(n+1+b) −ℚ f̂(n+1)|  <ℚ  2^{-n},        b symbolic
+
+`b` depends on `f`, so this is a telescope of *symbolically many* steps, not the one or two
+that `add_zero_R` / `add_assoc_R` spend. It needs the unbounded induction
+
+    ∀k ∀p.  |f̂(p) −ℚ f̂(p+k)|  +ℚ  2^{-(p+k)}  ≤ℚ  2^{-p}
+
+(the remaining slack has to be carried, or the step has none: base `k = 0` is `0 +ℚ 2^{-p} ≤ 2^{-p}`; the step
+splits off `|f̂(p+k) − f̂(p+k+1)| <ℚ 2^{-(p+k+1)}` and uses `2^{-(p+k)} = 2·2^{-(p+k+1)}`).
+This is §0.5 item 3 in the form that really is needed — and it is *not* what `eqR_tail`
+proves: `eqR_tail` carries its estimate inside the `eqR_hyp f h` two-sequence setting and
+never mentions `f̂(p) − f̂(p+k)`.
+
+So the honest classification is: `mul_one_R` has a factor of two of slack, but is gated on a
+new `cauchyfy`-scale induction. `distrib_R` and `mul_assoc_R` are gated on the same one, plus
+`mul_R_check`. The tightness question (§0.02(a)) is the right one, but "not tight" does not
+imply "no new induction".
+
 ### 0.3 `cauchyfy` is open — the invariant and the Cauchy property are proved
 
 This was the plan's declared main risk. It is real work but it is **not** an obstruction.
