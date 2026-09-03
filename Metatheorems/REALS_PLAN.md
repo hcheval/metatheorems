@@ -622,6 +622,76 @@ negative and `2^{-n}` is positive. The entire Archimedean-modulus content of `ap
 from the `<_ℝ` spelling. Worth checking against Kohlenbach p. 80 before investing in item 2:
 if the book says `≤_ℝ`, the lemma is a fraction of the work and items 1–3 shrink accordingly.
 
+### 0.9 `approx_R` and `cauchy_complete_R` — DONE 2026-09-03 (branch `reals-metric`)
+
+**Both `Metric.lean` sorries are closed**: `approx_le_R` (the `≤ℝ` form of Lemma 4.2, new,
+in `RealNumbers/Approx.lean`), `approx_R` (the `<ℝ` form as stated), and
+`cauchy_complete_R` (Lemma 4.3), all `[propext, Quot.sound]`. What §0.8 got right, what it
+got wrong, and what the completeness proof forced:
+
+**§0.8's witness analysis held, with one improvement.** The slack `d := 2^{-(k+1)} −ℚ
+|f̂(k) −ℚ f̂(k+1)|` and `pow2neg_rat_den_le` are exactly as predicted. But the witness is
+**`n := k +ℕ rat_den d`, not `max(k, rat_den d)`**: the sum dominates both components
+(`pow2neg_Q_le_add_r` gives `2^{-(k+D)} ≤ 2^{-D}`), so no object-level `max` lemmas, no
+case split, and the index identity `(k+1)+(D+1) =₀ n+2` is a two-step `add_succ` chain.
+Prefer sums to `max` for every future Archimedean witness.
+
+**Of §0.8's four "missing" items, three already existed by the time this was attempted:**
+
+1. The reverse-triangle prerequisites (`le_Q_self_abs`, `abs_Q_le_cases`,
+   `abs_Q_le_add_diff`) had landed in `Estimates.lean`/`QBounds.lean`; the reverse triangle
+   itself (`abs_Q_rev_triangle`, `Approx.lean`) is ~30 lines of assembly on top of them.
+   It is what makes `|w|ℝ` pass the Cauchy check **for any `w`** (`cauchyfy_abs_R`) — no
+   Cauchy-ness of the argument needed, since `ŵ` is Cauchy by `cauchyState_cauchy`.
+2. The "refined telescope keeping the `k`-th step's slack out of the sum" **is
+   `cauchyfy_tele_at`**, verbatim — the additively-carried slack `2^{-(p+j)}` lands, after
+   the index identity, on exactly the `2^{-(n+2)}` piece of
+   `2^{-n} =ℚ 2^{-(n+2)} +ℚ (2^{-(n+1)} +ℚ 2^{-(n+2)})`. Nothing new was built.
+3. `cauchyfy_const` at an arbitrary constant is 15 lines (`const_R_check` is
+   `lt_Q_abs_sub_self`); `cauchyfy_sub_R` reduces to `add_R_check` on `f +ℝ (−ℝ g)`
+   pointwise. Only item 4 (assembly) was real work — and its `max` half evaporated.
+
+**`cauchy_complete_R` is proved without choice, and the book's witness works verbatim**:
+`f := λk.Φ̂(k+3)(k+3)`, supplied to `Derivable`'s `∃`-introduction as a term — no Markov,
+no AC; `#print axioms` shows `[propext, Quot.sound]`. The check margin at index `x` is
+`2^{-(x+3)} + (2^{-(x+3)} + 2^{-(x+4)}) + 2^{-(x+4)} = 2^{-(x+2)} + 2^{-(x+3)} < 2^{-(x+1)}`
+— comfortable, no tightness. Five structural findings, each of which cost a build error or
+a timeout:
+
+- **Build the witness as a closed combinator applied to `Φ` (`Term.diag_seq`), never as a
+  bare `Term.lam` mentioning `Φ.weaken`.** An application spine weakens by one
+  `diag_seq_app_weaken` rewrite and stays visible to `prw`; a literal λ-witness accumulates
+  `Term.weaken`s around a binder, and pushing those through the λ-body forces the rename
+  through `cauchyfy`'s delta-expansion. This is the term-level twin of "a named `Formula`
+  hides itself from `canorm`".
+- **`f̂ = f` for the witness is hypothesis-dependent, so `cauchyfy_id` does not apply** —
+  the check needs the completeness hypothesis, which lives in the sequent. The invariant
+  (flag clear ∧ value on the nose, `cauchyState_id_of_cauchy`'s `idF`) is re-run
+  **in-sequent with `pinduction`**, hypothesis context and all; the step derives the check
+  from `hyp` by `pinst`×3 + `pdestruct_imp`×2 + `diag_check_bound`. ~50 lines, and
+  `pinduction` carried the context without complaint.
+- **`canorm` cannot push a substitution through `le_R`/`const_R`** (named wrappers), so
+  every `pinst` into the completeness hypothesis left a stuck `substF … (le_R …)` whose
+  later `pexact` was a heartbeat timeout. Fix: `le_R_substF` + `const_R_subst` naturality
+  lemmas folded into a local `rnorm` macro — **and `rnorm` must run after EVERY `pinst`**:
+  a second `pinst` into an unnormalised hypothesis builds a three-layer
+  `substF∘substF∘renameF` composite that no simp set in the project untangles.
+- **A folded `Term.weaken` around an application spine is display-invisible** (Pretty
+  prints through weakenings, even with `pp.explicit` the ⬝-notation hides it) and cost the
+  one `pp.explicit` dump of the session: the `pobtain`-crossed hypothesis `hn` carried
+  `(abs_R ⬝ …).weaken` where the hand-spelled refutation had the pushed form. Fix: a
+  weaken-pushing kit in `Approx.lean` (`weaken_app` — which is `rfl` — plus per-constant
+  weaken-folding lemmas) added to `rnorm`. CLAUDE.md note 12's family gains this member.
+- **`pdestruct_imp` + Lean-level `monus` facts** (`monus_add_r`, `monus_add_l`,
+  `monus_succ_self`, new) discharge the `n ≤ m` side conditions; no ℕ-order induction
+  beyond `monus_monus` was needed.
+
+**The two-lemma interface that made both proofs small**: `le_R (|u −ℝ v|ℝ) ⟨q⟩ℝ` is
+interconverted with its pointwise content `|û(m+2) −ℚ v̂(m+2)| <ℚ q +ℚ 2^{-m}` by
+`abs_sub_le_const_R` (Lean-level premise, for goals) and `bound_of_abs_sub_le_const`
+(object implication, for hypotheses inside a sequent). Everything Kohlenbach-§4.1-shaped
+factors through these two.
+
 ---
 
 *Original note, 2026-08-31, follows. §2's caveat is discharged (§0.1); §4's Class A and Class D
