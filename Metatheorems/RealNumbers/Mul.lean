@@ -21,36 +21,11 @@ variable {Γ : Ctx ι}
 
 -- `mul_comm_R` is PROVED, further down the file: it needs `cauchyfy_congr`, which is an
 -- induction on the `cauchyfy` recursion and so sits with the rest of that theory.
-
-/-- ⊢ ∀f,g,h : ℝ. (f ·_ℝ g) ·_ℝ h =_ℝ f ·_ℝ (g ·_ℝ h) -/
-def mul_assoc_R :
-    Derivable F al Premises (Γ := Γ)
-      (Formula.all rTy (Formula.all rTy (Formula.all rTy
-        (eq_R
-          (Term.app2 Term.mul_R
-            (Term.app2 Term.mul_R (.var (.vs (.vs .vz))) (.var (.vs .vz)))
-            (.var .vz))
-          (Term.app2 Term.mul_R (.var (.vs (.vs .vz)))
-            (Term.app2 Term.mul_R (.var (.vs .vz)) (.var .vz))))))) :=
-  sorry
+-- `mul_assoc_R` and `distrib_R` are proved at the BOTTOM of the file: they need
+-- `mul_R_check`/`cauchyfy_mul_R` (below) and the `Bounds.lean` assembly layer.
 
 -- `mul_one_R` is PROVED, at the bottom of the file: it needs `mul_R_apply` (below) and the
 -- symbolic-shift telescope `cauchyfy_shift_le` (`Estimates.lean`).
-
--- ── Distributivity ──────────────────────────────────────────────────────────
-
-/-- ⊢ ∀f,g,h : ℝ. f ·_ℝ (g +_ℝ h) =_ℝ (f ·_ℝ g) +_ℝ (f ·_ℝ h) -/
-def distrib_R :
-    Derivable F al Premises (Γ := Γ)
-      (Formula.all rTy (Formula.all rTy (Formula.all rTy
-        (eq_R
-          (Term.app2 Term.mul_R (.var (.vs (.vs .vz)))
-            (Term.app2 Term.add_R (.var (.vs .vz)) (.var .vz)))
-          (Term.app2 Term.add_R
-            (Term.app2 Term.mul_R (.var (.vs (.vs .vz))) (.var (.vs .vz)))
-            (Term.app2 Term.mul_R (.var (.vs (.vs .vz)))
-              (.var .vz))))))) :=
-  sorry
 
 -- ── `mul_comm_R` ────────────────────────────────────────────────────────────
 --
@@ -617,6 +592,454 @@ def mul_one_R :
         (eq_R (Term.app2 Term.mul_R (.var .vz) Term.one_R)
               (.var .vz))) :=
   univ_gen (mul_one_R_core (.var .vz))
+
+-- ── `mul_assoc_R` ───────────────────────────────────────────────────────────
+--
+-- With `cauchyfy_mul_R` the outer cauchyfication *evaluates* on both sides, and the two
+-- sides read `f̂, ĝ, ĥ` at different composite indices. The estimate moves each side onto
+-- the common triple product at the index `N = s + b₁ + b₂ + b₃ + b₄` in **four** moves —
+-- two per side, each an instance of `mul_move_le` (one factor takes a `cauchyfy_shift_le`
+-- telescope, the other is bounded by `cauchyfy_mag_le`'s `⟨·(0)⟩+1`) — and there the two
+-- sides agree by `mul_Q_assoc_inst` exactly. Each move costs at most `2^{-(x₀+2)}`
+-- (`mag_dyadic_le`: the index `b` paid for the magnitude, by construction of `mul_R`), the
+-- first strictly (`mag_dyadic_lt`, from `b+1 < 2^b`), so the four together stay strictly
+-- below the budget `2^{-x₀} = 4·2^{-(x₀+2)}`.
+
+/-- The pointwise estimate behind `mul_assoc_R`, at the bound index `x₀`. -/
+private def mul_assoc_est (f g w : Term F (Ty.nat :: Γ) (realTy ι)) :
+    Derivable F al Premises (Γ := Ty.nat :: Γ)
+      (lt_Q
+        (.app Term.abs_Q (Term.app2 Term.sub_Q
+          (Term.app2 Term.cauchyfy
+            (Term.app2 Term.mul_R (Term.app2 Term.mul_R f g) w) (.app .succ (.var .vz)))
+          (Term.app2 Term.cauchyfy
+            (Term.app2 Term.mul_R f (Term.app2 Term.mul_R g w)) (.app .succ (.var .vz)))))
+        (.app Term.pow2neg_Q (.var .vz))) :=
+  let s : Term F (Ty.nat :: Γ) Ty.nat := .app .succ (.var .vz)
+  let u : Term F (Ty.nat :: Γ) (realTy ι) := Term.app2 Term.mul_R f g
+  let v : Term F (Ty.nat :: Γ) (realTy ι) := Term.app2 Term.mul_R g w
+  let f0 : Term F (Ty.nat :: Γ) Ty.nat := .app f .zero
+  let g0 : Term F (Ty.nat :: Γ) Ty.nat := .app g .zero
+  let w0 : Term F (Ty.nat :: Γ) Ty.nat := .app w .zero
+  let u0 : Term F (Ty.nat :: Γ) Ty.nat := .app u .zero
+  let v0 : Term F (Ty.nat :: Γ) Ty.nat := .app v .zero
+  let two : Term F (Ty.nat :: Γ) Ty.nat := Term.ofNat 2
+  let b1 : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.add (Term.app2 Term.add f0 g0) two
+  let b2 : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.add (Term.app2 Term.add u0 w0) two
+  let b3 : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.add (Term.app2 Term.add g0 w0) two
+  let b4 : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.add (Term.app2 Term.add f0 v0) two
+  let p2 : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.add s b2
+  let p4 : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.add s b4
+  let mu : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.add p2 (Term.app2 Term.add b3 b4)
+  let Mh : Term F (Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.add p2 (Term.app2 Term.add (Term.app2 Term.add b3 b4) b1)
+  let mv : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.add p4 (Term.app2 Term.add b1 b2)
+  let mf : Term F (Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.add p4 (Term.app2 Term.add (Term.app2 Term.add b1 b2) b3)
+  let N : Term F (Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.add s (Term.app2 Term.add b1 (Term.app2 Term.add b2 (Term.app2 Term.add b3 b4)))
+  let X1 : Term F (Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.mul_Q (Term.app2 Term.cauchyfy u p2) (Term.app2 Term.cauchyfy w p2)
+  let X2 : Term F (Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.mul_Q (Term.app2 Term.cauchyfy u mu) (Term.app2 Term.cauchyfy w p2)
+  let X3 : Term F (Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.mul_Q (Term.app2 Term.cauchyfy u mu) (Term.app2 Term.cauchyfy w Mh)
+  let Y1 : Term F (Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.mul_Q (Term.app2 Term.cauchyfy f p4) (Term.app2 Term.cauchyfy v p4)
+  let Y2 : Term F (Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.mul_Q (Term.app2 Term.cauchyfy f p4) (Term.app2 Term.cauchyfy v mv)
+  let Y3 : Term F (Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.mul_Q (Term.app2 Term.cauchyfy f mf) (Term.app2 Term.cauchyfy v mv)
+  let W' : Term F (Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.mul_Q (Term.app2 Term.cauchyfy f N)
+      (Term.app2 Term.mul_Q (Term.app2 Term.cauchyfy g N) (Term.app2 Term.cauchyfy w N))
+  let Q2 : Term F (Ty.nat :: Γ) Ty.nat := .app Term.pow2neg_Q (.app .succ s)
+  let Bf : Term F (Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.add_Q (.app Term.encode_nat_Q f0) Term.one_Q
+  let Bu : Term F (Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.add_Q (.app Term.encode_nat_Q u0) Term.one_Q
+  let Bv : Term F (Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.add_Q (.app Term.encode_nat_Q v0) Term.one_Q
+  let Bw : Term F (Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.add_Q (.app Term.encode_nat_Q w0) Term.one_Q
+  -- ── the four moves, each `≤` (the first `<`) one quarter of the budget ──
+  let hT1 : Derivable F al Premises
+      (lt_Q (.app Term.abs_Q (Term.app2 Term.sub_Q X1 X2)) Q2) :=
+    Derivable.mp
+      (Derivable.mp (mag_dyadic_lt w0 p2 (.app .succ s) u0 (nat_shuffle1 w0 u0 s))
+        (Derivable.mp
+          (mul_move_le (Term.app2 Term.cauchyfy u p2) (Term.app2 Term.cauchyfy u mu)
+            (Term.app2 Term.cauchyfy w p2) (.app Term.pow2neg_Q p2) Bw
+            (cauchyfy_shift_le u p2 (Term.app2 Term.add b3 b4))
+            (cauchyfy_mag_le w p2))
+          and_intro))
+      (le_lt_Q_trans _ _ Q2)
+  let hT2 : Derivable F al Premises
+      (le_Q (.app Term.abs_Q (Term.app2 Term.sub_Q X2 X3)) Q2) :=
+    leQt
+      (mul_move_le_l (Term.app2 Term.cauchyfy u mu)
+        (Term.app2 Term.cauchyfy w p2) (Term.app2 Term.cauchyfy w Mh)
+        (.app Term.pow2neg_Q p2) Bu
+        (cauchyfy_shift_le w p2 (Term.app2 Term.add (Term.app2 Term.add b3 b4) b1))
+        (cauchyfy_mag_le u mu))
+      (mag_dyadic_le u0 p2 (.app .succ s) w0 (nat_shuffle2 u0 w0 s))
+  let hR1 : Derivable F al Premises
+      (le_Q (.app Term.abs_Q (Term.app2 Term.sub_Q Y1 Y2)) Q2) :=
+    leQt
+      (mul_move_le_l (Term.app2 Term.cauchyfy f p4)
+        (Term.app2 Term.cauchyfy v p4) (Term.app2 Term.cauchyfy v mv)
+        (.app Term.pow2neg_Q p4) Bf
+        (cauchyfy_shift_le v p4 (Term.app2 Term.add b1 b2))
+        (cauchyfy_mag_le f p4))
+      (mag_dyadic_le f0 p4 (.app .succ s) v0 (nat_shuffle2 f0 v0 s))
+  let hR2 : Derivable F al Premises
+      (le_Q (.app Term.abs_Q (Term.app2 Term.sub_Q Y2 Y3)) Q2) :=
+    leQt
+      (mul_move_le (Term.app2 Term.cauchyfy f p4) (Term.app2 Term.cauchyfy f mf)
+        (Term.app2 Term.cauchyfy v mv) (.app Term.pow2neg_Q p4) Bv
+        (cauchyfy_shift_le f p4 (Term.app2 Term.add (Term.app2 Term.add b1 b2) b3))
+        (cauchyfy_mag_le v mv))
+      (mag_dyadic_le v0 p4 (.app .succ s) f0 (nat_shuffle1 v0 f0 s))
+  -- ── the index bookkeeping: everything lands on `N` ──
+  let r1 : Derivable F al Premises
+      (Formula.eq0 (Term.app2 Term.add b2 (Term.app2 Term.add (Term.app2 Term.add b3 b4) b1))
+        (Term.app2 Term.add b1 (Term.app2 Term.add b2 (Term.app2 Term.add b3 b4)))) :=
+    let X : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.add b3 b4
+    qtrans (add_congr_r b2 (add_comm X b1))
+      (qtrans (add_comm b2 (Term.app2 Term.add b1 X))
+        (qtrans (add_assoc b1 X b2) (add_congr_r b1 (add_comm X b2))))
+  let r2 : Derivable F al Premises
+      (Formula.eq0 (Term.app2 Term.add b4 (Term.app2 Term.add (Term.app2 Term.add b1 b2) b3))
+        (Term.app2 Term.add b1 (Term.app2 Term.add b2 (Term.app2 Term.add b3 b4)))) :=
+    let Y : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.add b1 b2
+    qtrans (add_comm b4 (Term.app2 Term.add Y b3))
+      (qtrans (add_assoc Y b3 b4) (add_assoc b1 b2 (Term.app2 Term.add b3 b4)))
+  let hMhN : Derivable F al Premises (Formula.eq0 Mh N) :=
+    qtrans (add_assoc s b2 (Term.app2 Term.add (Term.app2 Term.add b3 b4) b1))
+      (add_congr_r s r1)
+  let hmuN : Derivable F al Premises (Formula.eq0 (Term.app2 Term.add mu b1) N) :=
+    qtrans (add_assoc p2 (Term.app2 Term.add b3 b4) b1) hMhN
+  let hmfN : Derivable F al Premises (Formula.eq0 mf N) :=
+    qtrans (add_assoc s b4 (Term.app2 Term.add (Term.app2 Term.add b1 b2) b3))
+      (add_congr_r s r2)
+  let hmvN : Derivable F al Premises (Formula.eq0 (Term.app2 Term.add mv b3) N) :=
+    qtrans (add_assoc p4 (Term.app2 Term.add b1 b2) b3) hmfN
+  -- ── the exact rewrites: X3 and Y3 both equal the triple product at N ──
+  let eX3W : Derivable F al Premises (eq_Q X3 W') :=
+    eqQtrans
+      (eqQ_of_nat_eq'
+        (qtrans
+          (mulQ_l_nat (Term.app2 Term.cauchyfy w Mh)
+            (qtrans (cauchyfy_mul_R f g mu)
+              (qtrans (mulQ_l_nat _ (cauchyfy_idx_nat' f hmuN))
+                (mulQ_r_nat _ (cauchyfy_idx_nat' g hmuN)))))
+          (mulQ_r_nat _ (cauchyfy_idx_nat' w hMhN))))
+      (mul_Q_assoc_inst (Term.app2 Term.cauchyfy f N)
+        (Term.app2 Term.cauchyfy g N) (Term.app2 Term.cauchyfy w N))
+  let eY3W : Derivable F al Premises (eq_Q Y3 W') :=
+    eqQ_of_nat_eq'
+      (qtrans
+        (mulQ_l_nat (Term.app2 Term.cauchyfy v mv) (cauchyfy_idx_nat' f hmfN))
+        (mulQ_r_nat _
+          (qtrans (cauchyfy_mul_R g w mv)
+            (qtrans (mulQ_l_nat _ (cauchyfy_idx_nat' g hmvN))
+              (mulQ_r_nat _ (cauchyfy_idx_nat' w hmvN))))))
+  -- ── the assembled estimate ──
+  let hLX : Derivable F al Premises
+      (lt_Q (.app Term.abs_Q (Term.app2 Term.sub_Q X1 X3))
+        (Term.app2 Term.add_Q Q2 Q2)) :=
+    Derivable.mp
+      (Derivable.mp
+        (Derivable.mp (Derivable.mp hT2 (Derivable.mp hT1 and_intro))
+          (lt_le_Q_add _ _ Q2 Q2))
+        (Derivable.mp (abs_Q_sub_triangle X1 X2 X3) and_intro))
+      (le_lt_Q_trans _ _ (Term.app2 Term.add_Q Q2 Q2))
+  let hY2W : Derivable F al Premises
+      (le_Q (.app Term.abs_Q (Term.app2 Term.sub_Q Y2 W')) Q2) :=
+    Derivable.mp hR2
+      (le_Q_congr _ _ _ _
+        (abs_Q_congr (sub_Q_congr (eq_Q_refl_inst Y2) eY3W))
+        (eq_Q_refl_inst Q2))
+  let hRY : Derivable F al Premises
+      (le_Q (.app Term.abs_Q (Term.app2 Term.sub_Q Y1 W'))
+        (Term.app2 Term.add_Q Q2 Q2)) :=
+    leQt (abs_Q_sub_triangle Y1 Y2 W')
+      (Derivable.mp (Derivable.mp hY2W (Derivable.mp hR1 and_intro))
+        (le_Q_add_both _ _ Q2 Q2))
+  let hX3Y1 : Derivable F al Premises
+      (le_Q (.app Term.abs_Q (Term.app2 Term.sub_Q X3 Y1))
+        (Term.app2 Term.add_Q Q2 Q2)) :=
+    Derivable.mp hRY
+      (le_Q_congr _ _ _ _
+        (eqQtrans (abs_diff_Q_comm Y1 W')
+          (abs_Q_congr (sub_Q_congr (eqQsym eX3W) (eq_Q_refl_inst Y1))))
+        (eq_Q_refl_inst _))
+  let htot : Derivable F al Premises
+      (lt_Q (.app Term.abs_Q (Term.app2 Term.sub_Q X1 Y1))
+        (Term.app2 Term.add_Q (Term.app2 Term.add_Q Q2 Q2) (Term.app2 Term.add_Q Q2 Q2))) :=
+    Derivable.mp
+      (Derivable.mp
+        (Derivable.mp (Derivable.mp hX3Y1 (Derivable.mp hLX and_intro))
+          (lt_le_Q_add _ _ (Term.app2 Term.add_Q Q2 Q2) (Term.app2 Term.add_Q Q2 Q2)))
+        (Derivable.mp (abs_Q_sub_triangle X1 X3 Y1) and_intro))
+      (le_lt_Q_trans _ _ _)
+  let hcol : Derivable F al Premises
+      (eq_Q (Term.app2 Term.add_Q (Term.app2 Term.add_Q Q2 Q2) (Term.app2 Term.add_Q Q2 Q2))
+        (.app Term.pow2neg_Q (.var .vz))) :=
+    eqQtrans (addQl (pow2neg_Q_halve s) (Term.app2 Term.add_Q Q2 Q2))
+      (eqQtrans (addQr (.app Term.pow2neg_Q s) (pow2neg_Q_halve s))
+        (pow2neg_Q_halve (.var .vz)))
+  let hsub : Derivable F al Premises
+      (eq_Q
+        (.app Term.abs_Q (Term.app2 Term.sub_Q
+          (Term.app2 Term.cauchyfy (Term.app2 Term.mul_R u w) s)
+          (Term.app2 Term.cauchyfy (Term.app2 Term.mul_R f v) s)))
+        (.app Term.abs_Q (Term.app2 Term.sub_Q X1 Y1))) :=
+    abs_Q_congr (sub_Q_congr
+      (eqQ_of_nat_eq' (cauchyfy_mul_R u w s))
+      (eqQ_of_nat_eq' (cauchyfy_mul_R f v s)))
+  Derivable.mp htot (lt_Q_congr _ _ _ _ (eqQsym hsub) hcol)
+
+/-- `(f ·_ℝ g) ·_ℝ h =_ℝ f ·_ℝ (g ·_ℝ h)`, at explicit reals. -/
+def mul_assoc_R_core (f g h : Term F Γ (realTy ι)) :
+    Derivable F al Premises
+      (eq_R (Term.app2 Term.mul_R (Term.app2 Term.mul_R f g) h)
+            (Term.app2 Term.mul_R f (Term.app2 Term.mul_R g h))) :=
+  eq_R_of_lt_bound _ _ (by
+    simp only [mul_R_app_weaken]
+    exact mul_assoc_est f.weaken g.weaken h.weaken)
+
+/-- ⊢ ∀f,g,h : ℝ. (f ·_ℝ g) ·_ℝ h =_ℝ f ·_ℝ (g ·_ℝ h) -/
+def mul_assoc_R :
+    Derivable F al Premises (Γ := Γ)
+      (Formula.all rTy (Formula.all rTy (Formula.all rTy
+        (eq_R
+          (Term.app2 Term.mul_R
+            (Term.app2 Term.mul_R (.var (.vs (.vs .vz))) (.var (.vs .vz)))
+            (.var .vz))
+          (Term.app2 Term.mul_R (.var (.vs (.vs .vz)))
+            (Term.app2 Term.mul_R (.var (.vs .vz)) (.var .vz))))))) :=
+  univ_gen (univ_gen (univ_gen
+    (mul_assoc_R_core (.var (.vs (.vs .vz))) (.var (.vs .vz)) (.var .vz))))
+
+-- ── `distrib_R` ─────────────────────────────────────────────────────────────
+--
+-- Same architecture as `mul_assoc_R`, with one asymmetry: the right-hand side is a *sum*
+-- of products, so its two `cauchyfy_shift_le` moves sit inside `add_Q` and cost a bare
+-- `2^{-(x₀+2)}` each (`abs_Q_sub_add_split`) — no magnitude, no dyadic conversion. The
+-- left side pays the two magnitude-weighted moves, the first strictly. The key exact step
+-- is `distrib_Q_inst` at the common index `N`, after `cauchyfy_add_R` has evaluated the
+-- sum both where it is an operand (left) and where it is the outer operation (right).
+
+private def succ_congr_n {s t : Term F Γ Ty.nat}
+    (h : Derivable F al Premises (Formula.eq0 s t)) :
+    Derivable F al Premises (Formula.eq0 (.app .succ s) (.app .succ t)) :=
+  qfer_no_premise_nat_nf h (r := .app .succ (.var .vz)) (by qb_nf) (by qb_nf)
+
+/-- Congruence for `add_Q` in its first argument, at the level of `=₀` (the mirror of
+`Field.lean`'s public `addQ_r_nat`; the left version there is private). -/
+private def addQ_l_nat' (u : Term F Γ Ty.nat) {s t : Term F Γ Ty.nat}
+    (h : Derivable F al Premises (Formula.eq0 s t)) :
+    Derivable F al Premises
+      (Formula.eq0 (Term.app2 Term.add_Q s u) (Term.app2 Term.add_Q t u)) :=
+  qfer_no_premise_nat_nf h (r := Term.app2 Term.add_Q (.var .vz) u.weaken)
+    (by qb_nf) (by qb_nf)
+
+/-- The pointwise estimate behind `distrib_R`, at the bound index `x₀`. -/
+private def distrib_est (f g w : Term F (Ty.nat :: Γ) (realTy ι)) :
+    Derivable F al Premises (Γ := Ty.nat :: Γ)
+      (lt_Q
+        (.app Term.abs_Q (Term.app2 Term.sub_Q
+          (Term.app2 Term.cauchyfy
+            (Term.app2 Term.mul_R f (Term.app2 Term.add_R g w)) (.app .succ (.var .vz)))
+          (Term.app2 Term.cauchyfy
+            (Term.app2 Term.add_R
+              (Term.app2 Term.mul_R f g) (Term.app2 Term.mul_R f w))
+            (.app .succ (.var .vz)))))
+        (.app Term.pow2neg_Q (.var .vz))) :=
+  let s : Term F (Ty.nat :: Γ) Ty.nat := .app .succ (.var .vz)
+  let sgh : Term F (Ty.nat :: Γ) (realTy ι) := Term.app2 Term.add_R g w
+  let u : Term F (Ty.nat :: Γ) (realTy ι) := Term.app2 Term.mul_R f g
+  let v : Term F (Ty.nat :: Γ) (realTy ι) := Term.app2 Term.mul_R f w
+  let f0 : Term F (Ty.nat :: Γ) Ty.nat := .app f .zero
+  let g0 : Term F (Ty.nat :: Γ) Ty.nat := .app g .zero
+  let w0 : Term F (Ty.nat :: Γ) Ty.nat := .app w .zero
+  let sg0 : Term F (Ty.nat :: Γ) Ty.nat := .app sgh .zero
+  let two : Term F (Ty.nat :: Γ) Ty.nat := Term.ofNat 2
+  let B : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.add (Term.app2 Term.add f0 sg0) two
+  let b1 : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.add (Term.app2 Term.add f0 g0) two
+  let b5 : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.add (Term.app2 Term.add f0 w0) two
+  let pB : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.add s B
+  let b15 : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.add b1 b5
+  let mfL : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.add pB (.app .succ b15)
+  let mS : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.add pB b15
+  let mu' : Term F (Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.add (.app .succ s) (Term.app2 Term.add B b5)
+  let mv' : Term F (Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.add (.app .succ s) (Term.app2 Term.add B b1)
+  let N : Term F (Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.add (.app .succ s) (Term.app2 Term.add B b15)
+  let X1 : Term F (Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.mul_Q (Term.app2 Term.cauchyfy f pB) (Term.app2 Term.cauchyfy sgh pB)
+  let X2 : Term F (Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.mul_Q (Term.app2 Term.cauchyfy f mfL) (Term.app2 Term.cauchyfy sgh pB)
+  let X3 : Term F (Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.mul_Q (Term.app2 Term.cauchyfy f mfL) (Term.app2 Term.cauchyfy sgh mS)
+  let Y1 : Term F (Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.add_Q (Term.app2 Term.cauchyfy u (.app .succ s))
+      (Term.app2 Term.cauchyfy v (.app .succ s))
+  let Y3 : Term F (Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.add_Q (Term.app2 Term.cauchyfy u mu') (Term.app2 Term.cauchyfy v mv')
+  let T : Term F (Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.add_Q
+      (Term.app2 Term.mul_Q (Term.app2 Term.cauchyfy f N) (Term.app2 Term.cauchyfy g N))
+      (Term.app2 Term.mul_Q (Term.app2 Term.cauchyfy f N) (Term.app2 Term.cauchyfy w N))
+  let Q2 : Term F (Ty.nat :: Γ) Ty.nat := .app Term.pow2neg_Q (.app .succ s)
+  let Bf : Term F (Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.add_Q (.app Term.encode_nat_Q f0) Term.one_Q
+  let Bsg : Term F (Ty.nat :: Γ) Ty.nat :=
+    Term.app2 Term.add_Q (.app Term.encode_nat_Q sg0) Term.one_Q
+  -- ── the L-side moves ──
+  let hT1 : Derivable F al Premises
+      (lt_Q (.app Term.abs_Q (Term.app2 Term.sub_Q X1 X2)) Q2) :=
+    Derivable.mp
+      (Derivable.mp (mag_dyadic_lt sg0 pB (.app .succ s) f0 (nat_shuffle1 sg0 f0 s))
+        (Derivable.mp
+          (mul_move_le (Term.app2 Term.cauchyfy f pB) (Term.app2 Term.cauchyfy f mfL)
+            (Term.app2 Term.cauchyfy sgh pB) (.app Term.pow2neg_Q pB) Bsg
+            (cauchyfy_shift_le f pB (.app .succ b15))
+            (cauchyfy_mag_le sgh pB))
+          and_intro))
+      (le_lt_Q_trans _ _ Q2)
+  let hT2 : Derivable F al Premises
+      (le_Q (.app Term.abs_Q (Term.app2 Term.sub_Q X2 X3)) Q2) :=
+    leQt
+      (mul_move_le_l (Term.app2 Term.cauchyfy f mfL)
+        (Term.app2 Term.cauchyfy sgh pB) (Term.app2 Term.cauchyfy sgh mS)
+        (.app Term.pow2neg_Q pB) Bf
+        (cauchyfy_shift_le sgh pB b15)
+        (cauchyfy_mag_le f mfL))
+      (mag_dyadic_le f0 pB (.app .succ s) sg0 (nat_shuffle2 f0 sg0 s))
+  -- ── the R-side move (both summands at once, no magnitude) ──
+  let hY : Derivable F al Premises
+      (le_Q (.app Term.abs_Q (Term.app2 Term.sub_Q Y1 Y3))
+        (Term.app2 Term.add_Q Q2 Q2)) :=
+    leQt
+      (abs_Q_sub_add_split (Term.app2 Term.cauchyfy u mu') (Term.app2 Term.cauchyfy v mv')
+        (Term.app2 Term.cauchyfy u (.app .succ s)) (Term.app2 Term.cauchyfy v (.app .succ s)))
+      (Derivable.mp
+        (Derivable.mp (cauchyfy_shift_le v (.app .succ s) (Term.app2 Term.add B b1))
+          (Derivable.mp (cauchyfy_shift_le u (.app .succ s) (Term.app2 Term.add B b5))
+            and_intro))
+        (le_Q_add_both _ _ Q2 Q2))
+  -- ── the index bookkeeping ──
+  let hmfLN : Derivable F al Premises (Formula.eq0 mfL N) :=
+    qtrans (add_succ pB b15)
+      (qtrans (succ_congr_n (add_assoc s B b15))
+        (Derivable.mp (add_succ_l s (Term.app2 Term.add B b15)) Derivable.sym0))
+  let hSmS : Derivable F al Premises (Formula.eq0 (.app .succ mS) N) :=
+    qtrans (succ_congr_n (add_assoc s B b15))
+      (Derivable.mp (add_succ_l s (Term.app2 Term.add B b15)) Derivable.sym0)
+  let hmu'N : Derivable F al Premises (Formula.eq0 (Term.app2 Term.add mu' b1) N) :=
+    qtrans (add_assoc (.app .succ s) (Term.app2 Term.add B b5) b1)
+      (add_congr_r (.app .succ s)
+        (qtrans (add_assoc B b5 b1) (add_congr_r B (add_comm b5 b1))))
+  let hmv'N : Derivable F al Premises (Formula.eq0 (Term.app2 Term.add mv' b5) N) :=
+    qtrans (add_assoc (.app .succ s) (Term.app2 Term.add B b1) b5)
+      (add_congr_r (.app .succ s) (add_assoc B b1 b5))
+  -- ── the exact rewrites: X3 and Y3 both equal T ──
+  let eX3 : Derivable F al Premises (eq_Q X3 T) :=
+    eqQtrans
+      (eqQ_of_nat_eq'
+        (qtrans
+          (mulQ_l_nat (Term.app2 Term.cauchyfy sgh mS) (cauchyfy_idx_nat' f hmfLN))
+          (mulQ_r_nat _
+            (qtrans (cauchyfy_add_R g w mS)
+              (qtrans (addQ_l_nat' (Term.app2 Term.cauchyfy w (.app .succ mS))
+                  (cauchyfy_idx_nat' g hSmS))
+                (addQ_r_nat (Term.app2 Term.cauchyfy g N)
+                  (cauchyfy_idx_nat' w hSmS)))))))
+      (distrib_Q_inst (Term.app2 Term.cauchyfy f N)
+        (Term.app2 Term.cauchyfy g N) (Term.app2 Term.cauchyfy w N))
+  let eY3 : Derivable F al Premises (eq_Q Y3 T) :=
+    eqQ_of_nat_eq'
+      (qtrans
+        (addQ_l_nat' (Term.app2 Term.cauchyfy v mv')
+          (qtrans (cauchyfy_mul_R f g mu')
+            (qtrans (mulQ_l_nat _ (cauchyfy_idx_nat' f hmu'N))
+              (mulQ_r_nat _ (cauchyfy_idx_nat' g hmu'N)))))
+        (addQ_r_nat _
+          (qtrans (cauchyfy_mul_R f w mv')
+            (qtrans (mulQ_l_nat _ (cauchyfy_idx_nat' f hmv'N))
+              (mulQ_r_nat _ (cauchyfy_idx_nat' w hmv'N))))))
+  -- ── assembly ──
+  let hLX : Derivable F al Premises
+      (lt_Q (.app Term.abs_Q (Term.app2 Term.sub_Q X1 X3))
+        (Term.app2 Term.add_Q Q2 Q2)) :=
+    Derivable.mp
+      (Derivable.mp
+        (Derivable.mp (Derivable.mp hT2 (Derivable.mp hT1 and_intro))
+          (lt_le_Q_add _ _ Q2 Q2))
+        (Derivable.mp (abs_Q_sub_triangle X1 X2 X3) and_intro))
+      (le_lt_Q_trans _ _ (Term.app2 Term.add_Q Q2 Q2))
+  let eXY : Derivable F al Premises (eq_Q X3 Y3) := eqQtrans eX3 (eqQsym eY3)
+  let hX3Y1 : Derivable F al Premises
+      (le_Q (.app Term.abs_Q (Term.app2 Term.sub_Q X3 Y1))
+        (Term.app2 Term.add_Q Q2 Q2)) :=
+    Derivable.mp hY
+      (le_Q_congr _ _ _ _
+        (eqQtrans (abs_diff_Q_comm Y1 Y3)
+          (abs_Q_congr (sub_Q_congr (eqQsym eXY) (eq_Q_refl_inst Y1))))
+        (eq_Q_refl_inst _))
+  let htot : Derivable F al Premises
+      (lt_Q (.app Term.abs_Q (Term.app2 Term.sub_Q X1 Y1))
+        (Term.app2 Term.add_Q (Term.app2 Term.add_Q Q2 Q2) (Term.app2 Term.add_Q Q2 Q2))) :=
+    Derivable.mp
+      (Derivable.mp
+        (Derivable.mp (Derivable.mp hX3Y1 (Derivable.mp hLX and_intro))
+          (lt_le_Q_add _ _ (Term.app2 Term.add_Q Q2 Q2) (Term.app2 Term.add_Q Q2 Q2)))
+        (Derivable.mp (abs_Q_sub_triangle X1 X3 Y1) and_intro))
+      (le_lt_Q_trans _ _ _)
+  let hcol : Derivable F al Premises
+      (eq_Q (Term.app2 Term.add_Q (Term.app2 Term.add_Q Q2 Q2) (Term.app2 Term.add_Q Q2 Q2))
+        (.app Term.pow2neg_Q (.var .vz))) :=
+    eqQtrans (addQl (pow2neg_Q_halve s) (Term.app2 Term.add_Q Q2 Q2))
+      (eqQtrans (addQr (.app Term.pow2neg_Q s) (pow2neg_Q_halve s))
+        (pow2neg_Q_halve (.var .vz)))
+  let hsub : Derivable F al Premises
+      (eq_Q
+        (.app Term.abs_Q (Term.app2 Term.sub_Q
+          (Term.app2 Term.cauchyfy (Term.app2 Term.mul_R f sgh) s)
+          (Term.app2 Term.cauchyfy (Term.app2 Term.add_R u v) s)))
+        (.app Term.abs_Q (Term.app2 Term.sub_Q X1 Y1))) :=
+    abs_Q_congr (sub_Q_congr
+      (eqQ_of_nat_eq' (cauchyfy_mul_R f sgh s))
+      (eqQ_of_nat_eq' (cauchyfy_add_R u v s)))
+  Derivable.mp htot (lt_Q_congr _ _ _ _ (eqQsym hsub) hcol)
+
+/-- `f ·_ℝ (g +_ℝ h) =_ℝ (f ·_ℝ g) +_ℝ (f ·_ℝ h)`, at explicit reals. -/
+def distrib_R_core (f g h : Term F Γ (realTy ι)) :
+    Derivable F al Premises
+      (eq_R (Term.app2 Term.mul_R f (Term.app2 Term.add_R g h))
+            (Term.app2 Term.add_R
+              (Term.app2 Term.mul_R f g) (Term.app2 Term.mul_R f h))) :=
+  eq_R_of_lt_bound _ _ (by
+    simp only [mul_R_app_weaken, add_R_app_weaken]
+    exact distrib_est f.weaken g.weaken h.weaken)
+
+/-- ⊢ ∀f,g,h : ℝ. f ·_ℝ (g +_ℝ h) =_ℝ (f ·_ℝ g) +_ℝ (f ·_ℝ h) -/
+def distrib_R :
+    Derivable F al Premises (Γ := Γ)
+      (Formula.all rTy (Formula.all rTy (Formula.all rTy
+        (eq_R
+          (Term.app2 Term.mul_R (.var (.vs (.vs .vz)))
+            (Term.app2 Term.add_R (.var (.vs .vz)) (.var .vz)))
+          (Term.app2 Term.add_R
+            (Term.app2 Term.mul_R (.var (.vs (.vs .vz))) (.var (.vs .vz)))
+            (Term.app2 Term.mul_R (.var (.vs (.vs .vz)))
+              (.var .vz))))))) :=
+  univ_gen (univ_gen (univ_gen
+    (distrib_R_core (.var (.vs (.vs .vz))) (.var (.vs .vz)) (.var .vz))))
 
 end OrderedFieldAxioms
 

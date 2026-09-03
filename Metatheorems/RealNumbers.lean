@@ -129,5 +129,11 @@ namespace Metatheorems
 #print axioms encode_add
 #print axioms mul_move_le
 #print axioms abs_Q_mul
+-- The last two ring axioms (2026-09-03): four `mul_move_le` moves onto a common index,
+-- where `mul_Q_assoc_inst` / `distrib_Q_inst` close the gap exactly.
+#print axioms mul_assoc_R
+#print axioms mul_assoc_R_core
+#print axioms distrib_R
+#print axioms distrib_R_core
 
 end Metatheorems

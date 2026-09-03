@@ -169,6 +169,142 @@ def cauchyfy_mag_le (w : Term F Γ (realTy ι)) (y : Term F Γ Ty.nat) :
       (le_Q_add_both (.app Term.abs_Q w0) diff
         (.app Term.encode_nat_Q (.app w Term.zero)) Term.one_Q))
 
+-- ── Assembly pieces for the multiplicative axioms ───────────────────────────
+
+/-- `univ_gen` of the pointwise strict bound, folded into `=_ℝ` (definitionally the same
+formula). The two composed reals stay Lean-level parameters throughout, so no `prw` ever
+sees them. -/
+def eq_R_of_lt_bound (u v : Term F Γ (realTy ι))
+    (h : Derivable F al Premises (Γ := Ty.nat :: Γ)
+      (lt_Q (.app Term.abs_Q (Term.app2 Term.sub_Q
+        (Term.app2 Term.cauchyfy u.weaken (.app .succ (.var .vz)))
+        (Term.app2 Term.cauchyfy v.weaken (.app .succ (.var .vz)))))
+        (.app Term.pow2neg_Q (.var .vz)))) :
+    Derivable F al Premises (eq_R u v) :=
+  univ_gen h
+
+/-- **The dyadic conversion of one move**: `(⟨c⟩+1)·2^{-p} ≤_ℚ 2^{-j}` once
+`p = (c+1) + (j + w)` at ℕ — the magnitude `⟨c⟩+1 ≤ ⟨2^{c+1}⟩` eats `c+1` of the exponent,
+`w` is discarded, and `j` remains. -/
+def mag_dyadic_le (c p j w : Term F Γ Ty.nat)
+    (hp : Derivable F al Premises
+      (Formula.eq0 (Term.app2 Term.add (.app .succ c) (Term.app2 Term.add j w)) p)) :
+    Derivable F al Premises
+      (le_Q (Term.app2 Term.mul_Q
+        (Term.app2 Term.add_Q (.app Term.encode_nat_Q c) Term.one_Q)
+        (.app Term.pow2neg_Q p))
+        (.app Term.pow2neg_Q j)) :=
+  let P : Term F Γ Ty.nat := .app Term.pow2neg_Q p
+  let B : Term F Γ Ty.nat :=
+    Term.app2 Term.add_Q (.app Term.encode_nat_Q c) Term.one_Q
+  let eSc : Term F Γ Ty.nat := .app Term.encode_nat_Q (.app .succ c)
+  let e2c : Term F Γ Ty.nat := .app Term.encode_nat_Q (.app Term.exp2 (.app .succ c))
+  let e1 : Derivable F al Premises
+      (eq_Q (Term.app2 Term.mul_Q B P) (Term.app2 Term.mul_Q eSc P)) :=
+    mulQl (eqQsym (encode_succ c)) P
+  let l1 : Derivable F al Premises
+      (le_Q (Term.app2 Term.mul_Q eSc P) (Term.app2 Term.mul_Q e2c P)) :=
+    le_Q_mul_mono_l eSc e2c P
+      (encode_le (.app .succ c) (.app Term.exp2 (.app .succ c))
+        (exp2_ge_self_inst (.app .succ c)))
+      (Derivable.mp (zero_lt_pow2neg_Q p) (lt_Q_imp_le_Q _ _))
+  let e2 : Derivable F al Premises
+      (eq_Q (Term.app2 Term.mul_Q e2c P)
+        (.app Term.pow2neg_Q (Term.app2 Term.add j w))) :=
+    eqQtrans
+      (mulQr e2c (eqQ_of_nat_eq' (Derivable.mp (pow2neg_idx_nat' hp) Derivable.sym0)))
+      (encode_pow2_mul (.app .succ c) (Term.app2 Term.add j w))
+  leQt
+    (Derivable.mp l1 (le_Q_congr _ _ _ _ (eqQsym e1) e2))
+    (pow2neg_Q_le_add j w)
+
+/-- The strict variant: `(⟨c⟩+1)·2^{-p} <_ℚ 2^{-j}`, via `c+2 ≤ 2^{c+1}`. This is where the
+strictness of each check/estimate comes from. -/
+def mag_dyadic_lt (c p j w : Term F Γ Ty.nat)
+    (hp : Derivable F al Premises
+      (Formula.eq0 (Term.app2 Term.add (.app .succ c) (Term.app2 Term.add j w)) p)) :
+    Derivable F al Premises
+      (lt_Q (Term.app2 Term.mul_Q
+        (Term.app2 Term.add_Q (.app Term.encode_nat_Q c) Term.one_Q)
+        (.app Term.pow2neg_Q p))
+        (.app Term.pow2neg_Q j)) :=
+  let P : Term F Γ Ty.nat := .app Term.pow2neg_Q p
+  let B : Term F Γ Ty.nat :=
+    Term.app2 Term.add_Q (.app Term.encode_nat_Q c) Term.one_Q
+  let eSc : Term F Γ Ty.nat := .app Term.encode_nat_Q (.app .succ c)
+  let e2c : Term F Γ Ty.nat := .app Term.encode_nat_Q (.app Term.exp2 (.app .succ c))
+  let e1 : Derivable F al Premises
+      (eq_Q (Term.app2 Term.mul_Q B P) (Term.app2 Term.mul_Q eSc P)) :=
+    mulQl (eqQsym (encode_succ c)) P
+  let l1 : Derivable F al Premises
+      (lt_Q (Term.app2 Term.mul_Q eSc P) (Term.app2 Term.mul_Q e2c P)) :=
+    lt_Q_mul_mono_l eSc e2c P
+      (encode_lt (.app .succ c) (.app Term.exp2 (.app .succ c))
+        (succ_succ_le_exp2_succ c))
+      (zero_lt_pow2neg_Q p)
+  let e2 : Derivable F al Premises
+      (eq_Q (Term.app2 Term.mul_Q e2c P)
+        (.app Term.pow2neg_Q (Term.app2 Term.add j w))) :=
+    eqQtrans
+      (mulQr e2c (eqQ_of_nat_eq' (Derivable.mp (pow2neg_idx_nat' hp) Derivable.sym0)))
+      (encode_pow2_mul (.app .succ c) (Term.app2 Term.add j w))
+  Derivable.mp
+    (Derivable.mp (pow2neg_Q_le_add j w)
+      (Derivable.mp
+        (Derivable.mp l1 (lt_Q_congr _ _ _ _ (eqQsym e1) e2))
+        and_intro))
+    (lt_le_Q_trans _ _ (.app Term.pow2neg_Q j))
+
+/-- Local `S`-congruence (the one in `RationalNumbers.lean` is private). -/
+private def succ_congr₀ {s t : Term F Γ Ty.nat}
+    (h : Derivable F al Premises (Formula.eq0 s t)) :
+    Derivable F al Premises (Formula.eq0 (.app .succ s) (.app .succ t)) :=
+  qfer_no_premise_nat_nf h (r := .app .succ (.var .vz)) (by qb_nf) (by qb_nf)
+
+/-- `(p+1) + ((s+1) + q) =₀ s + ((q + p) + 2)` — the ℕ identity each move's dyadic
+conversion consumes, with the `(q+p)`-ordered bound. -/
+def nat_shuffle1 (p q s : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (Formula.eq0
+        (Term.app2 Term.add (.app .succ p) (Term.app2 Term.add (.app .succ s) q))
+        (Term.app2 Term.add s
+          (Term.app2 Term.add (Term.app2 Term.add q p) (Term.ofNat 2)))) :=
+  let sq : Term F Γ Ty.nat := Term.app2 Term.add s q
+  let qp : Term F Γ Ty.nat := Term.app2 Term.add q p
+  -- LHS =₀ S (S (p + (s + q)))
+  let hL : Derivable F al Premises
+      (Formula.eq0
+        (Term.app2 Term.add (.app .succ p) (Term.app2 Term.add (.app .succ s) q))
+        (.app .succ (.app .succ (Term.app2 Term.add p sq)))) :=
+    qtrans (add_succ_l p (Term.app2 Term.add (.app .succ s) q))
+      (succ_congr₀ (qtrans (add_congr_r p (add_succ_l s q))
+        (add_succ p sq)))
+  -- RHS =₀ S (S (s + (q + p)))
+  let hR : Derivable F al Premises
+      (Formula.eq0
+        (Term.app2 Term.add s (Term.app2 Term.add qp (Term.ofNat 2)))
+        (.app .succ (.app .succ (Term.app2 Term.add s qp)))) :=
+    qtrans
+      (add_congr_r s
+        (qtrans (add_succ qp (.app .succ .zero))
+          (succ_congr₀ (qtrans (add_succ qp .zero) (succ_congr₀ (add_zero_r qp))))))
+      (qtrans (add_succ s (.app .succ qp)) (succ_congr₀ (add_succ s qp)))
+  -- middle: p + (s + q) =₀ s + (q + p)
+  let mid : Derivable F al Premises (Formula.eq0 (Term.app2 Term.add p sq) (Term.app2 Term.add s qp)) :=
+    qtrans (add_comm p sq) (add_assoc s q p)
+  qtrans hL
+    (qtrans (succ_congr₀ (succ_congr₀ mid)) (Derivable.mp hR Derivable.sym0))
+
+/-- The mirror of `nat_shuffle1`, with the `(p+q)`-ordered bound. -/
+def nat_shuffle2 (p q s : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (Formula.eq0
+        (Term.app2 Term.add (.app .succ p) (Term.app2 Term.add (.app .succ s) q))
+        (Term.app2 Term.add s
+          (Term.app2 Term.add (Term.app2 Term.add p q) (Term.ofNat 2)))) :=
+  qtrans (nat_shuffle1 p q s)
+    (add_congr_r s (add_congr_l (add_comm q p) (Term.ofNat 2)))
+
 end Bounds
 
 end Metatheorems
