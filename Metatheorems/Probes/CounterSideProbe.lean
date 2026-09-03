@@ -234,44 +234,10 @@ theorem wapp_sForallAx {ρ : Ty ι} {A : Formula F (ρ :: Γ)} (t : Term F Γ ρ
 theorem tm_sRefl0 {t : Term F Γ Ty.nat} :
     termMajorizer cm (sRefl0 (si := si) (t := t)).val n e = () := rfl
 
-/-- `termMajorizer` commutes with substitution, mirroring `termMajorizer_rename_gen`. -/
-theorem termMajorizer_subst_gen :
-    ∀ {Γ Δ : Ctx ι} {ρ : Ty ι} (σ : Term.Subst F Γ Δ) (t : Term F Γ ρ) (n : ℕ)
-    (eΔ : Ctx.interpret X (Δ.map Ty.hat)) (eΓ : Ctx.interpret X (Γ.map Ty.hat)),
-    (∀ {τ} (v : Var Γ τ), termMajorizer cm (σ v) n eΔ = Ctx.lookupHat v eΓ) →
-    termMajorizer cm (t.subst σ) n eΔ = termMajorizer cm t n eΓ := by
-  intro Γ Δ ρ σ t
-  induction t generalizing Δ with
-  | var v => intro n eΔ eΓ h; exact h v
-  | app f a ihf iha =>
-    intro n eΔ eΓ h
-    simp only [Term.subst, termMajorizer, ihf σ n eΔ eΓ h, iha σ n eΔ eΓ h]
-  | lam body ih =>
-    intro n eΔ eΓ h
-    simp only [Term.subst, termMajorizer]
-    funext x
-    exact ih (Term.Subst.ext σ) n (x, eΔ) (x, eΓ) (fun v => by
-      cases v with
-      | vz => rfl
-      | vs w =>
-        show termMajorizer cm (Term.weaken (σ w)) n (x, eΔ) = _
-        rw [termMajorizer_weaken]; exact h w)
-  | zero | succ | prec | func | zeroX | dist | unitI => intros; rfl
-  | mkPair a b iha ihb =>
-    intro n eΔ eΓ h
-    simp only [Term.subst, termMajorizer, iha σ n eΔ eΓ h, ihb σ n eΔ eΓ h]
-  | fst p ih =>
-    intro n eΔ eΓ h
-    simp only [Term.subst, termMajorizer, ih σ n eΔ eΓ h]
-  | snd p ih =>
-    intro n eΔ eΓ h
-    simp only [Term.subst, termMajorizer, ih σ n eΔ eΓ h]
-
-/-- The `Term.interpret_subst0` analogue: substitution is environment extension. -/
-@[simp] theorem termMajorizer_subst0 {ρ σ : Ty ι} (t : Term F (σ :: Γ) ρ) (s : Term F Γ σ) :
-    termMajorizer cm (t.subst0 s) n e = termMajorizer cm t n (termMajorizer cm s n e, e) :=
-  termMajorizer_subst_gen cm (Term.subst0_map s) t n e (termMajorizer cm s n e, e)
-    (fun v => by cases v with | vz => rfl | vs w => rfl)
+/-! `termMajorizer_subst_gen` and `termMajorizer_subst0` were written here and are **now in
+`Majorizability.lean`**, beside `termMajorizer_rename_gen`/`termMajorizer_weaken` — they are
+general facts about `termMajorizer`, not probe scaffolding. Unchanged in the move; the uses
+below resolve to the library copies. -/
 
 theorem capp_sForallAx {ρ : Ty ι} {A : Formula F (ρ :: Γ)} (t : Term F Γ ρ)
     (w : Ty.interpret X (wTy (Formula.all ρ A)).hat) (y : Ty.interpret X (cTy (A.subst0 t)).hat) :

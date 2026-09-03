@@ -485,7 +485,15 @@ end ComputesDemo
 -- The equality interpretation
 -- ============================================================================
 
-/-! ### `EqXInterp` for a metric model — four fields of nine, and why the other five stall
+/-! ### `EqXInterp` for a metric model — four fields of nine, and why the other five stalled
+
+⚠ **HISTORICAL (written 2026-09-02, superseded 2026-09-03).** All nine fields are now
+constructed and this file has **zero** `sorry`; the evaluation bridge this note asks for is
+`QValBridge.lean`, and a soundness theorem — which the note below says does not exist — is
+`Soundness.lean`, with `MetricModel.soundness` some 280 lines further down *this* file. The
+diagnosis is kept because it is what identified the bridge as the single blocker, and because
+its reasoning about *which* field costs what is still accurate; read every present tense in it
+as past tense.
 
 `EqXInterp` is the last hypothesis of the two metric metatheorems that nothing constructed.
 `MetricModel.eqXInterp` below constructs it, and is honest about what it cannot yet prove.
@@ -526,11 +534,16 @@ plus `Rounding.qval_roundR_dist_le`, and `realize`/`extract`/`realizeTerm_sound`
 
 The alternative route — a soundness theorem `Derivable … A → ∀ env, Formula.interpret si A env`,
 which would let the object-level `lt_Q_abs_sub_self` discharge `dist_comm_holds` — is
-**circular**: soundness's `dist_comm`/`dist_tri` cases are *exactly* these two fields. There
-is no soundness theorem in the project, and this is why writing one would not be free.
+**circular**: soundness's `dist_comm`/`dist_tri` cases are *exactly* these two fields. That
+circularity is why the bridge, not soundness, was the way through.
 
-No `EqXInterp` field is weakened; the five stalled ones carry a `sorry`. See the report and
-`ARCHITECTURE.md` §3. -/
+(`Soundness.lean` was written the following day and does exist, so read the sentence above as
+"soundness cannot discharge *these two fields*", which remains true and is exactly why it takes
+`hdist_comm`/`hdist_tri` as hypotheses. `MetricModel.soundness` discharges them *from* the
+finished `eqXInterp` — the dependency runs bridge → fields → soundness, never the reverse.)
+
+No `EqXInterp` field is weakened. The five that stalled carried a `sorry` until the bridge
+landed; none does now. See `ARCHITECTURE.md` §3. -/
 
 -- ============================================================================
 -- Evaluating the two sides of `eqAtType` at a base type

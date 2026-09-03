@@ -48,70 +48,20 @@ namespace Metatheorems
 namespace BoundLemmasP2
 
 -- ============================================================================
--- Part 1: the enabling lemmas — termMajorizer commutes with weaken/castTy
+-- Part 1: the enabling lemmas — PROMOTED OUT OF THIS FILE 2026-09-04
 -- ============================================================================
 
-section Enabling
+/-! `termMajorizer_rename_gen`, `termMajorizer_weaken` and `termMajorizer_castTy` were written
+here and are **now in the library**: the first two in `Majorizability.lean` (with
+`termMajorizer_subst_gen`/`termMajorizer_subst0`, written later in
+`Probes/CounterSideProbe.lean`), and `termMajorizer_castTy` in `Dialectica/Syntactic.lean`,
+which is where `Term.castTy` is defined.
 
-variable {ι : Type} {X : ι → Type} {F : ι → Ty ι} {si : SpaceInterp X F}
-    {am : AbstractMajorizability si}
-
-/-- General form, mirroring `Term.interpret_rename_gen` (`Semantics.lean:145`) exactly:
-`termMajorizer` commutes with any renaming whose `env_star`s agree on `Ctx.lookupHat`. -/
-theorem termMajorizer_rename_gen (cm : ConstMajorants am) :
-    ∀ {Γ Δ : Ctx ι} {ρ : Ty ι} (r : Term.Renaming Γ Δ) (t : Term F Γ ρ) (n : ℕ)
-    (env_starΔ : Ctx.interpret X (Δ.map Ty.hat)) (env_starΓ : Ctx.interpret X (Γ.map Ty.hat)),
-    (∀ {σ} (v : Var Γ σ), Ctx.lookupHat (r v) env_starΔ = Ctx.lookupHat v env_starΓ) →
-    termMajorizer cm (t.rename r) n env_starΔ = termMajorizer cm t n env_starΓ := by
-  intro Γ Δ ρ r t
-  induction t generalizing Δ with
-  | var v => intro n env_starΔ env_starΓ h; exact h v
-  | app f a ihf iha =>
-    intro n env_starΔ env_starΓ h
-    simp only [Term.rename, termMajorizer, ihf r n env_starΔ env_starΓ h,
-      iha r n env_starΔ env_starΓ h]
-  | lam body ih =>
-    intro n env_starΔ env_starΓ h
-    simp only [Term.rename, termMajorizer]
-    funext x
-    exact ih (Term.Renaming.ext r) n (x, env_starΔ) (x, env_starΓ) (fun v => by
-      cases v with
-      | vz => rfl
-      | vs w => exact h w)
-  | zero | succ | prec | func | zeroX | dist | unitI => intros; rfl
-  | mkPair a b iha ihb =>
-    intro n env_starΔ env_starΓ h
-    simp only [Term.rename, termMajorizer, iha r n env_starΔ env_starΓ h,
-      ihb r n env_starΔ env_starΓ h]
-  | fst p ih =>
-    intro n env_starΔ env_starΓ h
-    simp only [Term.rename, termMajorizer, ih r n env_starΔ env_starΓ h]
-  | snd p ih =>
-    intro n env_starΔ env_starΓ h
-    simp only [Term.rename, termMajorizer, ih r n env_starΔ env_starΓ h]
-
-/-- **The enabling lemma.** `termMajorizer` commutes with `Term.weaken` — an `O(1)` fact per
-use-site, never requiring `Term.weaken` to be reduced to expose its constructors. This is what
-makes every `SRealizer` combinator (`sSyllogism`, `sInduction`, `sForallAx`, `sUnivGen`, …)
-transparent to `termMajorizer`: their `.val` fields are built from `Term.weaken`-wrapping of
-sub-realizers, and this lemma lets `simp` push straight through that wrapping to the
-sub-realizer's own `termMajorizer`, instead of forcing the wrapped term to whnf. -/
-@[simp] theorem termMajorizer_weaken (cm : ConstMajorants am) {Γ : Ctx ι} {ρ σ : Ty ι}
-    (t : Term F Γ ρ) (n : ℕ) (x_star : Ty.interpret X σ.hat)
-    (env_star : Ctx.interpret X (Γ.map Ty.hat)) :
-    termMajorizer cm (Term.weaken t (σ := σ)) n (x_star, env_star)
-      = termMajorizer cm t n env_star :=
-  termMajorizer_rename_gen cm Term.Renaming.shift t n (x_star, env_star) env_star (fun _ => rfl)
-
-/-- `termMajorizer` commutes with `Term.castTy` — trivial, since `castTy` is a bare `cast` at
-matching-on-the-nose types. -/
-@[simp] theorem termMajorizer_castTy (cm : ConstMajorants am) {Γ : Ctx ι} {ρ τ : Ty ι}
-    (h : ρ = τ) (t : Term F Γ ρ) (n : ℕ) (env_star : Ctx.interpret X (Γ.map Ty.hat)) :
-    termMajorizer cm (Term.castTy h t) n env_star
-      = cast (congrArg (fun ρ => Ty.interpret X ρ.hat) h) (termMajorizer cm t n env_star) := by
-  cases h; rfl
-
-end Enabling
+They are general facts about `termMajorizer` — the exact analogues of `Term.interpret_rename_gen`
+/ `interpret_weaken` / `interpret_subst0` in `Semantics.lean` — and belong beside the definition
+rather than in a probe. Nothing about them changed in the move; the paragraph above on *why*
+they matter (`O(1)` per use-site, never forcing the wrapped term to whnf, which is what makes
+every `SRealizer` combinator transparent to `termMajorizer`) is reproduced at the new site. -/
 
 -- ============================================================================
 -- Part 2: CORRECTED — the compositional route does NOT get past the proof-mode layer

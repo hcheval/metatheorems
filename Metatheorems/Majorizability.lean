@@ -451,6 +451,115 @@ theorem closedMajorizer_maj {ι : Type} {X : ι → Type} {F : ι → Ty ι}
   (termMajorizer_maj cm t am.N (Nat.le_refl _)).1 () () trivial
 
 -- ============================================================================
+-- `termMajorizer` commutes with renaming, weakening, casting and substitution
+-- ============================================================================
+
+/-! These mirror `Term.interpret_rename_gen` / `interpret_weaken` / `interpret_subst0` in
+`Semantics.lean` exactly, and they are what makes bound extraction *possible* rather than
+merely well-defined.
+
+Every `SRealizer` combinator in `Dialectica/Syntactic.lean` builds its `.val` by
+`.app`/`.lam`/`Term.weaken`/`Term.castTy`-wrapping of its sub-realizers' `.val`s, never by
+unfolding them. So with these lemmas `simp` pushes `termMajorizer` straight through the
+wrapping to the sub-realizer's own majorant — `O(1)` per use-site, and in particular **never
+forcing the wrapped term to whnf**. Without them the only route is delta-expansion, which is
+the pathology in this file's sibling note and in "Build cost": a single `S_comb` is 82
+derivation nodes but ≈4×10⁷ leaf-realizer copies.
+
+Promoted 2026-09-04 from `Probes/BoundLemmasP2.lean` and `Probes/CounterSideProbe.lean`, where
+they were written; they are general facts about `termMajorizer`, not probe scaffolding. -/
+
+section Structural
+
+variable {ι : Type} {X : ι → Type} {F : ι → Ty ι} {si : SpaceInterp X F}
+    {am : AbstractMajorizability si}
+
+/-- General form, mirroring `Term.interpret_rename_gen`: `termMajorizer` commutes with any
+renaming whose `env_star`s agree on `Ctx.lookupHat`. -/
+theorem termMajorizer_rename_gen (cm : ConstMajorants am) :
+    ∀ {Γ Δ : Ctx ι} {ρ : Ty ι} (r : Term.Renaming Γ Δ) (t : Term F Γ ρ) (n : ℕ)
+    (env_starΔ : Ctx.interpret X (Δ.map Ty.hat)) (env_starΓ : Ctx.interpret X (Γ.map Ty.hat)),
+    (∀ {σ} (v : Var Γ σ), Ctx.lookupHat (r v) env_starΔ = Ctx.lookupHat v env_starΓ) →
+    termMajorizer cm (t.rename r) n env_starΔ = termMajorizer cm t n env_starΓ := by
+  intro Γ Δ ρ r t
+  induction t generalizing Δ with
+  | var v => intro n env_starΔ env_starΓ h; exact h v
+  | app f a ihf iha =>
+    intro n env_starΔ env_starΓ h
+    simp only [Term.rename, termMajorizer, ihf r n env_starΔ env_starΓ h,
+      iha r n env_starΔ env_starΓ h]
+  | lam body ih =>
+    intro n env_starΔ env_starΓ h
+    simp only [Term.rename, termMajorizer]
+    funext x
+    exact ih (Term.Renaming.ext r) n (x, env_starΔ) (x, env_starΓ) (fun v => by
+      cases v with
+      | vz => rfl
+      | vs w => exact h w)
+  | zero | succ | prec | func | zeroX | dist | unitI => intros; rfl
+  | mkPair a b iha ihb =>
+    intro n env_starΔ env_starΓ h
+    simp only [Term.rename, termMajorizer, iha r n env_starΔ env_starΓ h,
+      ihb r n env_starΔ env_starΓ h]
+  | fst p ih =>
+    intro n env_starΔ env_starΓ h
+    simp only [Term.rename, termMajorizer, ih r n env_starΔ env_starΓ h]
+  | snd p ih =>
+    intro n env_starΔ env_starΓ h
+    simp only [Term.rename, termMajorizer, ih r n env_starΔ env_starΓ h]
+
+/-- **The enabling lemma.** `termMajorizer` commutes with `Term.weaken`. -/
+@[simp] theorem termMajorizer_weaken (cm : ConstMajorants am) {Γ : Ctx ι} {ρ σ : Ty ι}
+    (t : Term F Γ ρ) (n : ℕ) (x_star : Ty.interpret X σ.hat)
+    (env_star : Ctx.interpret X (Γ.map Ty.hat)) :
+    termMajorizer cm (Term.weaken t (σ := σ)) n (x_star, env_star)
+      = termMajorizer cm t n env_star :=
+  termMajorizer_rename_gen cm Term.Renaming.shift t n (x_star, env_star) env_star (fun _ => rfl)
+
+/-- The substitution analogue of `termMajorizer_rename_gen`. -/
+theorem termMajorizer_subst_gen (cm : ConstMajorants am) :
+    ∀ {Γ Δ : Ctx ι} {ρ : Ty ι} (σ : Term.Subst F Γ Δ) (t : Term F Γ ρ) (n : ℕ)
+    (eΔ : Ctx.interpret X (Δ.map Ty.hat)) (eΓ : Ctx.interpret X (Γ.map Ty.hat)),
+    (∀ {τ} (v : Var Γ τ), termMajorizer cm (σ v) n eΔ = Ctx.lookupHat v eΓ) →
+    termMajorizer cm (t.subst σ) n eΔ = termMajorizer cm t n eΓ := by
+  intro Γ Δ ρ σ t
+  induction t generalizing Δ with
+  | var v => intro n eΔ eΓ h; exact h v
+  | app f a ihf iha =>
+    intro n eΔ eΓ h
+    simp only [Term.subst, termMajorizer, ihf σ n eΔ eΓ h, iha σ n eΔ eΓ h]
+  | lam body ih =>
+    intro n eΔ eΓ h
+    simp only [Term.subst, termMajorizer]
+    funext x
+    exact ih (Term.Subst.ext σ) n (x, eΔ) (x, eΓ) (fun v => by
+      cases v with
+      | vz => rfl
+      | vs w =>
+        change termMajorizer cm (Term.weaken (σ w)) n (x, eΔ) = _
+        rw [termMajorizer_weaken]; exact h w)
+  | zero | succ | prec | func | zeroX | dist | unitI => intros; rfl
+  | mkPair a b iha ihb =>
+    intro n eΔ eΓ h
+    simp only [Term.subst, termMajorizer, iha σ n eΔ eΓ h, ihb σ n eΔ eΓ h]
+  | fst p ih =>
+    intro n eΔ eΓ h
+    simp only [Term.subst, termMajorizer, ih σ n eΔ eΓ h]
+  | snd p ih =>
+    intro n eΔ eΓ h
+    simp only [Term.subst, termMajorizer, ih σ n eΔ eΓ h]
+
+/-- The `Term.interpret_subst0` analogue: substitution is environment extension. -/
+@[simp] theorem termMajorizer_subst0 (cm : ConstMajorants am) {Γ : Ctx ι} {ρ σ : Ty ι}
+    (t : Term F (σ :: Γ) ρ) (s : Term F Γ σ) (n : ℕ)
+    (e : Ctx.interpret X (Γ.map Ty.hat)) :
+    termMajorizer cm (t.subst0 s) n e = termMajorizer cm t n (termMajorizer cm s n e, e) :=
+  termMajorizer_subst_gen cm (Term.subst0_map s) t n e (termMajorizer cm s n e, e)
+    (fun v => by cases v with | vz => rfl | vs w => rfl)
+
+end Structural
+
+-- ============================================================================
 -- Bridge to `MajorizabilityRel` (what the metatheorem consumes)
 -- ============================================================================
 

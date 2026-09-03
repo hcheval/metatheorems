@@ -398,6 +398,17 @@ theorem interpret_castTy {si : SpaceInterp X F} {ρ σ : Ty ι} (h : ρ = σ)
       = cast (congrArg (Ty.interpret X) h) (Term.interpret si t env) := by
   cases h; rfl
 
+/-- The majorant counterpart of `interpret_castTy`, and the last member of the structural
+family whose other four (`termMajorizer_rename_gen`/`_weaken`/`_subst_gen`/`_subst0`) live in
+`Majorizability.lean`. It sits here rather than there only because `Term.castTy` is defined in
+this file, downstream of that one. Trivial, since `castTy` is a bare `cast`. -/
+@[simp] theorem termMajorizer_castTy {si : SpaceInterp X F}
+    {am : AbstractMajorizability si} (cm : ConstMajorants am) {ρ σ : Ty ι}
+    (h : ρ = σ) (t : Term F Γ ρ) (n : ℕ) (env_star : Ctx.interpret X (Γ.map Ty.hat)) :
+    termMajorizer cm (Term.castTy h t) n env_star
+      = cast (congrArg (fun ρ => Ty.interpret X ρ.hat) h) (termMajorizer cm t n env_star) := by
+  cases h; rfl
+
 
 /-- Interpreting a substitution built from a renaming just relocates the environment. -/
 theorem interpretSubst_of_renaming {si : SpaceInterp X F} :
