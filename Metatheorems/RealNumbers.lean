@@ -66,6 +66,12 @@ namespace Metatheorems
 #print axioms mul_R_pointwise_comm
 #print axioms mul_comm_R
 #print axioms mul_comm_R_core
+#print axioms mul_one_R
+#print axioms mul_one_R_core
+#print axioms mul_one_R_apply
+#print axioms mul_one_R_check
+#print axioms cauchyfy_mul_one_R
+#print axioms mul_Q_one_inst
 -- The `<_ℝ` shift estimate. `lt_trans_R` itself is NOT here: it is still `sorryAx`, through
 -- `lt_trans_R_core`, and the note there says why. These three are the mathematics of it.
 #print axioms lt_shift1
