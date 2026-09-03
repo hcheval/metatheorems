@@ -3,7 +3,7 @@ Copyright (c) 2026. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Horatiu
 -/
-import Metatheorems.RealNumbers.Field
+import Metatheorems.RealNumbers.OrderBounds
 
 namespace Metatheorems
 
@@ -48,6 +48,156 @@ def lt_add_R :
             (Term.app2 Term.add_R (.var (.vs .vz)) (.var .vz)))))) :=
   sorry
 
+/-- The core of `lt_mul_pos_R`, at the two witnesses as bound variables: `n₂ = vz` from
+`0 <ℝ g`, `n₁ = vs vz` from `0 <ℝ f`.
+
+Each hypothesis `2^{-nᵢ} ≤ℚ ·̂(nᵢ+1)` persists, halved, at every later index
+(`cauchyfy_lb_imp`), so at the product's own index `S = (m+1)+b` both factors are bounded
+below by `2^{-(nᵢ+1)}`, and the product by `2^{-(n₁+1)}·2^{-(n₂+1)} =ℚ 2^{-m}`
+(`pow2neg_Q_mul`) with `m := (n₁+n₂)+2` — exactly the witness `lt_R` wants. -/
+private def lt_mul_pos_core (f g : Term F Γ (realTy ι)) :
+    Derivable F al Premises (Γ := Ty.nat :: Ty.nat :: Γ)
+      (le_Q (.app Term.pow2neg_Q (.var .vz))
+        (Term.app2 Term.sub_Q
+          (Term.app2 Term.cauchyfy g.weaken.weaken (.app .succ (.var .vz)))
+          (Term.app2 Term.cauchyfy Term.zero_R (.app .succ (.var .vz))))
+       →ᶠ
+       (le_Q (.app Term.pow2neg_Q (.var (.vs .vz)))
+        (Term.app2 Term.sub_Q
+          (Term.app2 Term.cauchyfy f.weaken.weaken (.app .succ (.var (.vs .vz))))
+          (Term.app2 Term.cauchyfy Term.zero_R (.app .succ (.var (.vs .vz)))))
+       →ᶠ
+       lt_R Term.zero_R (Term.app2 Term.mul_R f.weaken.weaken g.weaken.weaken))) :=
+  let Γ₂ := Ty.nat :: Ty.nat :: Γ
+  let n1 : Term F Γ₂ Ty.nat := .var (.vs .vz)
+  let n2 : Term F Γ₂ Ty.nat := .var .vz
+  let F2 : Term F Γ₂ (realTy ι) := f.weaken.weaken
+  let G2 : Term F Γ₂ (realTy ι) := g.weaken.weaken
+  let m : Term F Γ₂ Ty.nat := .app .succ (.app .succ (Term.app2 Term.add n1 n2))
+  let b : Term F Γ₂ Ty.nat :=
+    Term.app2 Term.add
+      (Term.app2 Term.add (.app F2 .zero) (.app G2 .zero)) (Term.ofNat 2)
+  let S : Term F Γ₂ Ty.nat := Term.app2 Term.add (.app .succ m) b
+  let P1 : Term F Γ₂ Ty.nat := .app Term.pow2neg_Q (.app .succ n1)
+  let P2 : Term F Γ₂ Ty.nat := .app Term.pow2neg_Q (.app .succ n2)
+  let Fs : Term F Γ₂ Ty.nat := Term.app2 Term.cauchyfy F2 S
+  let Gs : Term F Γ₂ Ty.nat := Term.app2 Term.cauchyfy G2 S
+  -- (n₁+1) + (n₂+1) =₀ m
+  let hm : Derivable F al Premises (Γ := Γ₂) (Formula.eq0
+      (Term.app2 Term.add (.app .succ n1) (.app .succ n2)) m) :=
+    qtrans (add_succ (.app .succ n1) n2) (succ_congr_o (add_succ_l n1 n2))
+  -- (n₂+1) + (n₁+1) =₀ m
+  let hm' : Derivable F al Premises (Γ := Γ₂) (Formula.eq0
+      (Term.app2 Term.add (.app .succ n2) (.app .succ n1)) m) :=
+    qtrans (add_succ (.app .succ n2) n1)
+      (succ_congr_o (qtrans (add_succ_l n2 n1) (succ_congr_o (add_comm n2 n1))))
+  -- (n₁+1) + ((n₂+2) + b) =₀ (m+1) + b
+  let hIf : Derivable F al Premises (Γ := Γ₂) (Formula.eq0
+      (Term.app2 Term.add (.app .succ n1)
+        (Term.app2 Term.add (.app .succ (.app .succ n2)) b)) S) :=
+    qtrans
+      (Derivable.mp (add_assoc (.app .succ n1) (.app .succ (.app .succ n2)) b)
+        Derivable.sym0)
+      (add_congr_l (qtrans (add_succ (.app .succ n1) (.app .succ n2))
+        (succ_congr_o hm)) b)
+  -- (n₂+1) + ((n₁+2) + b) =₀ (m+1) + b
+  let hIg : Derivable F al Premises (Γ := Γ₂) (Formula.eq0
+      (Term.app2 Term.add (.app .succ n2)
+        (Term.app2 Term.add (.app .succ (.app .succ n1)) b)) S) :=
+    qtrans
+      (Derivable.mp (add_assoc (.app .succ n2) (.app .succ (.app .succ n1)) b)
+        Derivable.sym0)
+      (add_congr_l (qtrans (add_succ (.app .succ n2) (.app .succ n1))
+        (succ_congr_o hm')) b)
+  by
+  pmode
+  pintro hb
+  pintro ha
+  -- clean the two hypotheses: `x −ℚ 0̂(·) =ℚ x`
+  papplym (le_Q_congr (.app Term.pow2neg_Q n1)
+    (Term.app2 Term.sub_Q (Term.app2 Term.cauchyfy F2 (.app .succ n1))
+      (Term.app2 Term.cauchyfy Term.zero_R (.app .succ n1)))
+    (.app Term.pow2neg_Q n1) (Term.app2 Term.cauchyfy F2 (.app .succ n1))
+    (eq_Q_refl_inst (.app Term.pow2neg_Q n1))
+    (eqQtrans
+      (sub_Q_congr (eq_Q_refl_inst (Term.app2 Term.cauchyfy F2 (.app .succ n1)))
+        (eqQ_of_nat_eq' (cauchyfy_zero_R (.app .succ n1))))
+      (sub_Q_zero_Q (Term.app2 Term.cauchyfy F2 (.app .succ n1))))) in ha with haf
+  papplym (le_Q_congr (.app Term.pow2neg_Q n2)
+    (Term.app2 Term.sub_Q (Term.app2 Term.cauchyfy G2 (.app .succ n2))
+      (Term.app2 Term.cauchyfy Term.zero_R (.app .succ n2)))
+    (.app Term.pow2neg_Q n2) (Term.app2 Term.cauchyfy G2 (.app .succ n2))
+    (eq_Q_refl_inst (.app Term.pow2neg_Q n2))
+    (eqQtrans
+      (sub_Q_congr (eq_Q_refl_inst (Term.app2 Term.cauchyfy G2 (.app .succ n2)))
+        (eqQ_of_nat_eq' (cauchyfy_zero_R (.app .succ n2))))
+      (sub_Q_zero_Q (Term.app2 Term.cauchyfy G2 (.app .succ n2))))) in hb with hag
+  -- persist the bounds to the product's index
+  papplym (cauchyfy_lb_imp F2 n1
+    (Term.app2 Term.add (.app .succ (.app .succ n2)) b)) in haf with hafs
+  papplym (le_Q_congr P1
+    (Term.app2 Term.cauchyfy F2 (Term.app2 Term.add (.app .succ n1)
+      (Term.app2 Term.add (.app .succ (.app .succ n2)) b)))
+    P1 Fs (eq_Q_refl_inst P1)
+    (eqQ_of_nat_eq' (cauchyfy_idx_nat' F2 hIf))) in hafs with hFs
+  papplym (cauchyfy_lb_imp G2 n2
+    (Term.app2 Term.add (.app .succ (.app .succ n1)) b)) in hag with hags
+  papplym (le_Q_congr P2
+    (Term.app2 Term.cauchyfy G2 (Term.app2 Term.add (.app .succ n2)
+      (Term.app2 Term.add (.app .succ (.app .succ n1)) b)))
+    P2 Gs (eq_Q_refl_inst P2)
+    (eqQ_of_nat_eq' (cauchyfy_idx_nat' G2 hIg))) in hags with hGs
+  -- the witness
+  pexists m
+  canorm
+  -- evaluate the outer cauchyfy on the product, drop the `−ℚ 0`
+  papplym (le_Q_congr (.app Term.pow2neg_Q m)
+    (Term.app2 Term.mul_Q Fs Gs)
+    (.app Term.pow2neg_Q m)
+    (Term.app2 Term.sub_Q
+      (Term.app2 Term.cauchyfy (Term.app2 Term.mul_R F2 G2) (.app .succ m))
+      (Term.app2 Term.cauchyfy Term.zero_R (.app .succ m)))
+    (eq_Q_refl_inst (.app Term.pow2neg_Q m))
+    (eqQsym (eqQtrans
+      (sub_Q_congr (eqQ_of_nat_eq' (cauchyfy_mul_R F2 G2 (.app .succ m)))
+        (eqQ_of_nat_eq' (cauchyfy_zero_R (.app .succ m))))
+      (sub_Q_zero_Q (Term.app2 Term.mul_Q Fs Gs)))))
+  -- 2^{-m} =ℚ 2^{-(n₁+1)} ·ℚ 2^{-(n₂+1)}
+  papplym (le_Q_congr (Term.app2 Term.mul_Q P1 P2) (Term.app2 Term.mul_Q Fs Gs)
+    (.app Term.pow2neg_Q m) (Term.app2 Term.mul_Q Fs Gs)
+    (eqQtrans (pow2neg_Q_mul (.app .succ n1) (.app .succ n2))
+      (eqQ_of_nat_eq' (pow2neg_idx_nat' hm)))
+    (eq_Q_refl_inst (Term.app2 Term.mul_Q Fs Gs)))
+  -- and the product bound
+  papplym (le_Q_mul_o P1 Fs P2 Gs)
+  psplit
+  · psplit
+    · pthm (Derivable.mp (zero_lt_pow2neg_Q (.app .succ n1))
+        (lt_Q_imp_le_Q Term.zero_Q P1))
+    · pthm (Derivable.mp (zero_lt_pow2neg_Q (.app .succ n2))
+        (lt_Q_imp_le_Q Term.zero_Q P2))
+  · psplit
+    · pexact hFs
+    · pexact hGs
+
+/-- `0 <ℝ f ∧ 0 <ℝ g → 0 <ℝ f·g`, at explicit reals. The two `∃`-eliminations happen at
+the Lean level with `Derivable.exist_rule` — exit 3 of the note at `lt_trans_R_core` — so
+no nested `pobtain` ever occurs. -/
+def lt_mul_pos_R_core (f g : Term F Γ (realTy ι)) :
+    Derivable F al Premises
+      ((lt_R Term.zero_R f ∧ᶠ lt_R Term.zero_R g) →ᶠ
+        lt_R Term.zero_R (Term.app2 Term.mul_R f g)) := by
+  refine Derivable.importation ?_
+  rw [lt_R_zero_ex f]
+  refine Derivable.exist_rule ?_
+  simp only [Formula.weakenBy_imp, lt_R_weakenBy, zero_R_weaken, mul_R_app_weaken2]
+  refine Derivable.mp ?_ flip_comb
+  rw [lt_R_zero_ex g.weaken]
+  refine Derivable.exist_rule ?_
+  simp only [Formula.weakenBy_imp, ltBody_weakenBy, lt_R_weakenBy, zero_R_weaken,
+    mul_R_app_weaken2]
+  exact lt_mul_pos_core f g
+
 /-- ⊢ ∀f,g : ℝ. 0 <_ℝ f ∧ 0 <_ℝ g → 0 <_ℝ f ·_ℝ g -/
 def lt_mul_pos_R :
     Derivable F al Premises (Γ := Γ)
@@ -56,7 +206,7 @@ def lt_mul_pos_R :
           ∧ᶠ lt_R Term.zero_R (.var .vz))
           →ᶠ lt_R Term.zero_R
             (Term.app2 Term.mul_R (.var (.vs .vz)) (.var .vz))))) :=
-  sorry
+  univ_gen (univ_gen (lt_mul_pos_R_core (.var (.vs .vz)) (.var .vz)))
 
 /-- ⊢ 0_ℝ <_ℝ 1_ℝ -/
 def zero_lt_one_R :
