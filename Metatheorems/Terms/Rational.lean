@@ -154,11 +154,20 @@ def snd_pair {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat) :=
 -- Section 3: Division by 2
 -- ============================================================================
 
-/-- Division by 2 via state-pair recursion.
-    Tracks state pair(div2(k), isEven(k)) as a single natural number.
+/-- Division by 2, **rounding UP**: `div2 n = ⌈n/2⌉ = (n+1)/2`, via state-pair recursion.
+
     state(0) = pair(0, 1)
     state(Sk) = pair(fst(state(k)) + snd(state(k)), sg_bar(snd(state(k))))
-    div2(n) = fst_pair(state(n)). -/
+    div2(n) = fst_pair(state(n)).
+
+    **The name and the old docstring said `⌊n/2⌋`; that is wrong**, and was corrected on
+    2026-09-03 when the semantic mirror was built (`QValBridge.rec_div2_state` proves the true
+    invariant `state k = pairN ((k+1)/2) (1 - k%2)`). The step adds `snd` *before* flipping the
+    parity flag, so the values run 0,1,1,2,2,… — `div2 1 = 1`, while `⌊1/2⌋ = 0`.
+
+    Nothing downstream is affected. `rat_num = div2 (j + isOdd j)` is `⌈j/2⌉` for both
+    parities, which is what the encoding wants, and `div2_zero` / `div2_double` hold of floor
+    and ceiling alike. The name is kept only because renaming it would churn every use. -/
 def div2 {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat) :=
   Term.lam
     (.app Term.fst_pair
