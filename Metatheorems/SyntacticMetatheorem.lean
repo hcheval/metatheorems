@@ -27,7 +27,7 @@ def extractedUTerm
     (eqxi : EqXInterp X F si)
     (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B)
     {ρ : Ty ι} {B₀ C₀ : Formula F [Ty.nat, ρ]}
-    (prf : @Derivable ι F Allowed.extended Premises []
+    (prf : @Derivable ι κ F Allowed.extended Premises []
       (Formula.all ρ (Formula.imp (Formula.all .nat B₀) (Formula.ex .nat C₀)))) :
     Term F ([] : Ctx ι) (ρ →ₜ Ty.nat) :=
   extractUTerm (ρ := ρ) (B₀ := B₀) (C₀ := C₀) (syntactic_soundness eqxi spremise prf).val
@@ -37,7 +37,7 @@ def extractedVTerm
     (eqxi : EqXInterp X F si)
     (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B)
     {ρ : Ty ι} {B₀ C₀ : Formula F [Ty.nat, ρ]}
-    (prf : @Derivable ι F Allowed.extended Premises []
+    (prf : @Derivable ι κ F Allowed.extended Premises []
       (Formula.all ρ (Formula.imp (Formula.all .nat B₀) (Formula.ex .nat C₀)))) :
     Term F ([] : Ctx ι) (ρ →ₜ Ty.nat) :=
   extractVTerm (ρ := ρ) (B₀ := B₀) (C₀ := C₀) (syntactic_soundness eqxi spremise prf).val
@@ -51,7 +51,7 @@ theorem syntactic_extraction
     {ρ : Ty ι} {B₀ C₀ : Formula F [Ty.nat, ρ]}
     (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
     (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
-    (prf : @Derivable ι F Allowed.extended Premises []
+    (prf : @Derivable ι κ F Allowed.extended Premises []
       (Formula.all ρ (Formula.imp (Formula.all .nat B₀) (Formula.ex .nat C₀)))) :
     ∀ x : Ty.interpret X ρ,
       Formula.interpret si B₀
@@ -95,7 +95,7 @@ def syntactic_general_metatheorem_at
     {ρ : Ty ι} {B₀ C₀ : Formula F [Ty.nat, ρ]}
     (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
     (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
-    (prf : @Derivable ι F Allowed.extended Premises []
+    (prf : @Derivable ι κ F Allowed.extended Premises []
       (Formula.all ρ (Formula.imp (Formula.all .nat B₀) (Formula.ex .nat C₀)))) :
     { Φ : Ty.interpret X ρ.hat → Nat //
       ∀ (x : Ty.interpret X ρ) (x_star : Ty.interpret X ρ.hat),

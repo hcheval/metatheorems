@@ -618,7 +618,7 @@ def coreBound {ι : Type} {X : ι → Type} {ρ : Ty ι}
 
 /-- `metatheorem_core_of_majorants` with the bound named instead of existentially bound. -/
 theorem metatheorem_core_of_majorants_at
-    {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     {si : SpaceInterp X F}
     (mj : MajorizabilityRel si)
     {ρ : Ty ι}
