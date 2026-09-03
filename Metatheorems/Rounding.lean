@@ -158,6 +158,17 @@ theorem roundR_maj_pair {a b : ℝ} (hb : 0 ≤ b) (hab : a ≤ b) :
   exact ⟨fun p q h => Nat.le_trans (roundR_le₁_of_le hab q) (hmono h),
          fun p q h => hmono h⟩
 
+/-- **`(·)◦` on a natural number computes.** `k₀ (m : ℝ) k = m · 2^{k+1}` exactly, since the
+floor of a natural is itself, so `(m)◦(k) = j(2·m·2^{k+1}, 2^{k+1} − 1)` — a closed ℕ
+expression. This is what lets the metric majorant `λn₁⁰n₂⁰.(n₁+n₂)∘` be evaluated to a literal
+at a given precision index (`MetricModel.constMajorants` in `MetricSpaces.lean`), even though
+`roundR` itself is `noncomputable` on account of taking a Mathlib real. -/
+theorem roundR_natCast (m k : ℕ) :
+    roundR (m : ℝ) k = pairN (2 * (m * 2 ^ (k + 1))) (2 ^ (k + 1) - 1) := by
+  unfold roundR k0
+  have : (m : ℝ) * 2 ^ (k + 1) = ((m * 2 ^ (k + 1) : ℕ) : ℝ) := by push_cast; ring
+  rw [this, Nat.floor_natCast]
+
 /-! ## What is deliberately not here
 
 **Part (1)** — "`(x)◦` is a representative of `x`", i.e. `(x)◦` satisfies the Cauchy condition
