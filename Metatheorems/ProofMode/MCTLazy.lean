@@ -208,23 +208,19 @@ def mct_extract_p1 (si : SpaceInterp X F) (eqxi : EqXInterp X F si)
         Formula.interpret si mctC₀ (UV.2 x, (x, ())) } :=
   mctExtract si eqxi premise_realizer (mct_p1 (al := Allowed.extended) rfl)
 
-/-- The bound p₁ gives, from majorants for its `U` and `V`. -/
+/-- The bound p₁ gives, **via the syntactic metatheorem**. Migrated 2026-09-03 alongside
+`mct_bound_p2`; see the note there for why the `MajorizabilityRel` and the two majorant
+hypotheses are gone. -/
 theorem mct_bound_p1 (si : SpaceInterp X F) (eqxi : EqXInterp X F si)
-    (mj : MajorizabilityRel si)
-    (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
-      ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
-    (U_star V_star : Ty.interpret X (mctTy ι →ₜ Ty.nat).hat)
-    (hU : mj.maj (mctTy ι →ₜ Ty.nat) U_star
-      (mctExtract si eqxi premise_realizer (mct_p1 (al := Allowed.extended) rfl)).val.1)
-    (hV : mj.maj (mctTy ι →ₜ Ty.nat) V_star
-      (mctExtract si eqxi premise_realizer (mct_p1 (al := Allowed.extended) rfl)).val.2) :
+    (am : AbstractMajorizability si)
+    (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B) :
     ∃ Φ : Ty.interpret X (mctTy ι).hat → Nat,
       ∀ (x : Ty.interpret X (mctTy ι)) (x_star : Ty.interpret X (mctTy ι).hat),
-        mj.maj (mctTy ι) x_star x →
+        am.toRel.maj (mctTy ι) x_star x →
         (∀ u : Nat, u ≤ Φ x_star → Formula.interpret si mctB₀ (u, (x, ()))) →
         ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret si mctC₀ (v, (x, ())) :=
-  mct_bound si eqxi mj premise_realizer (mct_p1 (al := Allowed.extended) rfl)
-    U_star V_star hU hV
+  syntactic_general_metatheorem eqxi spremise am rfl rfl rfl rfl
+    (mct_p1 (al := Allowed.extended) rfl)
 
 end Extraction
 

@@ -286,7 +286,14 @@ def mctExtract
     (prf : @Derivable ι F Allowed.extended Premises [] mctStatement) :=
   general_metatheorem_extract si eqxi premise_realizer rfl rfl rfl rfl prf
 
-/-- **The bound**, from the extraction plus majorants for `U` and `V`. -/
+/-- **The bound**, from the extraction plus majorants for `U` and `V`.
+
+**Superseded 2026-09-03 and no longer called.** `mct_bound_p1`/`mct_bound_p2` now go through
+`syntactic_general_metatheorem`, which produces the two majorants itself from
+`all_closed_terms_majorizable` — so the `mj`, `U_star`, `V_star`, `hU`, `hV` arguments below
+are all unnecessary. Kept as the record of Probe P2d, which was written before the
+`syntactic-witnesses` merge and correctly established that the extraction/bounding split
+composes at a time when `Majorizability` was the only alternative. -/
 theorem mct_bound
     {X : ι → Type} (si : SpaceInterp X F) (eqxi : EqXInterp X F si)
     (mj : MajorizabilityRel si)

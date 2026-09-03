@@ -5,6 +5,7 @@ Authors: Horatiu
 -/
 import Metatheorems.MCTStatement
 import Metatheorems.ProofMode.Arith
+import Metatheorems.SyntacticMetatheorem
 
 /-!
 # Rung 7 — ℕ-MCT, the dichotomy proof (p₂)
@@ -190,23 +191,25 @@ def mct_extract_p2 (si : SpaceInterp X F) (eqxi : EqXInterp X F si)
       ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env) :=
   mctExtract si eqxi premise_realizer (mct_p2 (al := Allowed.extended))
 
-/-- **A4, second half.** The bound, from that extraction plus majorants for `U` and `V`. -/
+/-- **A4, second half.** The bound for p₂, **via the syntactic metatheorem**.
+
+Migrated 2026-09-03. It used to route through `mct_bound` (Probe P2d), which predates the
+`syntactic-witnesses` merge and therefore had to hypothesise a `MajorizabilityRel` *and*
+majorants `U_star`/`V_star` for the two extracted functionals — because the only alternative
+then was `Majorizability`, which has no instances. That is no longer the situation: the
+extracted functionals are closed `Term`s, so `all_closed_terms_majorizable` supplies their
+majorants and the four extra hypotheses disappear. The only majorizability input is
+`AbstractMajorizability`, which `bezemAbstract` inhabits. -/
 theorem mct_bound_p2 (si : SpaceInterp X F) (eqxi : EqXInterp X F si)
-    (mj : MajorizabilityRel si)
-    (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
-      ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
-    (U_star V_star : Ty.interpret X (mctTy ι →ₜ Ty.nat).hat)
-    (hU : mj.maj (mctTy ι →ₜ Ty.nat) U_star
-      (mct_extract_p2 si eqxi premise_realizer).val.1)
-    (hV : mj.maj (mctTy ι →ₜ Ty.nat) V_star
-      (mct_extract_p2 si eqxi premise_realizer).val.2) :
+    (am : AbstractMajorizability si)
+    (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B) :
     ∃ Φ : Ty.interpret X (mctTy ι).hat → Nat,
       ∀ (x : Ty.interpret X (mctTy ι)) (x_star : Ty.interpret X (mctTy ι).hat),
-        mj.maj (mctTy ι) x_star x →
+        am.toRel.maj (mctTy ι) x_star x →
         (∀ u : Nat, u ≤ Φ x_star → Formula.interpret si mctB₀ (u, (x, ()))) →
         ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret si mctC₀ (v, (x, ())) :=
-  mct_bound si eqxi mj premise_realizer (mct_p2 (al := Allowed.extended))
-    U_star V_star hU hV
+  syntactic_general_metatheorem eqxi spremise am rfl rfl rfl rfl
+    (mct_p2 (al := Allowed.extended))
 
 end Extraction
 
