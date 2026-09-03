@@ -68,9 +68,14 @@ end Var
 /-- Terms of WE-HA^{ω,X} (Definition 2.3.1) with intrinsic typing.
 
 `Term F Γ τ` is a term of type `τ` in typing context `Γ`, where:
-- `ι` is the index set for abstract spaces
-- `F : ι → Ty ι` assigns a type to each abstract space function constant -/
-inductive Term {ι : Type} (F : ι → Ty ι) : Ctx ι → Ty ι → Type where
+- `ι` is the index set for abstract spaces (base types, with their `zeroX` and `dist`)
+- `κ` is the index set for abstract space function constants
+- `F : κ → Ty ι` assigns a type to each abstract space function constant
+
+The two index sets are separate (ARCHITECTURE.md §6) so that a theory may have one base
+type and several constants (normed spaces: `+`, scalar multiplication, `‖·‖`). Every
+existing instantiation takes `κ := ι`, which is inferred when `F : ι → Ty ι`. -/
+inductive Term {ι κ : Type} (F : κ → Ty ι) : Ctx ι → Ty ι → Type where
   /-- Variable: well-typed de Bruijn index into the context. -/
   | var   : Var Γ τ → Term F Γ τ
   /-- Application. -/
@@ -84,7 +89,7 @@ inductive Term {ι : Type} (F : ι → Ty ι) : Ctx ι → Ty ι → Type where
   /-- Lambda abstraction: λx^ρ. body. -/
   | lam   : Term F (ρ :: Γ) τ → Term F Γ (ρ →ₜ τ)
   /-- Abstract space function constant f_χ. -/
-  | func  : (f : ι) → Term F Γ (F f)
+  | func  : (f : κ) → Term F Γ (F f)
   /-- Zero element 0_{X_i} for base type X_i. -/
   | zeroX : (i : ι) → Term F Γ (Ty.base i)
   /-- The distance `d_{X_i} : X_i → X_i → ℝ` carried by every base type.
@@ -105,7 +110,7 @@ inductive Term {ι : Type} (F : ι → Ty ι) : Ctx ι → Ty ι → Type where
 
 namespace Term
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
 
 -- ============================================================================
 -- Convenience

@@ -42,7 +42,7 @@ are simply ignored.
 
 section
 
-variable {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+variable {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
 
 -- ============================================================================
 -- Semantics of formula substitution / weakening
@@ -222,7 +222,7 @@ private theorem ip_semantic {α : Type} (P : Prop) (Q : α → Prop) (d : α)
 
 section Soundness
 
-variable {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+variable {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
 variable (si : SpaceInterp X F) {Premises : PremiseSet F} {allowed : Allowed}
 
 -- Every premise is true in the model.

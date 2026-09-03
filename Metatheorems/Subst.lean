@@ -24,7 +24,7 @@ namespace Term
 /-- The identity renaming. -/
 def Renaming.id : Renaming Γ Γ := fun v => v
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
 
 -- ============================================================================
 -- Substitutions (variable-to-term maps)
@@ -32,7 +32,7 @@ variable {ι : Type} {F : ι → Ty ι}
 
 /-- A substitution from context Γ to context Δ: maps each variable in Γ to
     a term of the same type in Δ. -/
-def Subst (F : ι → Ty ι) (Γ Δ : Ctx ι) : Type :=
+def Subst (F : κ → Ty ι) (Γ Δ : Ctx ι) : Type :=
   ∀ {τ : Ty ι}, Var Γ τ → Term F Δ τ
 
 /-- The identity substitution. -/
@@ -137,7 +137,7 @@ theorem subst_rename {Γ Δ Δ' : Ctx ι} {τ : Ty ι}
 
 /-- `Subst.ext` of the identity substitution is the identity. -/
 theorem Subst.ext_id {Γ : Ctx ι} {σ : Ty ι} :
-    @Subst.ext ι F Γ Γ σ Subst.id = @Subst.id ι F (σ :: Γ) := by
+    @Subst.ext ι κ F Γ Γ σ Subst.id = @Subst.id ι κ F (σ :: Γ) := by
   funext τ v; cases v with
   | vz => rfl
   | vs w => rfl
@@ -177,7 +177,7 @@ theorem subst_rename_id {Γ Γ' : Ctx ι}
     {τ : Ty ι} (t : Term F Γ τ) :
     (t.rename r).subst s = t := by
   rw [rename_subst]
-  have : (fun {τ} (v : Var Γ τ) => s (r v)) = @Subst.id ι F Γ :=
+  have : (fun {τ} (v : Var Γ τ) => s (r v)) = @Subst.id ι κ F Γ :=
     funext fun τ => funext fun v => h v
   rw [this]; exact subst_id t
 

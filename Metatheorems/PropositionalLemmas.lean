@@ -27,7 +27,7 @@ open Formula
 
 section PropositionalLemmas
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
     {a : Allowed} {Premises : PremiseSet F} {Γ : Ctx ι} {A B C D : Formula F Γ}
 
 /-- Meta-level pairing: from `H→X` and `H→Y`, derive `H→X∧Y`. -/
@@ -110,11 +110,11 @@ Derivation (C abbreviates `(A →ᶠ A →ᶠ B) ∧ᶠ A`):
 | 13 | (A→A→B) → A → B           | exportation 12                      |
 -/
 def contract : Derivable F a Premises ((A →ᶠ A →ᶠ B) →ᶠ A →ᶠ B) :=
-  let h1 := @I_comb ι F a Premises Γ (A →ᶠ A →ᶠ B)
+  let h1 := @I_comb ι κ F a Premises Γ (A →ᶠ A →ᶠ B)
   let h2 := Derivable.importation h1
   let h3 := Derivable.importation h2
   let h4 : Derivable F a Premises ((A →ᶠ A →ᶠ B) ∧ᶠ A →ᶠ A) := .syllogism .and_perm .and_weak
-  let h5 := @I_comb ι F a Premises Γ (A ∧ᶠ ((A →ᶠ A →ᶠ B) ∧ᶠ A))
+  let h5 := @I_comb ι κ F a Premises Γ (A ∧ᶠ ((A →ᶠ A →ᶠ B) ∧ᶠ A))
   let h6 := Derivable.exportation h5
   let h7 := Derivable.syllogism h4 h6
   let h8 := Derivable.importation h7
@@ -159,19 +159,19 @@ def and_assocl : Derivable F a Premises (A ∧ᶠ (B ∧ᶠ C) →ᶠ (A ∧ᶠ 
   let get_B : Derivable F a Premises (A ∧ᶠ (B ∧ᶠ C) →ᶠ B) := .syllogism and_proj2 .and_weak
   let get_C : Derivable F a Premises (A ∧ᶠ (B ∧ᶠ C) →ᶠ C) := .syllogism and_proj2 and_proj2
   -- Get H→A∧B from and_weak(H→A) and get_B(H→B)
-  let s1 := .syllogism get_B (@and_intro ι F a Premises Γ B (A ∧ᶠ (B ∧ᶠ C)))
+  let s1 := .syllogism get_B (@and_intro ι κ F a Premises Γ B (A ∧ᶠ (B ∧ᶠ C)))
   let s2 := Derivable.importation s1
   let s3 := Derivable.syllogism .and_contract s2
   let s4 := Derivable.syllogism s3 .and_perm
-  let s5 := .syllogism .and_weak (@and_intro ι F a Premises Γ A B)
+  let s5 := .syllogism .and_weak (@and_intro ι κ F a Premises Γ A B)
   let s6 := Derivable.importation s5
   let get_AB := Derivable.syllogism s4 s6
   -- Get H→(A∧B)∧C from get_AB and get_C
-  let t1 := .syllogism get_C (@and_intro ι F a Premises Γ C (A ∧ᶠ (B ∧ᶠ C)))
+  let t1 := .syllogism get_C (@and_intro ι κ F a Premises Γ C (A ∧ᶠ (B ∧ᶠ C)))
   let t2 := Derivable.importation t1
   let t3 := Derivable.syllogism .and_contract t2
   let t4 := Derivable.syllogism t3 .and_perm
-  let t5 := .syllogism get_AB (@and_intro ι F a Premises Γ (A ∧ᶠ B) C)
+  let t5 := .syllogism get_AB (@and_intro ι κ F a Premises Γ (A ∧ᶠ B) C)
   let t6 := Derivable.importation t5
   Derivable.syllogism t4 t6
 
@@ -181,17 +181,17 @@ def and_assocr : Derivable F a Premises ((A ∧ᶠ B) ∧ᶠ C →ᶠ A ∧ᶠ (
   let get_B : Derivable F a Premises ((A ∧ᶠ B) ∧ᶠ C →ᶠ B) := .syllogism .and_weak and_proj2
   let get_C : Derivable F a Premises ((A ∧ᶠ B) ∧ᶠ C →ᶠ C) := and_proj2
   -- Get H→B∧C from get_B and get_C
-  let s1 := .syllogism get_B (@and_intro ι F a Premises Γ B C)
+  let s1 := .syllogism get_B (@and_intro ι κ F a Premises Γ B C)
   let s2 := Derivable.importation s1
-  let s3 := .syllogism get_C (@and_intro ι F a Premises Γ C ((A ∧ᶠ B) ∧ᶠ C))
+  let s3 := .syllogism get_C (@and_intro ι κ F a Premises Γ C ((A ∧ᶠ B) ∧ᶠ C))
   let s4 := Derivable.importation s3
   let s5 := Derivable.syllogism .and_contract s4
   let s6 := Derivable.syllogism s5 .and_perm
   let get_BC := Derivable.syllogism s6 s2
   -- Get H→A∧(B∧C) from get_A and get_BC
-  let t1 := .syllogism get_A (@and_intro ι F a Premises Γ A (B ∧ᶠ C))
+  let t1 := .syllogism get_A (@and_intro ι κ F a Premises Γ A (B ∧ᶠ C))
   let t2 := Derivable.importation t1
-  let t3 := .syllogism get_BC (@and_intro ι F a Premises Γ (B ∧ᶠ C) ((A ∧ᶠ B) ∧ᶠ C))
+  let t3 := .syllogism get_BC (@and_intro ι κ F a Premises Γ (B ∧ᶠ C) ((A ∧ᶠ B) ∧ᶠ C))
   let t4 := Derivable.importation t3
   let t5 := Derivable.syllogism .and_contract t4
   let t6 := Derivable.syllogism t5 .and_perm
@@ -376,7 +376,7 @@ def dnn_lem : Derivable F a Premises (¬ᶠ¬ᶠ(A ∨ᶠ ¬ᶠA)) :=
   let bot1 := .syllogism (pair_h get_K1 (.syllogism get_a .or_weak)) eval_K
   let neg_A := Derivable.exportation bot1
   let or_inr_A : Derivable F a Premises (¬ᶠ(A ∨ᶠ ¬ᶠA) →ᶠ A ∨ᶠ ¬ᶠA) :=
-    .syllogism neg_A (@or_inr ι F a Premises Γ A (¬ᶠA))
+    .syllogism neg_A (@or_inr ι κ F a Premises Γ A (¬ᶠA))
   Derivable.syllogism (pair_h I_comb or_inr_A) eval_K
 
 /-- Distribute a conjunct over a disjunction. -/

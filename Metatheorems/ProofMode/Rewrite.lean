@@ -42,7 +42,7 @@ namespace Metatheorems
 section QferGeneral
 open Formula
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
   {al : Allowed} {Premises : PremiseSet F}
 
 /-- QF-ER at an arbitrary pair of types, with the two `subst0` round-trips given explicitly.
@@ -110,7 +110,7 @@ The comparison is `isDefEq`, not syntactic equality, for two reasons. `Term.app2
 `Term.app (Term.app add x) 0` are the same term written two ways, and a rule applied at `_`
 arrives with metavariables that the match has to *solve*. Matching outermost-first and
 committing to the first success is what `rw` does. -/
-partial def scanTerm (occ : Occ) (seen : IO.Ref Nat) (ι F Γ ρ s t : Expr) (e : Expr) :
+partial def scanTerm (occ : Occ) (seen : IO.Ref Nat) (ι κ F Γ ρ s t : Expr) (e : Expr) :
     MetaM Scan := do
   let ctx' := mkApp3 (.const ``List.cons [0]) (mkApp (.const ``Ty []) ι) ρ Γ
   if ← isDefEq e s then
@@ -120,11 +120,11 @@ partial def scanTerm (occ : Occ) (seen : IO.Ref Nat) (ι F Γ ρ s t : Expr) (e 
       | .all => true
       | .at n => count == n
     if take then
-      return { abs := mkAppN (.const ``Term.var []) #[ι, F, ctx', ρ,
+      return { abs := mkAppN (.const ``Term.var []) #[ι, κ, F, ctx', ρ,
                  mkAppN (.const ``Var.vz []) #[ι, ρ, Γ]]
                rep := ← instantiateMVars t, hit := true }
     else
-      return ← leaf ι F Γ ρ e
+      return ← leaf ι κ F Γ ρ e
   -- A local abbreviation — `let same_ab := sg_bar (abs_diff sa sb)` in the surrounding term —
   -- is an fvar, not an application, so the structural descent below would call it a leaf and
   -- never look inside. Scan its value instead, and keep the unfolding only if the pattern was
@@ -132,44 +132,44 @@ partial def scanTerm (occ : Occ) (seen : IO.Ref Nat) (ι F Γ ρ s t : Expr) (e 
   if e.isFVar then
     if let some v := ((← getLCtx).find? e.fvarId!).bind (·.value?) then
       let before ← seen.get
-      let inner ← scanTerm occ seen ι F Γ ρ s t v
+      let inner ← scanTerm occ seen ι κ F Γ ρ s t v
       if inner.hit then return inner
       seen.set before
-      return ← leaf ι F Γ ρ e
+      return ← leaf ι κ F Γ ρ e
   -- All three application forms have to be descended through. `Term.app2` and `Term.app3`
   -- are abbreviations, but they survive elaboration, and the arithmetic notation produces
   -- them: treating them as leaves silently makes a whole subterm unreachable.
   match e.getAppFnArgs with
   | (``Term.app, args) =>
-      if args.size == 7 then
-        rebuild ``Term.app args #[3, 4] #[5, 6] ι F Γ ρ s t ctx' e
-      else leaf ι F Γ ρ e
+      if args.size == 8 then
+        rebuild ``Term.app args #[4, 5] #[6, 7] ι κ F Γ ρ s t ctx' e
+      else leaf ι κ F Γ ρ e
   | (``Term.app2, args) =>
-      if args.size == 9 then
-        rebuild ``Term.app2 args #[3, 4, 5] #[6, 7, 8] ι F Γ ρ s t ctx' e
-      else leaf ι F Γ ρ e
+      if args.size == 10 then
+        rebuild ``Term.app2 args #[4, 5, 6] #[7, 8, 9] ι κ F Γ ρ s t ctx' e
+      else leaf ι κ F Γ ρ e
   | (``Term.app3, args) =>
-      if args.size == 11 then
-        rebuild ``Term.app3 args #[3, 4, 5, 6] #[7, 8, 9, 10] ι F Γ ρ s t ctx' e
-      else leaf ι F Γ ρ e
-  | _ => leaf ι F Γ ρ e
+      if args.size == 12 then
+        rebuild ``Term.app3 args #[4, 5, 6, 7] #[8, 9, 10, 11] ι κ F Γ ρ s t ctx' e
+      else leaf ι κ F Γ ρ e
+  | _ => leaf ι κ F Γ ρ e
 where
   /-- A leaf the pattern does not reach: weaken it, and leave it alone in the replacement. -/
-  leaf (ι F Γ ρ e : Expr) : MetaM Scan := do
-    let τ := (← instantiateMVars (← inferType e)).getAppArgs[3]!
-    return { abs := mkAppN (.const ``Term.weaken []) #[ι, F, Γ, τ, ρ, e]
+  leaf (ι κ F Γ ρ e : Expr) : MetaM Scan := do
+    let τ := (← instantiateMVars (← inferType e)).getAppArgs[4]!
+    return { abs := mkAppN (.const ``Term.weaken []) #[ι, κ, F, Γ, τ, ρ, e]
              rep := e, hit := false }
   /-- Scan the arguments at `argIdx` and rebuild the node, or fall back to a leaf if the
   pattern is nowhere inside. `tyIdx` are the type arguments, which are copied through. -/
   rebuild (c : Name) (args : Array Expr) (tyIdx argIdx : Array Nat)
-      (ι F Γ ρ s t ctx' e : Expr) : MetaM Scan := do
-    let scans ← argIdx.mapM fun i => scanTerm occ seen ι F Γ ρ s t args[i]!
+      (ι κ F Γ ρ s t ctx' e : Expr) : MetaM Scan := do
+    let scans ← argIdx.mapM fun i => scanTerm occ seen ι κ F Γ ρ s t args[i]!
     if scans.any (·.hit) then
       let tys := tyIdx.map (args[·]!)
-      return { abs := mkAppN (.const c []) (#[ι, F, ctx'] ++ tys ++ scans.map (·.abs))
-               rep := mkAppN (.const c []) (#[ι, F, Γ] ++ tys ++ scans.map (·.rep))
+      return { abs := mkAppN (.const c []) (#[ι, κ, F, ctx'] ++ tys ++ scans.map (·.abs))
+               rep := mkAppN (.const c []) (#[ι, κ, F, Γ] ++ tys ++ scans.map (·.rep))
                hit := true }
-    else leaf ι F Γ ρ e
+    else leaf ι κ F Γ ρ e
 
 end Build
 
@@ -190,10 +190,10 @@ only falls back to `whnfD` for the definitions that genuinely unfold to an equat
 private def eqView? (ι : Expr) (f : Expr) : MetaM (Option EqShape) := do
   let check (e : Expr) : MetaM (Option EqShape) := do
     let a := e.getAppArgs
-    if e.isAppOf ``Formula.eq0 && a.size == 5 then
-      return some ⟨mkApp (.const ``Ty.nat []) ι, a[3]!, a[4]!⟩
-    if e.isAppOf ``eqAtType && a.size == 6 then
-      return some ⟨a[3]!, a[4]!, a[5]!⟩
+    if e.isAppOf ``Formula.eq0 && a.size == 6 then
+      return some ⟨mkApp (.const ``Ty.nat []) ι, a[4]!, a[5]!⟩
+    if e.isAppOf ``eqAtType && a.size == 7 then
+      return some ⟨a[4]!, a[5]!, a[6]!⟩
     -- The base-type case used to need a comparison against the goal's own `EqX` fvar. With
     -- `EqX` gone, `eqAtType (.base i) s t` is a genuine application of `eqAtType`, so the
     -- folded match above already covers it.
@@ -204,8 +204,8 @@ private def eqView? (ι : Expr) (f : Expr) : MetaM (Option EqShape) := do
 /-- The goal as an equation. -/
 private def eqGoalSides (who : String) : TacticM (Array Expr × EqShape) := do
   let args ← seqDGoalArgs who
-  let some v ← eqView? args[0]! args[7]! |
-    throwError "{who}: the goal is not an equation{indentExpr args[7]!}"
+  let some v ← eqView? args[0]! args[8]! |
+    throwError "{who}: the goal is not an equation{indentExpr args[8]!}"
   return (args, v)
 
 /-- Rewrite `s` to `t` throughout an equational goal, given a way to build the QF-ER
@@ -213,7 +213,7 @@ congruence proof from the abstraction. Shared by `prw` and `prwby`. -/
 private def prwCore (who : String) (occ : Occ) (ρ s t : Expr)
     (mkProof : TSyntax `term → TacticM (TSyntax `term)) : TacticM Unit := do
   let (args, goal) ← eqGoalSides who
-  let (ι, F, Γ) := (args[0]!, args[2]!, args[5]!)
+  let (ι, κ, F, Γ) := (args[0]!, args[1]!, args[3]!, args[6]!)
   -- The *goal's* type must stay `nat`: the gluing below is `pm_trans`/`pm_sym`, and the
   -- kernel's `.trans0`/`.sym0` are nat-only. At other types transitivity comes from
   -- `eqAtType_trans`, which needs an `AdmissibleEqX` this tactic is not given.
@@ -225,8 +225,8 @@ private def prwCore (who : String) (occ : Occ) (ρ s t : Expr)
   -- One counter across both sides, so `at n` numbers occurrences left to right in the goal
   -- as displayed rather than per side.
   let seen ← IO.mkRef 0
-  let L ← scanTerm occ seen ι F Γ ρ s t goal.lhs
-  let R ← scanTerm occ seen ι F Γ ρ s t goal.rhs
+  let L ← scanTerm occ seen ι κ F Γ ρ s t goal.lhs
+  let R ← scanTerm occ seen ι κ F Γ ρ s t goal.rhs
   unless L.hit || R.hit do
     match occ, ← seen.get with
     | .at n, found =>
@@ -234,7 +234,7 @@ private def prwCore (who : String) (occ : Occ) (ρ s t : Expr)
           in the goal.\nRewriting{indentExpr s}"
     | .all, _ =>
         throwError "{who}: the pattern does not occur in the goal.\n\
-          Rewriting{indentExpr s}\nbut the goal is{indentExpr args[7]!}"
+          Rewriting{indentExpr s}\nbut the goal is{indentExpr args[8]!}"
   -- `qfer` gives `L =₀ L[s:=t]` and `R =₀ R[s:=t]`; transitivity glues them to the goal.
   -- The abstraction is built, not written, so it goes back as an `Expr` rather than through
   -- the pretty printer: the display layer prints `Term.weaken` as `↑ᶜ`, which does not
@@ -268,20 +268,20 @@ congruences by transitivity. -/
 private def prwAtCore (who : String) (occ : Occ) (ρ s t : Expr) (h : Ident) (n : Ident)
     (mkProof : TSyntax `term → TacticM (TSyntax `term)) : TacticM Unit := do
   let args ← seqDGoalArgs who
-  let some hyps ← whnfListLit? args[6]! |
+  let some hyps ← whnfListLit? args[7]! |
     throwError "{who}: the hypothesis context is not a literal list"
-  let names := ((listLit? args[1]!).getD []).filterMap strLit?
+  let names := ((listLit? args[2]!).getD []).filterMap strLit?
   let some i := names.findIdx? (· == h.getId.toString) |
     throwError "{who}: no hypothesis named `{h.getId}` (have: {names})"
   let target ← eqSides who m!"`{h.getId}`" args[0]! hyps[i]!
   let (P, Q) := (target.lhs, target.rhs)
-  let (ι, F, Γ) := (args[0]!, args[2]!, args[5]!)
+  let (ι, κ, F, Γ) := (args[0]!, args[1]!, args[3]!, args[6]!)
   unless target.ty.isAppOf ``Ty.nat do
     throwError "{who}: `{h.getId}` is an equation at{indentExpr target.ty}\nbut the \
       forward form is glued by `pm_rw_at`, which is stated at `nat`."
   let seen ← IO.mkRef 0
-  let sP ← scanTerm occ seen ι F Γ ρ s t P
-  let sQ ← scanTerm occ seen ι F Γ ρ s t Q
+  let sP ← scanTerm occ seen ι κ F Γ ρ s t P
+  let sQ ← scanTerm occ seen ι κ F Γ ρ s t Q
   unless sP.hit || sQ.hit do
     throwError "{who}: the pattern does not occur in `{h.getId}`.\n\
       Rewriting{indentExpr s}\nbut `{h.getId}` is{indentExpr hyps[i]!}"
@@ -306,12 +306,12 @@ elab "prw " eStx:term occ:(occSel)? : tactic => withMainContext do
   -- nothing pins the rule's `Γ`, and a variable like `x₀` in its arguments has no context to
   -- resolve against — while a term from the outer context needs the weakening coercion.
   let args ← seqDGoalArgs "prw"
-  let e ← elabRuleInCtx eStx args[5]! (← derivableInGoal args)
+  let e ← elabRuleInCtx eStx args[6]! (← derivableInGoal args)
   let ety ← instantiateMVars (← inferType e)
   let etyArgs := ety.getAppArgs
-  unless ety.isAppOf ``Derivable && etyArgs.size == 6 do
+  unless ety.isAppOf ``Derivable && etyArgs.size == 7 do
     throwError "prw: not a kernel derivation{indentExpr ety}"
-  let rule ← eqSides "prw" m!"`{eStx}`" etyArgs[0]! etyArgs[5]!
+  let rule ← eqSides "prw" m!"`{eStx}`" etyArgs[0]! etyArgs[6]!
   -- The rule goes back as an `Expr`: matching may have solved metavariables in it, and
   -- re-elaborating the source would lose those solutions.
   prwCore "prw" (readOcc occ) rule.ty rule.lhs rule.rhs fun r => do
@@ -333,9 +333,9 @@ non-quantifier-free hypotheses like an induction hypothesis. The only requiremen
 `h`'s own formula is quantifier-free and ∨-free, which is exactly what QF-ER asks. -/
 elab "prwby " h:ident occ:(occSel)? : tactic => withMainContext do
   let args ← seqDGoalArgs "prwby"
-  let some hyps ← whnfListLit? args[6]! |
+  let some hyps ← whnfListLit? args[7]! |
     throwError "prwby: the hypothesis context is not a literal list"
-  let names := ((listLit? args[1]!).getD []).filterMap strLit?
+  let names := ((listLit? args[2]!).getD []).filterMap strLit?
   let n := h.getId.toString
   let some i := names.findIdx? (· == n) |
     throwError "prwby: no hypothesis named `{n}` (have: {names})"
@@ -354,12 +354,12 @@ the same congruence and threads the hypothesis between the two sides' copies of 
 elab "prw " eStx:term " in " h:ident " with " n:ident occ:(occSel)? : tactic =>
     withMainContext do
   let args ← seqDGoalArgs "prw"
-  let e ← elabRuleInCtx eStx args[5]! (← derivableInGoal args)
+  let e ← elabRuleInCtx eStx args[6]! (← derivableInGoal args)
   let ety ← instantiateMVars (← inferType e)
   let etyArgs := ety.getAppArgs
-  unless ety.isAppOf ``Derivable && etyArgs.size == 6 do
+  unless ety.isAppOf ``Derivable && etyArgs.size == 7 do
     throwError "prw: not a kernel derivation{indentExpr ety}"
-  let rule ← eqSides "prw" m!"`{eStx}`" etyArgs[0]! etyArgs[5]!
+  let rule ← eqSides "prw" m!"`{eStx}`" etyArgs[0]! etyArgs[6]!
   prwAtCore "prw" (readOcc occ) rule.ty rule.lhs rule.rhs h n fun r => do
     let eS ← Lean.Elab.Term.exprToSyntax (← instantiateMVars e)
     `(pm_have (qfer_no_premise_at_nf (σ := Ty.nat) $eS (r := $r) (by prw_norm) (by prw_norm)))
@@ -368,9 +368,9 @@ elab "prw " eStx:term " in " h:ident " with " n:ident occ:(occSel)? : tactic =>
 elab "prwby " h:ident " in " k:ident " with " n:ident occ:(occSel)? : tactic =>
     withMainContext do
   let args ← seqDGoalArgs "prwby"
-  let some hyps ← whnfListLit? args[6]! |
+  let some hyps ← whnfListLit? args[7]! |
     throwError "prwby: the hypothesis context is not a literal list"
-  let names := ((listLit? args[1]!).getD []).filterMap strLit?
+  let names := ((listLit? args[2]!).getD []).filterMap strLit?
   let some i := names.findIdx? (· == h.getId.toString) |
     throwError "prwby: no hypothesis named `{h.getId}` (have: {names})"
   let rule ← eqSides "prwby" m!"`{h.getId}`" args[0]! hyps[i]!

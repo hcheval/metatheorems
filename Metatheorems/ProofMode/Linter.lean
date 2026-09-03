@@ -42,7 +42,7 @@ namespace Metatheorems
 
 namespace Term
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
 
 /-- Does this term mention the primitive recursor? -/
 def usesPrec : {Γ : Ctx ι} → {ρ : Ty ι} → Term F Γ ρ → Bool
@@ -55,7 +55,7 @@ end Term
 
 namespace Formula
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
 
 /-- Does this formula mention the primitive recursor, anywhere in its terms?
 
@@ -76,7 +76,7 @@ end Formula
 
 namespace ProofMode
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
     {a : Allowed} {Premises : PremiseSet F} {Γ : Ctx ι}
 
 open Formula

@@ -58,7 +58,7 @@ namespace QBridge
 
 open Rounding
 
-variable {ι : Type} {F : ι → Ty ι} {X : ι → Type}
+variable {ι κ : Type} {F : κ → Ty ι} {X : ι → Type}
 
 -- ============================================================================
 -- Section 0: the Lean mirrors that are not already in Mathlib or `Rounding`

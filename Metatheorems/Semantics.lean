@@ -67,9 +67,9 @@ def Ctx.lookup {ι : Type} {X : ι → Type} :
 /-- Data needed to interpret abstract space constants:
     - An element of `Ty.interpret X (F f)` for each function constant f
     - A zero element of `X i` for each base type X_i -/
-structure SpaceInterp {ι : Type} (X : ι → Type) (F : ι → Ty ι) where
+structure SpaceInterp {ι κ : Type} (X : ι → Type) (F : κ → Ty ι) where
   /-- Interpretation of function constants f_χ ∈ F. -/
-  funcInterp : (f : ι) → Ty.interpret X (F f)
+  funcInterp : (f : κ) → Ty.interpret X (F f)
   /-- Interpretation of zero elements 0_{X_i}. -/
   zeroInterp : (i : ι) → X i
   /-- Interpretation of the distance `d_{X_i}` carried by every base type.
@@ -89,7 +89,7 @@ The interpretation of constants follows Proposition 2.3.52:
   [λx.t]  := fun x => [t]
   [f_χ]   := spaceInterp.funcInterp f
   [0_{X_i}] := spaceInterp.zeroInterp i -/
-def Term.interpret {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+def Term.interpret {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) :
     {Γ : Ctx ι} → {τ : Ty ι} → Term F Γ τ → Ctx.interpret X Γ → Ty.interpret X τ
   | _, _, .var v,       env => Ctx.lookup v env
@@ -111,7 +111,7 @@ def Term.interpret {ι : Type} {X : ι → Type} {F : ι → Ty ι}
 -- ============================================================================
 
 /-- Interpret a formula as a Lean proposition. -/
-def Formula.interpret {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+def Formula.interpret {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) :
     {Γ : Ctx ι} → Formula F Γ → Ctx.interpret X Γ → Prop
   | _, .bot,      _   => False
@@ -131,7 +131,7 @@ notation "‖" A "‖ₚ" si env => Formula.interpret si A env
 
 /-- Apply a substitution to an environment: evaluate each variable of Γ
     in the target environment via the substitution. -/
-def Ctx.interpretSubst {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+def Ctx.interpretSubst {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) : {Γ Δ : Ctx ι} → Term.Subst F Γ Δ → Ctx.interpret X Δ → Ctx.interpret X Γ
   | [],     _, _, _   => ()
   | _ :: _, _, s, env => (Term.interpret si (s .vz) env, Ctx.interpretSubst si (fun v => s (.vs v)) env)
@@ -142,7 +142,7 @@ def Ctx.interpretSubst {ι : Type} {X : ι → Type} {F : ι → Ty ι}
 
 /-- General: evaluating a renamed term in env_Δ equals evaluating the original
     in env_Γ when the environments agree on variable lookups through the renaming. -/
-lemma Term.interpret_rename_gen {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+lemma Term.interpret_rename_gen {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) {Γ Δ : Ctx ι} {τ : Ty ι}
     (r : Renaming Γ Δ) (t : Term F Γ τ)
     (env_Δ : Ctx.interpret X Δ) (env_Γ : Ctx.interpret X Γ)
@@ -169,13 +169,13 @@ lemma Term.interpret_rename_gen {ι : Type} {X : ι → Type} {F : ι → Ty ι}
 -- ============================================================================
 
 /-- Evaluating a weakened term in an extended environment equals the original. -/
-lemma Term.interpret_weaken {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+lemma Term.interpret_weaken {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) {Γ : Ctx ι} {τ σ : Ty ι}
     (t : Term F Γ τ) (v : Ty.interpret X σ) (env : Ctx.interpret X Γ) :
     Term.interpret si t.weaken (v, env) = Term.interpret si t env := by
   exact Term.interpret_rename_gen si Renaming.shift t (v, env) env (fun _ => rfl)
 
-private lemma lookupVar_interpCtxSubst {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+private lemma lookupVar_interpCtxSubst {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) {Γ Δ : Ctx ι} {τ : Ty ι}
     (s : Term.Subst F Γ Δ) (v : Var Γ τ) (env : Ctx.interpret X Δ) :
     Ctx.lookup v (Ctx.interpretSubst si s env) = Term.interpret si (s v) env := by
@@ -187,7 +187,7 @@ private lemma lookupVar_interpCtxSubst {ι : Type} {X : ι → Type} {F : ι →
 -- interpretSubst lemmas (moved before interpret_substF for lam case)
 -- ============================================================================
 
-lemma Ctx.interpretSubst_weaken_eq {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+lemma Ctx.interpretSubst_weaken_eq {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) {Γ Δ : Ctx ι} {σ : Ty ι}
     (s : Term.Subst F Γ Δ) (env : Ctx.interpret X Δ) (v : Ty.interpret X σ) :
     Ctx.interpretSubst si (fun w => (s w).weaken) (v, env) = Ctx.interpretSubst si s env := by
@@ -197,7 +197,7 @@ lemma Ctx.interpretSubst_weaken_eq {ι : Type} {X : ι → Type} {F : ι → Ty 
     simp only [Ctx.interpretSubst]
     exact Prod.ext (Term.interpret_weaken si (s .vz) v env) (ih (fun w => s (.vs w)))
 
-lemma Ctx.interpretSubst_id {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+lemma Ctx.interpretSubst_id {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) {Γ : Ctx ι} (env : Ctx.interpret X Γ) :
     Ctx.interpretSubst si (fun v => .var v) env = env := by
   induction Γ with
@@ -211,7 +211,7 @@ lemma Ctx.interpretSubst_id {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     simp only [Term.weaken, Term.rename, Renaming.shift, Term.Renaming.shift] at this
     rw [this, ih env']
 
-lemma Ctx.interpretSubst_ext {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+lemma Ctx.interpretSubst_ext {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) {Γ Δ : Ctx ι} {σ : Ty ι} (s : Term.Subst F Γ Δ)
     (env : Ctx.interpret X Δ) (v : Ty.interpret X σ) :
     Ctx.interpretSubst si (Term.Subst.ext s) (v, env) = (v, Ctx.interpretSubst si s env) := by
@@ -222,7 +222,7 @@ lemma Ctx.interpretSubst_ext {ι : Type} {X : ι → Type} {F : ι → Ty ι}
 -- Term evaluation commutes with substitution
 -- ============================================================================
 
-lemma Term.interpret_substF {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+lemma Term.interpret_substF {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) {Γ Δ : Ctx ι} {τ : Ty ι}
     (s : Term.Subst F Γ Δ) (t : Term F Γ τ) (env : Ctx.interpret X Δ) :
     Term.interpret si (t.subst s) env = Term.interpret si t (Ctx.interpretSubst si s env) := by
@@ -249,21 +249,21 @@ lemma Term.interpret_substF {ι : Type} {X : ι → Type} {F : ι → Ty ι}
 -- ============================================================================
 
 /-- Term evaluation commutes with renaming. -/
-theorem Term.interpret_rename {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+theorem Term.interpret_rename {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) {Γ Δ : Ctx ι} {τ : Ty ι}
     (r : Renaming Γ Δ) (t : Term F Γ τ) (env : Ctx.interpret X Δ) :
     Term.interpret si (t.rename r) env =
     Term.interpret si t (Ctx.interpretSubst si (fun v => .var (r v)) env) := by
   rw [Term.rename_eq_subst, Term.interpret_substF]
 
-lemma Ctx.interpretSubst_subst0_map {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+lemma Ctx.interpretSubst_subst0_map {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) {Γ : Ctx ι} {ρ : Ty ι}
     (t : Term F Γ ρ) (env : Ctx.interpret X Γ) :
     Ctx.interpretSubst si (Term.subst0_map t) env = (Term.interpret si t env, env) := by
   simp only [Ctx.interpretSubst, Term.subst0_map, Term.interpret]
   exact Prod.ext rfl (Ctx.interpretSubst_id si env)
 
-lemma Ctx.interpretSubst_substVar0_map {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+lemma Ctx.interpretSubst_substVar0_map {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) {Γ : Ctx ι} {ρ : Ty ι}
     (t : Term F (ρ :: Γ) ρ) (v : Ty.interpret X ρ) (env : Ctx.interpret X Γ) :
     Ctx.interpretSubst si (Formula.Term.substVar0_map t) (v, env) = (Term.interpret si t (v, env), env) := by
@@ -275,7 +275,7 @@ lemma Ctx.interpretSubst_substVar0_map {ι : Type} {X : ι → Type} {F : ι →
               (Term.var w : Term F Γ τ).weaken) := by funext; rfl
   rw [h, Ctx.interpretSubst_weaken_eq, Ctx.interpretSubst_id]
 
-lemma Term.interpret_subst0 {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+lemma Term.interpret_subst0 {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) {Γ : Ctx ι} {ρ τ : Ty ι}
     (t : Term F (ρ :: Γ) τ) (u : Term F Γ ρ) (env : Ctx.interpret X Γ) :
     Term.interpret si (t.subst0 u) env = Term.interpret si t (Term.interpret si u env, env) := by
@@ -289,7 +289,7 @@ lemma Term.interpret_subst0 {ι : Type} {X : ι → Type} {F : ι → Ty ι}
 -- `induction`, `ac`, `qfac` all substitute into a formula).
 -- ============================================================================
 
-lemma Formula.interpret_substF {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+lemma Formula.interpret_substF {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) {Γ Δ : Ctx ι} (A : Formula F Γ) (σ : Term.Subst F Γ Δ)
     (env : Ctx.interpret X Δ) :
     Formula.interpret si (A.substF σ) env
@@ -303,7 +303,7 @@ lemma Formula.interpret_substF {ι : Type} {X : ι → Type} {F : ι → Ty ι}
   | all _ _ ih => simp only [Formula.substF, Formula.interpret, ih, Ctx.interpretSubst_ext]
   | ex _ _ ih => simp only [Formula.substF, Formula.interpret, ih, Ctx.interpretSubst_ext]
 
-lemma Formula.interpret_subst0 {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+lemma Formula.interpret_subst0 {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) {Γ : Ctx ι} {ρ : Ty ι} (A : Formula F (ρ :: Γ))
     (u : Term F Γ ρ) (env : Ctx.interpret X Γ) :
     Formula.interpret si (A.subst0 u) env

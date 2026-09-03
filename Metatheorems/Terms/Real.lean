@@ -23,7 +23,7 @@ the ordered-field axioms — stays in `RealNumbers.lean`, above `Derivable`.
 
 open Formula
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
 
 namespace Term
 

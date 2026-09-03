@@ -32,7 +32,7 @@ Support for Kohlenbach §4.1's Lemma 4.2 (`approx_R`/`approx_le_R`) and Lemma 4.
 
 open Formula
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
 variable {al : Allowed} {Premises : PremiseSet F}
 
 section Approx

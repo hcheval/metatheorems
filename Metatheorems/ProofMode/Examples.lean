@@ -18,7 +18,7 @@ Everything below is in the *base* system: no LEM, no Markov, no choice. `a` is a
 `Allowed`, so these are intuitionistic derivations valid in every system we have.
 -/
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
     {a : Allowed} {Premises : PremiseSet F} {Γ : Ctx ι} {A B C : Formula F Γ}
 
 open Formula

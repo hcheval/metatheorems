@@ -26,7 +26,7 @@ makes `Order.lean` sit above the multiplicative layer — the price of `lt_mul_p
 
 open Formula
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
 variable {al : Allowed} {Premises : PremiseSet F}
 
 section OrderBounds

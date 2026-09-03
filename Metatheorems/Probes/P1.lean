@@ -10,7 +10,7 @@ Every `rfl` below that succeeds means the index computes on its own.
 namespace Metatheorems
 open Formula
 
-variable {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι}
+variable {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι}
 
 -- A concrete open formula: `x =₀ 0` with `x` the outermost bound variable.
 abbrev A0 : Formula F (Ty.nat :: Γ) :=

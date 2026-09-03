@@ -49,13 +49,13 @@ namespace ProofMode
 
 open Lean
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
     {a : Allowed} {Premises : PremiseSet F} {Γ : Ctx ι}
 
 /-- `Seq` together with display names for the hypothesis positions.
 
 Reducible, hence interchangeable with `Seq` for every purpose except printing. -/
-@[reducible] def SeqD (_names : List String) (F : ι → Ty ι)
+@[reducible] def SeqD (_names : List String) (F : κ → Ty ι)
     (a : Allowed) (Premises : PremiseSet F) {Γ : Ctx ι}
     (Δ : HCtx F Γ) (B : Formula F Γ) : Type :=
   Seq F a Premises Δ B
@@ -93,8 +93,8 @@ than in `Pretty.lean` because `Formula.weakenBy` is declared in `Derivable.lean`
 @[app_delab Metatheorems.Formula.weakenBy]
 def delabFormulaWeakenBy : Delab := do
   let args := (← SubExpr.getExpr).getAppArgs
-  guard (args.size == 5)
-  Pretty.delabWeakening args[4]!
+  guard (args.size == 6)
+  Pretty.delabWeakening args[5]!
 
 /-- Split an expression that is a literal `List` spine into its elements. -/
 partial def listLit? (e : Expr) : Option (List Expr) :=
@@ -127,21 +127,21 @@ list — there is nothing sensible to draw in that case. -/
 def delabSeqD : Delab := do
   let e ← SubExpr.getExpr
   let args := e.getAppArgs
-  -- ι, names, F, a, Premises, Γ, Δ, B
-  guard (args.size == 8)
+  -- ι, κ, names, F, a, Premises, Γ, Δ, B
+  guard (args.size == 9)
   -- `∀`-introduction leaves `Δ` as `Δ.map (weakenBy ρ)`, so the spine has to be reduced
   -- rather than matched syntactically.
-  let some hyps ← whnfListLit? args[6]! | failure
+  let some hyps ← whnfListLit? args[7]! | failure
   let names : List String :=
-    (listLit? args[1]!).map (·.filterMap strLit?) |>.getD []
+    (listLit? args[2]!).map (·.filterMap strLit?) |>.getD []
   -- The term context: its explicit prefix is shown as named binders, under the same naming
   -- scheme the term printer uses, and its (usually abstract) tail as itself.
-  let (tail, tys) := Pretty.ctxSplit args[5]!
+  let (tail, tys) := Pretty.ctxSplit args[6]!
   let tailStx ← Lean.PrettyPrinter.delab tail
   -- Outermost-first, under the same naming the term printer uses.
-  let tvs : Array (TSyntax `term) := Pretty.ctxVarIdents 0 0 args[5]!
+  let tvs : Array (TSyntax `term) := Pretty.ctxVarIdents 0 0 args[6]!
   let tts ← tys.toArray.reverse.mapM fun t => (Lean.PrettyPrinter.delab t : MetaM _)
-  let goalStx ← Lean.PrettyPrinter.delab args[7]!
+  let goalStx ← Lean.PrettyPrinter.delab args[8]!
   -- `Δ`'s head is the most recent hypothesis; display oldest-first.
   let hyps := hyps.reverse
   let names := (names ++ List.replicate hyps.length "_").take hyps.length |>.reverse

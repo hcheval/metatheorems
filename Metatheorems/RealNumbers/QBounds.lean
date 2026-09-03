@@ -23,7 +23,7 @@ here because that file is another workstream's and its privates are module-scope
 
 open Formula
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
 variable {al : Allowed} {Premises : PremiseSet F}
 
 /-- The substitution normal-form discharger for this file's `qfer`/beta side conditions.

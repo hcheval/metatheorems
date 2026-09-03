@@ -30,7 +30,7 @@ the general metatheorem.
 
 This is everything `metatheorem_core` needs apart from the majorants themselves, and
 unlike `Majorizability` below it is inhabited — see `bezemRel`. -/
-structure MajorizabilityRel {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+structure MajorizabilityRel {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) where
   /-- The majorizability relation at type ρ: `maj ρ x_star x` means x* ≥*_ρ x. -/
   maj : (ρ : Ty ι) → Ty.interpret X ρ.hat → Ty.interpret X ρ → Prop
@@ -69,7 +69,7 @@ one would need, for each `Φ`, a `Φ*` with `Φ* f* ≥ Φ f` whenever `f*` majo
 arbitrary `Φ` is unbounded. Degenerate choices (e.g. `maj := Eq` when `ρ.hat = ρ`) do satisfy
 it, but then the bound depends on `x` itself and carries no uniformity. Prefer
 `MajorizabilityRel` plus explicit majorants — `metatheorem_core_of_majorants`. -/
-structure Majorizability {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+structure Majorizability {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) extends MajorizabilityRel si where
   /-- Total majorizer: every semantic value has a majorant. -/
   majorizer : {ρ : Ty ι} → Ty.interpret X ρ → Ty.interpret X ρ.hat
@@ -219,7 +219,7 @@ end BezemLemmas
 
 /-- `bezemMaj` satisfies the two properties the metatheorem uses. Both come from the *first*
 conjunct, which is why the widening leaves `general_metatheorem` untouched. -/
-def bezemRel {ι : Type} {X : ι → Type} {F : ι → Ty ι} (si : SpaceInterp X F)
+def bezemRel {ι κ : Type} {X : ι → Type} {F : κ → Ty ι} (si : SpaceInterp X F)
     (base : (i : ι) → Nat → X i → Prop) : MajorizabilityRel si where
   maj := bezemMaj base
   maj_le h := by simpa [bezemMaj] using h

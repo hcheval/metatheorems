@@ -66,18 +66,18 @@ force exactly where proof-mode scripts are written.
 
 The printer already drops it in the same cases (see `delabWeakening`), so a term neither
 prints nor reads with a weakening in it. -/
-scoped instance instCoeWeakenTerm {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι} {τ σ : Ty ι} :
+scoped instance instCoeWeakenTerm {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι} {τ σ : Ty ι} :
     CoeTail (Term F Γ τ) (Term F (σ :: Γ) τ) :=
   ⟨Term.weaken⟩
 
 /-- …and again, so a term can cross *several* binders. A sequence quantified over twice needs
 two weakenings, and a single-step instance does not chain on its own. -/
-scoped instance instCoeWeakenTerm₂ {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι} {τ σ σ' : Ty ι} :
+scoped instance instCoeWeakenTerm₂ {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι} {τ σ σ' : Ty ι} :
     CoeTail (Term F Γ τ) (Term F (σ' :: σ :: Γ) τ) :=
   ⟨fun t => t.weaken.weaken⟩
 
 /-- Three, which is as deep as anything here goes. -/
-scoped instance instCoeWeakenTerm₃ {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι} {τ σ σ' σ'' : Ty ι} :
+scoped instance instCoeWeakenTerm₃ {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι} {τ σ σ' σ'' : Ty ι} :
     CoeTail (Term F Γ τ) (Term F (σ'' :: σ' :: σ :: Γ) τ) :=
   ⟨fun t => t.weaken.weaken.weaken⟩
 
@@ -277,8 +277,8 @@ def delabTyBase : Delab := do
 /-- The context of an expression that is an object-level formula or term, if it is one. -/
 def objCtx? (ty : Expr) : Option Expr :=
   match ty.getAppFnArgs with
-  | (``Formula, #[_, _, Γ]) => some Γ
-  | (``Term, #[_, _, Γ, _]) => some Γ
+  | (``Formula, #[_, _, _, Γ]) => some Γ
+  | (``Term, #[_, _, _, Γ, _]) => some Γ
   | _ => none
 
 /-- The syntax for the variable at de Bruijn index `i`: the token that reads back as the
@@ -319,10 +319,10 @@ def delabOpenAtom : Delab := do
 @[app_delab Metatheorems.Formula.subst0]
 def delabFormulaSubst0 : Delab := do
   let args := (← SubExpr.getExpr).getAppArgs
-  guard (args.size == 5)
-  guard args[3]!.isFVar
-  let p := mkIdent (← args[3]!.fvarId!.getUserName)
-  let t ← Lean.PrettyPrinter.delab args[4]!
+  guard (args.size == 7)
+  guard args[5]!.isFVar
+  let p := mkIdent (← args[5]!.fvarId!.getUserName)
+  let t ← Lean.PrettyPrinter.delab args[6]!
   `($p $t)
 
 /-- Likewise in place: `P.substVar0 t` prints as `P t`. This is what makes the induction step
@@ -330,10 +330,10 @@ readable — `P x₀ →ᶠ P (S x₀)`. -/
 @[app_delab Metatheorems.Formula.substVar0]
 def delabFormulaSubstVar0 : Delab := do
   let args := (← SubExpr.getExpr).getAppArgs
-  guard (args.size == 5)
-  guard args[3]!.isFVar
-  let p := mkIdent (← args[3]!.fvarId!.getUserName)
-  let t ← Lean.PrettyPrinter.delab args[4]!
+  guard (args.size == 7)
+  guard args[5]!.isFVar
+  let p := mkIdent (← args[5]!.fvarId!.getUserName)
+  let t ← Lean.PrettyPrinter.delab args[6]!
   `($p $t)
 
 /-- Does this expression contain an object-level binder — the only thing whose displayed name
@@ -397,12 +397,12 @@ when there is one. -/
 @[app_delab Metatheorems.Term.var]
 def delabTermVar : Delab := do
   let args := (← SubExpr.getExpr).getAppArgs
-  guard (args.size == 5)
-  let some i := varIndex args[4]! | failure
+  guard (args.size == 6)
+  let some i := varIndex args[5]! | failure
   let (s, inner) ← getDepths
-  if let some k := varSlot s inner args[2]! i then
+  if let some k := varSlot s inner args[3]! i then
     if let some stx := varStx k then return stx
-  return mkIdent (Name.mkSimple (varName s inner args[2]! i))
+  return mkIdent (Name.mkSimple (varName s inner args[3]! i))
 
 /-- Flatten an application spine, so `((f a) b) c` and `app2 f a b` both print as `f a b`.
 
@@ -411,28 +411,28 @@ elaborated terms, so the printer has to know all three. -/
 partial def termSpine (e : Expr) : Expr × Array Expr :=
   match e.getAppFnArgs with
   | (``Term.app, args) =>
-      if h : args.size = 7 then
-        let (hd, as) := termSpine args[5]
-        (hd, as.push args[6])
+      if h : args.size = 8 then
+        let (hd, as) := termSpine args[6]
+        (hd, as.push args[7])
       else (e, #[])
   | (``Term.app2, args) =>
-      if h : args.size = 9 then
-        let (hd, as) := termSpine args[6]
-        (hd, (as.push args[7]).push args[8])
+      if h : args.size = 10 then
+        let (hd, as) := termSpine args[7]
+        (hd, (as.push args[8]).push args[9])
       else (e, #[])
   | (``Term.app3, args) =>
-      if h : args.size = 11 then
-        let (hd, as) := termSpine args[7]
-        (hd, ((as.push args[8]).push args[9]).push args[10])
+      if h : args.size = 12 then
+        let (hd, as) := termSpine args[8]
+        (hd, ((as.push args[9]).push args[10]).push args[11])
       else (e, #[])
   | _ => (e, #[])
 
 /-- Is this expression an application spine the printer knows how to flatten? -/
 def isSpine (e : Expr) : Bool :=
   match e.getAppFnArgs with
-  | (``Term.app, args)  => args.size == 7
-  | (``Term.app2, args) => args.size == 9
-  | (``Term.app3, args) => args.size == 11
+  | (``Term.app, args)  => args.size == 8
+  | (``Term.app2, args) => args.size == 10
+  | (``Term.app3, args) => args.size == 12
   | _ => false
 
 /-- Application prints as juxtaposition. -/
@@ -459,23 +459,23 @@ goals and into `#hilbert` output as their raw constructor application. -/
 @[app_delab Metatheorems.Term.ofNat]
 def delabTermOfNat : Delab := do
   let args := (← SubExpr.getExpr).getAppArgs
-  guard (args.size == 4)
-  let some n := args[3]!.nat? | failure
+  guard (args.size == 5)
+  let some n := args[4]!.nat? | failure
   return Syntax.mkNumLit (toString n)
 
 @[app_delab Metatheorems.Term.prec]
 def delabTermPrec : Delab := do
   let args := (← SubExpr.getExpr).getAppArgs
-  guard (args.size == 4)
-  let ρ ← Lean.PrettyPrinter.delab args[3]!
+  guard (args.size == 5)
+  let ρ ← Lean.PrettyPrinter.delab args[4]!
   `(R[$ρ])
 
 /-- Weakening, under the rule in `delabWeakening`. -/
 @[app_delab Metatheorems.Term.weaken]
 def delabTermWeaken : Delab := do
   let args := (← SubExpr.getExpr).getAppArgs
-  guard (args.size == 6)
-  delabWeakening args[5]!
+  guard (args.size == 7)
+  delabWeakening args[6]!
 
 /-- The name a binder over `Γ` introduces, and its body printed one binder deeper. -/
 private def delabBinder (Γ ρ body : Expr) :
@@ -490,22 +490,22 @@ private def delabBinder (Γ ρ body : Expr) :
 @[app_delab Metatheorems.Term.lam]
 def delabTermLam : Delab := do
   let args := (← SubExpr.getExpr).getAppArgs
-  guard (args.size == 6)
-  let (x, ρ, b) ← delabBinder args[3]! args[2]! args[5]!
+  guard (args.size == 7)
+  let (x, ρ, b) ← delabBinder args[4]! args[3]! args[6]!
   `(λᶠ $x : $ρ, $b)
 
 @[app_delab Metatheorems.Formula.all]
 def delabFormulaAll : Delab := do
   let args := (← SubExpr.getExpr).getAppArgs
-  guard (args.size == 5)
-  let (x, ρ, b) ← delabBinder args[2]! args[3]! args[4]!
+  guard (args.size == 6)
+  let (x, ρ, b) ← delabBinder args[3]! args[4]! args[5]!
   `(∀ᶠ $x : $ρ, $b)
 
 @[app_delab Metatheorems.Formula.ex]
 def delabFormulaEx : Delab := do
   let args := (← SubExpr.getExpr).getAppArgs
-  guard (args.size == 5)
-  let (x, ρ, b) ← delabBinder args[2]! args[3]! args[4]!
+  guard (args.size == 6)
+  let (x, ρ, b) ← delabBinder args[3]! args[4]! args[5]!
   `(∃ᶠ $x : $ρ, $b)
 
 end Pretty

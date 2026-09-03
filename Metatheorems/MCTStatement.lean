@@ -26,7 +26,7 @@ stated in one-step form; the two-variable version is derived inside.
 namespace Metatheorems
 open Formula
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
 
 /-- The parameter type: `a`, `g`, `K` fused into a single functional. -/
 abbrev mctTy (ι : Type) : Ty ι := Ty.nat →ₜ Ty.nat →ₜ Ty.nat
@@ -100,7 +100,7 @@ example
     {Premises : PremiseSet F}
     (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
       ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
-    (prf : @Derivable ι F Allowed.extended Premises [] mctStatement) :
+    (prf : @Derivable ι κ F Allowed.extended Premises [] mctStatement) :
     { Φ : Ty.interpret X (mctTy ι).hat → Nat //
       ∀ (x : Ty.interpret X (mctTy ι)) (x_star : Ty.interpret X (mctTy ι).hat),
         mj.maj (mctTy ι) x_star x →
@@ -283,7 +283,7 @@ def mctExtract
     {Premises : PremiseSet F}
     (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
       ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
-    (prf : @Derivable ι F Allowed.extended Premises [] mctStatement) :=
+    (prf : @Derivable ι κ F Allowed.extended Premises [] mctStatement) :=
   general_metatheorem_extract si eqxi premise_realizer rfl rfl rfl rfl prf
 
 /-- **The bound**, from the extraction plus majorants for `U` and `V`.
@@ -300,7 +300,7 @@ theorem mct_bound
     {Premises : PremiseSet F}
     (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
       ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
-    (prf : @Derivable ι F Allowed.extended Premises [] mctStatement)
+    (prf : @Derivable ι κ F Allowed.extended Premises [] mctStatement)
     (U_star V_star : Ty.interpret X (mctTy ι →ₜ Ty.nat).hat)
     (hU : mj.maj (mctTy ι →ₜ Ty.nat) U_star
       (mctExtract si eqxi premise_realizer prf).val.1)

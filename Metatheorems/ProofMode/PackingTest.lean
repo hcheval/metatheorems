@@ -15,7 +15,7 @@ Every proof here goes through kit lemmas only — no kernel constructor is appli
 which is the discipline the tactic layer will inherit.
 -/
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
     {a : Allowed} {Premises : PremiseSet F} {Γ : Ctx ι} {A B C : Formula F Γ}
 
 open Formula
@@ -29,8 +29,8 @@ example : Seq F a Premises [A, B] (A ∧ᶠ B) :=
 
 This is the payoff of folding the context so the head is the innermost antecedent. -/
 
-example : @seq_intro ι F a Premises Γ [B] A C = id := rfl
-example : @seq_revert ι F a Premises Γ [B] A C = id := rfl
+example : @seq_intro ι κ F a Premises Γ [B] A C = id := rfl
+example : @seq_revert ι κ F a Premises Γ [B] A C = id := rfl
 
 /-- …and they are mutually inverse, definitionally. -/
 example (h : Seq F a Premises (A :: [B]) C) : seq_revert (seq_intro h) = h := rfl

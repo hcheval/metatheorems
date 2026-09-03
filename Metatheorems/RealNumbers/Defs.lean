@@ -26,7 +26,7 @@ to within 2^{-n}.
 
 open Formula
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
 
 -- ============================================================================
 -- Sections 1-2: term definitions and the ℝ formulas — MOVED

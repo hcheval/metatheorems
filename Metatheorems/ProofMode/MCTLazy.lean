@@ -43,7 +43,7 @@ namespace ProofMode
 
 open Formula
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
     {al : Allowed} {Premises : PremiseSet F} {Γ : Ctx ι}
 
 /-- **The body of the statement**, proved lazily: `(∀u B₀ u) → ∃n (a n = a (n + g n))`.

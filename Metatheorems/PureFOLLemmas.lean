@@ -11,7 +11,7 @@ namespace Metatheorems
 
 open Formula
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
     {a : Allowed} {Premises : PremiseSet F}
 
 -- Re-export helpers that are private in Arithmetic.lean
@@ -36,7 +36,7 @@ private theorem weaken_subst0_id {Γ : Ctx ι} {ρ : Ty ι} (A : Formula F (ρ :
 -- Helper: instantiate a weakened ∀ at var vz, getting back the body
 def forall_ax_vz {Γ : Ctx ι} {ρ : Ty ι} {A : Formula F (ρ :: Γ)} :
     Derivable F a Premises ((Formula.all ρ A).weakenBy ρ →ᶠ A) := by
-  have h := @Derivable.forall_ax ι F a Premises (ρ :: Γ) ρ
+  have h := @Derivable.forall_ax ι κ F a Premises (ρ :: Γ) ρ
     (A.renameF (Renaming.ext Renaming.shift)) (.var .vz)
   -- h : (all ρ (A.renameF (ext shift))).weakenBy ρ → (A.renameF (ext shift)).subst0 (var vz)
   -- Rewrite conclusion using weaken_subst0_id
