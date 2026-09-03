@@ -876,6 +876,13 @@ theorem interpret_lt_Q_dec_fun {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.i
     interpret_rat_sign_fun, interpret_rat_num_fun, interpret_sub_Q_fun]
   rfl
 
+theorem ltQdecN_eq_zero_iff (m n : ℕ) : ltQdecN m n = 0 ↔ qval m < qval n := by
+  have hkey : ltQdecN m n = 0
+      ↔ (ratSignN (subQN n m) = 1 ∧ 0 < ratNumN (subQN n m)) := by
+    simp only [ltQdecN]; omega
+  rw [hkey, ← qval_pos_iff, qval_subQN]
+  constructor <;> intro h <;> linarith
+
 /-- **The S2 payoff**: the object-level decision term `lt_Q_dec` decides `<` on `ℚ` —
 its value is `0` exactly when the first code denotes a rational strictly below the
 second's. -/
@@ -883,11 +890,108 @@ theorem interpret_lt_Q_dec_eq_zero_iff {si : SpaceInterp X F} {Δ : Ctx ι}
     (env : Ctx.interpret X Δ) (m n : ℕ) :
     Term.interpret si (Term.lt_Q_dec (F := F) (Γ := Δ)) env m n = 0 ↔ qval m < qval n := by
   rw [interpret_lt_Q_dec_fun]
-  have hkey : ltQdecN m n = 0
-      ↔ (ratSignN (subQN n m) = 1 ∧ 0 < ratNumN (subQN n m)) := by
-    simp only [ltQdecN]; omega
-  rw [hkey, ← qval_pos_iff, qval_subQN]
-  constructor <;> intro h <;> linarith
+  exact ltQdecN_eq_zero_iff m n
+
+-- ============================================================================
+-- Section 12: S3 — `cauchyfy` is the identity on sequences that pass the check
+--
+-- The sidestep: no analysis of the state recursion in general, only the
+-- invariant "state = pair(g n, 0)" under the hypothesis that every check
+-- passes — the semantic copy of the object-side `cauchyState_id_of_cauchy` /
+-- `cauchyfy_id` (`RealNumbers/Cauchyfy.lean`). The hypothesis is stated as
+-- `|qval (g k) − qval (g (k+1))| < 2^{-(k+1)}`, which is exactly the sharp form
+-- `Rounding.roundR_cauchy` provides for `roundR (M.d x y)`.
+-- ============================================================================
+
+/-- Mirror of `Term.abs_Q` (the RHS of `interpret_abs_Q_fun`, named). -/
+def absQN (k : ℕ) : ℕ := pairN (2 * ratNumN k) (sndN k)
+
+/-- Mirror of `Term.pow2neg_Q`. -/
+def pow2negQN (n : ℕ) : ℕ := pairN 2 (2 ^ n - 1)
+
+theorem qval_absQN (k : ℕ) : qval (absQN k) = |qval k| := by
+  simp only [absQN]
+  rw [qval_pairN_even, qval_eq_of_parts]
+  have hden : (0 : ℚ) < (ratDenN k : ℚ) := by exact_mod_cast ratDenN_pos k
+  rw [abs_div, abs_of_pos hden]
+  congr 1
+  · split <;> simp
+  · simp only [ratDenN]; push_cast; ring
+
+theorem qval_pow2negQN (n : ℕ) : qval (pow2negQN n) = 1 / 2 ^ n := qval_pow2neg_code n
+
+/-- Mirror of the Cauchy check `Term.cauchy_check_at` at index `k` of the sequence `g`:
+`0` exactly when `|g(k) −ℚ g(k+1)| <ℚ 2^{-(k+1)}`. -/
+def checkN (g : ℕ → ℕ) (k : ℕ) : ℕ :=
+  ltQdecN (absQN (subQN (g k) (g (k + 1)))) (pow2negQN (k + 1))
+
+theorem checkN_eq_zero_iff (g : ℕ → ℕ) (k : ℕ) :
+    checkN g k = 0 ↔ |qval (g k) - qval (g (k + 1))| < 1 / 2 ^ (k + 1) := by
+  simp only [checkN]
+  rw [ltQdecN_eq_zero_iff, qval_absQN, qval_subQN, qval_pow2negQN]
+
+/-- The step of the `cauchyfy` state recursion, in the mirror world: freeze on a raised
+flag, advance on a passing check, raise the flag on the first failure. -/
+def cstep (g : ℕ → ℕ) (k ih : ℕ) : ℕ :=
+  iteN (sndN ih) ih
+    (iteN (sgBarN (checkN g k)) (pairN (g (k + 1)) 0) (pairN (fstN ih) 1))
+
+/-- Mirror of the `cauchyfy` state: `pair(current value, violation flag)`. -/
+def cauchyStateN (g : ℕ → ℕ) : ℕ → ℕ
+  | 0 => pairN (g 0) 0
+  | n + 1 => cstep g n (cauchyStateN g n)
+
+theorem cauchyStateN_succ (g : ℕ → ℕ) (n : ℕ) :
+    cauchyStateN g (n + 1) = cstep g n (cauchyStateN g n) := rfl
+
+/-- Mirror of `Term.cauchyfy`. -/
+def cauchyfyN (g : ℕ → ℕ) (n : ℕ) : ℕ := fstN (cauchyStateN g n)
+
+private theorem rec_eq_cauchyStateN (g : ℕ → ℕ) :
+    ∀ n : ℕ, (Nat.rec (pairN (g 0) 0) (cstep g) n : ℕ) = cauchyStateN g n
+  | 0 => rfl
+  | m + 1 => by
+      change cstep g m (Nat.rec (pairN (g 0) 0) (cstep g) m : ℕ) = cauchyStateN g (m + 1)
+      rw [rec_eq_cauchyStateN g m, cauchyStateN_succ]
+
+theorem interpret_cauchyfy_fun {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpret X Δ) :
+    Term.interpret si (Term.cauchyfy (F := F) (Γ := Δ)) env = cauchyfyN := by
+  funext g n
+  simp only [Term.cauchyfy, Term.app2, Term.app3, Term.interpret,
+    interpret_fst_pair_fun, interpret_snd_pair_fun, interpret_pair_fun,
+    interpret_lt_Q_dec_fun, interpret_abs_Q_fun, interpret_sub_Q_fun,
+    interpret_pow2neg_Q_fun, interpret_sg_bar_fun, interpret_ite_nat_fun]
+  change fstN (Nat.rec (pairN (g 0) 0) (cstep g) n : ℕ) = cauchyfyN g n
+  rw [rec_eq_cauchyStateN]
+  rfl
+
+/-- The invariant: on a sequence whose every check passes, the flag never rises and the
+value tracks `g` on the nose. -/
+theorem cauchyStateN_id_of_cauchy (g : ℕ → ℕ)
+    (hg : ∀ k, |qval (g k) - qval (g (k + 1))| < 1 / 2 ^ (k + 1)) :
+    ∀ n : ℕ, cauchyStateN g n = pairN (g n) 0
+  | 0 => rfl
+  | n + 1 => by
+      have ih := cauchyStateN_id_of_cauchy g hg n
+      have hchk : checkN g n = 0 := (checkN_eq_zero_iff g n).mpr (hg n)
+      rw [cauchyStateN_succ, ih]
+      simp only [cstep, hchk, sndN_pairN, fstN_pairN, iteN, sgBarN]
+      norm_num
+
+theorem cauchyfyN_id_of_cauchy (g : ℕ → ℕ)
+    (hg : ∀ k, |qval (g k) - qval (g (k + 1))| < 1 / 2 ^ (k + 1)) (n : ℕ) :
+    cauchyfyN g n = g n := by
+  simp only [cauchyfyN]
+  rw [cauchyStateN_id_of_cauchy g hg n, fstN_pairN]
+
+/-- **The S3 sidestep**: on a sequence passing the Cauchy check at every index —
+in particular on `roundR (M.d x y)`, by `Rounding.roundR_cauchy` — `cauchyfy` is
+the identity. -/
+theorem interpret_cauchyfy_id {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpret X Δ)
+    (g : ℕ → ℕ) (hg : ∀ k, |qval (g k) - qval (g (k + 1))| < 1 / 2 ^ (k + 1)) (n : ℕ) :
+    Term.interpret si (Term.cauchyfy (F := F) (Γ := Δ)) env g n = g n := by
+  rw [interpret_cauchyfy_fun]
+  exact cauchyfyN_id_of_cauchy g hg n
 
 -- ============================================================================
 -- Axiom audit. `Classical.choice` is expected: `invTriagN` is a
@@ -919,6 +1023,10 @@ theorem interpret_lt_Q_dec_eq_zero_iff {si : SpaceInterp X F} {Δ : Ctx ι}
 #print axioms qval_interpret_sub_Q
 #print axioms interpret_lt_Q_dec_fun
 #print axioms interpret_lt_Q_dec_eq_zero_iff
+#print axioms checkN_eq_zero_iff
+#print axioms interpret_cauchyfy_fun
+#print axioms cauchyfyN_id_of_cauchy
+#print axioms interpret_cauchyfy_id
 #print axioms eq_R_interp_congr
 #print axioms le_R_pu_interp_congr
 #print axioms Formula.interpret_substF
