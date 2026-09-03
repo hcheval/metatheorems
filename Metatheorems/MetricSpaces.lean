@@ -556,6 +556,23 @@ theorem MetricModel.eqAtType_base_extract (M : MetricModel) (i : MetricSpace.ι)
   exact M.eq_of_eqAtType_base s t env
     (interp_of_realizer_pu M.si (eqAtType (Ty.base ()) s t) rfl rfl env r)
 
+/-- **`dist_comm_holds`'s content**, isolated from the structure instance for the same reason
+`eqAtType_base_extract` is: `i` stays a parameter and is cased inside.
+
+`M.d_comm` makes the two sides interpret to *literally the same* `ℕ → ℕ`, so after
+`interpret_eq_R` the goal is `|q −ℚ q| <ℚ 2^{-n}`, i.e. `0 < 2^{-n}`.  No `cauchyfy` analysis
+is needed at all — the two `cauchyfyN` applications are applied to the same argument. -/
+theorem MetricModel.dist_comm_interp (M : MetricModel) (i : MetricSpace.ι)
+    {Γ : Ctx MetricSpace.ι} (x y : Term MetricSpace.F Γ (Ty.base i))
+    (env : Ctx.interpret (fun () => M.carrier) Γ) :
+    Formula.interpret M.si
+      (eq_R (Term.app2 (Term.dist i) x y) (Term.app2 (Term.dist i) y x)) env := by
+  cases i
+  rw [QBridge.interpret_eq_R]
+  intro n
+  rw [M.interp_dist x y env, M.interp_dist y x env, M.d_comm]
+  simpa using (by positivity : (0:ℚ) < 1 / 2 ^ n)
+
 /-- The `EqXInterp` a metric model induces. -/
 noncomputable def MetricModel.eqXInterp (M : MetricModel) :
     EqXInterp (fun () => M.carrier) MetricSpace.F M.si where
@@ -583,10 +600,8 @@ noncomputable def MetricModel.eqXInterp (M : MetricModel) :
     have hw : Term.interpret M.si (Term.lam Term.unitI) env = R.val := hsub.elim _ _
     rw [hw]
     exact R.property y
-  -- MISSING: `M.d_comm` makes the two sides interpret to the *same* `ℕ → ℕ`, so all that is
-  -- owed is `|q −ℚ q| <ℚ 2^{-n}` in the model — the semantic counterpart of the proved
-  -- object-level `lt_Q_abs_sub_self`. Needs the bridge.
-  dist_comm_holds := sorry
+  -- `M.d_comm` makes the two sides interpret to the same `ℕ → ℕ`; what is left is `0 < 2^{-n}`.
+  dist_comm_holds := fun i {_Γ} x y env => M.dist_comm_interp i x y env
   -- MISSING: `M.d_triangle` plus `Rounding.qval_roundR_dist_le` to control the rounding error
   -- of `(·)◦` on the three distances. Needs the bridge.
   dist_tri_holds := sorry
