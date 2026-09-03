@@ -265,6 +265,16 @@ theorem mul_R_app_weaken2 {Δ : Ctx ι} {ρ : Ty ι} (f g : Term F Δ (realTy ι
   rw [show (Term.mul_R : Term F Δ _).weaken (σ := ρ) = Term.mul_R by
     rw [Term.weaken, Term.rename_eq_subst]; exact mul_R_closed_subst _]
 
+/-- `lt_R` as an explicit `∃`, with the body in the `le_Q`/`app2` spelling the order proofs
+use — definitionally the same formula, but *syntactically* the one `ltBody_weakenBy` and the
+proof-mode tactics match. -/
+theorem lt_R_ex (u v : Term F Γ (realTy ι)) :
+    lt_R u v = Formula.ex Ty.nat
+      (le_Q (.app Term.pow2neg_Q (.var .vz))
+        (Term.app2 Term.sub_Q
+          (Term.app2 Term.cauchyfy v.weaken (.app .succ (.var .vz)))
+          (Term.app2 Term.cauchyfy u.weaken (.app .succ (.var .vz))))) := rfl
+
 /-- `lt_R 0ℝ u` with the body's `zero_R.weaken` folded back to `zero_R`, so that
 `cauchyfy_zero_R` matches it. -/
 theorem lt_R_zero_ex (u : Term F Γ (realTy ι)) :

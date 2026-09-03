@@ -671,63 +671,104 @@ by `n₁` and then `add_comm` — where the two differences simply add:
 other contributes through `0_ℚ ≤ℚ 2^{-m} ≤ℚ ĥ −ℚ ĝ`, which is why no `max` and no doubling of
 the dyadic scale is needed.
 
-**STILL A `sorry`, and the mathematics is NOT what is missing.** `lt_shift1` / `lt_shift` /
-`lt_shift_at` above are the whole estimate, and they are proved and `[propext, Quot.sound]`.
-What blocks the assembly is a *proof-mode plumbing* limitation, diagnosed precisely:
+**CLOSED 2026-09-03 via exit 3 of the note that used to stand here.** The history, kept
+because it is a worked example of the display-hiding trap family (CLAUDE.md note 12): the
+first attempt ran **two nested `pobtain`s**, and `pm_exE` wraps every earlier hypothesis in
+`Formula.weakenBy`, which the delaborator hides — `pexact` on the wrapped hypothesis was a
+measured heartbeat timeout, not a type error. Adding `Term.subst_shift_eq_weaken` /
+`Formula.substF_shift_eq_weakenBy` to `canorm` (exit 1) was necessary but not sufficient:
+the failure moved to `canorm` itself timing out on the large packed goal. What landed is
+exit 3 — **both `∃`-eliminations happen at the Lean level with `Derivable.exist_rule`**
+(`lt_R_ex` presents the antecedent in the `le_Q` spelling, `ltBody_weakenBy` /
+`lt_R_weakenBy` compute the `weakenBy` the rule's premise carries, `flip_comb` swaps the
+antecedents between the two peels), so no `pobtain` ever runs and no hypothesis is ever
+wrapped. `lt_trans_inner` below then sees the two witnesses as plain bound variables and is
+a short forward proof over `lt_shift_at`. The same assembly closed `lt_mul_pos_R` and
+`lt_add_R`. -/
+private def lt_trans_inner (f g h : Term F Γ (realTy ι)) :
+    Derivable F al Premises (Γ := Ty.nat :: Ty.nat :: Γ)
+      (le_Q (.app Term.pow2neg_Q (.var .vz))
+        (Term.app2 Term.sub_Q
+          (Term.app2 Term.cauchyfy h.weaken.weaken (.app .succ (.var .vz)))
+          (Term.app2 Term.cauchyfy g.weaken.weaken (.app .succ (.var .vz))))
+       →ᶠ
+       (le_Q (.app Term.pow2neg_Q (.var (.vs .vz)))
+        (Term.app2 Term.sub_Q
+          (Term.app2 Term.cauchyfy g.weaken.weaken (.app .succ (.var (.vs .vz))))
+          (Term.app2 Term.cauchyfy f.weaken.weaken (.app .succ (.var (.vs .vz)))))
+       →ᶠ
+       lt_R f.weaken.weaken h.weaken.weaken)) :=
+  let Γ₂ := Ty.nat :: Ty.nat :: Γ
+  let n1 : Term F Γ₂ Ty.nat := .var (.vs .vz)
+  let n2 : Term F Γ₂ Ty.nat := .var .vz
+  let F2 : Term F Γ₂ (realTy ι) := f.weaken.weaken
+  let G2 : Term F Γ₂ (realTy ι) := g.weaken.weaken
+  let H2 : Term F Γ₂ (realTy ι) := h.weaken.weaken
+  let m : Term F Γ₂ Ty.nat := Term.app2 Term.add n1 n2
+  let M : Term F Γ₂ Ty.nat := .app .succ m
+  let Fm : Term F Γ₂ Ty.nat := Term.app2 Term.cauchyfy F2 M
+  let Gm : Term F Γ₂ Ty.nat := Term.app2 Term.cauchyfy G2 M
+  let Hm : Term F Γ₂ Ty.nat := Term.app2 Term.cauchyfy H2 M
+  let hcomm : Derivable F al Premises (Γ := Γ₂)
+      (Formula.eq0 (Term.app2 Term.add n2 n1) m) := add_comm n2 n1
+  by
+  pmode
+  pintro b
+  pintro a
+  -- shift both witnesses to the common index m = n₁ + n₂
+  papplym (lt_shift_at F2 G2 n1 n2) in a with hA
+  papplym (lt_shift_at G2 H2 n2 n1) in b with hB0
+  papplym (le_Q_congr (.app Term.pow2neg_Q (Term.app2 Term.add n2 n1))
+    (Term.app2 Term.sub_Q
+      (Term.app2 Term.cauchyfy H2 (.app .succ (Term.app2 Term.add n2 n1)))
+      (Term.app2 Term.cauchyfy G2 (.app .succ (Term.app2 Term.add n2 n1))))
+    (.app Term.pow2neg_Q m)
+    (Term.app2 Term.sub_Q Hm Gm)
+    (eqQ_of_nat_eq' (pow2neg_idx_nat' hcomm))
+    (sub_Q_congr
+      (eqQ_of_nat_eq' (cauchyfy_idx_nat' H2 (succ_congr_o hcomm)))
+      (eqQ_of_nat_eq' (cauchyfy_idx_nat' G2 (succ_congr_o hcomm))))) in hB0 with hB
+  -- only one bound is spent as a bound; the other through 0 ≤ 2^{-m} ≤ ĥ − ĝ
+  papplym (le_Q_trans_l (Term.app2 Term.sub_Q Hm Gm)
+    (Derivable.mp (zero_lt_pow2neg_Q m)
+      (lt_Q_imp_le_Q Term.zero_Q (.app Term.pow2neg_Q m)))) in hB with hz
+  pexists m
+  canorm
+  papplym (le_Q_congr
+    (Term.app2 Term.add_Q (.app Term.pow2neg_Q m) Term.zero_Q)
+    (Term.app2 Term.add_Q (Term.app2 Term.sub_Q Gm Fm) (Term.app2 Term.sub_Q Hm Gm))
+    (.app Term.pow2neg_Q m)
+    (Term.app2 Term.sub_Q Hm Fm)
+    (add_Q_zero_inst (.app Term.pow2neg_Q m))
+    (eqQsym (sub_Q_trans_split Fm Gm Hm)))
+  papplym (le_Q_add_both (.app Term.pow2neg_Q m) Term.zero_Q
+    (Term.app2 Term.sub_Q Gm Fm) (Term.app2 Term.sub_Q Hm Gm))
+  psplit
+  · pexact hA
+  · pexact hz
 
-`lt_R f g ∧ᶠ lt_R g h` needs **two nested `pobtain`s**, and the second one wraps every
-hypothesis obtained by the first in `Formula.weakenBy` (see `ProofMode/Tactics.lean`'s
-`pm_exE`, whose `hbody` premise maps `Formula.weakenBy ρ` over `Δ`). `canorm` does not
-normalise that wrapper: `q_cons_norm` handles `renameF (Renaming.ext …)` — which is why the
-*second*-obtained witness comes out clean — but nothing handles the bare
-`Formula.weakenBy ρ A` the first-obtained one carries. The delaborator *hides* the wrapper
-(`ProofMode/Pretty.lean`, "printing under a weakening"), so the hypothesis and the goal print
-identically while being different terms; with `pp.explicit` the tell is that the hypothesis's
-context prints as `nat :: Γ` inside a sequent over `nat :: nat :: Γ`.
+/-- `f <ℝ g ∧ g <ℝ h → f <ℝ h`, at explicit reals.
 
-Consequently `pexact a` / `papplym … in a` on that hypothesis do not fail cleanly — they run
-`isDefEq` on two stuck terms containing `Term.cauchyfy` and exhaust the heartbeat budget.
-That is the build-cost pathology of CLAUDE.md in a new place, and it is a *display*-assisted
-one, exactly like the `mdata` bug recorded as metaprogramming trap 11.
-
-Three ways out, none attempted here:
-
-1. Give `canorm` a `Formula.weakenBy` rule that lands in the same normal form the goal's own
-   double weakening reaches. `Formula.renameF_eq_substF` gets partway and then leaves
-   `Term.subst (Term.var ∘ shift) (Term.weaken g)`, which is *not* `g.weaken.weaken` — that
-   last step is the missing lemma.
-
-   **TRIED 2026-09-03, NECESSARY BUT NOT SUFFICIENT.** The missing lemma is trivial:
-   `Term.subst_shift_eq_weaken` (`Subst.lean`) is `rename_eq_subst` read right-to-left at
-   `Renaming.shift`, one line, and `Formula.substF_shift_eq_weakenBy` (`Derivable.lean`) is
-   its formula-level counterpart. Both are proved, `canorm` now carries them, and the whole
-   library still builds — so they are kept. **But restoring the script below still fails**,
-   and the failure has *moved*: it is no longer `pexact a` running `isDefEq` on a mismatch,
-   it is `canorm` itself timing out at that point. Inserting `canorm` immediately before
-   `pexact a` reproduces the timeout on the `canorm` line. So the wrapper mismatch was real
-   but is not the whole story: at that point in the script the packed goal is large enough
-   that *any* substitution normalisation exhausts the budget. Exit 1 alone will not do it;
-   whatever lands must also keep the goal small — which points at exit 2 or 3, both of which
-   avoid ever having two `∃`-eliminations live at once.
-2. Convert the first witness into a `∀`-formula *before* the second `pobtain` (`pinst` does
-   see through `weakenBy`, which is why the two `pobtain`s in `ProofMode/MCTLazy.lean` are
-   never nested). This needs `lt_shift` restated as `∀p. (P p →ᶠ ∀k. Q p k)`, i.e. a
-   quantifier swap on top of `lt_shift`, plus `Derivable.forall_rule`.
-3. Do both `∃`-eliminations at the Lean level with `Derivable.exist_rule` and explicit `▸`
-   normal-form lemmas, as `lt_irrefl_R` does for its single one.
-
-The script below is otherwise complete and is kept verbatim rather than deleted: every step
-except the `pexact a` marked below elaborated, and re-deriving it would cost more than reading
-it. -/
+The two witnesses are shifted to the common index `n₁ +ℕ n₂` — the first by `n₂`, the second
+by `n₁` and then `add_comm` — where the two differences simply add:
+`(ĥ −ℚ ĝ) +ℚ (ĝ −ℚ f̂) = ĥ −ℚ f̂`. See the note at `lt_trans_inner` for the assembly. -/
 def lt_trans_R_core (f g h : Term F Γ (realTy ι)) :
-    Derivable F al Premises (lt_R f g ∧ᶠ lt_R g h →ᶠ lt_R f h) :=
-  sorry
+    Derivable F al Premises (lt_R f g ∧ᶠ lt_R g h →ᶠ lt_R f h) := by
+  refine Derivable.importation ?_
+  rw [lt_R_ex f g]
+  refine Derivable.exist_rule ?_
+  simp only [Formula.weakenBy_imp, lt_R_weakenBy]
+  refine Derivable.mp ?_ flip_comb
+  rw [lt_R_ex g.weaken h.weaken]
+  refine Derivable.exist_rule ?_
+  simp only [Formula.weakenBy_imp, ltBody_weakenBy, lt_R_weakenBy]
+  exact lt_trans_inner f g h
 
-/-
-  -- No `let` abbreviations anywhere below, deliberately: `pexact`/`papply` match a
-  -- proof-mode hypothesis against the goal, and a `let`-bound term on one side only forces a
-  -- `whnf` that unfolds `Term.cauchyfy` — the delta-expansion blow-up, and here a measured
-  -- heartbeat timeout at an innocuous `pexact`.
+/- HISTORICAL — the nested-`pobtain` script that could not be completed (it died at the
+`pexact a` marked below: a heartbeat timeout on a `weakenBy`-wrapped hypothesis). Kept
+because it is the measured failure that forced the Lean-level `exist_rule` assembly above;
+its estimate steps live on inside `lt_trans_inner`.
+
   pmode
   pintro hyp
   pdestruct hyp with hfg hgh
@@ -820,10 +861,7 @@ def lt_trans_R_core (f g h : Term F Γ (realTy ι)) :
   · pexact hzero
 -/
 
-/-- ⊢ ∀f,g,h : ℝ. f <_ℝ g ∧ g <_ℝ h → f <_ℝ h
-
-**Depends on `sorryAx`** through `lt_trans_R_core`; see the note there for exactly what is
-missing (proof-mode plumbing, not an estimate). -/
+/-- ⊢ ∀f,g,h : ℝ. f <_ℝ g ∧ g <_ℝ h → f <_ℝ h -/
 def lt_trans_R :
     Derivable F al Premises (Γ := Γ)
       (Formula.all rTy (Formula.all rTy (Formula.all rTy
