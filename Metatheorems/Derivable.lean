@@ -15,7 +15,7 @@ Following Appendix 9 of the reference document, we define the Hilbert-style
 proof system for WE-HA^{ω,X}_{=_X}.
 
 The system is parametric in:
-- `F : ι → Ty ι` — the abstract space function constants
+- `F : κ → Ty ι` — the abstract space function constants (`κ` indexes constants, `ι` base types)
 - `allowed : Allowed` — which extension principles (LEM, AC, Markov, IP) are available
 
 Equality at a base type is no longer a parameter: it is *defined*, as
@@ -31,7 +31,7 @@ open Formula
 
 /-- Weaken a formula into context extended by ρ. Same as `Formula.weaken` but
     with the new type ρ given explicitly for unification. -/
-def Formula.weakenBy {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι}
+def Formula.weakenBy {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι}
     (ρ : Ty ι) (A : Formula F Γ) : Formula F (ρ :: Γ) :=
   A.weaken
 
@@ -41,7 +41,7 @@ def Formula.weakenBy {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι}
 obtained by an earlier `pobtain` carries it while the goal carries hand-written
 `.weaken`s.  The two are equal but not syntactically so; this is the rewrite that closes
 the gap, together with `Term.subst_shift_eq_weaken` for the terms inside. -/
-theorem Formula.substF_shift_eq_weakenBy {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι} {σ : Ty ι}
+theorem Formula.substF_shift_eq_weakenBy {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι} {σ : Ty ι}
     (A : Formula F Γ) :
     A.substF (fun {_} v => Term.var (Term.Renaming.shift (σ := σ) v)) = A.weakenBy σ := by
   rw [Formula.weakenBy, Formula.weaken, Formula.renameF_eq_substF]
@@ -101,9 +101,9 @@ available).
 When `allowed = Allowed.base`, this is pure WE-HA^{ω,X}.
 When `allowed = Allowed.extended`, this adds AC + IP + Markov.
 When `allowed = Allowed.classical`, this adds LEM + AC. -/
-abbrev PremiseSet {ι : Type} (F : ι → Ty ι) := (Σ Γ : Ctx ι, Formula F Γ) → Prop
+abbrev PremiseSet {ι κ : Type} (F : κ → Ty ι) := (Σ Γ : Ctx ι, Formula F Γ) → Prop
 
-inductive Derivable {ι : Type} (F : ι → Ty ι)
+inductive Derivable {ι κ : Type} (F : κ → Ty ι)
     (allowed : Allowed)
     (Premises : PremiseSet F) :
     {Γ : Ctx ι} → Formula F Γ → Type where
@@ -258,7 +258,7 @@ inductive Derivable {ι : Type} (F : ι → Ty ι)
 
 /-- If `a₁ ≤ a₂`, then any derivation in system `a₁` is also a derivation in `a₂`.
     Proved by structural recursion on the derivation. -/
-def Derivable.castAllowed {ι : Type} {F : ι → Ty ι}
+def Derivable.castAllowed {ι κ : Type} {F : κ → Ty ι}
     {a₁ a₂ : Allowed} (h_le : Allowed.le a₁ a₂)
     {Premises : PremiseSet F}
     {Γ : Ctx ι} {A : Formula F Γ}

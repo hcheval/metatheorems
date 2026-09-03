@@ -28,7 +28,7 @@ open Formula
 
 -- `realTy` moved to `TypeSystem.lean` — `Term.dist` mentions it, and `Term` is below here.
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
 
 -- ============================================================================
 -- Sections 1-8: term definitions — MOVED to Metatheorems/Terms/Rational.lean
@@ -1297,7 +1297,7 @@ private def add_monus_cancel_l (x y z : Term F Γ Ty.nat) :
     let c123 := .mp (.mp m3 (.mp c12 and_intro)) .trans0
     -- A is exactly: (x+y) ∸ (x+z) =₀ y ∸ z (with x = .var .vz = xv).
     -- So (A →ᶠ A) via I_comb gives us the IH step.
-    .syllogism (pair_h (weaken_intro c123) (@I_comb _ _ al Premises _ A)) .trans0
+    .syllogism (pair_h (weaken_intro c123) (@I_comb _ _ _ al Premises _ A)) .trans0
   have inst_nf : A.subst0 x =
       Formula.eq0 (Term.app2 Term.monus
         (Term.app2 Term.add x y) (Term.app2 Term.add x z))
@@ -1340,7 +1340,7 @@ private def le_pred (r w : Term F Γ Ty.nat) :
          Formula.eq0 (.app .succ r) Term.zero) :=
       .syllogism (pair_h (weaken_intro (.mp mz_Sr .sym0)) I_comb) .trans0
     let succ_ne : Derivable F al Premises (Formula.eq0 (.app .succ r) Term.zero →ᶠ ⊥ᶠ) :=
-      .mp (@Derivable.succ_ne_zero _ _ al Premises Γ) (.forall_ax r)
+      .mp (@Derivable.succ_ne_zero _ _ _ al Premises Γ) (.forall_ax r)
     let to_bot := .syllogism qf succ_ne
     .syllogism to_bot .exfalso
   -- Step w → Sw
@@ -1942,7 +1942,7 @@ private def inv_triag_triag_add_inner_step (w r : Term F Γ Ty.nat)
     -- Step H: (S0 = 0) → ⊥ via succ_ne_zero
     let h_succ_ne : Derivable F al Premises
         (Formula.eq0 (.app .succ Term.zero) Term.zero →ᶠ ⊥ᶠ) :=
-      .mp (@Derivable.succ_ne_zero _ _ al Premises Γ) (.forall_ax Term.zero)
+      .mp (@Derivable.succ_ne_zero _ _ _ al Premises Γ) (.forall_ax Term.zero)
     -- Step I: chain to_r_eq_Sw, to_S0_eq_0, h_succ_ne
     .syllogism to_r_eq_Sw (.syllogism to_S0_eq_0 h_succ_ne)
   -- Extract: sg_bar(Sw ∸ r) = 0 from sg_bar_eq_zero_iff (backward direction)
@@ -2123,7 +2123,7 @@ private def inv_triag_triag_add_inner_step_imp
   let h_Swmw_eq_S0 := succ_monus_self w
   let h_succ_ne : Derivable F al Premises
       (Formula.eq0 (.app .succ Term.zero) Term.zero →ᶠ ⊥ᶠ) :=
-    .mp (@Derivable.succ_ne_zero _ _ al Premises Γ) (.forall_ax Term.zero)
+    .mp (@Derivable.succ_ne_zero _ _ _ al Premises Γ) (.forall_ax Term.zero)
   -- Now, using `pair_h`/`eval_h` style where the "H" is P, we derive:
   -- h_Swmr_ne_0_imp : P → ((Sw∸r=0) → ⊥)
   -- by chaining through:
@@ -2361,7 +2361,7 @@ private def inv_triag_triag_add_step {Γ : Ctx ι} :
   -- feed `monus_self w_v` to the extracted implication.
   have base_deriv : Derivable F al Premises (B →ᶠ base_body) :=
     let fa : Derivable F al Premises (B →ᶠ C.subst0 w_v) :=
-      @Derivable.forall_ax ι F al Premises (Ty.nat :: Γ) Ty.nat C w_v
+      @Derivable.forall_ax ι κ F al Premises (Ty.nat :: Γ) Ty.nat C w_v
     let fa' : Derivable F al Premises
         (B →ᶠ (Formula.eq0 (Term.app2 Term.monus w_v w_v) Term.zero →ᶠ
                Formula.eq0 (.app Term.inv_triag
@@ -2561,7 +2561,7 @@ private def inv_triag_triag_add (w r : Term F Γ Ty.nat)
   let base : Derivable F al Premises (B.subst0 Term.zero) :=
     base_nf ▸ univ_gen base_body
   -- Step: inv_triag_triag_add_step
-  let step := @inv_triag_triag_add_step _ _ _ Premises Γ
+  let step := @inv_triag_triag_add_step _ _ _ _ Premises Γ
   -- Induction
   let ind := Derivable.induction base (univ_gen step)
   -- Instantiate: ind : ∀w. B(w), so at w: B(w) = ∀r. C(w,r)
@@ -3789,20 +3789,20 @@ def sg_bar_eq_S0_implies_zero (x : Term F Γ Ty.nat) :
 -- next to the `monus_cancel` it is proved from.
 
 -- Helpers for doubly-weakened terms under substitution
-private theorem dw_subst0 {Γ : Ctx ι} {F : ι → Ty ι} (t : Term F Γ Ty.nat) (s : Term F Γ Ty.nat) :
+private theorem dw_subst0 {Γ : Ctx ι} {F : κ → Ty ι} (t : Term F Γ Ty.nat) (s : Term F Γ Ty.nat) :
     Term.subst (Term.Subst.ext (σ := Ty.nat) (Term.subst0_map s))
       (t.weaken (σ := Ty.nat)).weaken = t.weaken := by
   simp only [Term.weaken]
   rw [Term.rename_subst, Term.rename_subst, Term.rename_eq_subst]; rfl
 
-private theorem dw_substVar0 {Γ : Ctx ι} {F : ι → Ty ι} (t : Term F Γ Ty.nat)
+private theorem dw_substVar0 {Γ : Ctx ι} {F : κ → Ty ι} (t : Term F Γ Ty.nat)
     (u : Term F (Ty.nat :: Γ) Ty.nat) :
     Term.subst (Term.Subst.ext (σ := Ty.nat) (Term.substVar0_map u))
       (t.weaken (σ := Ty.nat)).weaken = (t.weaken (σ := Ty.nat)).weaken := by
   simp only [Term.weaken]
   rw [Term.rename_subst, Term.rename_subst, Term.rename_rename, Term.rename_eq_subst]; rfl
 
-private theorem tw_subst0 {Γ : Ctx ι} {F : ι → Ty ι} (t : Term F Γ Ty.nat)
+private theorem tw_subst0 {Γ : Ctx ι} {F : κ → Ty ι} (t : Term F Γ Ty.nat)
     (s : Term F (Ty.nat :: Γ) Ty.nat) :
     Term.subst (Term.Subst.ext (σ := Ty.nat) (Term.subst0_map s))
       ((t.weaken (σ := Ty.nat)).weaken (σ := Ty.nat)).weaken = (t.weaken (σ := Ty.nat)).weaken := by
@@ -3813,14 +3813,14 @@ private theorem tw_subst0 {Γ : Ctx ι} {F : ι → Ty ι} (t : Term F Γ Ty.nat
 @[simp] private theorem mul_closed_rename {Γ Δ : Ctx ι} (r : Renaming Γ Δ) :
     (Term.mul : Term F Γ _).rename r = Term.mul := by rfl
 
-private theorem ww_subst_ext_subst0 {Γ : Ctx ι} {F : ι → Ty ι} (t : Term F Γ Ty.nat)
+private theorem ww_subst_ext_subst0 {Γ : Ctx ι} {F : κ → Ty ι} (t : Term F Γ Ty.nat)
     (s : Term F Γ Ty.nat) :
     Term.subst (Term.Subst.ext (σ := Ty.nat) (Term.subst0_map s))
       ((t.weaken (σ := Ty.nat)).weaken (σ := Ty.nat)) = t.weaken (σ := Ty.nat) := by
   simp only [Term.weaken]
   rw [Term.rename_subst, Term.rename_subst, Term.rename_eq_subst]; rfl
 
-private theorem ww_subst_ext_substVar0 {Γ : Ctx ι} {F : ι → Ty ι} (t : Term F Γ Ty.nat)
+private theorem ww_subst_ext_substVar0 {Γ : Ctx ι} {F : κ → Ty ι} (t : Term F Γ Ty.nat)
     (u : Term F (Ty.nat :: Γ) Ty.nat) :
     Term.subst (Term.Subst.ext (σ := Ty.nat) (Term.substVar0_map u))
       ((t.weaken (σ := Ty.nat)).weaken (σ := Ty.nat)) =
@@ -3828,7 +3828,7 @@ private theorem ww_subst_ext_substVar0 {Γ : Ctx ι} {F : ι → Ty ι} (t : Ter
   simp only [Term.weaken]
   rw [Term.rename_subst, Term.rename_subst, Term.rename_rename, Term.rename_eq_subst]; rfl
 
-private theorem nww_rename_subst0 {Γ : Ctx ι} {F : ι → Ty ι} (t : Term F Γ Ty.nat)
+private theorem nww_rename_subst0 {Γ : Ctx ι} {F : κ → Ty ι} (t : Term F Γ Ty.nat)
     (s : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat) :
     Term.subst (Term.subst0_map s)
       (Term.rename (Term.Renaming.ext Term.Renaming.shift)
@@ -3939,7 +3939,7 @@ private def mul_cancel_succ_step {Γ : Ctx ι} (n : Term F Γ Ty.nat) :
                     (Term.app2 Term.mul yv snww) →ᶠ Formula.eq0 sxv yv))) :=
     .exportation (.exportation (
     -- Hypothesis context (left-assoc): (¬(y=0) ∧ IH) ∧ hyp
-    let get_hyp := @and_proj2 _ F al Premises _
+    let get_hyp := @and_proj2 _ _ F al Premises _
       (¬ᶠFormula.eq0 yv .zero ∧ᶠ A.weakenBy Ty.nat)
       (Formula.eq0 (Term.app2 Term.mul sxv snww) (Term.app2 Term.mul yv snww))
     let get_ne : Derivable F al Premises
@@ -6096,7 +6096,7 @@ def mul_Q_comm :
     Derivable.mp (Derivable.mp eq_nf (Derivable.mp unfold_ab and_intro)) .trans0
   let h_eq := Derivable.mp (Derivable.mp (Derivable.mp unfold_ba .sym0) (Derivable.mp c1 and_intro)) .trans0
   -- Lift to eq_Q and universalize
-  univ_gen (univ_gen (@eq_Q_from_nat_eq _ _ _ _ _ _ _ h_eq))
+  univ_gen (univ_gen (@eq_Q_from_nat_eq _ _ _ _ _ _ _ _ h_eq))
 
 
 /-- `mul_Q_comm` instantiated at two explicit terms, with the resulting formula stated.
@@ -7068,7 +7068,7 @@ def lt_Q_irrefl :
   let h_eq_neg : Derivable F al Premises (eq_Q add_neg Term.zero_Q) := by
     have h := Derivable.mp (add_Q_neg (al := al) (Premises := Premises)) (.forall_ax a)
     q_norm using h
-  let h_eq_sub_neg := @eq_Q_from_nat_eq _ _ _ _ _ _ _ h_sub_unfold
+  let h_eq_sub_neg := @eq_Q_from_nat_eq _ _ _ _ _ _ _ _ h_sub_unfold
   let trans_inst := eq_Q_trans_inst (Term.app2 Term.sub_Q a a) add_neg Term.zero_Q
   let h_eq_sub_zero : Derivable F al Premises (eq_Q (Term.app2 Term.sub_Q a a) Term.zero_Q) :=
     Derivable.mp (Derivable.mp h_eq_neg (.mp h_eq_sub_neg and_intro)) trans_inst

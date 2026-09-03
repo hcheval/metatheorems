@@ -24,7 +24,7 @@ via `.val`.
 
 open Formula
 
-variable {ι : Type} {X : ι → Type} {F : ι → Ty ι} (si : SpaceInterp X F)
+variable {ι κ : Type} {X : ι → Type} {F : κ → Ty ι} (si : SpaceInterp X F)
 variable (eqxi : EqXInterp X F si)
 variable {Premises : PremiseSet F}
 variable (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
@@ -191,7 +191,7 @@ def dialectica_trans0 {Γ : Ctx ι} {s t u : Term F Γ Ty.nat} (env : Ctx.interp
 -- ============================================================================
 
 /-- A canonical element of `Ty.interpret X ρ`, using `si.zeroInterp` at base types. -/
-private def Ty.interpret_default' {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+private def Ty.interpret_default' {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) : ∀ (ρ : Ty ι), Ty.interpret X ρ
   | .nat    => Nat.zero
   | .base i => si.zeroInterp i
@@ -495,7 +495,7 @@ def dialectica_induction {Γ : Ctx ι} {A : Formula F (Ty.nat :: Γ)} (env : Ctx
 -- ============================================================================
 
 /-- `Ty.interpret X ρ` is always nonempty given a `SpaceInterp`. -/
-private lemma Ty.interpret_nonempty {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+private lemma Ty.interpret_nonempty {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) (ρ : Ty ι) : Nonempty (Ty.interpret X ρ) := by
   induction ρ with
   | nat    => exact ⟨Nat.zero⟩
@@ -505,7 +505,7 @@ private lemma Ty.interpret_nonempty {ι : Type} {X : ι → Type} {F : ι → Ty
   | prod _ _ ihρ ihτ => exact ⟨(ihρ.some, ihτ.some)⟩
 
 /-- Both `𝕎 X A` and `ℂ X A` are nonempty. -/
-private lemma dialectica_nonempty {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+private lemma dialectica_nonempty {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) {Γ : Ctx ι} (A : Formula F Γ) :
     Nonempty (𝕎 X A) ∧ Nonempty (ℂ X A) := by
   induction A with
@@ -643,7 +643,7 @@ def dialectica_ac {Γ : Ctx ι} {ρ τ : Ty ι} {A : Formula F (τ :: ρ :: Γ)}
 /-- Generalized Dialectica realizer for any context and environment.
     Returns a realizer for all environments; structural recursion on the derivation. -/
 def dialectica_soundness_ctx' {Γ : Ctx ι} {A : Formula F Γ}
-    (h : @Derivable ι F Allowed.extended Premises Γ A) :
+    (h : @Derivable ι κ F Allowed.extended Premises Γ A) :
     ∀ env : Ctx.interpret X Γ, dialecticaRealizerCtx si A env :=
   match h with
   -- Premises
@@ -721,7 +721,7 @@ def dialectica_soundness_ctx' {Γ : Ctx ι} {A : Formula F Γ}
 
 /-- **Dialectica Soundness Theorem** (Theorem 3.0.7). -/
 def dialectica_soundness' {A : Formula F ([] : Ctx ι)}
-    (h : @Derivable ι F Allowed.extended Premises [] A) : dialecticaRealizer si A :=
-  @dialectica_soundness_ctx' ι X F si eqxi Premises premise_realizer [] A h ()
+    (h : @Derivable ι κ F Allowed.extended Premises [] A) : dialecticaRealizer si A :=
+  @dialectica_soundness_ctx' ι κ X F si eqxi Premises premise_realizer [] A h ()
 
 end Metatheorems

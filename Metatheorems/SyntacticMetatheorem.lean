@@ -10,7 +10,7 @@ namespace Metatheorems
 
 open Formula
 
-variable {ι : Type} {F : ι → Ty ι} {X : ι → Type}
+variable {ι κ : Type} {F : κ → Ty ι} {X : ι → Type}
 
 -- ============================================================================
 -- The metatheorem, with majorants supplied by the syntax
@@ -36,7 +36,7 @@ theorem syntactic_general_metatheorem
     {ρ : Ty ι} {B₀ C₀ : Formula F [Ty.nat, ρ]}
     (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
     (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
-    (prf : @Derivable ι F Allowed.extended Premises []
+    (prf : @Derivable ι κ F Allowed.extended Premises []
       (Formula.all ρ (Formula.imp (Formula.all .nat B₀) (Formula.ex .nat C₀)))) :
     ∃ Φ : Ty.interpret X ρ.hat → Nat,
       ∀ (x : Ty.interpret X ρ) (x_star : Ty.interpret X ρ.hat),
@@ -101,7 +101,7 @@ theorem syntactic_general_metatheorem_classical
     {ρ : Ty ι} {B₀ C₀ : Formula F [Ty.nat, ρ]}
     (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
     (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
-    (prf : @Derivable ι F Allowed.classical Premises []
+    (prf : @Derivable ι κ F Allowed.classical Premises []
       (Formula.all ρ (Formula.imp (Formula.all .nat B₀) (Formula.ex .nat C₀)))) :
     ∃ Φ : Ty.interpret X ρ.hat → Nat,
       ∀ (x : Ty.interpret X ρ) (x_star : Ty.interpret X ρ.hat),

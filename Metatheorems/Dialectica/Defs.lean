@@ -60,11 +60,11 @@ end
 /-- The Lean type of witnesses: the interpretation of the object-level witness type.
 Definitionally the familiar clause-by-clause definition — `Unit`, products, function
 spaces — so nothing that used the old definition changes. -/
-@[reducible] def dialecticaWitness {ι : Type} (X : ι → Type) {F : ι → Ty ι} {Γ : Ctx ι}
+@[reducible] def dialecticaWitness {ι κ : Type} (X : ι → Type) {F : κ → Ty ι} {Γ : Ctx ι}
     (A : Formula F Γ) : Type := Ty.interpret X (wTy A)
 
 /-- The Lean type of counters. -/
-@[reducible] def dialecticaCounter {ι : Type} (X : ι → Type) {F : ι → Ty ι} {Γ : Ctx ι}
+@[reducible] def dialecticaCounter {ι κ : Type} (X : ι → Type) {F : κ → Ty ι} {Γ : Ctx ι}
     (A : Formula F Γ) : Type := Ty.interpret X (cTy A)
 
 notation "𝕎" => dialecticaWitness
@@ -76,7 +76,7 @@ notation "ℂ" => dialecticaCounter
 
 /-- Every `Ty.interpret X ρ` has a computable default: 0 for Nat, zeroInterp for base types,
     constant function for arrow types. -/
-def Ty.interpret_default {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+def Ty.interpret_default {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) : (ρ : Ty ι) → Ty.interpret X ρ
   | .nat    => Nat.zero
   | .base i => si.zeroInterp i
@@ -86,7 +86,7 @@ def Ty.interpret_default {ι : Type} {X : ι → Type} {F : ι → Ty ι}
 
 mutual
 /-- Computable default witness for any formula's Dialectica translation. -/
-def dialecticaDefaultWitness {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+def dialecticaDefaultWitness {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) {Γ : Ctx ι} : (A : Formula F Γ) → dialecticaWitness X A
   | .bot      => ()
   | .eq0 _ _  => ()
@@ -98,7 +98,7 @@ def dialecticaDefaultWitness {ι : Type} {X : ι → Type} {F : ι → Ty ι}
   | .all _ A  => fun _ => dialecticaDefaultWitness si A
 
 /-- Computable default counter for any formula's Dialectica translation. -/
-def dialecticaDefaultCounter {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+def dialecticaDefaultCounter {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) {Γ : Ctx ι} : (A : Formula F Γ) → dialecticaCounter X A
   | .bot      => ()
   | .eq0 _ _  => ()
@@ -117,7 +117,7 @@ end
 
 Takes an environment `env : Ctx.interpret X Γ` to evaluate the formula's free
 variables, witnesses, and counters. -/
-def dialecticaMatrix {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+def dialecticaMatrix {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) :
     {Γ : Ctx ι} → (A : Formula F Γ) → Ctx.interpret X Γ →
     dialecticaWitness X A → dialecticaCounter X A → Prop
@@ -148,7 +148,7 @@ def dialecticaMatrix {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     Defined by structural recursion on `A` in term mode (rather than
     `induction A generalizing`) because the context `Γ` is indexed into
     `A`'s type and changes in the `all`/`ex` arms. -/
-instance dialecticaMatrix_decidable {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+instance dialecticaMatrix_decidable {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) {Γ : Ctx ι} (A : Formula F Γ)
     (env : Ctx.interpret X Γ) (w : dialecticaWitness X A) (y : dialecticaCounter X A) :
     Decidable (dialecticaMatrix si A env w y) :=
@@ -193,13 +193,13 @@ instance dialecticaMatrix_decidable {ι : Type} {X : ι → Type} {F : ι → Ty
     This is a *subtype* (not a Prop): the computational witness together with
     a proof it satisfies the matrix for all counters. Because `dialecticaRealizerCtx`
     lives in `Type`, the witness can be extracted computably via `.val`. -/
-def dialecticaRealizerCtx {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+def dialecticaRealizerCtx {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) {Γ : Ctx ι} (A : Formula F Γ) (env : Ctx.interpret X Γ) : Type :=
   { x : dialecticaWitness X A //
     ∀ (y : dialecticaCounter X A), dialecticaMatrix si A env x y }
 
 /-- The Dialectica realizer for a closed formula (env = ()). -/
-def dialecticaRealizer {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+def dialecticaRealizer {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) (A : Formula F ([] : Ctx ι)) : Type :=
   dialecticaRealizerCtx si A ()
 
@@ -209,8 +209,8 @@ def dialecticaRealizer {ι : Type} {X : ι → Type} {F : ι → Ty ι}
 
 /-- For QF ∨-free formulas, the witness and counter types are subsingletons.
     This is needed for Markov's principle and IP. -/
-theorem dialecticaWitness_subsingleton {ι : Type} {X : ι → Type}
-    {F : ι → Ty ι} {Γ : Ctx ι}
+theorem dialecticaWitness_subsingleton {ι κ : Type} {X : ι → Type}
+    {F : κ → Ty ι} {Γ : Ctx ι}
     (A : Formula F Γ) (hqf : A.isQF = true) (hvf : A.isVFree = true) :
     Subsingleton (dialecticaWitness X A) ∧
     Subsingleton (dialecticaCounter X A) := by
@@ -250,8 +250,8 @@ theorem dialecticaWitness_subsingleton {ι : Type} {X : ι → Type}
 
 /-- For QF ∨-free formulas, construct default witness and counter values.
     These are unique by `dialecticaWitness_subsingleton`. -/
-def dialecticaDefault {ι : Type} {X : ι → Type}
-    {F : ι → Ty ι} {Γ : Ctx ι} :
+def dialecticaDefault {ι κ : Type} {X : ι → Type}
+    {F : κ → Ty ι} {Γ : Ctx ι} :
     (A : Formula F Γ) → A.isQF = true → A.isVFree = true →
     dialecticaWitness X A × dialecticaCounter X A
   | .bot, _, _ => ((), ())
@@ -281,7 +281,7 @@ def dialecticaDefault {ι : Type} {X : ι → Type}
 -- ============================================================================
 
 /-- Object-level type invariance under substF. -/
-theorem wTy_cTy_substF {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι} (A : Formula F Γ) :
+theorem wTy_cTy_substF {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι} (A : Formula F Γ) :
     ∀ {Δ : Ctx ι} (s : Term.Subst F Γ Δ),
     wTy (A.substF s) = wTy A ∧ cTy (A.substF s) = cTy A := by
   induction A with
@@ -310,19 +310,19 @@ theorem wTy_cTy_substF {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι} (A : Formula
     exact ⟨by simp only [Formula.substF, wTy, hwA], by simp only [Formula.substF, cTy, hcA]⟩
 
 /-- Witness and counter types are invariant under substF. -/
-theorem dialectica_types_substF {ι : Type} {X : ι → Type} {F : ι → Ty ι} {Γ : Ctx ι}
+theorem dialectica_types_substF {ι κ : Type} {X : ι → Type} {F : κ → Ty ι} {Γ : Ctx ι}
     (A : Formula F Γ) {Δ : Ctx ι} (s : Term.Subst F Γ Δ) :
     dialecticaWitness X (A.substF s) = dialecticaWitness X A ∧
     dialecticaCounter X (A.substF s) = dialecticaCounter X A :=
   ⟨congrArg _ (wTy_cTy_substF A s).1, congrArg _ (wTy_cTy_substF A s).2⟩
 
 /-- Corollaries: type invariance under subst0 and weaken. -/
-theorem dialecticaWitness_subst0 {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+theorem dialecticaWitness_subst0 {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     {Γ : Ctx ι} {ρ : Ty ι} (A : Formula F (ρ :: Γ)) (t : Term F Γ ρ) :
     dialecticaWitness X (A.subst0 t) = dialecticaWitness X A :=
   (dialectica_types_substF A (Term.subst0_map t)).1
 
-theorem dialecticaCounter_subst0 {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+theorem dialecticaCounter_subst0 {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     {Γ : Ctx ι} {ρ : Ty ι} (A : Formula F (ρ :: Γ)) (t : Term F Γ ρ) :
     dialecticaCounter X (A.subst0 t) = dialecticaCounter X A :=
   (dialectica_types_substF A (Term.subst0_map t)).2
@@ -332,7 +332,7 @@ theorem dialecticaCounter_subst0 {ι : Type} {X : ι → Type} {F : ι → Ty ι
 -- ============================================================================
 
 /-- Object-level type invariance under renameF. -/
-theorem wTy_cTy_renameF {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι} (A : Formula F Γ) :
+theorem wTy_cTy_renameF {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι} (A : Formula F Γ) :
     ∀ {Δ : Ctx ι} (s : Term.Renaming Γ Δ),
     wTy (A.renameF s) = wTy A ∧ cTy (A.renameF s) = cTy A := by
   induction A with
@@ -361,18 +361,18 @@ theorem wTy_cTy_renameF {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι} (A : Formul
     exact ⟨by simp only [Formula.renameF, wTy, hwA], by simp only [Formula.renameF, cTy, hcA]⟩
 
 /-- Witness and counter types are invariant under renameF. -/
-theorem dialectica_types_renameF {ι : Type} {X : ι → Type} {F : ι → Ty ι} {Γ : Ctx ι}
+theorem dialectica_types_renameF {ι κ : Type} {X : ι → Type} {F : κ → Ty ι} {Γ : Ctx ι}
     (A : Formula F Γ) {Δ : Ctx ι} (s : Term.Renaming Γ Δ) :
     dialecticaWitness X (A.renameF s) = dialecticaWitness X A ∧
     dialecticaCounter X (A.renameF s) = dialecticaCounter X A :=
   ⟨congrArg _ (wTy_cTy_renameF A s).1, congrArg _ (wTy_cTy_renameF A s).2⟩
 
-theorem dialecticaWitness_weaken {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+theorem dialecticaWitness_weaken {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     {Γ : Ctx ι} (ρ : Ty ι) (A : Formula F Γ) :
     dialecticaWitness X (A.weakenBy ρ) = dialecticaWitness X A :=
   (dialectica_types_renameF A Renaming.shift).1
 
-theorem dialecticaCounter_weaken {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+theorem dialecticaCounter_weaken {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     {Γ : Ctx ι} (ρ : Ty ι) (A : Formula F Γ) :
     dialecticaCounter X (A.weakenBy ρ) = dialecticaCounter X A :=
   (dialectica_types_renameF A Renaming.shift).2
@@ -412,7 +412,7 @@ lemma cast_cancel {α β : Type} (h : α = β) (a : α) :
   eq_of_heq ((cast_heq h.symm (cast h a)).trans (cast_heq h a))
 
 /-- Evaluate Ctx.interpretSubst for Renaming.ext applied to var-renaming. -/
-private lemma Ctx.interpretSubst_ext_var {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+private lemma Ctx.interpretSubst_ext_var {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) {Γ Δ : Ctx ι} {ρ' : Ty ι}
     (r : Renaming Γ Δ) (z : Ty.interpret X ρ') (env : Ctx.interpret X Δ) :
     Ctx.interpretSubst si
@@ -431,7 +431,7 @@ private lemma Ctx.interpretSubst_ext_var {ι : Type} {X : ι → Type} {F : ι �
     separate cast decomposition. The proof uses the fact that
     `dialecticaWitness`/`dialecticaCounter`/`dialecticaMatrix` all unfold
     structurally on `A.renameF r` and `A` in the same way. -/
-theorem dialecticaMatrix_renameF {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+theorem dialecticaMatrix_renameF {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) {Γ : Ctx ι} (A : Formula F Γ) :
     ∀ {Δ : Ctx ι} (r : Renaming Γ Δ) (env : Ctx.interpret X Δ)
       (w : dialecticaWitness X (A.renameF r))
@@ -536,7 +536,7 @@ theorem dialecticaMatrix_renameF {ι : Type} {X : ι → Type} {F : ι → Ty ι
 
 /-- The Dialectica matrix commutes with formula substitution.
     Key: cast witnesses/counters via the type invariance equalities. -/
-theorem dialecticaMatrix_substF {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+theorem dialecticaMatrix_substF {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) {Γ : Ctx ι} (A : Formula F Γ) :
     ∀ {Δ : Ctx ι} (s : Term.Subst F Γ Δ) (env : Ctx.interpret X Δ)
       (w : dialecticaWitness X A) (y : dialecticaCounter X A),
@@ -636,7 +636,7 @@ theorem dialecticaMatrix_substF {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     rw [Ctx.interpretSubst_ext] at key
     exact key
 
-theorem dialecticaMatrix_subst0 {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+theorem dialecticaMatrix_subst0 {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) {Γ : Ctx ι} {ρ : Ty ι}
     (A : Formula F (ρ :: Γ)) (t : Term F Γ ρ) (env : Ctx.interpret X Γ)
     (w : dialecticaWitness X A) (y : dialecticaCounter X A) :
@@ -647,7 +647,7 @@ theorem dialecticaMatrix_subst0 {ι : Type} {X : ι → Type} {F : ι → Ty ι}
   have h := dialecticaMatrix_substF si A (Term.subst0_map t) env w y
   rwa [Ctx.interpretSubst_subst0_map] at h
 
-theorem dialecticaMatrix_substVar0 {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+theorem dialecticaMatrix_substVar0 {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) {Γ : Ctx ι} {ρ : Ty ι}
     (A : Formula F (ρ :: Γ)) (t : Term F (ρ :: Γ) ρ)
     (v : Ty.interpret X ρ) (env : Ctx.interpret X Γ)
@@ -666,7 +666,7 @@ theorem dialecticaMatrix_substVar0 {ι : Type} {X : ι → Type} {F : ι → Ty 
 /-- The Dialectica matrix is invariant under formula weakening.
     Witnesses/counters for A.weakenBy ρ correspond to those for A,
     and the matrix value at (v, env) equals that at env. -/
-theorem dialecticaMatrix_weaken {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+theorem dialecticaMatrix_weaken {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) {Γ : Ctx ι} {ρ : Ty ι} (A : Formula F Γ)
     (env : Ctx.interpret X Γ) (v : Ty.interpret X ρ)
     (w : dialecticaWitness X (A.weakenBy ρ))
@@ -707,7 +707,7 @@ subsingletons (`dialecticaWitness_subsingleton`).
 This duplicates `dialecticaMatrix_iff_interpFormula` (`Metatheorem.lean`), which cannot be
 used here: `Metatheorem.lean` sits far above this file. When the two are ever unified, this
 is the one to keep — it is the lower of the two. -/
-theorem dialecticaMatrix_iff_interp_qf {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+theorem dialecticaMatrix_iff_interp_qf {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) {Γ : Ctx ι}
     (A : Formula F Γ) (hqf : A.isQF = true) (hvf : A.isVFree = true)
     (env : Ctx.interpret X Γ) (w : 𝕎 X A) (c : ℂ X A) :
@@ -745,7 +745,7 @@ closed under `∧` since the 2026-09-01 merge), and the quantifier-free core, wh
 `dialecticaMatrix_iff_interp_qf` discharges the matrix *for every counter*.
 
 `srealizer_of_pu` (`Dialectica/Syntactic.lean`) is the syntactic counterpart. -/
-def realizer_of_pu {ι : Type} {X : ι → Type} {F : ι → Ty ι} (si : SpaceInterp X F) :
+def realizer_of_pu {ι κ : Type} {X : ι → Type} {F : κ → Ty ι} (si : SpaceInterp X F) :
     {Γ : Ctx ι} → (B : Formula F Γ) →
       B.isPurelyUniversal = true → B.isVFree = true →
       (∀ env : Ctx.interpret X Γ, Formula.interpret si B env) →
@@ -791,7 +791,7 @@ def realizer_of_pu {ι : Type} {X : ι → Type} {F : ι → Ty ι} (si : SpaceI
 handed. That is enough: the `∀` case only ever needs truth at *extensions* of the given
 environment, which `htrue v` supplies, and the quantifier-free cases use `env` alone. The two
 definitions are otherwise identical. -/
-def realizer_of_pu_at {ι : Type} {X : ι → Type} {F : ι → Ty ι} (si : SpaceInterp X F) :
+def realizer_of_pu_at {ι κ : Type} {X : ι → Type} {F : κ → Ty ι} (si : SpaceInterp X F) :
     {Γ : Ctx ι} → (B : Formula F Γ) →
       B.isPurelyUniversal = true → B.isVFree = true →
       (env : Ctx.interpret X Γ) → Formula.interpret si B env →
@@ -838,7 +838,7 @@ statement about the distance.  The `∀` case reads the realizer componentwise �
 `.all ρ A` is a function and its counter a dependent pair, so `⟨r.val v, fun y => r.property
 ⟨v, y⟩⟩` realizes `A` at `(v, env)`.  The quantifier-free cases just feed the default counter
 to `dialecticaMatrix_iff_interp_qf`, which reduces the matrix *for every* counter. -/
-def interp_of_realizer_pu {ι : Type} {X : ι → Type} {F : ι → Ty ι} (si : SpaceInterp X F) :
+def interp_of_realizer_pu {ι κ : Type} {X : ι → Type} {F : κ → Ty ι} (si : SpaceInterp X F) :
     {Γ : Ctx ι} → (B : Formula F Γ) →
       B.isPurelyUniversal = true → B.isVFree = true →
       (env : Ctx.interpret X Γ) → dialecticaRealizerCtx si B env →
@@ -894,7 +894,7 @@ five conditions needed in the inductive argument:
 
 Concrete theories (e.g. metric spaces) supply an `EqXInterp` instance
 for their chosen equality predicate. -/
-structure EqXInterp {ι : Type} (X : ι → Type) (F : ι → Ty ι)
+structure EqXInterp {ι κ : Type} (X : ι → Type) (F : κ → Ty ι)
     (si : SpaceInterp X F) where
   /-- The witness type for `EqX i s t` is a subsingleton (purely universal). -/
   witnessSubsingleton : ∀ (i : ι) {Γ : Ctx ι} (s t : Term F Γ (Ty.base i)),
@@ -956,7 +956,7 @@ Was a field (`dist_comm_realize`) until 2026-09-02; it is now derived from the m
 `dist_comm_holds` by `realizer_of_pu`, since `eq_R` is purely universal and ∨-free
 (`isPurelyUniversal` and `isVFree` are both `true` by `rfl`). Its signature is unchanged,
 so call sites in `Dialectica/Lemmas.lean` are untouched. -/
-def EqXInterp.dist_comm_realize {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+def EqXInterp.dist_comm_realize {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     {si : SpaceInterp X F} (eqxi : EqXInterp X F si)
     (i : ι) {Γ : Ctx ι} (x y : Term F Γ (Ty.base i)) (env : Ctx.interpret X Γ) :
     dialecticaRealizerCtx si
@@ -966,7 +966,7 @@ def EqXInterp.dist_comm_realize {ι : Type} {X : ι → Type} {F : ι → Ty ι}
 /-- The triangle inequality, as a Dialectica realizer. Derived from `dist_tri_holds`
 exactly as `dist_comm_realize` is; `le_R_pu` is the ∨-free purely universal form of `≤ℝ`
 precisely so that this works. -/
-def EqXInterp.dist_tri_realize {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+def EqXInterp.dist_tri_realize {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     {si : SpaceInterp X F} (eqxi : EqXInterp X F si)
     (i : ι) {Γ : Ctx ι} (x y z : Term F Γ (Ty.base i)) (env : Ctx.interpret X Γ) :
     dialecticaRealizerCtx si

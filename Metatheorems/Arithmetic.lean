@@ -44,7 +44,7 @@ Following arithmetic.tex, lambda.tex, and wehax.tex (§2.3) of the reference doc
 
 open Formula
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
     {al : Allowed} {Premises : PremiseSet F} 
 -- Private combinators used throughout (same as NegTrans.lean private defs)
 private def self_imp_h {Γ : Ctx ι} {A : Formula F Γ} :
@@ -66,7 +66,7 @@ def forall_ax_inst {Γ : Ctx ι} {ρ : Ty ι} (P : Formula F (ρ :: Γ)) :
   let heq : (Formula.renameF (Renaming.ext Renaming.shift) P).subst0 (.var .vz) = P :=
     Formula.substF_renameF_id (Renaming.ext Renaming.shift)
       (Term.subst0_map (.var .vz)) hbody P
-  have h := @Derivable.forall_ax ι F al Premises (ρ :: Γ) ρ
+  have h := @Derivable.forall_ax ι κ F al Premises (ρ :: Γ) ρ
               (Formula.renameF (Renaming.ext Renaming.shift) P) (.var .vz)
   -- h : ⊢ all ρ (renameF (ext shift) P) →ᶠ X  where X = (renameF (ext shift) P).subst0 (var vz)
   -- heq : X = P.  Use Eq.mp to convert only the consequent X → P.
@@ -618,7 +618,7 @@ def add_succ (x n : Term F Γ Ty.nat) :
   let h2 := lam2_correct_nf step (Term.app3 (.prec Ty.nat) x z n) n
     (step_succ_nf _ _)
   let h3 := lam2_correct_nf body x n (add_body_nf x _)
-  let h4 := @qfer_no_premise _ _ al Premises _ _ _ _ _
+  let h4 := @qfer_no_premise _ _ _ al Premises _ _ _ _ _
     (.app .succ (.var .vz)) (Derivable.mp h3 (eqAtType_sym))
   let c1 := .mp (.mp .rec_succ (.mp h1 and_intro)) (eqAtType_trans)
   let c2 := .mp (.mp h2 (.mp c1 and_intro)) (eqAtType_trans)
@@ -703,7 +703,7 @@ def mul_succ (x n : Term F Γ Ty.nat) :
       (Term.app2 Term.mul x (Term.app Term.succ n))
       (Term.app2 Term.add (Term.app2 Term.mul x n) x)) :=
   -- Prove in variable context nat :: nat :: Γ, then transport
-  let h_var := @mul_succ_var _ _ _ Premises Γ
+  let h_var := @mul_succ_var _ _ _ _ Premises Γ
   let h_all_n := univ_gen h_var
   let h_at_n := .mp h_all_n (.forall_ax n.weaken)
   let h_all_x := univ_gen h_at_n
@@ -769,7 +769,7 @@ def monus_succ (x n : Term F Γ Ty.nat) :
   let h2 := lam2_correct_nf step
     (Term.app3 (.prec Ty.nat) x z n) n (step_pd_nf _ _)
   let h3 := lam2_correct_nf body x n (monus_body_nf x _)
-  let h4 := @qfer_no_premise _ _ al Premises _ _ _ _ _
+  let h4 := @qfer_no_premise _ _ _ al Premises _ _ _ _ _
     (.app Term.pd (.var .vz)) (Derivable.mp h3 (eqAtType_sym))
   let c1 := .mp (.mp .rec_succ (.mp h1 and_intro)) (eqAtType_trans)
   let c2 := .mp (.mp h2 (.mp c1 and_intro)) (eqAtType_trans)
@@ -846,7 +846,7 @@ def eq0_decidable' {Γ : Ctx ι} :
     .mp (.refl0 (t := Term.zero)) .or_weak
   let succ_ne : Derivable F al Premises
       (Formula.eq0 (Term.app Term.succ (.var .vz)) Term.zero →ᶠ ⊥ᶠ) :=
-    .mp (@Derivable.succ_ne_zero ι F al Premises (Ty.nat :: Γ)) (.forall_ax (.var .vz))
+    .mp (@Derivable.succ_ne_zero ι κ F al Premises (Ty.nat :: Γ)) (.forall_ax (.var .vz))
   let concl : Derivable F al Premises (Formula.substVar0 A (Term.app Term.succ (.var .vz))) :=
     .mp succ_ne or_inr
   let step_body : Derivable F al Premises
@@ -935,7 +935,7 @@ def ne_zero_eq_succ_pd (x : Term F Γ Ty.nat) :
   let pd_sx := pd_succ (.var .vz : Term F (Ty.nat :: Γ) Ty.nat)
   let sx_eq : Derivable F al Premises (Formula.eq0
       (.app .succ (.var .vz)) (.app .succ (.app Term.pd (.app .succ (.var .vz))))) :=
-    Derivable.mp (@qfer_no_premise _ _ al Premises _ _ _ _ _
+    Derivable.mp (@qfer_no_premise _ _ _ al Premises _ _ _ _ _
       (.app .succ (.var .vz)) pd_sx) .sym0
   let step_body : Derivable F al Premises
       (A →ᶠ Formula.substVar0 A (.app .succ (.var .vz))) :=
@@ -1397,7 +1397,7 @@ private def monus_cancel_step {Γ : Ctx ι} :
   let inner : Derivable F al Premises
       (Formula.eq0 (Term.app2 Term.monus (Term.app2 Term.add skv yv) yv) skv →ᶠ
        Formula.eq0 (Term.app2 Term.monus sky syv) kv) :=
-    @monus_cancel_step_inner _ _ _ Premises Γ
+    @monus_cancel_step_inner _ _ _ _ Premises Γ
   -- inner_chain: C(Sk,y) → C(k,Sy)  (= inner + congr2 + trans)
   let inner_chain : Derivable F al Premises
       (Formula.eq0 (Term.app2 Term.monus (Term.app2 Term.add skv yv) yv) skv →ᶠ
@@ -1441,7 +1441,7 @@ def monus_cancel (x y : Term F Γ Ty.nat) :
     let kv : Term F (Ty.nat :: Γ) _ := .var .vz
     univ_gen (.mp (.mp (add_zero_r kv)
       (.mp (monus_zero (Term.app2 Term.add kv Term.zero)) and_intro)) .trans0)
-  let step := @monus_cancel_step _ _ _ Premises Γ
+  let step := @monus_cancel_step _ _ _ _ Premises Γ
   -- Normalize B.subst0 y to an explicit ∀k formula
   have B_y_nf : B.subst0 y = Formula.all Ty.nat
       (Formula.eq0 (Term.app2 Term.monus (Term.app2 Term.add (.var .vz) y.weaken) y.weaken)
@@ -1574,7 +1574,7 @@ private def monus_antisym_case_y0 {Γ : Ctx ι} :
   let yv : Term F (Ty.nat :: Ty.nat :: Γ) _ := .var .vz
   let sxv := Term.app Term.succ xv
   let succ_ne : Derivable F al Premises (Formula.eq0 sxv Term.zero →ᶠ ⊥ᶠ) :=
-    .mp (@Derivable.succ_ne_zero _ _ al Premises (Ty.nat :: Ty.nat :: Γ)) (.forall_ax xv)
+    .mp (@Derivable.succ_ne_zero _ _ _ al Premises (Ty.nat :: Ty.nat :: Γ)) (.forall_ax xv)
   -- qf_mz: y=0 → monus(Sx,y) = monus(Sx,0)
   let qf_mz := qfer_nat_nf (by rfl) (by rfl) I_comb
     (monus_subst0_rw_nf sxv yv) (monus_subst0_rw_nf sxv Term.zero)
@@ -1623,7 +1623,7 @@ private def monus_antisym_case_yne0 {Γ : Ctx ι} :
   let succ_imp : Derivable F al Premises (Formula.eq0 xv pdy →ᶠ Formula.eq0 sxv spdy) :=
     .qfer (σ := Ty.nat) (r := .app .succ (.var .vz)) (by rfl) (by rfl) I_comb
   -- Projections from IH ∧ (NE ∧ (P ∧ Q))
-  let get_IH := @Derivable.and_weak _ _ al _ _ _  -- → IH
+  let get_IH := @Derivable.and_weak _ _ _ al _ _ _  -- → IH
   let get_NE := .syllogism (.syllogism .and_perm .and_weak) .and_weak  -- → NE
   let get_PQ := .syllogism (.syllogism .and_perm .and_weak) (.syllogism .and_perm .and_weak)  -- → P∧Q
   let get_P := .syllogism get_PQ .and_weak  -- → P
@@ -1678,8 +1678,8 @@ private def monus_antisym_step_body {Γ : Ctx ι} :
       pd_closed_subst, Term.weaken, Term.pd]
   let ih_inst := Eq.mp (congrArg (fun f => Derivable F al Premises (B.weakenBy Ty.nat →ᶠ f)) ih_nf)
     (Derivable.forall_ax pdy)
-  let case_yne0 := @monus_antisym_case_yne0 _ _ _ Premises Γ
-  let case_y0 := @monus_antisym_case_y0 _ _ _ Premises Γ
+  let case_yne0 := @monus_antisym_case_yne0 _ _ _ _ Premises Γ
+  let case_y0 := @monus_antisym_case_y0 _ _ _ _ Premises Γ
   let dec_y := .mp eq0_decidable' (.forall_ax yv)
   -- f: y=0 → (B_w∧PQ → Sx=y)
   let f := .exportation (.syllogism
@@ -1747,7 +1747,7 @@ def monus_eq_zero_antisym (x y : Term F Γ Ty.nat) :
     univ_gen (.syllogism (pair_h (weaken_intro_h (.mp (monus_zero kv) .sym0))
       (.syllogism .and_perm .and_weak)) (.syllogism .trans0 .sym0))
   -- Step: monus_antisym_step
-  let step := @monus_antisym_step _ _ _ Premises Γ
+  let step := @monus_antisym_step _ _ _ _ Premises Γ
   -- Normalize B.subst0 y
   have B_y_nf : B.subst0 y = Formula.all Ty.nat
       (Formula.eq0 (Term.app2 Term.monus y.weaken (.var .vz)) Term.zero ∧ᶠ
@@ -1905,7 +1905,7 @@ private def monus_disjunct_step_body {Γ : Ctx ι} :
       (¬ᶠFormula.eq0 yv .zero ∧ᶠ Formula.eq0 (Term.app2 Term.monus pdy xv) .zero →ᶠ
        Formula.eq0 (Term.app2 Term.monus yv sxv) .zero) :=
     .syllogism (pair_h (.syllogism .and_weak chain_r) (.syllogism .and_perm .and_weak)) .trans0
-  let get_ne := @Derivable.and_weak _ _ al _ _ (¬ᶠFormula.eq0 yv .zero) _
+  let get_ne := @Derivable.and_weak _ _ _ al _ _ (¬ᶠFormula.eq0 yv .zero) _
   let get_bw : Derivable F al Premises
       (¬ᶠFormula.eq0 yv .zero ∧ᶠ (B.weakenBy Ty.nat) →ᶠ B.weakenBy Ty.nat) :=
     .syllogism .and_perm .and_weak
@@ -1960,7 +1960,7 @@ def monus_disjunct (x y : Term F Γ Ty.nat) :
       Term.weaken, Term.rename, Term.Renaming.shift]
   have base : Derivable F al Premises (B.subst0 Term.zero) := base_nf ▸
     univ_gen (.mp (monus_zero_l (.var .vz : Term F (Ty.nat :: Γ) _)) .or_weak)
-  let step := @monus_disjunct_step _ _ _ Premises Γ
+  let step := @monus_disjunct_step _ _ _ _ Premises Γ
   have B_y_nf : B.subst0 y = Formula.all Ty.nat
       (Formula.eq0 (Term.app2 Term.monus y.weaken (.var .vz)) .zero ∨ᶠ
        Formula.eq0 (Term.app2 Term.monus (.var .vz) y.weaken) .zero) := by
@@ -2732,8 +2732,8 @@ private def monus_add_comm_step_body {Γ : Ctx ι} :
   let ih_inst := Eq.mp
     (congrArg (fun f => Derivable F al Premises (B.weakenBy Ty.nat →ᶠ f)) ih_nf)
     (Derivable.forall_ax pdy)
-  let case_y0 := @monus_add_comm_case_y0 _ _ _ Premises Γ
-  let case_yne0 := @monus_add_comm_case_yne0 _ _ _ Premises Γ
+  let case_y0 := @monus_add_comm_case_y0 _ _ _ _ Premises Γ
+  let case_yne0 := @monus_add_comm_case_yne0 _ _ _ _ Premises Γ
   let dec_y := .mp eq0_decidable' (.forall_ax yv)
   -- y = 0 → (B_w → goal)
   let f := Derivable.exportation (.syllogism .and_weak case_y0)
@@ -2788,7 +2788,7 @@ def monus_add_comm (x y : Term F Γ Ty.nat) :
     univ_gen (qtrans
       (qtrans (add_congr_l (monus_zero_l yv) yv) (add_zero_l yv))
       (.mp (qtrans (add_congr_l (monus_zero yv) Term.zero) (add_zero_r yv)) .sym0))
-  let step := @monus_add_comm_step _ _ _ Premises Γ
+  let step := @monus_add_comm_step _ _ _ _ Premises Γ
   have B_x_nf : B.subst0 x = Formula.all Ty.nat
       (Formula.eq0
         (Term.app2 Term.add (Term.app2 Term.monus x.weaken (.var .vz)) (.var .vz))
@@ -3069,7 +3069,7 @@ def qf_lem {Γ : Ctx ι} {A : Formula F Γ} (hqf : A.isQF = true) :
   let bwd : Derivable F al Premises (A →ᶠ Formula.eq0 (qf_term A) Term.zero) :=
     .mp corr and_proj2
   -- eq0_decidable instantiated at qf_term A: ⊢ eq0(t_A, 0) ∨ ¬eq0(t_A, 0)
-  let dec := @eq0_decidable ι F al Premises Γ
+  let dec := @eq0_decidable ι κ F al Premises Γ
   let dec_at := .mp dec (.forall_ax (qf_term A))
   -- Two cases from the decidability
   let case_t : Derivable F al Premises (Formula.eq0 (qf_term A) Term.zero →ᶠ A ∨ᶠ ¬ᶠA) :=

@@ -82,7 +82,7 @@ namespace ProofMode
 
 open Formula
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
     {al : Allowed} {Premises : PremiseSet F} {Γ : Ctx ι}
 
 /-- Congruence for the successor, as an internal implication so a script can `papply` it.

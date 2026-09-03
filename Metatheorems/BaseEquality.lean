@@ -32,7 +32,7 @@ See ARCHITECTURE.md §1 and §8.
 
 open Formula
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
     {al : Allowed} {Premises : PremiseSet F}
 
 /-- Reflexivity of equality at a base type — `d_i(t,t) =ℝ 0ℝ`, i.e. the `dist_self`

@@ -28,7 +28,7 @@ namespace Metatheorems
 
 namespace Formula
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
 
 /-- Substituting for the variable a weakening just introduced undoes the weakening. -/
 theorem subst0_weakenBy {Γ : Ctx ι} {ρ : Ty ι} (B : Formula F Γ) (t : Term F Γ ρ) :
@@ -58,7 +58,7 @@ end Formula
 
 namespace ProofMode
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
     {a : Allowed} {Premises : PremiseSet F} {Γ : Ctx ι}
 
 open Formula

@@ -20,7 +20,7 @@ Rational numbers are encoded as natural numbers via Cantor pairing of
 (sign-adjusted numerator, denominator - 1).
 -/
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
 
 namespace Term
 

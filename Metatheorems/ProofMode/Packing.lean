@@ -44,7 +44,7 @@ display layer reverses `Δ` for presentation; nothing else is affected.
 Names live only in the tactic state, never in `Seq`. This layer sees positions.
 -/
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
     {a : Allowed} {Premises : PremiseSet F} {Γ : Ctx ι}
 
 open Formula
@@ -56,7 +56,7 @@ private def weaken_intro_h {Γ : Ctx ι} {A B : Formula F Γ}
   .mp h (.exportation .and_weak)
 
 /-- The reified hypothesis context: formulas in the same term context. -/
-abbrev HCtx (F : ι → Ty ι) (Γ : Ctx ι) := List (Formula F Γ)
+abbrev HCtx (F : κ → Ty ι) (Γ : Ctx ι) := List (Formula F Γ)
 
 /-- Package a hypothesis context into nested implications. The head of `Δ` becomes the
 innermost antecedent. -/
@@ -65,7 +65,7 @@ def pack : HCtx F Γ → Formula F Γ → Formula F Γ
   | A :: Δ, B => pack Δ (A →ᶠ B)
 
 /-- The sequent judgment. -/
-abbrev Seq (F : ι → Ty ι)
+abbrev Seq (F : κ → Ty ι)
     (a : Allowed) (Premises : PremiseSet F) {Γ : Ctx ι}
     (Δ : HCtx F Γ) (B : Formula F Γ) : Type :=
   Derivable F a Premises (pack Δ B)

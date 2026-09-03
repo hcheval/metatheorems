@@ -27,7 +27,7 @@ namespace Probes
 
 open Formula ProofMode
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
   {al : Allowed} {Premises : PremiseSet F} {Γ : Ctx ι}
 
 /-- The shape the reals need: a pointwise rule pushed under a function-typed argument

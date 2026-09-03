@@ -876,7 +876,7 @@ theorem MetricModel.metric_metatheorem (M : MetricModel)
     {ρ : Ty MetricSpace.ι} {B₀ C₀ : Formula MetricSpace.F [Ty.nat, ρ]}
     (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
     (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
-    (prf : @Derivable MetricSpace.ι MetricSpace.F Allowed.extended
+    (prf : @Derivable MetricSpace.ι MetricSpace.ι MetricSpace.F Allowed.extended
       MetricSpace.Premises []
       (Formula.all ρ (Formula.imp (Formula.all .nat B₀) (Formula.ex .nat C₀)))) :
     ∃ Φ : Ty.interpret (fun () => M.carrier) ρ.hat → Nat,
@@ -983,7 +983,7 @@ theorem MetricModel.metric_metatheorem_classical (M : MetricModel)
     {ρ : Ty MetricSpace.ι} {B₀ C₀ : Formula MetricSpace.F [Ty.nat, ρ]}
     (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
     (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
-    (prf : @Derivable MetricSpace.ι MetricSpace.F Allowed.classical
+    (prf : @Derivable MetricSpace.ι MetricSpace.ι MetricSpace.F Allowed.classical
       MetricSpace.Premises []
       (Formula.all ρ (Formula.imp (Formula.all .nat B₀) (Formula.ex .nat C₀)))) :
     ∃ Φ : Ty.interpret (fun () => M.carrier) ρ.hat → Nat,

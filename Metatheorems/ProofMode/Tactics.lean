@@ -44,7 +44,7 @@ namespace ProofMode
 
 open Lean Formula
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
     {a : Allowed} {Premises : PremiseSet F} {Γ : Ctx ι} {ns : List String}
 
 -- ============================================================================
@@ -315,9 +315,9 @@ elab "pexact " h:ident : tactic => do
   let goal ← getMainGoal
   let ty ← instantiateMVars (← goal.getType)
   let args := ty.getAppArgs
-  unless ty.isAppOf ``SeqD && args.size == 8 do
+  unless ty.isAppOf ``SeqD && args.size == 9 do
     throwError "pexact: the goal is not a proof-mode sequent{indentExpr ty}"
-  let some namesE := listLit? args[1]! |
+  let some namesE := listLit? args[2]! |
     throwError "pexact: the hypothesis names are not a literal list"
   let names := namesE.filterMap strLit?
   let n := h.getId.toString
@@ -335,9 +335,9 @@ macro "pmode" : tactic => `(tactic| refine pm_enter ?_)
 elab "passumption" : tactic => do
   let ty ← instantiateMVars (← (← getMainGoal).getType)
   let args := ty.getAppArgs
-  unless ty.isAppOf ``SeqD && args.size == 8 do
+  unless ty.isAppOf ``SeqD && args.size == 9 do
     throwError "passumption: the goal is not a proof-mode sequent{indentExpr ty}"
-  let names := ((listLit? args[1]!).getD []).filterMap strLit?
+  let names := ((listLit? args[2]!).getD []).filterMap strLit?
   for n in names do
     let stx := mkIdent (Name.mkSimple n)
     try
@@ -365,7 +365,7 @@ private def evalBoolCheck (e : Expr) : TacticM (Option Bool) := do
   | .const ``Bool.false _ => return some false
   | _ => return none
 
-/-- The `SeqD` goal, split into its arguments: `ι, names, F, a, Premises, Γ, Δ, B`.
+/-- The `SeqD` goal, split into its arguments: `ι, κ, names, F, a, Premises, Γ, Δ, B`.
 
 `consumeMData` is load-bearing. Lean's `have`/`obtain` leave the target wrapped in an `mdata`
 node, and without stripping it `isAppOf ``SeqD` is false — so every proof-mode tactic used
@@ -376,19 +376,19 @@ nargs=0` after. -/
 def seqDGoalArgs (who : String) : TacticM (Array Expr) := do
   let ty := (← instantiateMVars (← (← getMainGoal).getType)).consumeMData
   let args := ty.getAppArgs
-  unless ty.isAppOf ``SeqD && args.size == 8 do
+  unless ty.isAppOf ``SeqD && args.size == 9 do
     throwError "{who}: the goal is not a proof-mode sequent{indentExpr ty}"
   return args
 
 /-- The formula at position `n` of the hypothesis context of the current goal. -/
 private def hypFormula (who : String) (n : String) : TacticM Expr := do
   let args ← seqDGoalArgs who
-  let some namesE := listLit? args[1]! |
+  let some namesE := listLit? args[2]! |
     throwError "{who}: the hypothesis names are not a literal list"
   let names := namesE.filterMap strLit?
   let some i := names.findIdx? (· == n) |
     throwError "{who}: no hypothesis named `{n}` (have: {names})"
-  let some hyps ← whnfListLit? args[6]! |
+  let some hyps ← whnfListLit? args[7]! |
     throwError "{who}: the hypothesis context is not a literal list"
   let some A := hyps[i]? | throwError "{who}: `{n}` names position {i}, which is not there"
   return A
@@ -431,9 +431,9 @@ def elabRuleInCtx (eStx : TSyntax `term) (Γ expected : Expr) : TacticM Expr :=
 /-- The type `Derivable F a Premises Γ ?A` for the goal's parameters — the expected type
 a kernel theorem is elaborated against. -/
 def derivableInGoal (args : Array Expr) : TacticM Expr := do
-  let A ← mkFreshExprMVar (mkAppN (.const ``Formula []) #[args[0]!, args[2]!, args[5]!])
+  let A ← mkFreshExprMVar (mkAppN (.const ``Formula []) #[args[0]!, args[1]!, args[3]!, args[6]!])
   return mkAppN (.const ``Derivable [])
-    #[args[0]!, args[2]!, args[3]!, args[4]!, args[5]!, A]
+    #[args[0]!, args[1]!, args[3]!, args[4]!, args[5]!, args[6]!, A]
 
 /-- Elaborate a term the *user wrote* at a surface position, and enforce the recursor ban.
 
@@ -444,9 +444,9 @@ non-triviality claim a statement about *expressiveness*: the input language cann
 bound, so no enumeration of smuggling routes is needed. R4's attempt C reached the extracted
 term through an *instantiation*, never touching an `∃`, which is exactly why the check has
 to live here rather than at `∃`-introduction. -/
-private def elabSurfaceTerm (who : String) (ι F Γ ρ : Expr) (tStx : TSyntax `term) :
+private def elabSurfaceTerm (who : String) (ι κ F Γ ρ : Expr) (tStx : TSyntax `term) :
     TacticM Expr := withMainContext do
-  let t ← elabTerm tStx (some (mkAppN (.const ``Term []) #[ι, F, Γ, ρ]))
+  let t ← elabTerm tStx (some (mkAppN (.const ``Term []) #[ι, κ, F, Γ, ρ]))
   if mentionsPrec (← instantiateMVars t) then
     throwError "{who}: the term applies the primitive recursor directly.\n\
       Iteration is what extraction produces, so a hand-written iterating term makes the\n\
@@ -493,12 +493,12 @@ macro "psym" : tactic => `(tactic| refine pm_sym ?_)
 
 elab "ptrans " tStx:term : tactic => withMainContext do
   let args ← seqDGoalArgs "ptrans"
-  let target ← whnfD args[7]!
+  let target ← whnfD args[8]!
   let targs := target.getAppArgs
-  unless target.isAppOf ``Formula.eq0 && targs.size == 5 do
+  unless target.isAppOf ``Formula.eq0 && targs.size == 6 do
     throwError "ptrans: the goal is not an equation."
   let natTy := mkApp (.const ``Ty.nat []) targs[0]!
-  let _ ← elabSurfaceTerm "ptrans" targs[0]! targs[1]! targs[2]! natTy tStx
+  let _ ← elabSurfaceTerm "ptrans" targs[0]! targs[1]! targs[2]! targs[3]! natTy tStx
   evalTactic (← `(tactic| refine pm_trans $tStx ?_ ?_))
 
 /-- `pnorm` clears the de Bruijn bookkeeping a goal accumulates when a weakening meets a
@@ -523,19 +523,19 @@ macro_rules
   | `(tactic| pspecialize $h:ident with $k:ident) =>
       `(tactic| refine pm_allE_here_cut $(Lean.quote k.getId.toString) (by pexact $h) ?_)
 
-/-- The `Formula.ex` the goal is, split into `ι, F, Γ, ρ, A`. -/
+/-- The `Formula.ex` the goal is, split into `ι, κ, F, Γ, ρ, A`. -/
 private def exGoalArgs (who : String) : TacticM (Array Expr) := do
   let args ← seqDGoalArgs who
-  let target ← whnfD args[7]!
+  let target ← whnfD args[8]!
   let targs := target.getAppArgs
-  unless target.isAppOf ``Formula.ex && targs.size == 5 do
+  unless target.isAppOf ``Formula.ex && targs.size == 6 do
     throwError "{who}: the goal is not an ∃, so there is no witness to supply."
   return targs
 
 /-- `pexists t` supplies a witness for an `∃` goal, subject to the surface-recursor ban. -/
 elab "pexists " tStx:term : tactic => withMainContext do
   let g ← exGoalArgs "pexists"
-  let _ ← elabSurfaceTerm "pexists" g[0]! g[1]! g[2]! g[3]! tStx
+  let _ ← elabSurfaceTerm "pexists" g[0]! g[1]! g[2]! g[3]! g[4]! tStx
   evalTactic (← `(tactic| refine pm_exI $tStx ?_))
 
 /-- `pexists! t` supplies a witness **without** the recursor ban.
@@ -555,7 +555,7 @@ language rather than on headline positions specifically.
 Like `pby_contra`, the check runs *before* anything is applied to the goal. -/
 elab "pbound " tStx:term : tactic => withMainContext do
   let g ← exGoalArgs "pbound"
-  let _ ← elabSurfaceTerm "pbound" g[0]! g[1]! g[2]! g[3]! tStx
+  let _ ← elabSurfaceTerm "pbound" g[0]! g[1]! g[2]! g[3]! g[4]! tStx
   evalTactic (← `(tactic| refine pm_bound $tStx ?_))
 
 /-- `pobtain h with x` consumes the `∃` proved by hypothesis `h`, naming the body `x`. -/
@@ -579,10 +579,10 @@ every call, and on a large statement that is where it diverges. -/
 elab "pthm " eStx:term : tactic => withMainContext do
   let args ← seqDGoalArgs "pthm"
   let e ← try
-      Lean.Elab.Term.withoutErrToSorry (elabRuleInCtx eStx args[5]! (← derivableInGoal args))
+      Lean.Elab.Term.withoutErrToSorry (elabRuleInCtx eStx args[6]! (← derivableInGoal args))
     catch _ =>
-      elabRuleInCtx eStx args[5]! (mkAppN (.const ``Derivable [])
-        #[args[0]!, args[2]!, args[3]!, args[4]!, args[5]!, args[7]!])
+      elabRuleInCtx eStx args[6]! (mkAppN (.const ``Derivable [])
+        #[args[0]!, args[1]!, args[3]!, args[4]!, args[5]!, args[6]!, args[8]!])
   let eS ← Lean.Elab.Term.exprToSyntax (← instantiateMVars e)
   evalTactic (← `(tactic| exact pm_have $eS))
 
@@ -592,7 +592,7 @@ It peels as many arrows as it takes to reach the goal, so a hypothesis with seve
 produces several subgoals, in order — the same way Lean's own `apply` does. -/
 elab "papply " h:ident : tactic => do
   let args ← seqDGoalArgs "papply"
-  let goalF := args[7]!
+  let goalF := args[8]!
   let hyp ← hypFormula "papply" h.getId.toString
   -- How many antecedents lie between `h` and the goal? Probed without committing to any
   -- unification the probe happens to make.
@@ -601,8 +601,8 @@ elab "papply " h:ident : tactic => do
     for i in [0:16] do
       if (← isDefEq cur goalF) then return some i
       let cargs := cur.getAppArgs
-      unless cur.isAppOf ``Formula.imp && cargs.size == 5 do return none
-      cur ← whnfD cargs[4]!
+      unless cur.isAppOf ``Formula.imp && cargs.size == 6 do return none
+      cur ← whnfD cargs[5]!
     return none
   let some k := k? |
     throwError "papply: `{h.getId}` does not conclude the goal.\n\
@@ -624,19 +624,19 @@ macro "papply " h:ident " in " k:ident " with " m:ident : tactic =>
 the escape hatch's `apply`, next to `pthm`'s `exact`. -/
 elab "papplym " eStx:term : tactic => withMainContext do
   let args ← seqDGoalArgs "papplym"
-  let goalF := args[7]!
-  let e ← elabRuleInCtx eStx args[5]! (← derivableInGoal args)
+  let goalF := args[8]!
+  let e ← elabRuleInCtx eStx args[6]! (← derivableInGoal args)
   let ety ← instantiateMVars (← inferType e)
   let etyArgs := ety.getAppArgs
-  unless ety.isAppOf ``Derivable && etyArgs.size == 6 do
+  unless ety.isAppOf ``Derivable && etyArgs.size == 7 do
     throwError "papplym: not a kernel derivation{indentExpr ety}"
   let k? ← withoutModifyingState do
-    let mut cur ← whnfD etyArgs[5]!
+    let mut cur ← whnfD etyArgs[6]!
     for i in [0:16] do
       if (← isDefEq cur goalF) then return some i
       let cargs := cur.getAppArgs
-      unless cur.isAppOf ``Formula.imp && cargs.size == 5 do return none
-      cur ← whnfD cargs[4]!
+      unless cur.isAppOf ``Formula.imp && cargs.size == 6 do return none
+      cur ← whnfD cargs[5]!
     return none
   let some k := k? | throwError "papplym: this theorem does not conclude the goal.\n\
       It proves{indentExpr etyArgs[6]!}\nand the goal is{indentExpr goalF}"
@@ -651,7 +651,7 @@ elab "papplym " eStx:term : tactic => withMainContext do
 theorem is elaborated in the goal's context, so it can mention `x₀`. -/
 elab "papplym " eStx:term " in " h:ident " with " k:ident : tactic => withMainContext do
   let args ← seqDGoalArgs "papplym"
-  let e ← elabRuleInCtx eStx args[5]! (← derivableInGoal args)
+  let e ← elabRuleInCtx eStx args[6]! (← derivableInGoal args)
   let eS ← Lean.Elab.Term.exprToSyntax (← instantiateMVars e)
   evalTactic (← `(tactic| refine pm_cut $(Lean.quote k.getId.toString)
       (pm_mp (pm_have $eS) (by pexact $h)) ?_))
@@ -672,7 +672,7 @@ macro "pcontradiction " h:ident : tactic => `(tactic| (pexfalso; pexact $h))
 goal — unless LEM is available. -/
 elab "pclassic " A:term " with " h:ident ppSpace k:ident : tactic => withMainContext do
   let args ← seqDGoalArgs "pclassic"
-  if (← evalBoolCheck (mkAppN (.const ``Allowed.lem []) #[args[3]!])) == some false then
+  if (← evalBoolCheck (mkAppN (.const ``Allowed.lem []) #[args[4]!])) == some false then
     throwError "pclassic: excluded middle is not available here — \
       `allowed.lem` is not `true`."
   evalTactic (← `(tactic|
@@ -685,14 +685,14 @@ the hypothesis formulas, the position of `n`, and the `Formula F Γ` type to bui
 private def hypSplit (who : String) (n : String) :
     TacticM (Array Expr × List String × List Expr × Nat × Expr) := do
   let args ← seqDGoalArgs who
-  let some namesE := listLit? args[1]! |
+  let some namesE := listLit? args[2]! |
     throwError "{who}: the hypothesis names are not a literal list"
   let names := namesE.filterMap strLit?
   let some i := names.findIdx? (· == n) |
     throwError "{who}: no hypothesis named `{n}` (have: {names})"
-  let some hyps ← whnfListLit? args[6]! |
+  let some hyps ← whnfListLit? args[7]! |
     throwError "{who}: the hypothesis context is not a literal list"
-  let fTy := mkAppN (.const ``Formula []) #[args[0]!, args[2]!, args[5]!]
+  let fTy := mkAppN (.const ``Formula []) #[args[0]!, args[1]!, args[3]!, args[6]!]
   return (args, names, hyps, i, fTy)
 
 /-- Replace the goal by `newTy`, justified by `proof newGoal`. -/
@@ -704,8 +704,8 @@ private def replaceGoalWith (newTy : Expr) (proof : Expr → Expr) : TacticM Uni
 
 /-- Rebuild a `SeqD` goal with new names and a new hypothesis context. -/
 private def mkSeqD (args : Array Expr) (namesE ΔE : Expr) : Expr :=
-  mkAppN (.const ``SeqD []) #[args[0]!, namesE, args[2]!, args[3]!, args[4]!,
-    args[5]!, ΔE, args[7]!]
+  mkAppN (.const ``SeqD []) #[args[0]!, args[1]!, namesE, args[3]!, args[4]!, args[5]!,
+    args[6]!, ΔE, args[8]!]
 
 private def mkStrListLit (xs : List String) : MetaM Expr :=
   Lean.Meta.mkListLit (.const ``String []) (xs.map (Expr.lit <| .strVal ·))
@@ -718,8 +718,8 @@ elab "pclear " h:ident : tactic => do
   let namesE ← mkStrListLit (names.take i ++ names.drop (i + 1))
   let ΔE ← Lean.Meta.mkListLit fTy (hyps.take i ++ hyps.drop (i + 1))
   replaceGoalWith (mkSeqD args namesE ΔE) fun m =>
-    mkAppN (.const ``seq_clear []) #[args[0]!, args[2]!, args[3]!, args[4]!,
-      args[5]!, Δ₁, hyps[i]!, Δ₂, args[7]!, m]
+    mkAppN (.const ``seq_clear []) #[args[0]!, args[1]!, args[3]!, args[4]!, args[5]!,
+      args[6]!, Δ₁, hyps[i]!, Δ₂, args[8]!, m]
 
 /-- `pswap h with k` exchanges two *adjacent* hypotheses. Non-adjacent swaps compose from
 these; the kit rule is the adjacent one. -/
@@ -738,8 +738,8 @@ elab "pswap " h:ident " with " k:ident : tactic => do
   let ΔE ← Lean.Meta.mkListLit fTy
     (hyps.take i ++ [hyps[j]!, hyps[i]!] ++ hyps.drop (i + 2))
   replaceGoalWith (mkSeqD args namesE ΔE) fun m =>
-    mkAppN (.const ``seq_swap []) #[args[0]!, args[2]!, args[3]!, args[4]!,
-      args[5]!, Δ₁, hyps[j]!, hyps[i]!, Δ₂, args[7]!, m]
+    mkAppN (.const ``seq_swap []) #[args[0]!, args[1]!, args[3]!, args[4]!, args[5]!,
+      args[6]!, Δ₁, hyps[j]!, hyps[i]!, Δ₂, args[8]!, m]
 
 /-- `prevert` moves the most recent hypothesis back into the goal;
 `prevert h` moves a named one, walking it to the top with adjacent exchanges first. -/
@@ -755,7 +755,7 @@ elab_rules : tactic
     -- since the tactic that did the exchange rewrote them.
     for _ in [0:64] do
       let args ← seqDGoalArgs "prevert"
-      let names := ((listLit? args[1]!).getD []).filterMap strLit?
+      let names := ((listLit? args[2]!).getD []).filterMap strLit?
       let some i := names.findIdx? (· == n) |
         throwError "prevert: no hypothesis named `{n}` (have: {names})"
       if i == 0 then
@@ -771,7 +771,7 @@ macro "pin_system " h:term : tactic => `(tactic| refine pm_in_system $h ?_)
 /-- `prename h into k` renames a hypothesis. Names are display data, so nothing is proved. -/
 elab "prename " h:ident " into " k:ident : tactic => do
   let args ← seqDGoalArgs "prename"
-  let names := ((listLit? args[1]!).getD []).filterMap strLit?
+  let names := ((listLit? args[2]!).getD []).filterMap strLit?
   let n := h.getId.toString
   let some i := names.findIdx? (· == n) |
     throwError "prename: no hypothesis named `{n}` (have: {names})"
@@ -796,7 +796,7 @@ would leave `pm_cut`'s own `Γ` a metavariable at the moment the formula is proc
 elab "phave " h:ident " : " AStx:term : tactic => withMainContext do
   let args ← seqDGoalArgs "phave"
   let A ← instantiateMVars
-    (← elabTerm AStx (some (mkAppN (.const ``Formula []) #[args[0]!, args[2]!, args[5]!])))
+    (← elabTerm AStx (some (mkAppN (.const ``Formula []) #[args[0]!, args[1]!, args[3]!, args[6]!])))
   if mentionsPrec A then
     throwError "phave: the formula applies the primitive recursor directly.\n\
       Iteration is what extraction produces, so writing it by hand makes the extraction\n\
@@ -811,7 +811,7 @@ a parameter in the *outer* context is usable under binders, the parameter weaken
 coercion. -/
 elab "pfrom " h:ident " := " eStx:term : tactic => withMainContext do
   let args ← seqDGoalArgs "pfrom"
-  let e ← elabRuleInCtx eStx args[5]! (← derivableInGoal args)
+  let e ← elabRuleInCtx eStx args[6]! (← derivableInGoal args)
   let eStx' ← Lean.Elab.Term.exprToSyntax e
   evalTactic (← `(tactic|
     refine pm_cut $(Lean.quote h.getId.toString) (pm_have $eStx') ?_))
@@ -829,19 +829,19 @@ to it — a tactic that half-applies and then complains leaves the user reading 
 goal they did not write. -/
 elab "pby_contra " h:ident : tactic => do
   let args ← seqDGoalArgs "pby_contra"
-  -- `Formula.ex` : {ι} {F} {Γ} (ρ) (A)
-  let target ← whnfD args[7]!
+  -- `Formula.ex` : {ι} {κ} {F} {Γ} (ρ) (A)
+  let target ← whnfD args[8]!
   let targs := target.getAppArgs
-  unless target.isAppOf ``Formula.ex && targs.size == 5 do
+  unless target.isAppOf ``Formula.ex && targs.size == 6 do
     throwError "pby_contra: the goal is not an ∃ — not a Markov shape.\n\
       Is this proof translated? (HANDOFF D-1: the classical content of a hand-translated \
       proof is\nexactly `¬¬∃n(qf) → ∃n(qf)`.)"
-  let A₀ := targs[4]!
+  let A₀ := targs[5]!
   -- `Formula F Γ'` : the three arguments needed to say `isQF A₀` / `isVFree A₀`
   let fargs := (← instantiateMVars (← inferType A₀)).getAppArgs
   let check (fn : Name) : TacticM (Option Bool) :=
-    evalBoolCheck (mkAppN (.const fn []) #[fargs[0]!, fargs[1]!, fargs[2]!, A₀])
-  if (← evalBoolCheck (mkAppN (.const ``Allowed.markov []) #[args[3]!])) == some false then
+    evalBoolCheck (mkAppN (.const fn []) #[fargs[0]!, fargs[1]!, fargs[2]!, fargs[3]!, A₀])
+  if (← evalBoolCheck (mkAppN (.const ``Allowed.markov []) #[args[4]!])) == some false then
     throwError "pby_contra: Markov is not available here — `allowed.markov` is not `true`."
   if (← check ``Formula.isQF) == some false then
     throwError "pby_contra: the matrix is not quantifier-free — not a Markov shape.\n\
@@ -864,9 +864,9 @@ introducing an `∃` for a headline-scoped linter to notice. -/
 elab "pinst " h:ident ppSpace tStx:term " with " k:ident : tactic => withMainContext do
   let A ← whnfD (← hypFormula "pinst" h.getId.toString)
   let aargs := A.getAppArgs
-  unless A.isAppOf ``Formula.all && aargs.size == 5 do
+  unless A.isAppOf ``Formula.all && aargs.size == 6 do
     throwError "pinst: `{h.getId}` is not a ∀, so there is nothing to instantiate."
-  let _ ← elabSurfaceTerm "pinst" aargs[0]! aargs[1]! aargs[2]! aargs[3]! tStx
+  let _ ← elabSurfaceTerm "pinst" aargs[0]! aargs[1]! aargs[2]! aargs[3]! aargs[4]! tStx
   evalTactic (← `(tactic| refine pm_inst $(Lean.quote k.getId.toString) $tStx
     (by pexact $h) ?_))
 

@@ -32,7 +32,7 @@ This is the "syntactic witness, semantic soundness" split: the witness carries s
 it can be majorized; the correctness statement stays where it already is.
 -/
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
 
 -- ============================================================================
 -- Witness and counter types, object-level
@@ -1109,7 +1109,7 @@ realizing term, not merely a realizing value. -/
 def syntactic_soundness (eqxi : EqXInterp X F si)
     (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B) :
     {Γ : Ctx ι} → {A : Formula F Γ} →
-    @Derivable ι F Allowed.extended Premises Γ A → SRealizer si A
+    @Derivable ι κ F Allowed.extended Premises Γ A → SRealizer si A
   | _, _, .premise hp      => spremise _ _ hp
   | _, _, .or_contract     => sOrContract
   | _, _, .and_contract    => sAndContract

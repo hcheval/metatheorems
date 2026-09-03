@@ -20,7 +20,7 @@ index 0 (`cauchyfy_shift_le` at `p = 0`, worth `2^{-0} = 1`) plus the code-domin
 
 open Formula
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
 variable {al : Allowed} {Premises : PremiseSet F}
 
 section Bounds

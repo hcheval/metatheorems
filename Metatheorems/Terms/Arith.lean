@@ -23,7 +23,7 @@ since they use only closed constants (`prec`, `succ`, `zero`) and `lam`, which e
 context.
 -/
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
 
 namespace Term
 

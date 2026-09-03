@@ -30,7 +30,7 @@ open Formula
 /-- **ND-Interpretation**: from a classical derivation of `A`,
     extract a Lean-computable Dialectica realizer for `NT(A)`. -/
 def nd_soundness
-    {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F)
     (eqxi : EqXInterp X F si)
     {Premises : PremiseSet F}
@@ -38,7 +38,7 @@ def nd_soundness
     (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
       ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
     {Γ : Ctx ι} {A : Formula F Γ}
-    (h : @Derivable ι F Allowed.classical Premises Γ A)
+    (h : @Derivable ι κ F Allowed.classical Premises Γ A)
     (env : Ctx.interpret X Γ)
     : dialecticaRealizerCtx si Aᴺᵀ env :=
   dialectica_soundness_ctx si eqxi premise_realizer Aᴺᵀ env
@@ -46,7 +46,7 @@ def nd_soundness
 
 /-- Closed-formula variant: the realizer lives at the empty environment. -/
 def nd_soundness_closed
-    {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F)
     (eqxi : EqXInterp X F si)
     {Premises : PremiseSet F}
@@ -54,7 +54,7 @@ def nd_soundness_closed
     (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
       ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
     {A : Formula F ([] : Ctx ι)}
-    (h : @Derivable ι F Allowed.classical Premises [] A)
+    (h : @Derivable ι κ F Allowed.classical Premises [] A)
     : dialecticaRealizer si Aᴺᵀ :=
   nd_soundness si eqxi nts premise_realizer h ()
 #print axioms nd_soundness 

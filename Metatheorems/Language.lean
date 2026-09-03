@@ -28,7 +28,7 @@ type 0, propositional connectives, and quantifiers over all types.
 -- ============================================================================
 
 /-- Formulas of WE-HA^{ω,X} (Definition 2.1.5). -/
-inductive Formula {ι : Type} (F : ι → Ty ι) : Ctx ι → Type where
+inductive Formula {ι κ : Type} (F : κ → Ty ι) : Ctx ι → Type where
   /-- Falsity ⊥. -/
   | bot    : Formula F Γ
   /-- Equality at type 0: s =₀ t. -/
@@ -46,7 +46,7 @@ inductive Formula {ι : Type} (F : ι → Ty ι) : Ctx ι → Type where
 
 namespace Formula
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
 
 -- ============================================================================
 -- Notation

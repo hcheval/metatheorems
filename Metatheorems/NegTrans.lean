@@ -43,7 +43,7 @@ open Formula
 
 /-- The inner Kuroda translation `nt(A)`. Only `∀` is modified:
     `∀x.A ↦ ∀x.¬¬nt(A)`.  All other connectives are structural. -/
-def Formula.kurodaInner {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι} :
+def Formula.kurodaInner {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι} :
     Formula F Γ → Formula F Γ
   | .bot     => .bot
   | .eq0 s t => .eq0 s t
@@ -54,7 +54,7 @@ def Formula.kurodaInner {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι} :
   | .all ρ A => .all ρ (¬ᶠ¬ᶠA.kurodaInner)
 
 /-- The full Kuroda negative translation `NT(A) = ¬¬nt(A)`. -/
-def Formula.negTrans {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι}
+def Formula.negTrans {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι}
     (A : Formula F Γ) : Formula F Γ :=
   ¬ᶠ¬ᶠA.kurodaInner
 
@@ -66,7 +66,7 @@ postfix:max "ₙₜ" => Formula.kurodaInner
 -- ============================================================================
 
 /-- `nt` commutes with formula renaming. -/
-theorem kurodaInner_renameF {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι}
+theorem kurodaInner_renameF {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι}
     (A : Formula F Γ) {Δ : Ctx ι} (r : Renaming Γ Δ) :
     (A.renameF r).kurodaInner = A.kurodaInner.renameF r := by
   induction A generalizing Δ with
@@ -83,7 +83,7 @@ theorem kurodaInner_renameF {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι}
     simp [Formula.kurodaInner, Formula.renameF, Formula.neg, ih (Renaming.ext r)]
 
 /-- `nt` commutes with formula substitution. -/
-theorem kurodaInner_substF {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι}
+theorem kurodaInner_substF {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι}
     (A : Formula F Γ) {Δ : Ctx ι} (s : Term.Subst F Γ Δ) :
     (A.substF s).kurodaInner = A.kurodaInner.substF s := by
   induction A generalizing Δ with
@@ -100,39 +100,39 @@ theorem kurodaInner_substF {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι}
     simp [Formula.kurodaInner, Formula.substF, Formula.neg, ih (Term.Subst.ext s)]
 
 /-- `nt` commutes with `subst0`. -/
-theorem kurodaInner_subst0 {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι} {ρ : Ty ι}
+theorem kurodaInner_subst0 {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι} {ρ : Ty ι}
     (A : Formula F (ρ :: Γ)) (t : Term F Γ ρ) :
     (A.subst0 t).kurodaInner = A.kurodaInner.subst0 t :=
   kurodaInner_substF A _
 
 /-- `nt` commutes with `substVar0`. -/
-theorem kurodaInner_substVar0 {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι} {ρ : Ty ι}
+theorem kurodaInner_substVar0 {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι} {ρ : Ty ι}
     (A : Formula F (ρ :: Γ)) (t : Term F (ρ :: Γ) ρ) :
     (A.substVar0 t).kurodaInner = A.kurodaInner.substVar0 t :=
   kurodaInner_substF A _
 
 /-- `nt` commutes with weakening. -/
-theorem kurodaInner_weaken {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι} {ρ : Ty ι}
+theorem kurodaInner_weaken {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι} {ρ : Ty ι}
     (A : Formula F Γ) :
     (A.weakenBy ρ).kurodaInner = A.kurodaInner.weakenBy ρ :=
   kurodaInner_renameF A _
 
 /-- `NT` commutes with `subst0`. -/
-theorem negTrans_subst0 {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι} {ρ : Ty ι}
+theorem negTrans_subst0 {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι} {ρ : Ty ι}
     (A : Formula F (ρ :: Γ)) (t : Term F Γ ρ) :
     (A.subst0 t).negTrans = A.negTrans.subst0 t := by
   show (¬ᶠ¬ᶠ(A.subst0 t).kurodaInner) = (¬ᶠ¬ᶠ(A.kurodaInner.subst0 t))
   rw [kurodaInner_subst0]
 
 /-- `NT` commutes with `substVar0`. -/
-theorem negTrans_substVar0 {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι} {ρ : Ty ι}
+theorem negTrans_substVar0 {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι} {ρ : Ty ι}
     (A : Formula F (ρ :: Γ)) (t : Term F (ρ :: Γ) ρ) :
     (A.substVar0 t).negTrans = A.negTrans.substVar0 t := by
   show (¬ᶠ¬ᶠ(A.substVar0 t).kurodaInner) = (¬ᶠ¬ᶠ(A.kurodaInner.substVar0 t))
   rw [kurodaInner_substVar0]
 
 /-- `NT` commutes with weakening. -/
-theorem negTrans_weaken {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι} {ρ : Ty ι}
+theorem negTrans_weaken {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι} {ρ : Ty ι}
     (A : Formula F Γ) :
     (A.weakenBy ρ).negTrans = A.negTrans.weakenBy ρ := by
   show (¬ᶠ¬ᶠ(A.weakenBy ρ).kurodaInner) = (¬ᶠ¬ᶠ(A.kurodaInner.weakenBy ρ))
@@ -144,7 +144,7 @@ theorem negTrans_weaken {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι} {ρ : Ty ι
 -- ============================================================================
 
 /-- `kurodaInner` is the identity on quantifier-free formulas. -/
-theorem kurodaInner_qf {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι}
+theorem kurodaInner_qf {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι}
     (A : Formula F Γ) (hqf : A.isQF = true) : A.kurodaInner = A := by
   induction A with
   | bot | eq0 => rfl
@@ -166,7 +166,7 @@ theorem kurodaInner_qf {ι : Type} {F : ι → Ty ι} {Γ : Ctx ι}
 
 section HilbertExtras
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
 
     {a : Allowed} {Premises : PremiseSet F}
 
@@ -248,7 +248,7 @@ def nn_all_nn {Γ : Ctx ι} {ρ : Ty ι} {Q : Formula F (ρ :: Γ)} :
       hbody (¬ᶠ¬ᶠQ)
   -- inst : (∀x.¬¬Q).weakenBy ρ →ᶠ ¬¬Q, proved via forall_ax + heq rewrite
   let inst : Derivable F a Premises ((Formula.all ρ (¬ᶠ¬ᶠQ)).weakenBy ρ →ᶠ ¬ᶠ¬ᶠQ) := by
-    have h := @Derivable.forall_ax ι F a Premises (ρ :: Γ) ρ
+    have h := @Derivable.forall_ax ι κ F a Premises (ρ :: Γ) ρ
                 (Formula.renameF (Renaming.ext Renaming.shift) (¬ᶠ¬ᶠQ)) (.var .vz)
     rw [heq] at h
     exact h
@@ -270,14 +270,14 @@ end HilbertExtras
 -- ============================================================================
 
 /-- Wrap a derivation in ¬¬. -/
-private def wrap_dnn {ι : Type} {F : ι → Ty ι}
+private def wrap_dnn {ι κ : Type} {F : κ → Ty ι}
 
     {a : Allowed} {Premises : PremiseSet F} {Γ : Ctx ι} {A : Formula F Γ}
     (h : Derivable F a Premises A) : Derivable F a Premises (¬ᶠ¬ᶠA) :=
   .mp h dnn_intro
 
 /-- Alias for backward compat — identity in the unified system. -/
-private abbrev lift {ι : Type} {F : ι → Ty ι}
+private abbrev lift {ι κ : Type} {F : κ → Ty ι}
 
     {a : Allowed} {Premises : PremiseSet F} {Γ : Ctx ι} {A : Formula F Γ}
     (h : Derivable F a Premises A) : Derivable F a Premises A := h
@@ -292,7 +292,7 @@ private abbrev lift {ι : Type} {F : ι → Ty ι}
     Step (∀x.B): NT(∀x.B) = ¬¬∀x.¬¬B.kurodaInner.
     Forward: ∀x.B → ∀x.NT(B) (IH + forall_map) → ¬¬∀x.NT(B) (dnn_intro) = NT(∀x.B).
     Backward: NT(∀x.B) → ∀x.¬¬B.kurodaInner (nn_all_nn) → ∀x.B (IH backward + forall_map). -/
-def negTrans_iff_pu {ι : Type} {F : ι → Ty ι}
+def negTrans_iff_pu {ι κ : Type} {F : κ → Ty ι}
 
     {a : Allowed} {Premises : PremiseSet F}
     
@@ -345,7 +345,7 @@ Sharper than `negTrans_iff_pu`, which only relates `A` to `¬¬Aₙₜ`. The bac
 `negTrans_iff_pu`'s backward direction under a `∀`; the forward direction is the induction
 that `negTrans_iff_pu` does not state on its own. Intuitionistic: the only non-structural
 ingredient is `qf_double_neg_elim`, inherited through `negTrans_iff_pu`. -/
-def kurodaInner_iff_pu {ι : Type} {F : ι → Ty ι}
+def kurodaInner_iff_pu {ι κ : Type} {F : κ → Ty ι}
 
     {a : Allowed} {Premises : PremiseSet F}
     
@@ -390,7 +390,7 @@ a quantifier.
 No `Allowed` flag is used: this holds in the same system `negTrans_iff_pu` does, for every
 `a`. The classical strength is entirely in `qf_double_neg_elim`, which is available for
 quantifier-free matrices already. -/
-def negTrans_iff_imp_pu {ι : Type} {F : ι → Ty ι}
+def negTrans_iff_imp_pu {ι κ : Type} {F : κ → Ty ι}
 
     {a : Allowed} {Premises : PremiseSet F}
     
@@ -428,7 +428,7 @@ end ImpPU
 
 section NegTransCases
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
 
     {Premises : PremiseSet F}
 
@@ -564,7 +564,7 @@ def negTrans_expansion {Γ : Ctx ι} {A B C : Formula F Γ}
 -- ── ∀-rule ───────────────────────────────────────────────────────────────────
 
 /-- NT respects the ∀-rule. -/
-def negTrans_forall_rule {ι : Type} {F : ι → Ty ι}
+def negTrans_forall_rule {ι κ : Type} {F : κ → Ty ι}
 
     {Premises : PremiseSet F}
     {Γ : Ctx ι} {ρ : Ty ι} {B : Formula F Γ} {A : Formula F (ρ :: Γ)}
@@ -590,7 +590,7 @@ def negTrans_forall_rule {ι : Type} {F : ι → Ty ι}
 -- ── ∃-rule ───────────────────────────────────────────────────────────────────
 
 /-- NT respects the ∃-rule (Derivable level, mirrors negTrans_forall_rule). -/
-def negTrans_exist_rule {ι : Type} {F : ι → Ty ι}
+def negTrans_exist_rule {ι κ : Type} {F : κ → Ty ι}
 
     {Premises : PremiseSet F}
     {Γ : Ctx ι} {ρ : Ty ι} {B : Formula F Γ} {A : Formula F (ρ :: Γ)}
@@ -611,7 +611,7 @@ def negTrans_exist_rule {ι : Type} {F : ι → Ty ι}
 -- ── Universal generalization ──────────────────────────────────────────────────
 
 /-- NT respects universal generalization. -/
-def negTrans_univ_gen {ι : Type} {F : ι → Ty ι}
+def negTrans_univ_gen {ι κ : Type} {F : κ → Ty ι}
 
     {Premises : PremiseSet F}
     {Γ : Ctx ι} {ρ : Ty ι} {A : Formula F Γ}
@@ -624,13 +624,13 @@ def negTrans_univ_gen {ι : Type} {F : ι → Ty ι}
   -- (B.weaken = ¬¬A.ki.weaken means B = ¬¬A.ki; I_comb : B.weaken → B.weaken = B.weaken → A')
   let to_all : Derivable F Allowed.nt_target Premises
       (¬ᶠ¬ᶠA.kurodaInner →ᶠ Formula.all ρ (¬ᶠ¬ᶠA.kurodaInner.weakenBy ρ)) :=
-    .forall_rule (@I_comb ι F Allowed.nt_target Premises (ρ :: Γ) (¬ᶠ¬ᶠA.kurodaInner.weakenBy ρ))
+    .forall_rule (@I_comb ι κ F Allowed.nt_target Premises (ρ :: Γ) (¬ᶠ¬ᶠA.kurodaInner.weakenBy ρ))
   exact Derivable.mp (Derivable.mp h (to_all)) (dnn_intro)
 
 -- ── Induction ────────────────────────────────────────────────────────────────
 
 /-- NT respects induction (Derivable level, mirrors negTrans_forall_rule). -/
-def negTrans_induction {ι : Type} {F : ι → Ty ι}
+def negTrans_induction {ι κ : Type} {F : κ → Ty ι}
 
     {Premises : PremiseSet F}
     {Γ : Ctx ι} {A : Formula F (Ty.nat :: Γ)}
@@ -667,7 +667,7 @@ def negTrans_induction {ι : Type} {F : ι → Ty ι}
       Formula.substF_renameF_id (Renaming.ext Renaming.shift) (Term.subst0_map (.var .vz))
         hbody Q₀
     have inst2 : Derivable F Allowed.nt_target Premises ((Formula.all Ty.nat Q₀).weakenBy Ty.nat →ᶠ Q₀) := by
-      have h' := @Derivable.forall_ax ι F Allowed.nt_target Premises (Ty.nat :: Γ) Ty.nat
+      have h' := @Derivable.forall_ax ι κ F Allowed.nt_target Premises (Ty.nat :: Γ) Ty.nat
                    (Formula.renameF (Renaming.ext Renaming.shift) Q₀) (.var .vz)
       rw [heq2] at h'; exact h'
     let inner : Derivable F Allowed.nt_target Premises ((Formula.all Ty.nat Q₀).weakenBy Ty.nat →ᶠ
@@ -726,7 +726,7 @@ def negTrans_trans0 {Γ : Ctx ι} {s t u : Term F Γ Ty.nat} :
 
 def negTrans_succ_ne_zero {Γ : Ctx ι} :
     Derivable F Allowed.nt_target Premises
-      (@Formula.all ι F Γ Ty.nat
+      (@Formula.all ι κ F Γ Ty.nat
         (Formula.eq0 (Term.app Term.succ (.var .vz)) Term.zero →ᶠ ⊥ᶠ)).negTrans := by
   show Derivable F Allowed.nt_target Premises
     (¬ᶠ¬ᶠ(Formula.all Ty.nat (¬ᶠ¬ᶠ(Formula.eq0 (Term.app Term.succ (.var .vz)) Term.zero →ᶠ ⊥ᶠ))))
@@ -734,7 +734,7 @@ def negTrans_succ_ne_zero {Γ : Ctx ι} :
   -- Use succ_ne_zero in context Ty.nat::Γ, instantiate with .var .vz
   let inst : Derivable F Allowed.nt_target Premises
       (Formula.eq0 (Term.app Term.succ (.var .vz)) Term.zero →ᶠ ⊥ᶠ) :=
-    .mp (@Derivable.succ_ne_zero ι F Allowed.nt_target Premises (Ty.nat :: Γ)) (.forall_ax (.var .vz))
+    .mp (@Derivable.succ_ne_zero ι κ F Allowed.nt_target Premises (Ty.nat :: Γ)) (.forall_ax (.var .vz))
   let inner : Derivable F Allowed.nt_target Premises
       (¬ᶠ¬ᶠ(Formula.eq0 (Term.app Term.succ (.var .vz)) Term.zero →ᶠ ⊥ᶠ)) :=
     .mp inst dnn_intro
@@ -749,13 +749,13 @@ def negTrans_succ_ne_zero {Γ : Ctx ι} :
       (¬ᶠ⊥ᶠ →ᶠ Formula.all Ty.nat (¬ᶠ¬ᶠ(Formula.eq0 (Term.app Term.succ (.var .vz)) Term.zero →ᶠ ⊥ᶠ))) :=
     .forall_rule h_inner
   -- ¬⊥ is provable: I_comb at ⊥
-  let neg_bot : Derivable F Allowed.nt_target Premises (¬ᶠ⊥ᶠ) := @I_comb ι F Allowed.nt_target Premises Γ ⊥ᶠ
+  let neg_bot : Derivable F Allowed.nt_target Premises (¬ᶠ⊥ᶠ) := @I_comb ι κ F Allowed.nt_target Premises Γ ⊥ᶠ
   -- Derive ∀n. ¬¬(succ(n)=0→⊥) and wrap in ¬¬
   exact .mp (.mp neg_bot all_h) dnn_intro
 
 def negTrans_succ_inj {Γ : Ctx ι} :
     Derivable F Allowed.nt_target Premises
-      (@Formula.all ι F Γ Ty.nat (@Formula.all ι F (Ty.nat :: Γ) Ty.nat
+      (@Formula.all ι κ F Γ Ty.nat (@Formula.all ι κ F (Ty.nat :: Γ) Ty.nat
         (Formula.eq0
           (Term.app Term.succ (.var (.vs .vz)))
           (Term.app Term.succ (.var .vz))
@@ -773,7 +773,7 @@ def negTrans_succ_inj {Γ : Ctx ι} :
       (Formula.all Ty.nat
         (Formula.eq0 (Term.app Term.succ (.var (.vs (.vs .vz)))) (Term.app Term.succ (.var .vz))
          →ᶠ Formula.eq0 (.var (.vs (.vs .vz))) (.var .vz))) :=
-    .mp (@Derivable.succ_inj ι F Allowed.nt_target Premises (Ty.nat :: Ty.nat :: Γ)) (.forall_ax (.var (.vs .vz)))
+    .mp (@Derivable.succ_inj ι κ F Allowed.nt_target Premises (Ty.nat :: Ty.nat :: Γ)) (.forall_ax (.var (.vs .vz)))
   -- step_mn: instantiate inner ∀n with n = .var .vz, getting succ m = succ n → m = n
   let step_mn : Derivable F Allowed.nt_target Premises
       (Formula.eq0 (Term.app Term.succ (.var (.vs .vz))) (Term.app Term.succ (.var .vz))
@@ -793,7 +793,7 @@ def negTrans_succ_inj {Γ : Ctx ι} :
       (¬ᶠ⊥ᶠ →ᶠ Formula.all Ty.nat (¬ᶠ¬ᶠ(Formula.eq0 (Term.app Term.succ (.var (.vs .vz)))
            (Term.app Term.succ (.var .vz)) →ᶠ Formula.eq0 (.var (.vs .vz)) (.var .vz)))) :=
     .forall_rule h1
-  let neg_bot1 : Derivable F Allowed.nt_target Premises (¬ᶠ⊥ᶠ) := @I_comb ι F Allowed.nt_target Premises (Ty.nat :: Γ) ⊥ᶠ
+  let neg_bot1 : Derivable F Allowed.nt_target Premises (¬ᶠ⊥ᶠ) := @I_comb ι κ F Allowed.nt_target Premises (Ty.nat :: Γ) ⊥ᶠ
   let step1 : Derivable F Allowed.nt_target Premises
       (Formula.all Ty.nat (¬ᶠ¬ᶠ(Formula.eq0 (Term.app Term.succ (.var (.vs .vz)))
            (Term.app Term.succ (.var .vz)) →ᶠ Formula.eq0 (.var (.vs .vz)) (.var .vz)))) :=
@@ -811,7 +811,7 @@ def negTrans_succ_inj {Γ : Ctx ι} :
        Formula.eq0 (Term.app Term.succ (.var (.vs .vz))) (Term.app Term.succ (.var .vz))
        →ᶠ Formula.eq0 (.var (.vs .vz)) (.var .vz)))))) :=
     .forall_rule h2
-  let neg_bot2 : Derivable F Allowed.nt_target Premises (¬ᶠ⊥ᶠ) := @I_comb ι F Allowed.nt_target Premises Γ ⊥ᶠ
+  let neg_bot2 : Derivable F Allowed.nt_target Premises (¬ᶠ⊥ᶠ) := @I_comb ι κ F Allowed.nt_target Premises Γ ⊥ᶠ
   let step3 := Derivable.mp neg_bot2 all_step2
   exact .mp step3 dnn_intro
 
@@ -821,7 +821,7 @@ def negTrans_forall_ax {Γ : Ctx ι} {ρ : Ty ι} {A : Formula F (ρ :: Γ)}
     Derivable F Allowed.nt_target Premises (Formula.all ρ A →ᶠ A.subst0 t).negTrans := by
   show Derivable F Allowed.nt_target Premises (¬ᶠ¬ᶠ(Formula.all ρ (¬ᶠ¬ᶠA.kurodaInner) →ᶠ (A.subst0 t).kurodaInner))
   rw [kurodaInner_subst0]
-  exact (Derivable.mp (@Derivable.forall_ax ι F Allowed.nt_target Premises _ _ (¬ᶠ¬ᶠA.kurodaInner) t) neg_neg_imp_rev)
+  exact (Derivable.mp (@Derivable.forall_ax ι κ F Allowed.nt_target Premises _ _ (¬ᶠ¬ᶠA.kurodaInner) t) neg_neg_imp_rev)
 
 def negTrans_exist_ax {Γ : Ctx ι} {ρ : Ty ι} {A : Formula F (ρ :: Γ)}
     (t : Term F Γ ρ) :
@@ -984,7 +984,7 @@ end NegTransCases
 
 section NegTransSound
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
 
     {Premises : PremiseSet F}
     
@@ -995,14 +995,14 @@ This is the condition `negTrans_sound` actually needs, and the *only* thing anyt
 needed `isPurelyUniversal` on `Derivable.premise` for. It is strictly weaker than "every
 premise is purely universal" — `negTrans_iff_imp_pu` shows an implication between two PU
 formulas is NT-stable while not itself being PU. -/
-abbrev NTStable {ι : Type} {F : ι → Ty ι}
+abbrev NTStable {ι κ : Type} {F : κ → Ty ι}
     (Premises : PremiseSet F) : Prop :=
   ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
     Nonempty (Derivable F Allowed.nt_target Premises (B →ᶠ Bᴺᵀ))
 
 /-- The `Type`-valued form: a premise set that supplies an actual derivation, not just its
 existence. `negTrans_sound` takes this, since it is building a term. -/
-abbrev NTStableD {ι : Type} {F : ι → Ty ι}
+abbrev NTStableD {ι κ : Type} {F : κ → Ty ι}
     (Premises : PremiseSet F) : Type :=
   ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
     Derivable F Allowed.nt_target Premises (B →ᶠ Bᴺᵀ)
@@ -1046,11 +1046,11 @@ def negTrans_sound {Γ : Ctx ι} {A : Formula F Γ}
   -- forall_ax
   | .forall_ax (A := A_body) t => by
       simp only [Formula.negTrans, Formula.kurodaInner, kurodaInner_subst0]
-      exact Derivable.mp (@Derivable.forall_ax ι F Allowed.nt_target Premises _ _ (¬ᶠ¬ᶠA_body.kurodaInner) t) neg_neg_imp_rev
+      exact Derivable.mp (@Derivable.forall_ax ι κ F Allowed.nt_target Premises _ _ (¬ᶠ¬ᶠA_body.kurodaInner) t) neg_neg_imp_rev
   -- exist_ax
   | .exist_ax (A := A_body) t => by
       simp only [Formula.negTrans, Formula.kurodaInner, kurodaInner_subst0]
-      exact Derivable.mp (@Derivable.exist_ax ι F Allowed.nt_target Premises _ _ t (A_body.kurodaInner)) dnn_intro
+      exact Derivable.mp (@Derivable.exist_ax ι κ F Allowed.nt_target Premises _ _ t (A_body.kurodaInner)) dnn_intro
   -- mp
   | .mp hA hAB =>
       .mp (negTrans_sound hA) (.mp (negTrans_sound hAB) neg_neg_mp)
@@ -1112,7 +1112,7 @@ def negTrans_sound {Γ : Ctx ι} {A : Formula F Γ}
       have ih : Derivable F Allowed.nt_target Premises (¬ᶠ¬ᶠA_inner.kurodaInner) := negTrans_sound h_inner
       let to_all : Derivable F Allowed.nt_target Premises
           (¬ᶠ¬ᶠA_inner.kurodaInner →ᶠ Formula.all ρ_v (¬ᶠ¬ᶠA_inner.kurodaInner.weakenBy ρ_v)) :=
-        Derivable.forall_rule (@I_comb ι F Allowed.nt_target Premises _ (¬ᶠ¬ᶠA_inner.kurodaInner.weakenBy ρ_v))
+        Derivable.forall_rule (@I_comb ι κ F Allowed.nt_target Premises _ (¬ᶠ¬ᶠA_inner.kurodaInner.weakenBy ρ_v))
       exact Derivable.mp (Derivable.mp ih to_all) dnn_intro
   -- Axioms with ∀ inside
   | .succ_ne_zero          => negTrans_succ_ne_zero

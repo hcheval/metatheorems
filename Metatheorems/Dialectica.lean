@@ -23,31 +23,31 @@ Splitting across three files avoids the circular import:
 /-- Generalized soundness for any context: derivable formulas satisfy
     the Dialectica interpretation at every environment. -/
 def dialectica_soundness_ctx
-    {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F)
     (eqxi : EqXInterp X F si)
     {Premises : PremiseSet F}
     (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
       ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
     {Γ : Ctx ι} (A : Formula F Γ) (env : Ctx.interpret X Γ)
-    (h : @Derivable ι F Allowed.extended Premises Γ A)
+    (h : @Derivable ι κ F Allowed.extended Premises Γ A)
     : dialecticaRealizerCtx si A env :=
-  @dialectica_soundness_ctx' ι X F si eqxi Premises premise_realizer Γ A h env
+  @dialectica_soundness_ctx' ι κ X F si eqxi Premises premise_realizer Γ A h env
 
 /-- **Dialectica Soundness Theorem** (Theorem 3.0.7).
 
     If `T^ω[X,F] + AC + IP^ω_∀ + M^ω ⊢ A`, then one can construct a
     Lean-computable realizer for the Dialectica translation of `A`. -/
 def dialectica_soundness
-    {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F)
     (eqxi : EqXInterp X F si)
     {Premises : PremiseSet F}
     (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
       ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
     (A : Formula F ([] : Ctx ι))
-    (h : @Derivable ι F Allowed.extended Premises [] A)
+    (h : @Derivable ι κ F Allowed.extended Premises [] A)
     : dialecticaRealizer si A :=
-  @dialectica_soundness' ι X F si eqxi Premises premise_realizer A h
+  @dialectica_soundness' ι κ X F si eqxi Premises premise_realizer A h
 
 end Metatheorems

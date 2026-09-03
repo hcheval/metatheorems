@@ -45,7 +45,7 @@ namespace ProofMode
 
 open Formula
 
-variable {ι : Type} {F : ι → Ty ι}
+variable {ι κ : Type} {F : κ → Ty ι}
     {al : Allowed} {Premises : PremiseSet F} {Γ : Ctx ι}
 
 /-- **The budget descent.** `∀k ((∀u B₀ u) → ∀m (a m ≤ k → ∃n (a n = a (n + g n))))`.

@@ -30,7 +30,7 @@ is an abstract majorizability if:
 Given a type structure `(X, F)` with interpretation `si`, an abstract
 majorizability provides a family of relations indexed by types, relating
 elements of ρ̂ to elements of ρ, satisfying compatibility conditions. -/
-structure AbstractMajorizability {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+structure AbstractMajorizability {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) where
   /-- The majorizability relation at type ρ: `maj ρ x_star x` means x* ≥*_ρ x. -/
   maj : (ρ : Ty ι) → Ty.interpret X ρ.hat → Ty.interpret X ρ → Prop
@@ -112,7 +112,7 @@ structure AbstractMajorizability {ι : Type} {X : ι → Type} {F : ι → Ty ι
       (fun (y : Ty.interpret X ρ) (z : Ty.interpret X ρ → Ty.interpret X Ty.nat → Ty.interpret X ρ)
            (n : Nat) => Nat.rec y (fun n ih => z ih n) n)
   /-- Majorant for function constants (f_χ). -/
-  func_maj : ∀ (f : ι), ∃ f_star : ℕ → Ty.interpret X (F f).hat,
+  func_maj : ∀ (f : κ), ∃ f_star : ℕ → Ty.interpret X (F f).hat,
     ∀ n ≥ N, maj (F f) (f_star n) (si.funcInterp f)
   /-- Majorant for zero elements (0_{X_i}). -/
   zeroX_maj : ∀ (i : ι), ∃ z_star : ℕ → Nat,
@@ -139,14 +139,14 @@ def Ctx.lookupHat {ι : Type} {X : ι → Type} :
 
 /-- An environment pair `(env_star, env)` is majorizable if each component
     of `env_star` majorizes the corresponding component of `env`. -/
-def MajEnv {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+def MajEnv {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     {si : SpaceInterp X F} (am : AbstractMajorizability si) :
     (Γ : Ctx ι) → Ctx.interpret X (Γ.map Ty.hat) → Ctx.interpret X Γ → Prop
   | [],     (),              ()           => True
   | _ :: Γ, (v_star, e_star), (v, env)    => am.maj _ v_star v ∧ MajEnv am Γ e_star env
 
 /-- Looking up a variable in a majorizable environment preserves majorizability. -/
-lemma MajEnv.lookup {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+lemma MajEnv.lookup {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     {si : SpaceInterp X F} {am : AbstractMajorizability si}
     {Γ : Ctx ι} {τ : Ty ι} (v : Var Γ τ)
     {env_star : Ctx.interpret X (Γ.map Ty.hat)} {env : Ctx.interpret X Γ}
@@ -160,13 +160,13 @@ lemma MajEnv.lookup {ι : Type} {X : ι → Type} {F : ι → Ty ι}
 `all_terms_majorizable` needs this: `arrow_intro`'s self-majorization obligation is a
 statement about the *majorant* alone, so the induction has to carry hat-level monotonicity of
 the majorant in its environment. -/
-def SelfMajEnv {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+def SelfMajEnv {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     {si : SpaceInterp X F} (am : AbstractMajorizability si) :
     (Γ : Ctx ι) → Ctx.interpret X (Γ.map Ty.hat) → Ctx.interpret X (Γ.map Ty.hat) → Prop
   | [],     (),          ()          => True
   | _ :: Γ, (v₁, e₁), (v₂, e₂) => am.selfMaj _ v₁ v₂ ∧ SelfMajEnv am Γ e₁ e₂
 
-lemma SelfMajEnv.lookup {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+lemma SelfMajEnv.lookup {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     {si : SpaceInterp X F} {am : AbstractMajorizability si}
     {Γ : Ctx ι} {τ : Ty ι} (v : Var Γ τ)
     {e₁ e₂ : Ctx.interpret X (Γ.map Ty.hat)} (h : SelfMajEnv am Γ e₁ e₂) :
@@ -175,14 +175,14 @@ lemma SelfMajEnv.lookup {ι : Type} {X : ι → Type} {F : ι → Ty ι}
   | vz => exact h.1
   | vs w ih => exact ih h.2
 
-lemma SelfMajEnv.self {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+lemma SelfMajEnv.self {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     {si : SpaceInterp X F} {am : AbstractMajorizability si} :
     ∀ (Γ : Ctx ι) {e₁ e₂ : Ctx.interpret X (Γ.map Ty.hat)},
       SelfMajEnv am Γ e₁ e₂ → SelfMajEnv am Γ e₁ e₁
   | [],     _, _, _ => trivial
   | _ :: Γ, _, _, h => ⟨am.selfMaj_self h.1, SelfMajEnv.self Γ h.2⟩
 
-lemma MajEnv.toSelfMajEnv {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+lemma MajEnv.toSelfMajEnv {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     {si : SpaceInterp X F} {am : AbstractMajorizability si} :
     ∀ (Γ : Ctx ι) {env_star : Ctx.interpret X (Γ.map Ty.hat)} {env : Ctx.interpret X Γ},
       MajEnv am Γ env_star env → SelfMajEnv am Γ env_star env_star
@@ -195,7 +195,7 @@ lemma MajEnv.toSelfMajEnv {ι : Type} {X : ι → Type} {F : ι → Ty ι}
 
 /-- A closed term `t : Term F [] ρ` is majorizable if there exists
     `t* : ℕ → Ty.interpret X ρ̂` such that `t*(n) ≥*_ρ t` for all `n ≥ N`. -/
-def IsMajorizable {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+def IsMajorizable {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     {si : SpaceInterp X F} (am : AbstractMajorizability si)
     {ρ : Ty ι} (t : Term F ([] : Ctx ι) ρ) : Prop :=
   ∃ t_star : ℕ → Ty.interpret X ρ.hat,
@@ -209,7 +209,7 @@ def IsMajorizable {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     - Application: combine majorants via `app_compat`
     - Lambda: use IH on body + `arrow_intro`
     - Constants: use the corresponding field of `AbstractMajorizability` -/
-theorem all_terms_majorizable {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+theorem all_terms_majorizable {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     {si : SpaceInterp X F} (am : AbstractMajorizability si)
     {Γ : Ctx ι} {ρ : Ty ι} (t : Term F Γ ρ) :
     ∃ t_star : ℕ → Ctx.interpret X (Γ.map Ty.hat) → Ty.interpret X ρ.hat,
@@ -295,7 +295,7 @@ theorem all_terms_majorizable {ι : Type} {X : ι → Type} {F : ι → Ty ι}
          fun e₁ e₂ he => am.selfMaj_prod_snd _ _ ((hp n hn).2 e₁ e₂ he)⟩⟩
 
 /-- **Corollary**: All closed terms are majorizable. -/
-theorem all_closed_terms_majorizable {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+theorem all_closed_terms_majorizable {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     {si : SpaceInterp X F} (am : AbstractMajorizability si)
     {ρ : Ty ι} (t : Term F ([] : Ctx ι) ρ) : IsMajorizable am t := by
   obtain ⟨t_star, ht⟩ := all_terms_majorizable am t
@@ -323,7 +323,7 @@ route for callers who need the number rather than its existence. -/
 /-- The six per-constant majorants of an `AbstractMajorizability`, as data rather than as
 existential statements. Everything else in the structure is already `Prop`-valued and stays
 there; these are the only fields carrying computational content. -/
-structure ConstMajorants {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+structure ConstMajorants {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     {si : SpaceInterp X F} (am : AbstractMajorizability si) : Type where
   /-- Majorant for `0`. -/
   zeroM : ℕ → Nat
@@ -338,8 +338,8 @@ structure ConstMajorants {ι : Type} {X : ι → Type} {F : ι → Ty ι}
          (z : Ty.interpret X ρ → Ty.interpret X Ty.nat → Ty.interpret X ρ)
          (n : Nat) => Nat.rec y (fun n ih => z ih n) n)
   /-- Majorant for each function constant. -/
-  funcM : (f : ι) → ℕ → Ty.interpret X (F f).hat
-  funcM_maj : ∀ (f : ι), ∀ n ≥ am.N, am.maj (F f) (funcM f n) (si.funcInterp f)
+  funcM : (f : κ) → ℕ → Ty.interpret X (F f).hat
+  funcM_maj : ∀ (f : κ), ∀ n ≥ am.N, am.maj (F f) (funcM f n) (si.funcInterp f)
   /-- Majorant for each base-type zero element. -/
   zeroXM : (i : ι) → ℕ → Nat
   zeroXM_maj : ∀ (i : ι), ∀ n ≥ am.N, am.maj (.base i) (zeroXM i n) (si.zeroInterp i)
@@ -351,7 +351,7 @@ structure ConstMajorants {ι : Type} {X : ι → Type} {F : ι → Ty ι}
 /-- **The majorant of a term, as a function.** This is `all_terms_majorizable`'s witness,
 written out: the same structural recursion, but computing rather than asserting. Compare the
 proof of `all_terms_majorizable` case by case — they agree constructor for constructor. -/
-def termMajorizer {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+def termMajorizer {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     {si : SpaceInterp X F} {am : AbstractMajorizability si} (cm : ConstMajorants am) :
     {Γ : Ctx ι} → {ρ : Ty ι} → Term F Γ ρ → ℕ →
       Ctx.interpret X (Γ.map Ty.hat) → Ty.interpret X ρ.hat
@@ -373,7 +373,7 @@ def termMajorizer {ι : Type} {X : ι → Type} {F : ι → Ty ι}
 
 /-- **`termMajorizer` is correct.** Identical in content to `all_terms_majorizable`; the
 difference is only that the witness is now named in the statement instead of bound by `∃`. -/
-theorem termMajorizer_maj {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+theorem termMajorizer_maj {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     {si : SpaceInterp X F} {am : AbstractMajorizability si} (cm : ConstMajorants am)
     {Γ : Ctx ι} {ρ : Ty ι} (t : Term F Γ ρ) :
     ∀ n ≥ am.N,
@@ -439,12 +439,12 @@ theorem termMajorizer_maj {ι : Type} {X : ι → Type} {F : ι → Ty ι}
 
 /-- **The majorant of a closed term, computed.** The `Type`-valued counterpart of
 `majorant_of_closed_term`: same value, but available rather than erased. -/
-def closedMajorizer {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+def closedMajorizer {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     {si : SpaceInterp X F} {am : AbstractMajorizability si} (cm : ConstMajorants am)
     {ρ : Ty ι} (t : Term F ([] : Ctx ι) ρ) : Ty.interpret X ρ.hat :=
   termMajorizer cm t am.N ()
 
-theorem closedMajorizer_maj {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+theorem closedMajorizer_maj {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     {si : SpaceInterp X F} {am : AbstractMajorizability si} (cm : ConstMajorants am)
     {ρ : Ty ι} (t : Term F ([] : Ctx ι) ρ) :
     am.maj ρ (closedMajorizer cm t) (Term.interpret si t ()) :=
@@ -471,7 +471,7 @@ they were written; they are general facts about `termMajorizer`, not probe scaff
 
 section Structural
 
-variable {ι : Type} {X : ι → Type} {F : ι → Ty ι} {si : SpaceInterp X F}
+variable {ι κ : Type} {X : ι → Type} {F : κ → Ty ι} {si : SpaceInterp X F}
     {am : AbstractMajorizability si}
 
 /-- General form, mirroring `Term.interpret_rename_gen`: `termMajorizer` commutes with any
@@ -565,7 +565,7 @@ end Structural
 
 /-- `AbstractMajorizability` contains `MajorizabilityRel`: same `maj`, and `nat_order` /
 `app_compat` are `maj_le` / `maj_app` with explicit arguments. -/
-def AbstractMajorizability.toRel {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+def AbstractMajorizability.toRel {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     {si : SpaceInterp X F} (am : AbstractMajorizability si) : MajorizabilityRel si where
   maj := am.maj
   maj_le h := am.nat_order _ _ h
@@ -574,7 +574,7 @@ def AbstractMajorizability.toRel {ι : Type} {X : ι → Type} {F : ι → Ty ι
 /-- **The point of the syntactic route.** A closed term's interpretation has a majorant,
 outright — instantiate `all_closed_terms_majorizable` at the threshold `N`. This is exactly
 the `U_star` / `V_star` that `metatheorem_core_of_majorants` asks for. -/
-theorem majorant_of_closed_term {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+theorem majorant_of_closed_term {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     {si : SpaceInterp X F} (am : AbstractMajorizability si)
     {ρ : Ty ι} (t : Term F ([] : Ctx ι) ρ) :
     ∃ x_star : Ty.interpret X ρ.hat,
@@ -598,7 +598,7 @@ That is `bezemAbstract`. -/
 
 section BezemAbstract
 
-variable {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+variable {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
 
 /-- The structural half of `AbstractMajorizability` for `bezemMaj base`, packaged so that a
 concrete space supplies only the per-constant obligations.
@@ -615,7 +615,7 @@ def bezemAbstract (si : SpaceInterp X F) (base : (i : ι) → Nat → X i → Pr
         (fun (y : Ty.interpret X ρ)
              (z : Ty.interpret X ρ → Ty.interpret X Ty.nat → Ty.interpret X ρ)
              (n : Nat) => Nat.rec y (fun n ih => z ih n) n))
-    (func_maj : ∀ (f : ι), ∃ f_star : ℕ → Ty.interpret X (F f).hat,
+    (func_maj : ∀ (f : κ), ∃ f_star : ℕ → Ty.interpret X (F f).hat,
       ∀ n ≥ N, bezemMaj base (F f) (f_star n) (si.funcInterp f))
     (zeroX_maj : ∀ (i : ι), ∃ z_star : ℕ → Nat,
       ∀ n ≥ N, bezemMaj base (.base i) (z_star n) (si.zeroInterp i))
