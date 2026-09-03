@@ -10,6 +10,7 @@ import Metatheorems.Rounding
 import Metatheorems.QValBridge
 import Metatheorems.Majorizability
 import Metatheorems.SyntacticMetatheorem
+import Metatheorems.Soundness
 
 namespace Metatheorems
 
@@ -690,6 +691,50 @@ noncomputable def MetricModel.eqXInterp (M : MetricModel) :
   dist_tri_holds := fun i {_Γ} x y z env => M.dist_tri_interp i x y z env
 
 -- ============================================================================
+-- Semantic soundness for the metric model
+-- ============================================================================
+
+/-! `Soundness.lean` proves soundness relative to five model facts, taken as section
+`variable`s. Until 2026-09-03 none of them was dischargeable for `MetricModel` — `hsep` in
+particular *is* `EqXInterp.extract`, and nothing in the project could build one. All five are
+now available, and every one is a result proved above:
+
+| hypothesis | discharged by |
+|---|---|
+| `hprem` | vacuous — `MetricSpace.Premises` is `fun _ => False` |
+| `hdist_self` | `eqAtType_base_holds x x rfl` |
+| `hdist_comm` | `dist_comm_interp` |
+| `hdist_tri` | `dist_tri_interp` |
+| `hsep` | `eq_of_eqAtType_base` — separation, i.e. `M.d_eq_zero` |
+
+So the metric model is a genuine model of the whole theory, with no side conditions. -/
+
+/-- **Semantic soundness for a metric model**, unconditionally: everything derivable in
+WE-HA^{ω,X} over one metric space is true in that space.
+
+This is the syntactic and semantic halves of the project meeting. Note it is *not* circular
+with the metatheorems: `hsep` comes from `M.d_eq_zero` and the evaluation bridge, never from
+soundness itself. -/
+theorem MetricModel.soundness (M : MetricModel) {Γ : Ctx MetricSpace.ι}
+    {allowed : Allowed} {A : Formula MetricSpace.F Γ}
+    (h : Derivable MetricSpace.F allowed MetricSpace.Premises A) :
+    ∀ env : Ctx.interpret (fun () => M.carrier) Γ, Formula.interpret M.si A env :=
+  Metatheorems.soundness M.si
+    (fun _ hp => hp.elim)
+    (fun i {_Γ} x env => by cases i; exact M.eqAtType_base_holds x x env rfl)
+    (fun i {_Γ} x y env => M.dist_comm_interp i x y env)
+    (fun i {_Γ} x y z env => M.dist_tri_interp i x y z env)
+    (fun i {_Γ} x y env hxy => by cases i; exact M.eq_of_eqAtType_base x y env hxy)
+    h
+
+/-- **The object theory is consistent**, relative to the existence of one metric space:
+`⊥ᶠ` is not derivable. A direct corollary of soundness, and the first statement in the
+project that rules anything *out*. -/
+theorem MetricModel.not_derivable_bot (M : MetricModel) {allowed : Allowed}
+    (h : Derivable MetricSpace.F allowed MetricSpace.Premises (Γ := []) ⊥ᶠ) : False :=
+  M.soundness h ()
+
+-- ============================================================================
 -- The metric-space metatheorem
 -- ============================================================================
 
@@ -860,6 +905,8 @@ theorem MetricModel.metric_metatheorem_classical (M : MetricModel)
 #print axioms MetricModel.dist_comm_interp
 #print axioms MetricModel.dist_tri_interp
 #print axioms MetricModel.eqXInterp
+#print axioms MetricModel.soundness
+#print axioms MetricModel.not_derivable_bot
 #print axioms MetricModel.metric_metatheorem
 #print axioms MetricModel.metric_metatheorem_classical
 
