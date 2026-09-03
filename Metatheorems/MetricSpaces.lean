@@ -300,17 +300,34 @@ If `n₁ ≽ᵃ_X x` and `n₂ ≽ᵃ_X y`, i.e. `d(a,x) ≤ n₁` and `d(a,y) �
 
 The self-majorization half is what the document flags separately — *"We also need to check
 that `λx⁰,y⁰.(x+y)∘` majorizes itself"* — and it needs no metric input at all, only that
-`m ≥ n → (m)∘ s-maj₁ (n)∘`. -/
-theorem MetricModel.dist_maj (M : MetricModel) (N : ℕ) :
-    ∃ f_star : ℕ →
-      Ty.interpret (fun () => M.carrier) (xTy →ₜ xTy →ₜ realTy MetricSpace.ι).hat,
-      ∀ n ≥ N, bezemMaj (X := fun () => M.carrier) M.base
-        (xTy →ₜ xTy →ₜ realTy MetricSpace.ι)
-        (f_star n) (M.si.distInterp ()) := by
+`m ≥ n → (m)∘ s-maj₁ (n)∘`.
+
+The majorant is named (`distMajorant`) and the proof is `dist_maj_at`; `dist_maj` itself is
+the `∃`-packaging `bezemAbstract` consumes. Split 2026-09-04 so that
+`MetricModel.constMajorants` can carry the witness as data. -/
+noncomputable def MetricModel.distMajorant (M : MetricModel) :
+    Ty.interpret (fun () => M.carrier) (xTy →ₜ xTy →ₜ realTy MetricSpace.ι).hat :=
   -- the binder ascriptions are load-bearing: `Ty.hat` is not reducible, so without them
   -- instance search cannot see that `Ty.interpret X xTy.hat` is `ℕ` and `+` fails to elaborate
-  refine ⟨fun _ => fun (n₁ : ℕ) (n₂ : ℕ) => Rounding.roundR ((n₁ + n₂ : ℕ) : ℝ),
-          fun _ _ => ?_⟩
+  fun (n₁ : ℕ) (n₂ : ℕ) => Rounding.roundR ((n₁ + n₂ : ℕ) : ℝ)
+
+/-- **`distMajorant` evaluates**: at naturals `n₁, n₂` and precision `k` it is the closed
+ℕ-expression `j(2·(n₁+n₂)·2^{k+1}, 2^{k+1} − 1)`. `Rounding.roundR_natCast`, specialised. -/
+theorem MetricModel.distMajorant_apply (M : MetricModel) (n₁ n₂ k : ℕ) :
+    M.distMajorant n₁ n₂ k =
+      Rounding.pairN (2 * ((n₁ + n₂) * 2 ^ (k + 1))) (2 ^ (k + 1) - 1) :=
+  Rounding.roundR_natCast (n₁ + n₂) k
+
+/-- `dist_maj` with its witness named. Same relationship as `bezem_prec_maj_at` to
+`bezem_prec_maj`. The majorant `λn₁⁰n₂⁰.(n₁+n₂)∘` mentions the model only through its *type*
+(the carrier family), never through `M.d`: it is a closed `ℕ → ℕ → (ℕ → ℕ)`, and at natural
+arguments it evaluates by `Rounding.roundR_natCast`. -/
+theorem MetricModel.dist_maj_at (M : MetricModel) (N : ℕ) :
+    ∀ n ≥ N, bezemMaj (X := fun () => M.carrier) M.base
+        (xTy →ₜ xTy →ₜ realTy MetricSpace.ι)
+        M.distMajorant (M.si.distInterp ()) := by
+  intro _ _
+  unfold MetricModel.distMajorant
   -- `d(x,y) ≤ n₁ + n₂` from the two `X`-clause hypotheses and the triangle inequality
   have key : ∀ (n₁ n₂ : ℕ) (x y : M.carrier),
       M.base () n₁ x → M.base () n₂ y → M.d x y ≤ ((n₁ + n₂ : ℕ) : ℝ) := by
@@ -344,6 +361,15 @@ theorem MetricModel.dist_maj (M : MetricModel) (N : ℕ) :
     -- ∀-statement, not a nested pair — so this is exactly `self`.
     exact fun a b h => self a b h
 
+/-- **`d_X` is majorizable** — `dist_maj_at`, `∃`-packaged for `bezemAbstract`. -/
+theorem MetricModel.dist_maj (M : MetricModel) (N : ℕ) :
+    ∃ f_star : ℕ →
+      Ty.interpret (fun () => M.carrier) (xTy →ₜ xTy →ₜ realTy MetricSpace.ι).hat,
+      ∀ n ≥ N, bezemMaj (X := fun () => M.carrier) M.base
+        (xTy →ₜ xTy →ₜ realTy MetricSpace.ι)
+        (f_star n) (M.si.distInterp ()) :=
+  ⟨fun _ => M.distMajorant, M.dist_maj_at N⟩
+
 /-- The metric base relation is upward closed in its numeric argument: if `n ≥ m` and
 `d(a,x) ≤ m` then `d(a,x) ≤ n`. This is `BaseMono`, the one extra hypothesis the two-clause
 `bezemMaj` forces, and for a metric it is immediate. -/
@@ -374,6 +400,86 @@ noncomputable def MetricModel.abstractMajorizability (M : MetricModel) :
     (fun () => ⟨fun _ => (), fun _ _ => trivial⟩)
     (fun () => M.zeroX_maj 0)
     (fun () => M.dist_maj 0)
+
+-- ============================================================================
+-- The majorants as DATA: `ConstMajorants` for the metric model
+-- ============================================================================
+
+/-! `abstractMajorizability` proves every constant *has* a majorant and `∃`-binds it, so a
+bound extracted through it exists but cannot be evaluated. `constMajorants` below is the same
+six majorants as data, which is what `termMajorizer`/`closedMajorizer` need to run.
+
+This is possible at `ι = Unit` for the same reason it is at `ι = Empty`: `Ty.hat` sends every
+base type to `nat`, so `Ty.interpret X ρ.hat` is built from `ℕ`/`unit`/`×`/`→` and never
+mentions the carrier. The majorants are ℕ-valued whatever the space is. Concretely:
+
+* `0`, `S`, `R`, `unitI`-typed `F ()` — the same values as `bezemConstMajorantsEmpty`,
+  since none of them looks at the space;
+* `d_X ↦ λn₁⁰n₂⁰.(n₁+n₂)∘` (`distMajorant`) — closed, no space dependence at all;
+* `0_X ↦ n₀` — the **one** space-dependent number, `n₀ ≥ d(a, 0_X)`. It is a *parameter*:
+  Kohlenbach's bounds are computable functionals of the majorants of their inputs, and a bound
+  on `d(a, 0_X)` is an input. Nothing here computes it, and nothing needs to.
+
+So the metric `ConstMajorants` is a function of `n₀`, and every majorant `closedMajorizer`
+produces from it is a closed ℕ-expression in `n₀`. -/
+
+/-- **The metric model's constant majorants, as data**, parameterised by a bound
+`n₀ ≥ d(a, 0_X)`. The one hypothesis `h` is `M.base () n₀ M.zeroX`, i.e. `n₀ ≽ᵃ_X 0_X`.
+
+`noncomputable` only through `distMajorant`'s `Rounding.roundR` on a Mathlib real; see
+`Rounding.roundR_natCast` for why that does not stop the numbers from coming out. -/
+noncomputable def MetricModel.constMajorants (M : MetricModel) (n₀ : ℕ)
+    (h : M.d M.ref M.zeroX ≤ (n₀ : ℝ)) : ConstMajorants M.abstractMajorizability where
+  zeroM := fun _ => 0
+  zeroM_maj := fun _ _ => Nat.le_refl 0
+  succM := fun _ => Nat.succ
+  succM_maj := fun _ _ =>
+    ⟨fun _ _ h => Nat.succ_le_succ h, fun _ _ h => Nat.succ_le_succ h⟩
+  precM := fun ρ _ => fun y_star z_star n => recMaj ρ y_star z_star n
+  precM_maj := fun ρ => bezem_prec_maj_at M.base_mono 0 ρ
+  -- `F () = Ty.unit`: the majorant is `()` and the obligation is `True`
+  funcM := fun () _ => ()
+  funcM_maj := fun () _ _ => trivial
+  zeroXM := fun _ _ => n₀
+  zeroXM_maj := fun () _ _ => h
+  distM := fun _ _ => M.distMajorant
+  distM_maj := fun () => M.dist_maj_at 0
+
+/-! ### The majorants compute
+
+Kernel-checked, not `#eval`ed (the project bans `#eval` on composed interpretations), and in
+the same style as the two `ι = Empty` examples in `Majorizability.lean`: bare `rfl` gets stuck
+on the `(M.abstractMajorizability).N → (bezemAbstract …).N` projection chain, so `simp` names
+the definitions and uses `termMajorizer`'s equation lemmas.
+
+`M` and `h` are variables throughout: the majorant depends on the model only through the
+number `n₀` it was handed. -/
+
+section ComputesDemo
+
+/-- `0_X`'s majorant is the parameter, for any `n₀`. -/
+example (M : MetricModel) (n₀ : ℕ) (h : M.d M.ref M.zeroX ≤ (n₀ : ℝ)) :
+    n₀ = closedMajorizer (M.constMajorants n₀ h)
+      (Term.zeroX (F := MetricSpace.F) (Γ := []) ()) := by
+  simp [closedMajorizer, termMajorizer, MetricModel.constMajorants,
+    MetricModel.abstractMajorizability, bezemAbstract]
+
+/-- **`d_X(0_X, 0_X)`'s majorant, evaluated at precision index `0`, with `n₀ = 5`**:
+`(5 + 5)∘(0) = j(2·10·2¹, 2¹ − 1) = j(40, 1) = triag(41) + 40 = 861 + 40 = 901`.
+
+This is the reading of "the metric metatheorem produces runnable bounds": a closed term at the
+real type, involving the metric and the distinguished point, has a majorant that is a literal
+once `n₀` is. Stated with the literal on the left for the same reducibility reason as the
+`ι = Empty` examples. -/
+example (M : MetricModel) (h : M.d M.ref M.zeroX ≤ ((5 : ℕ) : ℝ)) :
+    (901 : ℕ) = closedMajorizer (M.constMajorants 5 h)
+      (Term.app (Term.app (Term.dist (F := MetricSpace.F) (Γ := []) ())
+        (Term.zeroX ())) (Term.zeroX ())) ((0 : ℕ)) := by
+  simp only [closedMajorizer, termMajorizer, MetricModel.constMajorants,
+    MetricModel.abstractMajorizability, bezemAbstract, MetricModel.distMajorant_apply]
+  decide
+
+end ComputesDemo
 
 -- ============================================================================
 -- The equality interpretation
@@ -887,7 +993,10 @@ theorem MetricModel.metric_metatheorem_classical (M : MetricModel)
 
 #print axioms MetricModel.abstractMajorizability
 #print axioms MetricModel.dist_maj
+#print axioms MetricModel.dist_maj_at
 #print axioms MetricModel.zeroX_maj
+#print axioms MetricModel.constMajorants
+#print axioms MetricModel.distMajorant_apply
 #print axioms MetricModel.eqAtType_base_holds
 #print axioms MetricModel.eq_of_eqAtType_base
 #print axioms MetricModel.eqAtType_base_extract
