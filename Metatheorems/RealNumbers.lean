@@ -11,6 +11,7 @@ import Metatheorems.RealNumbers.Bounds
 import Metatheorems.RealNumbers.Field
 import Metatheorems.RealNumbers.Negation
 import Metatheorems.RealNumbers.Mul
+import Metatheorems.RealNumbers.OrderBounds
 import Metatheorems.RealNumbers.Order
 import Metatheorems.RealNumbers.Metric
 
