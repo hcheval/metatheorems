@@ -20,6 +20,98 @@ section Metatheorem
 
 variable {si : SpaceInterp X F} {Premises : PremiseSet F}
 
+/-- The `U` functional a derivation extracts — where the premise must be tested — as a
+**closed term**. Named so that both the `∃`-valued and the `Subtype`-valued metatheorem can
+speak about the same object. -/
+def extractedUTerm
+    (eqxi : EqXInterp X F si)
+    (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B)
+    {ρ : Ty ι} {B₀ C₀ : Formula F [Ty.nat, ρ]}
+    (prf : @Derivable ι F Allowed.extended Premises []
+      (Formula.all ρ (Formula.imp (Formula.all .nat B₀) (Formula.ex .nat C₀)))) :
+    Term F ([] : Ctx ι) (ρ →ₜ Ty.nat) :=
+  extractUTerm (ρ := ρ) (B₀ := B₀) (C₀ := C₀) (syntactic_soundness eqxi spremise prf).val
+
+/-- The `V` functional — the witness — as a closed term. -/
+def extractedVTerm
+    (eqxi : EqXInterp X F si)
+    (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B)
+    {ρ : Ty ι} {B₀ C₀ : Formula F [Ty.nat, ρ]}
+    (prf : @Derivable ι F Allowed.extended Premises []
+      (Formula.all ρ (Formula.imp (Formula.all .nat B₀) (Formula.ex .nat C₀)))) :
+    Term F ([] : Ctx ι) (ρ →ₜ Ty.nat) :=
+  extractVTerm (ρ := ρ) (B₀ := B₀) (C₀ := C₀) (syntactic_soundness eqxi spremise prf).val
+
+/-- **The extracted content**: challenged at `U`, the premise yields the conclusion at `V`.
+This is the Dialectica half of the metatheorem, with no majorizability in sight; both the
+`∃`-valued and the `Subtype`-valued metatheorem consume it unchanged. -/
+theorem syntactic_extraction
+    (eqxi : EqXInterp X F si)
+    (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B)
+    {ρ : Ty ι} {B₀ C₀ : Formula F [Ty.nat, ρ]}
+    (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
+    (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
+    (prf : @Derivable ι F Allowed.extended Premises []
+      (Formula.all ρ (Formula.imp (Formula.all .nat B₀) (Formula.ex .nat C₀)))) :
+    ∀ x : Ty.interpret X ρ,
+      Formula.interpret si B₀
+        (Term.interpret si (extractedUTerm eqxi spremise prf) () x, (x, ())) →
+      Formula.interpret si C₀
+        (Term.interpret si (extractedVTerm eqxi spremise prf) () x, (x, ())) := by
+  intro x hBx
+  have h_spec := (syntactic_soundness eqxi spremise prf).property ()
+    (x, (Ty.interpret_default si (wTy (Formula.all Ty.nat B₀)),
+         Ty.interpret_default si (cTy (Formula.ex Ty.nat C₀))))
+  simp only [dialecticaMatrix] at h_spec
+  rw [dialecticaMatrix_iff_interpFormula si B₀ hB_qf hB_vf] at h_spec
+  rw [dialecticaMatrix_iff_interpFormula si C₀ hC_qf hC_vf] at h_spec
+  simp only [extractedUTerm, extractedVTerm, extractUTerm, extractVTerm, defaultWTerm,
+    defaultCTerm, Term.interpret, Term.interpret_weaken, interpret_defaultOf,
+    Ctx.lookup] at hBx ⊢
+  exact h_spec hBx
+
+/-- **The metatheorem with the bound as DATA.**
+
+Identical in content to `syntactic_general_metatheorem` below, but the conclusion is a
+`Subtype` rather than an `∃`, so `Φ` is *available* — `(… ).val` is a function that computes.
+This is the same `Prop`→`Type` move the design table records for the Dialectica realizer
+("Subtype, not `∃` — lives in `Type`, witness extractable via `.val`"), and that
+`ConstMajorants`/`termMajorizer`/`closedMajorizer` made for majorizability.
+
+**Why the extra hypothesis.** It takes a `ConstMajorants am`, where the `∃` version needs only
+`AbstractMajorizability`. That is forced, not stylistic: `majorant_of_closed_term` returns a
+`Prop`-existential, which cannot be eliminated into a `Type`-valued goal, so the majorants must
+come from `closedMajorizer` instead. `ConstMajorants` is inhabited where it matters —
+`bezemConstMajorantsEmpty` at `ι = Empty`, `MetricModel.constMajorants n₀` for metric spaces.
+
+**What it does not do.** It does not make Φ *reduce*; the bound is only as computable as
+`syntactic_soundness` is reducible on the given derivation, which for a proof-mode derivation
+is what the `Probes/SeqMpBoundProbe.lean` line of work is about. What it provides is a
+statement in which a computed bound can be *put*. -/
+def syntactic_general_metatheorem_at
+    (eqxi : EqXInterp X F si)
+    (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B)
+    {am : AbstractMajorizability si} (cm : ConstMajorants am)
+    {ρ : Ty ι} {B₀ C₀ : Formula F [Ty.nat, ρ]}
+    (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
+    (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
+    (prf : @Derivable ι F Allowed.extended Premises []
+      (Formula.all ρ (Formula.imp (Formula.all .nat B₀) (Formula.ex .nat C₀)))) :
+    { Φ : Ty.interpret X ρ.hat → Nat //
+      ∀ (x : Ty.interpret X ρ) (x_star : Ty.interpret X ρ.hat),
+        am.toRel.maj ρ x_star x →
+        (∀ u : Nat, u ≤ Φ x_star → Formula.interpret si B₀ (u, (x, ()))) →
+        ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret si C₀ (v, (x, ())) } :=
+  ⟨coreBound (closedMajorizer cm (extractedUTerm eqxi spremise prf))
+             (closedMajorizer cm (extractedVTerm eqxi spremise prf)),
+   metatheorem_core_of_majorants_at am.toRel
+     (fun x u => Formula.interpret si B₀ (u, (x, ())))
+     (fun x v => Formula.interpret si C₀ (v, (x, ())))
+     _ _ _ _
+     (closedMajorizer_maj cm (extractedUTerm eqxi spremise prf))
+     (closedMajorizer_maj cm (extractedVTerm eqxi spremise prf))
+     (syntactic_extraction eqxi spremise hB_qf hB_vf hC_qf hC_vf prf)⟩
+
 /-- **The point of the whole branch.**
 
 From a derivation of `∀x (∀u B₀ → ∃v C₀)` we obtain a bound `Φ` depending only on a
@@ -43,31 +135,13 @@ theorem syntactic_general_metatheorem
         am.toRel.maj ρ x_star x →
         (∀ u : Nat, u ≤ Φ x_star → Formula.interpret si B₀ (u, (x, ()))) →
         ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret si C₀ (v, (x, ())) := by
-  -- the witness, as a closed term
-  let r := syntactic_soundness eqxi spremise prf
-  let Ut := extractUTerm (ρ := ρ) (B₀ := B₀) (C₀ := C₀) r.val
-  let Vt := extractVTerm (ρ := ρ) (B₀ := B₀) (C₀ := C₀) r.val
-  -- majorants, free
-  obtain ⟨U_star, hU⟩ := majorant_of_closed_term am Ut
-  obtain ⟨V_star, hV⟩ := majorant_of_closed_term am Vt
-  -- the extracted content
-  have hUV : ∀ x : Ty.interpret X ρ,
-      Formula.interpret si B₀ (Term.interpret si Ut () x, (x, ())) →
-      Formula.interpret si C₀ (Term.interpret si Vt () x, (x, ())) := by
-    intro x hBx
-    have h_spec := r.property ()
-      (x, (Ty.interpret_default si (wTy (Formula.all Ty.nat B₀)),
-           Ty.interpret_default si (cTy (Formula.ex Ty.nat C₀))))
-    simp only [dialecticaMatrix] at h_spec
-    rw [dialecticaMatrix_iff_interpFormula si B₀ hB_qf hB_vf] at h_spec
-    rw [dialecticaMatrix_iff_interpFormula si C₀ hC_qf hC_vf] at h_spec
-    simp only [Ut, Vt, extractUTerm, extractVTerm, defaultWTerm, defaultCTerm,
-      Term.interpret, Term.interpret_weaken, interpret_defaultOf, Ctx.lookup] at hBx ⊢
-    exact h_spec hBx
+  obtain ⟨U_star, hU⟩ := majorant_of_closed_term am (extractedUTerm eqxi spremise prf)
+  obtain ⟨V_star, hV⟩ := majorant_of_closed_term am (extractedVTerm eqxi spremise prf)
   exact metatheorem_core_of_majorants am.toRel
     (fun x u => Formula.interpret si B₀ (u, (x, ())))
     (fun x v => Formula.interpret si C₀ (v, (x, ())))
-    (Term.interpret si Ut ()) (Term.interpret si Vt ()) U_star V_star hU hV hUV
+    _ _ U_star V_star hU hV
+    (syntactic_extraction eqxi spremise hB_qf hB_vf hC_qf hC_vf prf)
 
 /-- **The classical syntactic metatheorem.**
 

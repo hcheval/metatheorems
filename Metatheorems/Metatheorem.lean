@@ -596,13 +596,48 @@ theorem metatheorem_core
   -- C(x, V(x)) holds by the semantic content
   exact ⟨V x, Nat.le_trans hV_le (Nat.le_max_right ..), hUV x hBU⟩
 
-/-- `metatheorem_core` with the majorants supplied explicitly instead of obtained from a
+/-! `metatheorem_core` with the majorants supplied explicitly instead of obtained from a
 total `majorizer`.
 
 This is the form that is actually usable: it needs only `MajorizabilityRel` (which is
 inhabited — `bezemRel`) together with majorants for the two extracted functionals. The
 total-majorizer version is the special case `U_star := majorizer U`, `V_star := majorizer V`.
--/
+
+Since 2026-09-04 it comes in the project's usual two flavours: `coreBound` names the witness,
+`metatheorem_core_of_majorants_at` is the statement about it, and `metatheorem_core_of_majorants`
+is the `∃`-valued original, now a one-liner over those two. -/
+
+/-- **The bound, named.** `Φ` is the pointwise max of the two majorants — that is the whole
+content of `metatheorem_core_of_majorants`'s witness, and naming it is what lets a bound be
+*computed* rather than merely shown to exist. Same `_at` convention as `bezem_prec_maj_at`
+and `MetricModel.dist_maj_at`. -/
+def coreBound {ι : Type} {X : ι → Type} {ρ : Ty ι}
+    (U_star V_star : Ty.interpret X (ρ →ₜ Ty.nat).hat) :
+    Ty.interpret X ρ.hat → Nat :=
+  fun x_star => Nat.max (U_star x_star) (V_star x_star)
+
+/-- `metatheorem_core_of_majorants` with the bound named instead of existentially bound. -/
+theorem metatheorem_core_of_majorants_at
+    {ι : Type} {X : ι → Type} {F : ι → Ty ι}
+    {si : SpaceInterp X F}
+    (mj : MajorizabilityRel si)
+    {ρ : Ty ι}
+    (B C : Ty.interpret X ρ → Nat → Prop)
+    (U V : Ty.interpret X ρ → Nat)
+    (U_star V_star : Ty.interpret X (ρ →ₜ Ty.nat).hat)
+    (hU : mj.maj (ρ →ₜ Ty.nat) U_star U)
+    (hV : mj.maj (ρ →ₜ Ty.nat) V_star V)
+    (hUV : ∀ x : Ty.interpret X ρ, B x (U x) → C x (V x)) :
+    ∀ (x : Ty.interpret X ρ) (x_star : Ty.interpret X ρ.hat),
+      mj.maj ρ x_star x →
+      (∀ u : Nat, u ≤ coreBound U_star V_star x_star → B x u) →
+      ∃ v : Nat, v ≤ coreBound U_star V_star x_star ∧ C x v := by
+  intro x x_star hx hB
+  have hV_le : V x ≤ V_star x_star := mj.maj_le (mj.maj_app hV hx)
+  have hU_le : U x ≤ U_star x_star := mj.maj_le (mj.maj_app hU hx)
+  have hBU : B x (U x) := hB (U x) (Nat.le_trans hU_le (Nat.le_max_left ..))
+  exact ⟨V x, Nat.le_trans hV_le (Nat.le_max_right ..), hUV x hBU⟩
+
 theorem metatheorem_core_of_majorants
     {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     {si : SpaceInterp X F}
@@ -618,13 +653,9 @@ theorem metatheorem_core_of_majorants
     ∀ (x : Ty.interpret X ρ) (x_star : Ty.interpret X ρ.hat),
       mj.maj ρ x_star x →
       (∀ u : Nat, u ≤ Φ x_star → B x u) →
-      ∃ v : Nat, v ≤ Φ x_star ∧ C x v := by
-  refine ⟨fun x_star => Nat.max (U_star x_star) (V_star x_star), ?_⟩
-  intro x x_star hx hB
-  have hV_le : V x ≤ V_star x_star := mj.maj_le (mj.maj_app hV hx)
-  have hU_le : U x ≤ U_star x_star := mj.maj_le (mj.maj_app hU hx)
-  have hBU : B x (U x) := hB (U x) (Nat.le_trans hU_le (Nat.le_max_left ..))
-  exact ⟨V x, Nat.le_trans hV_le (Nat.le_max_right ..), hUV x hBU⟩
+      ∃ v : Nat, v ≤ Φ x_star ∧ C x v :=
+  ⟨coreBound U_star V_star,
+   metatheorem_core_of_majorants_at mj B C U V U_star V_star hU hV hUV⟩
 
 /-- **The extraction half of the metatheorem**, on its own.
 
