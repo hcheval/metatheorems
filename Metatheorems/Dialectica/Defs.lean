@@ -830,6 +830,51 @@ def realizer_of_pu_at {ι : Type} {X : ι → Type} {F : ι → Ty ι} (si : Spa
       ⟨dialecticaDefaultWitness si _,
        fun c => (dialecticaMatrix_iff_interp_qf si _ hpu hvf env _ c).mpr htrue⟩
 
+/-- The converse of `realizer_of_pu_at`: for a purely universal ∨-free formula, a realizer
+gives back the formula's truth in the model.
+
+Needed by `EqXInterp.extract`, which has to turn a realizer of `s =_X t` back into a semantic
+statement about the distance.  The `∀` case reads the realizer componentwise — the witness of
+`.all ρ A` is a function and its counter a dependent pair, so `⟨r.val v, fun y => r.property
+⟨v, y⟩⟩` realizes `A` at `(v, env)`.  The quantifier-free cases just feed the default counter
+to `dialecticaMatrix_iff_interp_qf`, which reduces the matrix *for every* counter. -/
+def interp_of_realizer_pu {ι : Type} {X : ι → Type} {F : ι → Ty ι} (si : SpaceInterp X F) :
+    {Γ : Ctx ι} → (B : Formula F Γ) →
+      B.isPurelyUniversal = true → B.isVFree = true →
+      (env : Ctx.interpret X Γ) → dialecticaRealizerCtx si B env →
+      Formula.interpret si B env
+  | _, .all _ A, hpu, hvf, env, r => fun v =>
+      interp_of_realizer_pu si A hpu hvf (v, env)
+        ⟨r.val v, fun y => r.property ⟨v, y⟩⟩
+  | _, .and A B, hpu, hvf, env, r =>
+      have hpuA : A.isPurelyUniversal = true := by
+        simp only [Formula.isPurelyUniversal, Bool.and_eq_true] at hpu; exact hpu.1
+      have hpuB : B.isPurelyUniversal = true := by
+        simp only [Formula.isPurelyUniversal, Bool.and_eq_true] at hpu; exact hpu.2
+      have hvfA : A.isVFree = true := by
+        simp only [Formula.isVFree, Bool.and_eq_true] at hvf; exact hvf.1
+      have hvfB : B.isVFree = true := by
+        simp only [Formula.isVFree, Bool.and_eq_true] at hvf; exact hvf.2
+      ⟨interp_of_realizer_pu si A hpuA hvfA env
+          ⟨r.val.1, fun y => (r.property (y, dialecticaDefaultCounter si B)).1⟩,
+       interp_of_realizer_pu si B hpuB hvfB env
+          ⟨r.val.2, fun y => (r.property (dialecticaDefaultCounter si A, y)).2⟩⟩
+  | _, .bot, hpu, hvf, env, r =>
+      (dialecticaMatrix_iff_interp_qf si _ hpu hvf env _ _).mp
+        (r.property (dialecticaDefaultCounter si _))
+  | _, .eq0 _ _, hpu, hvf, env, r =>
+      (dialecticaMatrix_iff_interp_qf si _ hpu hvf env _ _).mp
+        (r.property (dialecticaDefaultCounter si _))
+  | _, .or _ _, hpu, hvf, env, r =>
+      (dialecticaMatrix_iff_interp_qf si _ hpu hvf env _ _).mp
+        (r.property (dialecticaDefaultCounter si _))
+  | _, .imp _ _, hpu, hvf, env, r =>
+      (dialecticaMatrix_iff_interp_qf si _ hpu hvf env _ _).mp
+        (r.property (dialecticaDefaultCounter si _))
+  | _, .ex _ _, hpu, hvf, env, r =>
+      (dialecticaMatrix_iff_interp_qf si _ hpu hvf env _ _).mp
+        (r.property (dialecticaDefaultCounter si _))
+
 -- ============================================================================
 -- EqX interface for the Dialectica proof (Def. of "purely universal" EqX)
 -- ============================================================================

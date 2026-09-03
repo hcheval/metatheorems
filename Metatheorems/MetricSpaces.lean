@@ -498,6 +498,64 @@ theorem MetricModel.eqAtType_base_holds (M : MetricModel) {Γ : Ctx MetricSpace.
     M.cauchyfyN_zero_R env]
   simpa using (by positivity : (0:ℚ) < 1 / 2 ^ n)
 
+/-- **The model fact behind `extract`**, and the one place separation is used.
+
+If `s =_X t` holds in the model then every rounding `(d(s,t))◦(n+1)` is within `2^{-n}` of
+zero, and `(·)◦` is within `2^{-(n+2)}` of the real it rounds (17.8), so `d(s,t)` is below
+every positive bound and hence `0`.  `M.d_eq_zero` — separation — then gives `s = t`.
+A pseudometric model would stop one step short here, which is exactly why the field exists. -/
+theorem MetricModel.eq_of_eqAtType_base (M : MetricModel) {Γ : Ctx MetricSpace.ι}
+    (s t : Term MetricSpace.F Γ (Ty.base ())) (env : Ctx.interpret (fun () => M.carrier) Γ)
+    (h : Formula.interpret M.si (eqAtType (Ty.base ()) s t) env) :
+    Term.interpret M.si s env = Term.interpret M.si t env := by
+  refine M.d_eq_zero _ _ ?_
+  set r := M.d (Term.interpret M.si s env) (Term.interpret M.si t env) with hr_def
+  have hr : 0 ≤ r := M.d_nonneg _ _
+  rw [show eqAtType (Ty.base ()) s t
+      = eq_R (Term.app2 (Term.dist ()) s t) Term.zero_R from rfl,
+    QBridge.interpret_eq_R] at h
+  -- Every rounding of `r` is within `2^{-n}` of `0`, as a rational.
+  have hq : ∀ n : ℕ, |((Rounding.qval (Rounding.roundR r (n + 1)) : ℚ) : ℝ)| < 1 / 2 ^ n := by
+    intro n
+    have hn := h n
+    rw [M.interp_dist s t env, ← hr_def, cauchyfyN_roundR r hr, M.cauchyfyN_zero_R env] at hn
+    have hQ : |Rounding.qval (Rounding.roundR r (n + 1))| < 1 / 2 ^ n := by simpa using hn
+    calc |((Rounding.qval (Rounding.roundR r (n + 1)) : ℚ) : ℝ)|
+        = ((|Rounding.qval (Rounding.roundR r (n + 1))| : ℚ) : ℝ) := (Rat.cast_abs _).symm
+      _ < ((1 / 2 ^ n : ℚ) : ℝ) := by exact_mod_cast hQ
+      _ = 1 / 2 ^ n := by push_cast; ring
+  -- `(·)◦` is within `2^{-(n+2)}` of the real it rounds, so `r` is below every positive bound.
+  refine le_antisymm ?_ hr
+  refine le_of_forall_pos_le_add ?_
+  intro ε hε
+  obtain ⟨n, hn⟩ := exists_pow_lt_of_lt_one (half_pos hε) (by norm_num : (1:ℝ)/2 < 1)
+  have hpow : (1:ℝ) / 2 ^ n < ε / 2 := by
+    rw [div_pow] at hn; simpa using hn
+  have hdist := Rounding.qval_roundR_dist_le r hr (n + 1)
+  have h1 : |((Rounding.qval (Rounding.roundR r (n + 1)) : ℚ) : ℝ)| < 1 / 2 ^ n := hq n
+  have h2 : (1:ℝ) / 2 ^ (n + 1 + 1) ≤ 1 / 2 ^ n := by
+    apply one_div_le_one_div_of_le (by positivity)
+    exact pow_le_pow_right₀ (by norm_num) (by omega)
+  have hsum : r ≤ 1 / 2 ^ n + 1 / 2 ^ n := by
+    have habs := abs_le.mp (le_of_lt h1)
+    have hd := abs_le.mp hdist
+    linarith [hd.1, hd.2, habs.1, habs.2, h2]
+  linarith
+
+/-- `extract`'s content, isolated from the structure instance so that its elaboration cost is
+paid once and its errors are legible. -/
+theorem MetricModel.eqAtType_base_extract (M : MetricModel) (i : MetricSpace.ι)
+    {Γ : Ctx MetricSpace.ι} (s t : Term MetricSpace.F Γ (Ty.base i))
+    (env : Ctx.interpret (fun () => M.carrier) Γ)
+    (r : dialecticaRealizerCtx M.si (eqAtType (Ty.base i) s t) env) :
+    Term.interpret M.si s env = Term.interpret M.si t env := by
+  -- Keep `i` a parameter rather than matching `()` in the field: matching there forces the
+  -- elaborator to reduce `dialecticaRealizerCtx` at the specialised index while unifying `r`,
+  -- which exhausts the heartbeat budget.  Here the reduction is paid once, in isolation.
+  cases i
+  exact M.eq_of_eqAtType_base s t env
+    (interp_of_realizer_pu M.si (eqAtType (Ty.base ()) s t) rfl rfl env r)
+
 /-- The `EqXInterp` a metric model induces. -/
 noncomputable def MetricModel.eqXInterp (M : MetricModel) :
     EqXInterp (fun () => M.carrier) MetricSpace.F M.si where
@@ -509,10 +567,8 @@ noncomputable def MetricModel.eqXInterp (M : MetricModel) :
   -- content is the model fact `eqAtType_base_holds`.
   realize := fun () {_Γ} s t env h =>
     realizer_of_pu_at M.si _ rfl rfl env (M.eqAtType_base_holds s t env h)
-  -- MISSING: the same bridge, read the other way, plus `M.d_eq_zero` (separation) to turn
-  -- `M.d x y = 0` into `x = y`. Separation is now available (`MetricModel.d_eq_zero`); the
-  -- bridge is not.
-  extract := sorry
+  -- The bridge read the other way, plus `M.d_eq_zero` (separation).
+  extract := fun i {_Γ} s t env r => M.eqAtType_base_extract i s t env r
   -- MISSING: as `realize` — the realizing term `λn.⋆` carries no information, so this field
   -- is exactly the model fact `realize` needs.
   realizeTerm := fun _ _ _ _ => Term.lam Term.unitI
