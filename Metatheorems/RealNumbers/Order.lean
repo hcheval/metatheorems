@@ -254,6 +254,83 @@ def zero_lt_one_R :
 
 -- ── Archimedean property ────────────────────────────────────────────────────
 
+/-- The body of `archimedean_R` at a fixed real `f = var vz`.
+
+The witness is `S (S (f 0))`: its ℚ-value is `(⟨f 0⟩ +ℚ 1) +ℚ 1` (`encode_succ` twice), and
+`cauchyfy_mag_le` bounds every cauchyfied value of `f` by `⟨f 0⟩ +ℚ 1`, so the gap is at
+least `1 =ℚ 2^{-0}` and the inner witness is `0`. Both `∃`-introductions are Lean-level
+`Derivable.exist_ax` steps with `subst0` normal-form lemmas, in the style of
+`zero_lt_one_R`. -/
+private def archimedean_body :
+    Derivable F al Premises (Γ := realTy ι :: Γ)
+      (Formula.ex Ty.nat
+        (lt_R (Term.var (.vs .vz)) (.app Term.embed_nat_R (.var .vz)))) :=
+  let fv : Term F (realTy ι :: Γ) (realTy ι) := .var .vz
+  let t : Term F (realTy ι :: Γ) Ty.nat := .app .succ (.app .succ (.app fv .zero))
+  let E1 : Term F (realTy ι :: Γ) Ty.nat :=
+    Term.app2 Term.add_Q (.app Term.encode_nat_Q (.app fv .zero)) Term.one_Q
+  let X : Term F (realTy ι :: Γ) Ty.nat := Term.app2 Term.add_Q E1 Term.one_Q
+  let f1 : Term F (realTy ι :: Γ) Ty.nat :=
+    Term.app2 Term.cauchyfy fv (.app .succ .zero)
+  let Ct : Term F (realTy ι :: Γ) Ty.nat :=
+    Term.app2 Term.cauchyfy (.app Term.embed_nat_R t) (.app .succ .zero)
+  -- f̂(1) ≤ ⟨f 0⟩ + 1
+  let h1 : Derivable F al Premises (le_Q f1 E1) :=
+    leQt (le_Q_self_abs f1) (cauchyfy_mag_le fv (.app .succ .zero))
+  -- ⟨t⟩ =ℚ (⟨f 0⟩ + 1) + 1
+  let hEt : Derivable F al Premises (eq_Q (.app Term.encode_nat_Q t) X) :=
+    eqQtrans (encode_succ (.app .succ (.app fv .zero)))
+      (addQl (encode_succ (.app fv .zero)) Term.one_Q)
+  -- 1 ≤ X − f̂(1)
+  let s0 : Derivable F al Premises
+      (le_Q Term.one_Q (Term.app2 Term.sub_Q X f1)) :=
+    Derivable.mp (sub_Q_mono_r X h1)
+      (le_Q_congr (Term.app2 Term.sub_Q X E1) (Term.app2 Term.sub_Q X f1)
+        Term.one_Q (Term.app2 Term.sub_Q X f1)
+        (add_Q_sub_cancel_l E1 Term.one_Q)
+        (eq_Q_refl_inst (Term.app2 Term.sub_Q X f1)))
+  -- 1 ≤ Ĉ(1) − f̂(1), where Ĉ = the embedded witness
+  let s2 : Derivable F al Premises
+      (le_Q Term.one_Q (Term.app2 Term.sub_Q Ct f1)) :=
+    Derivable.mp s0
+      (le_Q_congr Term.one_Q (Term.app2 Term.sub_Q X f1)
+        Term.one_Q (Term.app2 Term.sub_Q Ct f1)
+        (eq_Q_refl_inst Term.one_Q)
+        (sub_Q_congr
+          (eqQtrans (eqQsym hEt)
+            (eqQsym (eqQ_of_nat_eq' (cauchyfy_embed t (.app .succ .zero)))))
+          (eq_Q_refl_inst f1)))
+  -- 2^{-0} ≤ Ĉ(1) − f̂(1)
+  let s3 : Derivable F al Premises
+      (le_Q (.app Term.pow2neg_Q Term.zero) (Term.app2 Term.sub_Q Ct f1)) :=
+    Derivable.mp s2
+      (le_Q_congr Term.one_Q (Term.app2 Term.sub_Q Ct f1)
+        (.app Term.pow2neg_Q Term.zero) (Term.app2 Term.sub_Q Ct f1)
+        (eqQsym (eqQ_of_nat_eq' pow2neg_zero_eq_one))
+        (eq_Q_refl_inst (Term.app2 Term.sub_Q Ct f1)))
+  -- inner ∃-introduction at witness 0
+  have nf2 : (le_Q (.app Term.pow2neg_Q (.var .vz))
+      (Term.app2 Term.sub_Q
+        (Term.app2 Term.cauchyfy
+          ((.app Term.embed_nat_R t : Term F (realTy ι :: Γ) (realTy ι)).weaken)
+          (.app .succ (.var .vz)))
+        (Term.app2 Term.cauchyfy (fv.weaken) (.app .succ (.var .vz))))).subst0
+        Term.zero
+      = le_Q (.app Term.pow2neg_Q Term.zero) (Term.app2 Term.sub_Q Ct f1) := by
+    simp only [le_Q, Formula.subst0, Formula.substF, Term.subst, Term.subst0_map,
+      Term.app2, subst_subst0_map_weaken, cauchyfy_closed_subst, closed_subst]
+    rfl
+  let inner : Derivable F al Premises
+      (lt_R fv (.app Term.embed_nat_R t)) :=
+    Derivable.mp (nf2 ▸ s3) (Derivable.exist_ax Term.zero _)
+  have nf1 : (lt_R (Term.var (.vs .vz)) (.app Term.embed_nat_R (.var .vz))
+      : Formula F (Ty.nat :: realTy ι :: Γ)).subst0 t
+      = lt_R fv (.app Term.embed_nat_R t) := by
+    simp only [Formula.subst0, lt_R_substF, Term.subst, Term.subst0_map,
+      embed_nat_R_closed_subst]
+    rfl
+  Derivable.mp (nf1 ▸ inner) (Derivable.exist_ax t _)
+
 /-- ⊢ ∀f : ℝ. ∃n⁰. f <_ℝ embed_nat(n) -/
 def archimedean_R :
     Derivable F al Premises (Γ := Γ)
@@ -261,7 +338,7 @@ def archimedean_R :
         (Formula.ex Ty.nat
           (lt_R (Term.var (.vs .vz))
                 (.app Term.embed_nat_R (.var .vz))))) :=
-  sorry
+  univ_gen archimedean_body
 
 -- ── `<_ℝ` moves to a later index, and `lt_trans_R` ──────────────────────────
 --
