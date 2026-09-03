@@ -784,6 +784,52 @@ def realizer_of_pu {ι : Type} {X : ι → Type} {F : ι → Ty ι} (si : SpaceI
       ⟨dialecticaDefaultWitness si _,
        fun c => (dialecticaMatrix_iff_interp_qf si _ hpu hvf env _ c).mpr (htrue env)⟩
 
+/-- `realizer_of_pu` at a **single** environment.
+
+`realizer_of_pu` asks for `∀ env, Formula.interpret si B env`, but the consumers that matter —
+`EqXInterp.realize` and `realizeTerm_sound` — have the formula only at the one `env` they were
+handed. That is enough: the `∀` case only ever needs truth at *extensions* of the given
+environment, which `htrue v` supplies, and the quantifier-free cases use `env` alone. The two
+definitions are otherwise identical. -/
+def realizer_of_pu_at {ι : Type} {X : ι → Type} {F : ι → Ty ι} (si : SpaceInterp X F) :
+    {Γ : Ctx ι} → (B : Formula F Γ) →
+      B.isPurelyUniversal = true → B.isVFree = true →
+      (env : Ctx.interpret X Γ) → Formula.interpret si B env →
+      dialecticaRealizerCtx si B env
+  | _, .all _ A, hpu, hvf, env, htrue =>
+      have r : ∀ v, dialecticaRealizerCtx si A (v, env) := fun v =>
+        realizer_of_pu_at si A hpu hvf (v, env) (htrue v)
+      ⟨fun v => (r v).val, fun y => (r y.1).property y.2⟩
+  | _, .and A B, hpu, hvf, env, htrue =>
+      have hpuA : A.isPurelyUniversal = true := by
+        simp only [Formula.isPurelyUniversal, Bool.and_eq_true] at hpu; exact hpu.1
+      have hpuB : B.isPurelyUniversal = true := by
+        simp only [Formula.isPurelyUniversal, Bool.and_eq_true] at hpu; exact hpu.2
+      have hvfA : A.isVFree = true := by
+        simp only [Formula.isVFree, Bool.and_eq_true] at hvf; exact hvf.1
+      have hvfB : B.isVFree = true := by
+        simp only [Formula.isVFree, Bool.and_eq_true] at hvf; exact hvf.2
+      have rA : dialecticaRealizerCtx si A env :=
+        realizer_of_pu_at si A hpuA hvfA env htrue.1
+      have rB : dialecticaRealizerCtx si B env :=
+        realizer_of_pu_at si B hpuB hvfB env htrue.2
+      ⟨(rA.val, rB.val), fun y => ⟨rA.property y.1, rB.property y.2⟩⟩
+  | _, .bot, hpu, hvf, env, htrue =>
+      ⟨dialecticaDefaultWitness si _,
+       fun c => (dialecticaMatrix_iff_interp_qf si _ hpu hvf env _ c).mpr htrue⟩
+  | _, .eq0 _ _, hpu, hvf, env, htrue =>
+      ⟨dialecticaDefaultWitness si _,
+       fun c => (dialecticaMatrix_iff_interp_qf si _ hpu hvf env _ c).mpr htrue⟩
+  | _, .or _ _, hpu, hvf, env, htrue =>
+      ⟨dialecticaDefaultWitness si _,
+       fun c => (dialecticaMatrix_iff_interp_qf si _ hpu hvf env _ c).mpr htrue⟩
+  | _, .imp _ _, hpu, hvf, env, htrue =>
+      ⟨dialecticaDefaultWitness si _,
+       fun c => (dialecticaMatrix_iff_interp_qf si _ hpu hvf env _ c).mpr htrue⟩
+  | _, .ex _ _, hpu, hvf, env, htrue =>
+      ⟨dialecticaDefaultWitness si _,
+       fun c => (dialecticaMatrix_iff_interp_qf si _ hpu hvf env _ c).mpr htrue⟩
+
 -- ============================================================================
 -- EqX interface for the Dialectica proof (Def. of "purely universal" EqX)
 -- ============================================================================

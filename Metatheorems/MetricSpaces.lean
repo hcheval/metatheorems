@@ -7,6 +7,7 @@ import Metatheorems.Semantics
 import Metatheorems.Derivable
 import Metatheorems.RealNumbers
 import Metatheorems.Rounding
+import Metatheorems.QValBridge
 import Metatheorems.Majorizability
 import Metatheorems.SyntacticMetatheorem
 
@@ -435,20 +436,79 @@ is no soundness theorem in the project, and this is why writing one would not be
 No `EqXInterp` field is weakened; the five stalled ones carry a `sorry`. See the report and
 `ARCHITECTURE.md` §3. -/
 
-/-- The `EqXInterp` a metric model induces.
+-- ============================================================================
+-- Evaluating the two sides of `eqAtType` at a base type
+-- ============================================================================
 
-Four fields are proved outright; five are `sorry`, all on the same missing evaluation bridge
-from object-level ℚ terms to `Rounding.qval`. See the note above for the precise statement of
-what is missing and for what each field costs once it exists. -/
+/-- `(0)◦` denotes the rational `0` at every precision. -/
+theorem qval_roundR_zero (n : ℕ) : Rounding.qval (Rounding.roundR 0 n) = 0 := by
+  rw [Rounding.qval_roundR]
+  simp [Rounding.k0]
+
+/-- `d_X` is interpreted by `(d(x,y))◦`.  Unfolding the three wrappers by hand, once. -/
+theorem MetricModel.interp_dist (M : MetricModel) {Γ : Ctx MetricSpace.ι}
+    (s t : Term MetricSpace.F Γ (Ty.base ())) (env : Ctx.interpret (fun () => M.carrier) Γ) :
+    Term.interpret M.si (Term.app2 (Term.dist ()) s t) env
+      = Rounding.roundR (M.d (Term.interpret M.si s env) (Term.interpret M.si t env)) := by
+  simp only [Term.app2, Term.interpret, MetricModel.si, MetricSpaceInterp.toSpaceInterp,
+    MetricModel.toMetricSpaceInterp]
+
+/-- `0ℝ` is the constant zero sequence, at the `qval` level. -/
+theorem MetricModel.qval_interp_zero_R (M : MetricModel) {Γ : Ctx MetricSpace.ι}
+    (env : Ctx.interpret (fun () => M.carrier) Γ) (k : ℕ) :
+    Rounding.qval (Term.interpret M.si (Term.zero_R (F := MetricSpace.F) (Γ := Γ)) env k) = 0 := by
+  -- Take the `lam` step with `Term.interpret`'s own equations and stop there: `zero_Q` is a
+  -- `def`, so `simp only` cannot descend into its `pair` spine.  A `rfl` here instead would
+  -- force that descent and blow the heartbeat budget.
+  have hstep : Term.interpret M.si (Term.zero_R (F := MetricSpace.F) (Γ := Γ)) env
+      = fun v => Term.interpret M.si (Term.zero_Q (F := MetricSpace.F) (Γ := Ty.nat :: Γ))
+          (v, env) := by
+    simp only [Term.zero_R, Term.interpret]
+  rw [hstep]
+  -- Name the implicits: leaving `si`/`Δ` to unification makes it search through
+  -- `Ty.interpret X Ty.nat` (only *reducibly* `ℕ`) and exhaust the heartbeat budget.
+  exact QBridge.qval_interpret_zero_Q (si := M.si) (Δ := Ty.nat :: Γ) (k, env)
+
+/-- `cauchyfy` fixes `0ℝ`: the constant sequence passes every check. -/
+theorem MetricModel.cauchyfyN_zero_R (M : MetricModel) {Γ : Ctx MetricSpace.ι}
+    (env : Ctx.interpret (fun () => M.carrier) Γ) (n : ℕ) :
+    Rounding.qval (QBridge.cauchyfyN
+      (Term.interpret M.si (Term.zero_R (F := MetricSpace.F) (Γ := Γ)) env) n) = 0 := by
+  rw [QBridge.cauchyfyN_id_of_cauchy _ (fun k => by
+    rw [M.qval_interp_zero_R env k, M.qval_interp_zero_R env (k + 1)]
+    simpa using (by positivity : (0:ℚ) < 1 / 2 ^ (k + 1)))]
+  exact M.qval_interp_zero_R env n
+
+/-- `cauchyfy` fixes a distance code: `(r)◦` is Cauchy at the sharp rate, by 17.8(1). -/
+theorem cauchyfyN_roundR (r : ℝ) (hr : 0 ≤ r) (n : ℕ) :
+    QBridge.cauchyfyN (Rounding.roundR r) n = Rounding.roundR r n :=
+  QBridge.cauchyfyN_id_of_cauchy _ (fun k => Rounding.roundR_cauchy r hr k) n
+
+/-- **The model fact behind `realize`**: if two base-type terms have the same interpretation,
+the object-level `s =_X t` holds in the model.  `M.d_self` collapses the distance to `0`, and
+both sides are then the constant zero rational sequence. -/
+theorem MetricModel.eqAtType_base_holds (M : MetricModel) {Γ : Ctx MetricSpace.ι}
+    (s t : Term MetricSpace.F Γ (Ty.base ())) (env : Ctx.interpret (fun () => M.carrier) Γ)
+    (h : Term.interpret M.si s env = Term.interpret M.si t env) :
+    Formula.interpret M.si (eqAtType (Ty.base ()) s t) env := by
+  show Formula.interpret M.si (eq_R (Term.app2 (Term.dist ()) s t) Term.zero_R) env
+  rw [QBridge.interpret_eq_R]
+  intro n
+  rw [M.interp_dist s t env, h, M.d_self, cauchyfyN_roundR 0 le_rfl, qval_roundR_zero,
+    M.cauchyfyN_zero_R env]
+  simpa using (by positivity : (0:ℚ) < 1 / 2 ^ n)
+
+/-- The `EqXInterp` a metric model induces. -/
 noncomputable def MetricModel.eqXInterp (M : MetricModel) :
     EqXInterp (fun () => M.carrier) MetricSpace.F M.si where
   -- `wTy (eq_R _ _) = nat →ₜ unit`, so the witness type is `ℕ → Unit`.
   witnessSubsingleton := fun _ _ _ _ => ⟨fun _ _ => funext fun _ => rfl⟩
   witnessDefault := fun i _ s t => dialecticaDefaultWitness M.si (eqAtType (Ty.base i) s t)
   counterDefault := fun i _ s t => dialecticaDefaultCounter M.si (eqAtType (Ty.base i) s t)
-  -- MISSING: `interpret_lt_Q_dec` &c. Then: `M.d_self` gives `M.d x x = 0`, and
-  -- `Rounding.qval_roundR` turns `(0)◦` into the constant-zero rational sequence.
-  realize := sorry
+  -- `eq_R` is purely universal and ∨-free, so a realizer carries no information and the whole
+  -- content is the model fact `eqAtType_base_holds`.
+  realize := fun () {_Γ} s t env h =>
+    realizer_of_pu_at M.si _ rfl rfl env (M.eqAtType_base_holds s t env h)
   -- MISSING: the same bridge, read the other way, plus `M.d_eq_zero` (separation) to turn
   -- `M.d x y = 0` into `x = y`. Separation is now available (`MetricModel.d_eq_zero`); the
   -- bridge is not.
@@ -456,7 +516,17 @@ noncomputable def MetricModel.eqXInterp (M : MetricModel) :
   -- MISSING: as `realize` — the realizing term `λn.⋆` carries no information, so this field
   -- is exactly the model fact `realize` needs.
   realizeTerm := fun _ _ _ _ => Term.lam Term.unitI
-  realizeTerm_sound := sorry
+  -- The witness type is `ℕ → Unit`, a subsingleton, so the realizing *term* carries no
+  -- information either: its interpretation is forced to equal the semantic realizer's witness.
+  realizeTerm_sound := fun () {_Γ} s t env h y => by
+    have R := realizer_of_pu_at M.si (eqAtType (Ty.base ()) s t) rfl rfl env
+      (M.eqAtType_base_holds s t env h)
+    have hsub : Subsingleton
+        (dialecticaWitness (fun () => M.carrier) (eqAtType (Ty.base ()) s t)) :=
+      ⟨fun _ _ => funext fun _ => rfl⟩
+    have hw : Term.interpret M.si (Term.lam Term.unitI) env = R.val := hsub.elim _ _
+    rw [hw]
+    exact R.property y
   -- MISSING: `M.d_comm` makes the two sides interpret to the *same* `ℕ → ℕ`, so all that is
   -- owed is `|q −ℚ q| <ℚ 2^{-n}` in the model — the semantic counterpart of the proved
   -- object-level `lt_Q_abs_sub_self`. Needs the bridge.
