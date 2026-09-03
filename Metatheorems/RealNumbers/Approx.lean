@@ -52,13 +52,13 @@ private theorem app_weaken_vz_subst0' {ρ σ' : Ty ι} (t : Term F Γ (ρ →ₜ
   rw [weaken_subst0']
 
 /-- `S`-congruence at `=₀` (the ones elsewhere are private). -/
-private def succ_congrA {s t : Term F Γ Ty.nat}
+def succ_congrA {s t : Term F Γ Ty.nat}
     (h : Derivable F al Premises (Formula.eq0 s t)) :
     Derivable F al Premises (Formula.eq0 (.app .succ s) (.app .succ t)) :=
   qfer_no_premise_nat_nf h (r := .app .succ (.var .vz)) (by qb_nf) (by qb_nf)
 
 /-- `sub_Q` congruence in the second argument, at `=₀`. -/
-private def subQ_r_nat (c : Term F Γ Ty.nat) {s t : Term F Γ Ty.nat}
+def subQ_r_nat (c : Term F Γ Ty.nat) {s t : Term F Γ Ty.nat}
     (h : Derivable F al Premises (Formula.eq0 s t)) :
     Derivable F al Premises
       (Formula.eq0 (Term.app2 Term.sub_Q c s) (Term.app2 Term.sub_Q c t)) :=
