@@ -574,6 +574,426 @@ theorem le_R_pu_interp_congr (si : SpaceInterp X F) {Γ : Ctx ι}
   simp only [le_R_pu, Formula.interpret, Term.app2, Term.interpret, hfw, hgw]
 
 -- ============================================================================
+-- Section 11: S2 — the `qval` semantics of `add_Q`, `sub_Q`, `lt_Q_dec`
+--
+-- Method unchanged: one constant per unfold, S1 lemmas for the rest. The new
+-- ingredient is the round trip through `ratEncodeN`, which is where the
+-- encoding's non-injectivity (the sign bit is ignored at numerator `0`) is
+-- paid, once, in `qval_ratEncodeN`.
+-- ============================================================================
+
+-- ---- Round trips through the encoder ----
+
+@[simp] theorem sndN_ratEncodeN (s p d : ℕ) : sndN (ratEncodeN s p d) = d := by
+  simp only [ratEncodeN, sndN_pairN]
+
+@[simp] theorem ratDenN_ratEncodeN (s p d : ℕ) : ratDenN (ratEncodeN s p d) = d + 1 := by
+  simp only [ratDenN, ratEncodeN, sndN_pairN]
+
+/-- The numerator round-trips unconditionally — including at `p = 0`, where the truncated
+`2·0 − 1 = 0` happens to decode to `0` again. -/
+@[simp] theorem ratNumN_ratEncodeN (s p d : ℕ) : ratNumN (ratEncodeN s p d) = p := by
+  simp only [ratNumN, ratEncodeN, fstN_pairN, isEvenN]
+  omega
+
+/-- The sign round-trips only away from `0` (and only mod 2): `rat_encode` ignores the sign
+bit when the numerator is `0`, which is exactly what makes the encoding non-injective. -/
+theorem ratSignN_ratEncodeN (s p d : ℕ) (hp : 0 < p) :
+    ratSignN (ratEncodeN s p d) = s % 2 := by
+  simp only [ratSignN, ratEncodeN, fstN_pairN, isEvenN]
+  omega
+
+/-- The degenerate case: an encoded `0` is always non-negative, whatever sign was requested. -/
+theorem ratSignN_ratEncodeN_zero (s d : ℕ) : ratSignN (ratEncodeN s 0 d) = 1 := by
+  simp only [ratSignN, ratEncodeN, fstN_pairN, isEvenN]
+  omega
+
+/-- What the encoder denotes. Unconditional: at `p = 0` both sides are `0`, so the
+degenerate sign does not surface at the `qval` level. -/
+theorem qval_ratEncodeN (s p d : ℕ) :
+    qval (ratEncodeN s p d)
+      = (if s % 2 = 1 then (p : ℚ) else -(p : ℚ)) / ((d : ℚ) + 1) := by
+  rcases Nat.eq_zero_or_pos p with hp | hp
+  · subst hp
+    have h0 : 2 * 0 - isEvenN s = 2 * 0 := by simp only [isEvenN]; omega
+    simp only [ratEncodeN]
+    rw [h0, qval_pairN_even]
+    split_ifs <;> norm_num
+  · rcases Nat.mod_two_eq_zero_or_one s with hs | hs
+    · -- sign bit even: the first component is odd, the value negative
+      obtain ⟨k, hk⟩ : ∃ k, p = k + 1 := ⟨p - 1, by omega⟩
+      have h0 : 2 * p - isEvenN s = 2 * k + 1 := by simp only [isEvenN]; omega
+      simp only [ratEncodeN]
+      rw [h0, qval_pairN_odd, if_neg (by omega), hk]
+      push_cast
+      ring
+    · have h0 : 2 * p - isEvenN s = 2 * p := by simp only [isEvenN]; omega
+      simp only [ratEncodeN]
+      rw [h0, qval_pairN_even, if_pos hs]
+
+-- ---- Small facts about the accessors ----
+
+theorem ratDenN_pos (k : ℕ) : 0 < ratDenN k := Nat.succ_pos _
+
+theorem ratSignN_cases (k : ℕ) : ratSignN k = 0 ∨ ratSignN k = 1 := by
+  simp only [ratSignN, isEvenN]; omega
+
+private theorem qval_of_sign_one {k : ℕ} (h : ratSignN k = 1) :
+    qval k = (ratNumN k : ℚ) / (ratDenN k : ℚ) := by
+  rw [qval_eq_of_parts, if_pos h]
+
+private theorem qval_of_sign_zero {k : ℕ} (h : ratSignN k = 0) :
+    qval k = -(ratNumN k : ℚ) / (ratDenN k : ℚ) := by
+  rw [qval_eq_of_parts, if_neg (by omega)]
+
+/-- Positivity of the denoted rational, through the parts. This is what turns the
+object-level decision `lt_Q_dec` into a statement about `<` on `ℚ`. -/
+theorem qval_pos_iff (k : ℕ) : 0 < qval k ↔ ratSignN k = 1 ∧ 0 < ratNumN k := by
+  have hden : (0:ℚ) < (ratDenN k : ℚ) := by exact_mod_cast ratDenN_pos k
+  rcases ratSignN_cases k with h | h
+  · rw [qval_of_sign_zero h]
+    constructor
+    · intro hpos
+      rw [neg_div, lt_neg] at hpos
+      have h1 : (0:ℚ) ≤ (ratNumN k : ℚ) / (ratDenN k : ℚ) :=
+        div_nonneg (Nat.cast_nonneg _) (le_of_lt hden)
+      exfalso; linarith
+    · rintro ⟨h1, -⟩
+      omega
+  · rw [qval_of_sign_one h]
+    constructor
+    · intro hpos
+      refine ⟨h, ?_⟩
+      by_contra h0
+      have hz : ratNumN k = 0 := by omega
+      rw [hz] at hpos
+      norm_num at hpos
+    · rintro ⟨-, hp⟩
+      exact div_pos (by exact_mod_cast hp) hden
+
+-- ---- The mirror of `Term.add_Q` and its four-branch semantics ----
+
+/-- Mirror of `Term.add_Q`, transcribed clause for clause (`a = p₁·d₂`, `b = p₂·d₁`,
+`same = sg_bar |s₁ − s₂|`, `num = ite(same, a+b, |a−b|)`,
+`sign = ite(same, s₁, ite(geq(a,b), s₁, s₂))`, `den−1 = d₁·d₂ − 1`). Kept in the exact
+shape the interpretation residual takes, so `interpret_add_Q_fun` closes by `rfl`. -/
+def addQN (m n : ℕ) : ℕ :=
+  ratEncodeN
+    (iteN (sgBarN ((ratSignN m - ratSignN n) + (ratSignN n - ratSignN m)))
+      (ratSignN m)
+      (iteN (geqN (ratNumN m * ratDenN n) (ratNumN n * ratDenN m))
+        (ratSignN m) (ratSignN n)))
+    (iteN (sgBarN ((ratSignN m - ratSignN n) + (ratSignN n - ratSignN m)))
+      (ratNumN m * ratDenN n + ratNumN n * ratDenN m)
+      ((ratNumN m * ratDenN n - ratNumN n * ratDenN m)
+        + (ratNumN n * ratDenN m - ratNumN m * ratDenN n)))
+    (ratDenN m * ratDenN n - 1)
+
+theorem interpret_add_Q_fun {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpret X Δ) :
+    Term.interpret si (Term.add_Q (F := F) (Γ := Δ)) env = addQN := by
+  funext m n
+  simp only [Term.add_Q, Term.app2, Term.app3, Term.interpret,
+    interpret_rat_sign_fun, interpret_rat_num_fun, interpret_rat_den_fun,
+    interpret_mul_fun, interpret_add_fun, interpret_sg_bar_fun,
+    interpret_abs_diff_fun, interpret_ite_nat_fun, interpret_geq_fun,
+    interpret_rat_encode_fun, interpret_pd_fun']
+  rfl
+
+-- The four shapes `addQN` collapses to, one per (sign agreement, magnitude order) branch.
+
+private theorem addQN_same_sign {m n : ℕ} (h : ratSignN m = ratSignN n) :
+    addQN m n = ratEncodeN (ratSignN m)
+      (ratNumN m * ratDenN n + ratNumN n * ratDenN m) (ratDenN m * ratDenN n - 1) := by
+  have h1 : sgBarN ((ratSignN m - ratSignN n) + (ratSignN n - ratSignN m)) = 1 := by
+    simp only [sgBarN]; omega
+  simp only [addQN, h1, iteN]
+  norm_num
+
+private theorem addQN_pos_neg_ge {m n : ℕ} (h₁ : ratSignN m = 1) (h₂ : ratSignN n = 0)
+    (hge : ratNumN n * ratDenN m ≤ ratNumN m * ratDenN n) :
+    addQN m n = ratEncodeN 1
+      (ratNumN m * ratDenN n - ratNumN n * ratDenN m) (ratDenN m * ratDenN n - 1) := by
+  have h1 : sgBarN ((ratSignN m - ratSignN n) + (ratSignN n - ratSignN m)) = 0 := by
+    simp only [sgBarN]; omega
+  have h2 : geqN (ratNumN m * ratDenN n) (ratNumN n * ratDenN m) = 1 := by
+    simp only [geqN]; omega
+  have h3 : (ratNumN m * ratDenN n - ratNumN n * ratDenN m)
+      + (ratNumN n * ratDenN m - ratNumN m * ratDenN n)
+      = ratNumN m * ratDenN n - ratNumN n * ratDenN m := by omega
+  simp only [addQN, h1, h2, h3, iteN]
+  norm_num [h₁]
+
+private theorem addQN_pos_neg_lt {m n : ℕ} (h₁ : ratSignN m = 1) (h₂ : ratSignN n = 0)
+    (hlt : ratNumN m * ratDenN n < ratNumN n * ratDenN m) :
+    addQN m n = ratEncodeN 0
+      (ratNumN n * ratDenN m - ratNumN m * ratDenN n) (ratDenN m * ratDenN n - 1) := by
+  have h1 : sgBarN ((ratSignN m - ratSignN n) + (ratSignN n - ratSignN m)) = 0 := by
+    simp only [sgBarN]; omega
+  have h2 : geqN (ratNumN m * ratDenN n) (ratNumN n * ratDenN m) = 0 := by
+    simp only [geqN]; omega
+  have h3 : (ratNumN m * ratDenN n - ratNumN n * ratDenN m)
+      + (ratNumN n * ratDenN m - ratNumN m * ratDenN n)
+      = ratNumN n * ratDenN m - ratNumN m * ratDenN n := by omega
+  simp only [addQN, h1, h2, h3, iteN]
+  norm_num [h₂]
+
+private theorem addQN_neg_pos_ge {m n : ℕ} (h₁ : ratSignN m = 0) (h₂ : ratSignN n = 1)
+    (hge : ratNumN n * ratDenN m ≤ ratNumN m * ratDenN n) :
+    addQN m n = ratEncodeN 0
+      (ratNumN m * ratDenN n - ratNumN n * ratDenN m) (ratDenN m * ratDenN n - 1) := by
+  have h1 : sgBarN ((ratSignN m - ratSignN n) + (ratSignN n - ratSignN m)) = 0 := by
+    simp only [sgBarN]; omega
+  have h2 : geqN (ratNumN m * ratDenN n) (ratNumN n * ratDenN m) = 1 := by
+    simp only [geqN]; omega
+  have h3 : (ratNumN m * ratDenN n - ratNumN n * ratDenN m)
+      + (ratNumN n * ratDenN m - ratNumN m * ratDenN n)
+      = ratNumN m * ratDenN n - ratNumN n * ratDenN m := by omega
+  simp only [addQN, h1, h2, h3, iteN]
+  norm_num [h₁]
+
+private theorem addQN_neg_pos_lt {m n : ℕ} (h₁ : ratSignN m = 0) (h₂ : ratSignN n = 1)
+    (hlt : ratNumN m * ratDenN n < ratNumN n * ratDenN m) :
+    addQN m n = ratEncodeN 1
+      (ratNumN n * ratDenN m - ratNumN m * ratDenN n) (ratDenN m * ratDenN n - 1) := by
+  have h1 : sgBarN ((ratSignN m - ratSignN n) + (ratSignN n - ratSignN m)) = 0 := by
+    simp only [sgBarN]; omega
+  have h2 : geqN (ratNumN m * ratDenN n) (ratNumN n * ratDenN m) = 0 := by
+    simp only [geqN]; omega
+  have h3 : (ratNumN m * ratDenN n - ratNumN n * ratDenN m)
+      + (ratNumN n * ratDenN m - ratNumN m * ratDenN n)
+      = ratNumN n * ratDenN m - ratNumN m * ratDenN n := by omega
+  simp only [addQN, h1, h2, h3, iteN]
+  norm_num [h₂]
+
+/-- **The S2 lemma**: `Term.add_Q` really denotes `+` on the rationals. -/
+theorem qval_addQN (m n : ℕ) : qval (addQN m n) = qval m + qval n := by
+  have hd₁ : 0 < ratDenN m := ratDenN_pos m
+  have hd₂ : 0 < ratDenN n := ratDenN_pos n
+  have hq₁ : (ratDenN m : ℚ) ≠ 0 := Nat.cast_ne_zero.mpr (by omega)
+  have hq₂ : (ratDenN n : ℚ) ≠ 0 := Nat.cast_ne_zero.mpr (by omega)
+  have hdd : 1 ≤ ratDenN m * ratDenN n := Nat.one_le_iff_ne_zero.mpr (by positivity)
+  have hden : ((ratDenN m * ratDenN n - 1 : ℕ) : ℚ) + 1
+      = (ratDenN m : ℚ) * (ratDenN n : ℚ) := by
+    push_cast [Nat.cast_sub hdd]
+    ring
+  rcases ratSignN_cases m with h₁ | h₁ <;> rcases ratSignN_cases n with h₂ | h₂
+  · -- both negative
+    rw [addQN_same_sign (h₁.trans h₂.symm), h₁, qval_ratEncodeN, hden,
+      qval_of_sign_zero h₁, qval_of_sign_zero h₂, if_neg (by norm_num)]
+    push_cast
+    field_simp
+    ring
+  · -- m negative, n positive
+    rcases Nat.lt_or_ge (ratNumN m * ratDenN n) (ratNumN n * ratDenN m) with hlt | hge
+    · rw [addQN_neg_pos_lt h₁ h₂ hlt, qval_ratEncodeN, hden, Nat.cast_sub (le_of_lt hlt),
+        qval_of_sign_zero h₁, qval_of_sign_one h₂, if_pos (by norm_num)]
+      push_cast
+      field_simp
+      ring
+    · rw [addQN_neg_pos_ge h₁ h₂ hge, qval_ratEncodeN, hden, Nat.cast_sub hge,
+        qval_of_sign_zero h₁, qval_of_sign_one h₂, if_neg (by norm_num)]
+      push_cast
+      field_simp
+      ring
+  · -- m positive, n negative
+    rcases Nat.lt_or_ge (ratNumN m * ratDenN n) (ratNumN n * ratDenN m) with hlt | hge
+    · rw [addQN_pos_neg_lt h₁ h₂ hlt, qval_ratEncodeN, hden, Nat.cast_sub (le_of_lt hlt),
+        qval_of_sign_one h₁, qval_of_sign_zero h₂, if_neg (by norm_num)]
+      push_cast
+      field_simp
+      ring
+    · rw [addQN_pos_neg_ge h₁ h₂ hge, qval_ratEncodeN, hden, Nat.cast_sub hge,
+        qval_of_sign_one h₁, qval_of_sign_zero h₂, if_pos (by norm_num)]
+      push_cast
+      field_simp
+      ring
+  · -- both positive
+    rw [addQN_same_sign (h₁.trans h₂.symm), h₁, qval_ratEncodeN, hden,
+      qval_of_sign_one h₁, qval_of_sign_one h₂, if_pos (by norm_num)]
+    push_cast
+    field_simp
+
+theorem qval_interpret_add_Q {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpret X Δ)
+    (a b : ℕ) :
+    qval (Term.interpret si (Term.add_Q (F := F) (Γ := Δ)) env a b) = qval a + qval b := by
+  rw [interpret_add_Q_fun]
+  exact qval_addQN a b
+
+-- ---- `sub_Q`, by assembly ----
+
+/-- Mirror of `Term.neg_Q` (the RHS of `interpret_neg_Q_fun`, named). -/
+def negQN (k : ℕ) : ℕ := ratEncodeN (1 - ratSignN k) (ratNumN k) (sndN k)
+
+theorem interpret_neg_Q_fun' {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpret X Δ) :
+    Term.interpret si (Term.neg_Q (F := F) (Γ := Δ)) env = negQN := by
+  rw [interpret_neg_Q_fun]
+  rfl
+
+theorem qval_negQN (k : ℕ) : qval (negQN k) = - qval k := by
+  have hden : ((sndN k : ℚ) + 1) = (ratDenN k : ℚ) := by
+    simp only [ratDenN]; push_cast; ring
+  simp only [negQN]
+  rw [qval_ratEncodeN, hden]
+  rcases ratSignN_cases k with h | h
+  · rw [h, qval_of_sign_zero h, if_pos (by norm_num)]
+    ring
+  · rw [h, qval_of_sign_one h, if_neg (by norm_num)]
+    ring
+
+/-- Mirror of `Term.sub_Q`. -/
+def subQN (m n : ℕ) : ℕ := addQN m (negQN n)
+
+theorem interpret_sub_Q_fun {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpret X Δ) :
+    Term.interpret si (Term.sub_Q (F := F) (Γ := Δ)) env = subQN := by
+  funext m n
+  simp only [Term.sub_Q, Term.app2, Term.interpret,
+    interpret_add_Q_fun, interpret_neg_Q_fun]
+  rfl
+
+theorem qval_subQN (m n : ℕ) : qval (subQN m n) = qval m - qval n := by
+  simp only [subQN]
+  rw [qval_addQN, qval_negQN]
+  ring
+
+theorem qval_interpret_sub_Q {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpret X Δ)
+    (a b : ℕ) :
+    qval (Term.interpret si (Term.sub_Q (F := F) (Γ := Δ)) env a b) = qval a - qval b := by
+  rw [interpret_sub_Q_fun]
+  exact qval_subQN a b
+
+-- ---- `lt_Q_dec`, the payoff ----
+
+/-- Mirror of `Term.lt_Q_dec`: `|sign(d) − 1| + sg_bar(num(d))` with `d = sub_Q n m`. -/
+def ltQdecN (m n : ℕ) : ℕ :=
+  ((ratSignN (subQN n m) - 1) + (1 - ratSignN (subQN n m)))
+    + (1 - ratNumN (subQN n m))
+
+theorem interpret_lt_Q_dec_fun {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpret X Δ) :
+    Term.interpret si (Term.lt_Q_dec (F := F) (Γ := Δ)) env = ltQdecN := by
+  funext m n
+  simp only [Term.lt_Q_dec, Term.app2, Term.interpret,
+    interpret_add_fun, interpret_abs_diff_fun, interpret_sg_bar_fun,
+    interpret_rat_sign_fun, interpret_rat_num_fun, interpret_sub_Q_fun]
+  rfl
+
+theorem ltQdecN_eq_zero_iff (m n : ℕ) : ltQdecN m n = 0 ↔ qval m < qval n := by
+  have hkey : ltQdecN m n = 0
+      ↔ (ratSignN (subQN n m) = 1 ∧ 0 < ratNumN (subQN n m)) := by
+    simp only [ltQdecN]; omega
+  rw [hkey, ← qval_pos_iff, qval_subQN]
+  constructor <;> intro h <;> linarith
+
+/-- **The S2 payoff**: the object-level decision term `lt_Q_dec` decides `<` on `ℚ` —
+its value is `0` exactly when the first code denotes a rational strictly below the
+second's. -/
+theorem interpret_lt_Q_dec_eq_zero_iff {si : SpaceInterp X F} {Δ : Ctx ι}
+    (env : Ctx.interpret X Δ) (m n : ℕ) :
+    Term.interpret si (Term.lt_Q_dec (F := F) (Γ := Δ)) env m n = 0 ↔ qval m < qval n := by
+  rw [interpret_lt_Q_dec_fun]
+  exact ltQdecN_eq_zero_iff m n
+
+-- ============================================================================
+-- Section 12: S3 — `cauchyfy` is the identity on sequences that pass the check
+--
+-- The sidestep: no analysis of the state recursion in general, only the
+-- invariant "state = pair(g n, 0)" under the hypothesis that every check
+-- passes — the semantic copy of the object-side `cauchyState_id_of_cauchy` /
+-- `cauchyfy_id` (`RealNumbers/Cauchyfy.lean`). The hypothesis is stated as
+-- `|qval (g k) − qval (g (k+1))| < 2^{-(k+1)}`, which is exactly the sharp form
+-- `Rounding.roundR_cauchy` provides for `roundR (M.d x y)`.
+-- ============================================================================
+
+/-- Mirror of `Term.abs_Q` (the RHS of `interpret_abs_Q_fun`, named). -/
+def absQN (k : ℕ) : ℕ := pairN (2 * ratNumN k) (sndN k)
+
+/-- Mirror of `Term.pow2neg_Q`. -/
+def pow2negQN (n : ℕ) : ℕ := pairN 2 (2 ^ n - 1)
+
+theorem qval_absQN (k : ℕ) : qval (absQN k) = |qval k| := by
+  simp only [absQN]
+  rw [qval_pairN_even, qval_eq_of_parts]
+  have hden : (0 : ℚ) < (ratDenN k : ℚ) := by exact_mod_cast ratDenN_pos k
+  rw [abs_div, abs_of_pos hden]
+  congr 1
+  · split <;> simp
+  · simp only [ratDenN]; push_cast; ring
+
+theorem qval_pow2negQN (n : ℕ) : qval (pow2negQN n) = 1 / 2 ^ n := qval_pow2neg_code n
+
+/-- Mirror of the Cauchy check `Term.cauchy_check_at` at index `k` of the sequence `g`:
+`0` exactly when `|g(k) −ℚ g(k+1)| <ℚ 2^{-(k+1)}`. -/
+def checkN (g : ℕ → ℕ) (k : ℕ) : ℕ :=
+  ltQdecN (absQN (subQN (g k) (g (k + 1)))) (pow2negQN (k + 1))
+
+theorem checkN_eq_zero_iff (g : ℕ → ℕ) (k : ℕ) :
+    checkN g k = 0 ↔ |qval (g k) - qval (g (k + 1))| < 1 / 2 ^ (k + 1) := by
+  simp only [checkN]
+  rw [ltQdecN_eq_zero_iff, qval_absQN, qval_subQN, qval_pow2negQN]
+
+/-- The step of the `cauchyfy` state recursion, in the mirror world: freeze on a raised
+flag, advance on a passing check, raise the flag on the first failure. -/
+def cstep (g : ℕ → ℕ) (k ih : ℕ) : ℕ :=
+  iteN (sndN ih) ih
+    (iteN (sgBarN (checkN g k)) (pairN (g (k + 1)) 0) (pairN (fstN ih) 1))
+
+/-- Mirror of the `cauchyfy` state: `pair(current value, violation flag)`. -/
+def cauchyStateN (g : ℕ → ℕ) : ℕ → ℕ
+  | 0 => pairN (g 0) 0
+  | n + 1 => cstep g n (cauchyStateN g n)
+
+theorem cauchyStateN_succ (g : ℕ → ℕ) (n : ℕ) :
+    cauchyStateN g (n + 1) = cstep g n (cauchyStateN g n) := rfl
+
+/-- Mirror of `Term.cauchyfy`. -/
+def cauchyfyN (g : ℕ → ℕ) (n : ℕ) : ℕ := fstN (cauchyStateN g n)
+
+private theorem rec_eq_cauchyStateN (g : ℕ → ℕ) :
+    ∀ n : ℕ, (Nat.rec (pairN (g 0) 0) (cstep g) n : ℕ) = cauchyStateN g n
+  | 0 => rfl
+  | m + 1 => by
+      change cstep g m (Nat.rec (pairN (g 0) 0) (cstep g) m : ℕ) = cauchyStateN g (m + 1)
+      rw [rec_eq_cauchyStateN g m, cauchyStateN_succ]
+
+theorem interpret_cauchyfy_fun {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpret X Δ) :
+    Term.interpret si (Term.cauchyfy (F := F) (Γ := Δ)) env = cauchyfyN := by
+  funext g n
+  simp only [Term.cauchyfy, Term.app2, Term.app3, Term.interpret,
+    interpret_fst_pair_fun, interpret_snd_pair_fun, interpret_pair_fun,
+    interpret_lt_Q_dec_fun, interpret_abs_Q_fun, interpret_sub_Q_fun,
+    interpret_pow2neg_Q_fun, interpret_sg_bar_fun, interpret_ite_nat_fun]
+  change fstN (Nat.rec (pairN (g 0) 0) (cstep g) n : ℕ) = cauchyfyN g n
+  rw [rec_eq_cauchyStateN]
+  rfl
+
+/-- The invariant: on a sequence whose every check passes, the flag never rises and the
+value tracks `g` on the nose. -/
+theorem cauchyStateN_id_of_cauchy (g : ℕ → ℕ)
+    (hg : ∀ k, |qval (g k) - qval (g (k + 1))| < 1 / 2 ^ (k + 1)) :
+    ∀ n : ℕ, cauchyStateN g n = pairN (g n) 0
+  | 0 => rfl
+  | n + 1 => by
+      have ih := cauchyStateN_id_of_cauchy g hg n
+      have hchk : checkN g n = 0 := (checkN_eq_zero_iff g n).mpr (hg n)
+      rw [cauchyStateN_succ, ih]
+      simp only [cstep, hchk, sndN_pairN, fstN_pairN, iteN, sgBarN]
+      norm_num
+
+theorem cauchyfyN_id_of_cauchy (g : ℕ → ℕ)
+    (hg : ∀ k, |qval (g k) - qval (g (k + 1))| < 1 / 2 ^ (k + 1)) (n : ℕ) :
+    cauchyfyN g n = g n := by
+  simp only [cauchyfyN]
+  rw [cauchyStateN_id_of_cauchy g hg n, fstN_pairN]
+
+/-- **The S3 sidestep**: on a sequence passing the Cauchy check at every index —
+in particular on `roundR (M.d x y)`, by `Rounding.roundR_cauchy` — `cauchyfy` is
+the identity. -/
+theorem interpret_cauchyfy_id {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpret X Δ)
+    (g : ℕ → ℕ) (hg : ∀ k, |qval (g k) - qval (g (k + 1))| < 1 / 2 ^ (k + 1)) (n : ℕ) :
+    Term.interpret si (Term.cauchyfy (F := F) (Γ := Δ)) env g n = g n := by
+  rw [interpret_cauchyfy_fun]
+  exact cauchyfyN_id_of_cauchy g hg n
+
+-- ============================================================================
 -- Axiom audit. `Classical.choice` is expected: `invTriagN` is a
 -- `Nat.findGreatest`, and `qval` lands in Mathlib's `ℚ`. What matters is the
 -- absence of `sorryAx`.
@@ -593,6 +1013,20 @@ theorem le_R_pu_interp_congr (si : SpaceInterp X F) {Γ : Ctx ι}
 #print axioms qval_eq_of_parts
 #print axioms qval_interpret_pow2neg_Q
 #print axioms qval_interpret_abs_Q
+#print axioms qval_ratEncodeN
+#print axioms ratNumN_ratEncodeN
+#print axioms ratSignN_ratEncodeN
+#print axioms interpret_add_Q_fun
+#print axioms qval_addQN
+#print axioms qval_interpret_add_Q
+#print axioms interpret_sub_Q_fun
+#print axioms qval_interpret_sub_Q
+#print axioms interpret_lt_Q_dec_fun
+#print axioms interpret_lt_Q_dec_eq_zero_iff
+#print axioms checkN_eq_zero_iff
+#print axioms interpret_cauchyfy_fun
+#print axioms cauchyfyN_id_of_cauchy
+#print axioms interpret_cauchyfy_id
 #print axioms eq_R_interp_congr
 #print axioms le_R_pu_interp_congr
 #print axioms Formula.interpret_substF
