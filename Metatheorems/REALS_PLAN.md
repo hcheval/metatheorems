@@ -5,6 +5,10 @@
 > **Revision 2026-09-02 — §0.02 and §0.03 are the newest state (the additive package and the
 > `<_ℝ` shift). §0.6 is SUPERSEDED (`AdmissibleEqX` no longer exists) and §0.5 item 3 was
 > superseded rather than built; both now say so in place.**
+>
+> **Revision 2026-09-03 — §0.2 is now the newest state: `add_comm_R` and `mul_comm_R` are
+> PROVED, and its own "blocked on `seq_induction`" verdict is retracted there with the reason.
+> §0.7's work order items 4 (and its framing of 1–3) are overtaken accordingly.**
 
 ## 0. What the 2026-09-01 session established
 
@@ -20,12 +24,15 @@ below was never checked.
 **Proved (4/19), `#print axioms` = `[propext, Quot.sound]` in-file:**
 `eq_R_refl`, `eq_R_sym`, `lt_irrefl_R`, `zero_lt_one_R`.
 
-> **Running total, 2026-09-02 (end of `reals-additive`): 10 proved.** The four above, plus
+> **Running total, 2026-09-03 (end of `reals-comm`): 12 proved.** The four above, plus
 > `eq_R_trans` and `add_eq_zero_R` (§0.05), `le_zero_eq_zero_R` (§0.05(c), in its *repaired*
-> form), and `add_zero_R` / `add_assoc_R` / `add_neg_R` (§0.02). Still open: `add_comm_R`,
-> `mul_comm_R`, `mul_assoc_R`, `mul_one_R`, `distrib_R`, `lt_trans_R`, `lt_add_R`,
-> `lt_mul_pos_R`, `archimedean_R`, plus `approx_R`, `cauchy_complete_R`, `abs_R_bound`.
-> `RealNumbers.lean` carries **12** sorried declarations.
+> form), `add_zero_R` / `add_assoc_R` / `add_neg_R` (§0.02), and **`add_comm_R` /
+> `mul_comm_R`** (§0.2). Still open: `mul_assoc_R`, `mul_one_R`, `distrib_R`, `lt_trans_R`,
+> `lt_add_R`, `lt_mul_pos_R`, `archimedean_R`, plus `approx_R`, `cauchy_complete_R`,
+> `abs_R_bound`. `RealNumbers.lean` carries **10** sorried declarations, verified by name
+> after a completed `lake build` (`mul_assoc_R`, `mul_one_R`, `distrib_R`, `lt_add_R`,
+> `lt_mul_pos_R`, `archimedean_R`, `lt_trans_R_core`, `approx_R`, `cauchy_complete_R`,
+> `abs_R_bound`).
 
 ### 0.02 The additive package, 2026-09-02 (branch `reals-additive`)
 
@@ -66,6 +73,12 @@ the two sequences are related by a **fixed ℚ-operation** rather than by an ass
 `cauchyState_neg` is 60 lines. Whether `add_comm_R` can be reached the same way — via a
 `cauchyState_congr` for a fixed operation rather than a hypothesis — was not tested, but the
 route is no longer obviously closed.
+
+**Tested 2026-09-03: it transfers, and more than that.** `cauchyState_congr` /
+`cauchyfy_congr` are proved in full generality — the pointwise `=ℚ` hypothesis is a *Lean-level
+schema*, so ordinary `pinduction` suffices even without a fixed operation — and
+`cauchyState_neg` is now the special case `v := neg_R u`. `mul_comm_R` is what spends them;
+`add_comm_R` turned out not to need them at all. See §0.2.
 
 **(c) `prw` at a goal containing `Term.add_R` bit exactly as predicted**, three times. All
 three proofs go through a `_gen` companion taking the composed real as an abstract Lean
@@ -204,25 +217,69 @@ wrapper hides its contents from the rewrite. `Term.cauchy_check_at f n`, or a `d
 inside have to be spelled out. This is why `RealNumbers.lean` has no `cVal`/`cFlag`
 abbreviations.
 
-### 0.2 §4's "Class A — the two sides are pointwise-identical" is **wrong**
+### 0.2 §4's "Class A — the two sides are pointwise-identical" is **wrong** — but the
+### commutativity axioms are **PROVED** (2026-09-03)
 
-`add_Q_comm` and `mul_Q_comm` are `eq_Q` statements, not `=₀` statements: the ℚ encoding does
-not commute on the nose (the sign field of `add_Q x y` is `ite(geq a b, s₁, s₂)` and of
-`add_Q y x` is `ite(geq b a, s₂, s₁)`, which differ when `a =₀ b`; they agree only because the
-numerator is then `0` and `rat_encode` ignores the sign there). So the two sides of
-`add_comm_R` are pointwise **`eq_Q`**, and §2b's technique — pointwise `=₀`, then QF-ER at
-`nat →ₜ nat` — does not apply to them.
+**Verdict, 2026-09-03: `add_comm_R` and `mul_comm_R` are both closed**, `[propext,
+Quot.sound]`, along with the general `cauchyfy_congr` this note called out of reach. Two
+things this section got right and one it got wrong; the wrong one was the blocker.
 
-`add_comm_R` and `mul_comm_R` therefore need **one of**:
+**Right, and still true.** `add_Q_comm` and `mul_Q_comm` are `eq_Q` statements, not `=₀`
+statements: the ℚ encoding does not commute on the nose (the sign field of `add_Q x y` is
+`ite(geq a b, s₁, s₂)` and of `add_Q y x` is `ite(geq b a, s₂, s₁)`, which differ when
+`a =₀ b`; they agree only because the numerator is then `0` and `rat_encode` ignores the sign
+there). So the two sides are pointwise `eq_Q`, and §2b's technique — pointwise `=₀`, then
+QF-ER at `nat →ₜ nat` — does not apply.
 
-- `add_Q_comm_nat : add_Q x y =₀ add_Q y x` at the *code* level (true; needs the `geq`
-  trichotomy and a "`rat_encode` ignores the sign when the numerator is 0" lemma — neither
-  exists), or
-- an `eq_Q`-level congruence for `cauchyfy`: pointwise `f k =ℚ g k` ⟹ `f̂ n =ℚ ĝ n`. This is
-  *now* within reach (§0.3 supplies the invariant), but is an induction carrying an
-  object-level hypothesis, so it needs `seq_induction` and the weakened-hypothesis plumbing.
+**Right.** `add_Q_comm_nat` at the code level was never built and is not needed.
 
-Only `eq_R_refl` and `eq_R_sym` were genuinely Class A, and both are done.
+**Wrong, twice over.**
+
+**(a) `add_comm_R` needs no `cauchyfy` congruence at all.** The section assumes the two
+sequences must be pushed through the outer `cauchyfy` that `eq_R` applies. They need not be:
+`add_R f g` is *provably Cauchy* (`add_R_check`, proved for `add_zero_R`), so `cauchyfy_add_R`
+**evaluates** that cauchyfication on both sides before they are ever compared. What is left is
+`|(A +ℚ B) −ℚ (B +ℚ A)| <ℚ 2^{-n}` at fixed rationals, which `add_Q_comm_inst` makes
+`eq_Q`-zero. `add_comm_R_gen` is fifteen lines and contains no estimate and no induction. The
+whole difficulty was located in the wrong place: it is not that ℚ fails to commute on the
+nose, it is whether the outer `cauchyfy` can be discharged, and for `+ℝ` it can.
+
+**(b) The general congruence does not need `seq_induction` either.** `cauchyfy_congr`
+(pointwise `f k =ℚ g k` ⟹ `f̂ n =ℚ ĝ n`) is proved by **plain `pinduction`**. The pointwise
+hypothesis is taken as a **Lean-level schema** — `∀ x : Term F (nat :: Γ) nat, Derivable …
+(eq_Q (u.weaken x) (v.weaken x))` — not as an object-level `∀`, so it is available at whatever
+index each case of the induction asks for and nothing is carried through the induction but the
+invariant. That is exactly what `cauchyfy_neg` did (§0.02(b)) and the route transfers verbatim;
+`cauchyState_neg` is now visibly the special case `v := neg_R u` in which the value halves
+agree on the nose.
+
+The invariant is a **conjunction**, and that is the one genuine generalisation over
+`cauchyfy_neg`:
+
+    eq_Q (fst (cauchyState u n)) (fst (cauchyState v n))
+      ∧ᶠ  snd (cauchyState u n) =₀ snd (cauchyState v n)
+
+— values up to `=ℚ`, **flags on the nose**, because `cauchyState_advance`/`_trip` branch on
+the flags. `check_sg_congr` (the generic `neg_check_sg`) keeps the flags in step and is the
+only step that is not bookkeeping; it is still `sg_bar_congr_iff` that does the work.
+
+**`mul_comm_R` is where the congruence is actually spent**, because there is no
+`mul_R_check` — supplying one is §1's majorization argument — so `cauchyfy` cannot be
+evaluated away on either side. The extra wrinkle over `+ℝ` is that `mul_R`'s index depends on
+its arguments (`b = f(0) +ℕ g(0) +ℕ 2`), so the swap permutes the summands inside `b`;
+`Arithmetic.add_comm` repairs that at ℕ, underneath `cauchyfy`, before `mul_Q_comm_inst` is
+spent (`mul_R_pointwise_comm`).
+
+**New and reusable**: `check_sg_congr`, `cauchyState_congr`, `cauchyfy_congr`,
+`eq_R_of_cauchyfy_eqQ` (pointwise `=ℚ` at every cauchyfied index ⟹ `=ℝ`, on abstract reals so
+no `prw` sees a composed real), `mul_R_apply`, `mul_R_weaken` / `mul_R_app_weaken`,
+`cauchyfy_idx_nat`, `mulQ_l_nat` / `mulQ_r_nat`, `eqQ_of_nat_eq`, `mul_R_pointwise_comm`.
+
+One mechanical note, paid for once: **`prwby` needs an equation**, so a conjunction goal must
+be `psplit` *before* the state equations are rewritten in, not after — the opposite order to
+`cauchyState_neg`, whose goal is a single equation.
+
+Only `eq_R_refl` and `eq_R_sym` were genuinely Class A; Class A as a class does not exist.
 
 ### 0.3 `cauchyfy` is open — the invariant and the Cauchy property are proved
 

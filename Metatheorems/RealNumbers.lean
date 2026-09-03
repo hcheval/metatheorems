@@ -761,13 +761,8 @@ variable {Γ : Ctx ι}
 
 -- ── Multiplicative monoid ───────────────────────────────────────────────────
 
-/-- ⊢ ∀f,g : ℝ. f ·_ℝ g =_ℝ g ·_ℝ f -/
-def mul_comm_R :
-    Derivable F al Premises (Γ := Γ)
-      (Formula.all rTy (Formula.all rTy
-        (eq_R (Term.app2 Term.mul_R (.var (.vs .vz)) (.var .vz))
-              (Term.app2 Term.mul_R (.var .vz) (.var (.vs .vz)))))) :=
-  sorry
+-- `mul_comm_R` is PROVED, further down the file: it needs `cauchyfy_congr`, which is an
+-- induction on the `cauchyfy` recursion and so sits with the rest of that theory.
 
 /-- ⊢ ∀f,g,h : ℝ. (f ·_ℝ g) ·_ℝ h =_ℝ f ·_ℝ (g ·_ℝ h) -/
 def mul_assoc_R :
@@ -2500,6 +2495,344 @@ def add_neg_R :
               Term.zero_R)) :=
   univ_gen (add_neg_R_core (.var .vz))
 
+-- ── `cauchyfy` respects pointwise `=_ℚ` ─────────────────────────────────────
+--
+-- This is REALS_PLAN §0.2's second option, the one it called out of reach: "an `eq_Q`-level
+-- congruence for `cauchyfy`: pointwise `f k =ℚ g k` ⟹ `f̂ n =ℚ ĝ n`… an induction carrying an
+-- object-level hypothesis, so it needs `seq_induction` and the weakened-hypothesis plumbing".
+--
+-- It needs neither. The pointwise hypothesis is taken as a **Lean-level schema** — a function
+-- from index terms to derivations — so it is available at whatever index each case of the
+-- induction asks for, and nothing has to be carried through the induction except the
+-- invariant itself. Plain `pinduction` suffices, exactly as for `cauchyState_neg`; that lemma
+-- is this one specialised to `v := neg_R u`, where the value halves happen to agree on the
+-- nose so the first conjunct could be stated with `=₀`.
+--
+-- The invariant is a conjunction because the two halves of the state behave differently: the
+-- **values** agree only up to `=_ℚ`, but the **flags** must agree on the nose, since
+-- `cauchyState_advance`/`_trip` branch on them. `check_sg_congr` is what keeps the flags in
+-- step, and it is the only step that is not bookkeeping.
+
+/-- If `u` and `v` agree at `n` and `n+1` up to `=_ℚ`, their Cauchy checks agree **as bits**.
+The generic form of `neg_check_sg`; `sg_bar_congr_iff` is again where the work happens. -/
+private def check_sg_congr (u v : Term F Γ (realTy ι)) (n : Term F Γ Ty.nat)
+    (hn : Derivable F al Premises (eq_Q (.app u n) (.app v n)))
+    (hn1 : Derivable F al Premises
+      (eq_Q (.app u (.app .succ n)) (.app v (.app .succ n)))) :
+    Derivable F al Premises
+      (Formula.eq0
+        (.app Term.sg_bar (Term.cauchy_check_at u n))
+        (.app Term.sg_bar (Term.cauchy_check_at v n))) := by
+  let A : Term F Γ Ty.nat := .app Term.abs_Q (Term.app2 Term.sub_Q
+    (.app u n) (.app u (.app .succ n)))
+  let B : Term F Γ Ty.nat := .app Term.abs_Q (Term.app2 Term.sub_Q
+    (.app v n) (.app v (.app .succ n)))
+  let P : Term F Γ Ty.nat := .app Term.pow2neg_Q (.app .succ n)
+  have hAB : Derivable F al Premises (eq_Q A B) := abs_Q_congr (sub_Q_congr hn hn1)
+  pmode
+  papplym (sg_bar_congr_iff (Term.app2 Term.lt_Q_dec A P) (Term.app2 Term.lt_Q_dec B P))
+  psplit
+  · pthm (lt_Q_congr A P B P hAB (eq_Q_refl_inst P))
+  · pthm (lt_Q_congr B P A P (eqQsym hAB) (eq_Q_refl_inst P))
+
+/-- **The `cauchyfy` recursions of two pointwise-`=_ℚ` sequences run in step**: equal flags,
+and values equal up to `=_ℚ`. -/
+def cauchyState_congr (u v : Term F Γ (realTy ι))
+    (h0 : Derivable F al Premises (eq_Q (.app u .zero) (.app v .zero)))
+    (hS : ∀ x : Term F (Ty.nat :: Γ) Ty.nat,
+      Derivable F al Premises (eq_Q (.app u.weaken x) (.app v.weaken x))) :
+    Derivable F al Premises
+      (Formula.all Ty.nat
+        (eq_Q (.app Term.fst_pair (Term.cauchyState u.weaken (.var .vz)))
+              (.app Term.fst_pair (Term.cauchyState v.weaken (.var .vz)))
+          ∧ᶠ Formula.eq0
+              (.app Term.snd_pair (Term.cauchyState u.weaken (.var .vz)))
+              (.app Term.snd_pair (Term.cauchyState v.weaken (.var .vz))))) := by
+  let uw : Term F (Ty.nat :: Γ) (realTy ι) := u.weaken
+  let vw : Term F (Ty.nat :: Γ) (realTy ι) := v.weaken
+  let nv : Term F (Ty.nat :: Γ) Ty.nat := .var .vz
+  let n1 : Term F (Ty.nat :: Γ) Ty.nat := .app .succ nv
+  pmode
+  pinduction
+  · canorm
+    psplit
+    · prw (cVal_zero u)
+      prw (cVal_zero v)
+      pthm h0
+    · prw (cFlag_zero u)
+      prw (cFlag_zero v)
+      prefl
+  · pforall
+    pintro ih
+    canorm
+    pdestruct ih with ihv ihf
+    pfrom hinv := cauchy_inv_at uw nv
+    pcases hinv with hL | hR
+    · pdestruct hL with h0u _hval
+      phave h0v : Formula.eq0 (.app Term.snd_pair (Term.cauchyState vw nv)) Term.zero
+      · psym in ihf with ihfs
+        prwby ihfs
+        pexact h0u
+      pfrom hsg := sg_bar_cases (Term.cauchy_check_at uw nv)
+      pcases hsg with hs1 | hs0
+      · -- the check passes for `u`, hence for `v`: both advance
+        phave hsgv : Formula.eq0
+            (.app Term.sg_bar (Term.cauchy_check_at vw nv)) (.app .succ .zero)
+        · prw (check_sg_congr vw uw nv (eqQsym (hS nv)) (eqQsym (hS n1)))
+          pexact hs1
+        pconj h0u hs1 with hbu
+        papplym (cauchyState_advance uw nv) in hbu with hun
+        pconj h0v hsgv with hbv
+        papplym (cauchyState_advance vw nv) in hbv with hvn
+        -- `prwby` needs an equation, so the conjunction is split before it is used
+        psplit
+        · prwby hun
+          prwby hvn
+          prw (fst_pair_pair (.app uw n1) Term.zero)
+          prw (fst_pair_pair (.app vw n1) Term.zero)
+          pthm (hS n1)
+        · prwby hun
+          prwby hvn
+          prw (snd_pair_pair (.app uw n1) Term.zero)
+          prw (snd_pair_pair (.app vw n1) Term.zero)
+          prefl
+      · -- the check fails for `u`, hence for `v`: both trip, both values freeze
+        phave hsgv : Formula.eq0
+            (.app Term.sg_bar (Term.cauchy_check_at vw nv)) Term.zero
+        · prw (check_sg_congr vw uw nv (eqQsym (hS nv)) (eqQsym (hS n1)))
+          pexact hs0
+        pconj h0u hs0 with hbu
+        papplym (cauchyState_trip uw nv) in hbu with hun
+        pconj h0v hsgv with hbv
+        papplym (cauchyState_trip vw nv) in hbv with hvn
+        psplit
+        · prwby hun
+          prwby hvn
+          prw (fst_pair_pair (.app Term.fst_pair (Term.cauchyState uw nv))
+            (.app .succ Term.zero))
+          prw (fst_pair_pair (.app Term.fst_pair (Term.cauchyState vw nv))
+            (.app .succ Term.zero))
+          pexact ihv
+        · prwby hun
+          prwby hvn
+          prw (snd_pair_pair (.app Term.fst_pair (Term.cauchyState uw nv))
+            (.app .succ Term.zero))
+          prw (snd_pair_pair (.app Term.fst_pair (Term.cauchyState vw nv))
+            (.app .succ Term.zero))
+          prefl
+    · -- already tripped: both states freeze
+      phave hRv : Formula.eq0
+          (.app Term.snd_pair (Term.cauchyState vw nv)) (.app .succ .zero)
+      · psym in ihf with ihfs
+        prwby ihfs
+        pexact hR
+      papplym (cauchyState_frozen uw nv) in hR with hun
+      papplym (cauchyState_frozen vw nv) in hRv with hvn
+      psplit
+      · prwby hun
+        prwby hvn
+        pexact ihv
+      · prwby hun
+        prwby hvn
+        pexact ihf
+
+private theorem congF_subst0 (u v : Term F Γ (realTy ι)) (s : Term F Γ Ty.nat) :
+    ((eq_Q (.app Term.fst_pair (Term.cauchyState u.weaken (.var .vz)))
+           (.app Term.fst_pair (Term.cauchyState v.weaken (.var .vz)))
+        ∧ᶠ Formula.eq0
+            (.app Term.snd_pair (Term.cauchyState u.weaken (.var .vz)))
+            (.app Term.snd_pair (Term.cauchyState v.weaken (.var .vz)))).subst0 s)
+      = (eq_Q (.app Term.fst_pair (Term.cauchyState u s))
+              (.app Term.fst_pair (Term.cauchyState v s))
+          ∧ᶠ Formula.eq0 (.app Term.snd_pair (Term.cauchyState u s))
+              (.app Term.snd_pair (Term.cauchyState v s))) := by
+  simp only [eq_Q, Formula.subst0, Formula.substF, Term.subst, Term.subst0_map,
+    Term.app2, cauchyState_subst, subst_subst0_map_weaken, closed_subst]
+
+/-- **`cauchyfy` respects pointwise `=_ℚ`.** REALS_PLAN §0.2's `cauchyfy_congr_eqQ`. -/
+def cauchyfy_congr (u v : Term F Γ (realTy ι))
+    (h0 : Derivable F al Premises (eq_Q (.app u .zero) (.app v .zero)))
+    (hS : ∀ x : Term F (Ty.nat :: Γ) Ty.nat,
+      Derivable F al Premises (eq_Q (.app u.weaken x) (.app v.weaken x)))
+    (k : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (eq_Q (Term.app2 Term.cauchyfy u k) (Term.app2 Term.cauchyfy v k)) := by
+  have hst := congF_subst0 u v k ▸
+    Derivable.mp (cauchyState_congr u v h0 hS) (.forall_ax k)
+  pmode
+  prw (cauchyfy_unfold u k)
+  prw (cauchyfy_unfold v k)
+  pfrom hc := hst
+  pdestruct hc with h1 _h2
+  pexact h1
+
+/-- **`=_ℚ` at every cauchyfied index is `=_ℝ`.** No estimate: the difference is `=_ℚ`-zero
+and `0_ℚ <_ℚ 2^{-n}`. Stated on abstract `u`, `v` so that no `prw` ever sees a composed real
+— the `Term.add_R` / `Term.mul_R` delta-expansion trap. -/
+def eq_R_of_cauchyfy_eqQ (u v : Term F Γ (realTy ι))
+    (h : Derivable F al Premises (Γ := Ty.nat :: Γ)
+      (eq_Q (Term.app2 Term.cauchyfy u.weaken (.app .succ (.var .vz)))
+            (Term.app2 Term.cauchyfy v.weaken (.app .succ (.var .vz))))) :
+    Derivable F al Premises (eq_R u v) := by
+  let s1 : Term F (Ty.nat :: Γ) Ty.nat := .app .succ (.var .vz)
+  let X  : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.cauchyfy u.weaken s1
+  let Y  : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.cauchyfy v.weaken s1
+  let P  : Term F (Ty.nat :: Γ) Ty.nat := .app Term.pow2neg_Q (.var .vz)
+  pmode
+  pforall
+  canorm
+  papplym (lt_Q_congr Term.zero_Q P (.app Term.abs_Q (Term.app2 Term.sub_Q X Y)) P
+    (eqQsym (eqQtrans (abs_Q_congr (sub_Q_congr h (eq_Q_refl_inst Y)))
+      (abs_Q_sub_self Y)))
+    (eq_Q_refl_inst P))
+  pthm (zero_lt_pow2neg_Q (.var .vz))
+
+-- ── `mul_comm_R` ────────────────────────────────────────────────────────────
+--
+-- Unlike `add_R`, `mul_R` is **not** known to be Cauchy — there is no `mul_R_check`, and
+-- supplying one is the majorization argument of REALS_PLAN §1 — so `cauchyfy` cannot be
+-- evaluated away on either side. This is where `cauchyfy_congr` earns its keep: the two raw
+-- sequences are pointwise `=_ℚ`, and that is enough.
+--
+-- The one wrinkle `add_R` does not have is that `mul_R`'s index depends on its arguments:
+-- `mul_R f g (n) = f̂(n +ℕ b) ·ℚ ĝ(n +ℕ b)` with `b = f(0) +ℕ g(0) +ℕ 2`, so swapping the
+-- arguments swaps the two summands inside `b`. `Arithmetic.add_comm` repairs that at ℕ,
+-- underneath `cauchyfy`, before `mul_Q_comm_inst` is spent.
+
+private theorem mul_R_weaken {Δ : Ctx ι} {ρ : Ty ι} :
+    (Term.mul_R : Term F Δ _).weaken (σ := ρ) = Term.mul_R := by
+  rw [Term.weaken, Term.rename_eq_subst]; exact mul_R_closed_subst _
+
+private theorem mul_R_app_weaken {Δ : Ctx ι} {ρ : Ty ι} (f g : Term F Δ (realTy ι)) :
+    (Term.app2 Term.mul_R f g).weaken (σ := ρ) =
+      Term.app2 Term.mul_R f.weaken g.weaken := by
+  show Term.app2 (Term.weaken Term.mul_R) f.weaken g.weaken = _
+  rw [mul_R_weaken]
+
+/-- `(f ·_ℝ g)(x) =₀ f̂(x +ℕ b) ·_ℚ ĝ(x +ℕ b)` with `b = f(0) +ℕ g(0) +ℕ 2` — the three beta
+steps of `mul_R`. The bound `b` is spelled out rather than named: a named wrapper would hide
+it from `prw`, and `add_comm` has to reach inside it. -/
+def mul_R_apply (f g : Term F Γ (realTy ι)) (x : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (Formula.eq0 (Term.app3 Term.mul_R f g x)
+        (Term.app2 Term.mul_Q
+          (Term.app2 Term.cauchyfy f
+            (Term.app2 Term.add x (Term.app2 Term.add
+              (Term.app2 Term.add (.app f .zero) (.app g .zero)) (Term.ofNat 2))))
+          (Term.app2 Term.cauchyfy g
+            (Term.app2 Term.add x (Term.app2 Term.add
+              (Term.app2 Term.add (.app f .zero) (.app g .zero)) (Term.ofNat 2)))))) :=
+  lam3_correct_nf
+    (Term.app2 Term.mul_Q
+      (Term.app2 Term.cauchyfy (.var (.vs (.vs .vz)))
+        (Term.app2 Term.add (.var .vz) (Term.app2 Term.add
+          (Term.app2 Term.add (.app (.var (.vs (.vs .vz))) .zero)
+            (.app (.var (.vs .vz)) .zero))
+          (Term.ofNat 2))))
+      (Term.app2 Term.cauchyfy (.var (.vs .vz))
+        (Term.app2 Term.add (.var .vz) (Term.app2 Term.add
+          (Term.app2 Term.add (.app (.var (.vs (.vs .vz))) .zero)
+            (.app (.var (.vs .vz)) .zero))
+          (Term.ofNat 2)))))
+    f g x
+    (by
+      simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2, Term.Subst.ext,
+        Term.ofNat, Term.weaken_var, subst_subst0_map_weaken, closed_subst])
+
+/-- Congruence for `cauchyfy` in its **index**, at the level of `=₀`. -/
+private def cauchyfy_idx_nat (h : Term F Γ (realTy ι)) {s t : Term F Γ Ty.nat}
+    (he : Derivable F al Premises (Formula.eq0 s t)) :
+    Derivable F al Premises
+      (Formula.eq0 (Term.app2 Term.cauchyfy h s) (Term.app2 Term.cauchyfy h t)) :=
+  qfer_no_premise_nat_nf he (r := Term.app2 Term.cauchyfy h.weaken (.var .vz))
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+          subst_subst0_map_weaken, closed_subst])
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+          subst_subst0_map_weaken, closed_subst])
+
+/-- Congruence for `mul_Q` in its first argument, at the level of `=₀`. -/
+private def mulQ_l_nat (u : Term F Γ Ty.nat) {s t : Term F Γ Ty.nat}
+    (h : Derivable F al Premises (Formula.eq0 s t)) :
+    Derivable F al Premises
+      (Formula.eq0 (Term.app2 Term.mul_Q s u) (Term.app2 Term.mul_Q t u)) :=
+  qfer_no_premise_nat_nf h (r := Term.app2 Term.mul_Q (.var .vz) u.weaken)
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+          subst_subst0_map_weaken, closed_subst])
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+          subst_subst0_map_weaken, closed_subst])
+
+/-- Congruence for `mul_Q` in its second argument, at the level of `=₀`. -/
+private def mulQ_r_nat (u : Term F Γ Ty.nat) {s t : Term F Γ Ty.nat}
+    (h : Derivable F al Premises (Formula.eq0 s t)) :
+    Derivable F al Premises
+      (Formula.eq0 (Term.app2 Term.mul_Q u s) (Term.app2 Term.mul_Q u t)) :=
+  qfer_no_premise_nat_nf h (r := Term.app2 Term.mul_Q u.weaken (.var .vz))
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+          subst_subst0_map_weaken, closed_subst])
+    (by simp only [Term.subst0, Term.subst, Term.subst0_map, Term.app2,
+          subst_subst0_map_weaken, closed_subst])
+
+/-- `=₀` implies `=_ℚ`. (`RationalNumbers.lean`'s `eq_Q_from_nat_eq` is private; this is the
+same statement, one `prwby` away from `eq_Q_refl_inst`.) -/
+private def eqQ_of_nat_eq {s t : Term F Γ Ty.nat}
+    (h : Derivable F al Premises (Formula.eq0 s t)) :
+    Derivable F al Premises (eq_Q s t) := by
+  pmode
+  pfrom hh := h
+  prwby hh
+  pthm (eq_Q_refl_inst t)
+
+/-- `(f ·_ℝ g)(x) =_ℚ (g ·_ℝ f)(x)` — pointwise commutativity of the **raw** product
+sequence. Not `=₀`: `mul_Q` does not commute on the nose, for the same encoding reason
+`add_Q` does not (REALS_PLAN §0.2). -/
+def mul_R_pointwise_comm (f g : Term F Γ (realTy ι)) (x : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (eq_Q (.app (Term.app2 Term.mul_R f g) x) (.app (Term.app2 Term.mul_R g f) x)) :=
+  let bfg : Term F Γ Ty.nat := Term.app2 Term.add
+    (Term.app2 Term.add (.app f .zero) (.app g .zero)) (Term.ofNat 2)
+  let bgf : Term F Γ Ty.nat := Term.app2 Term.add
+    (Term.app2 Term.add (.app g .zero) (.app f .zero)) (Term.ofNat 2)
+  let I : Term F Γ Ty.nat := Term.app2 Term.add x bfg
+  let J : Term F Γ Ty.nat := Term.app2 Term.add x bgf
+  -- `J =₀ I`: the two bounds differ only by the order of the two `·(0)` terms
+  let hJI : Derivable F al Premises (Formula.eq0 J I) :=
+    add_congr_r x (add_congr_l (add_comm (.app g .zero) (.app f .zero)) (Term.ofNat 2))
+  -- `(g ·_ℝ f)(x) =₀ ĝ(I) ·_ℚ f̂(I)`
+  let hgf : Derivable F al Premises
+      (Formula.eq0 (.app (Term.app2 Term.mul_R g f) x)
+        (Term.app2 Term.mul_Q (Term.app2 Term.cauchyfy g I)
+          (Term.app2 Term.cauchyfy f I))) :=
+    qtrans (mul_R_apply g f x)
+      (qtrans (mulQ_l_nat _ (cauchyfy_idx_nat g hJI))
+        (mulQ_r_nat _ (cauchyfy_idx_nat f hJI)))
+  eqQtrans (eqQ_of_nat_eq (mul_R_apply f g x))
+    (eqQtrans
+      (mul_Q_comm_inst (Term.app2 Term.cauchyfy f I) (Term.app2 Term.cauchyfy g I))
+      (eqQ_of_nat_eq (Derivable.mp hgf Derivable.sym0)))
+
+/-- `f ·_ℝ g =_ℝ g ·_ℝ f`, at explicit reals. -/
+def mul_comm_R_core (f g : Term F Γ (realTy ι)) :
+    Derivable F al Premises
+      (eq_R (Term.app2 Term.mul_R f g) (Term.app2 Term.mul_R g f)) :=
+  eq_R_of_cauchyfy_eqQ _ _ (by
+    rw [mul_R_app_weaken, mul_R_app_weaken]
+    exact cauchyfy_congr
+      (Term.app2 Term.mul_R f.weaken g.weaken)
+      (Term.app2 Term.mul_R g.weaken f.weaken)
+      (mul_R_pointwise_comm f.weaken g.weaken Term.zero)
+      (fun x => by
+        rw [mul_R_app_weaken, mul_R_app_weaken]
+        exact mul_R_pointwise_comm f.weaken.weaken g.weaken.weaken x)
+      (.app .succ (.var .vz)))
+
+/-- ⊢ ∀f,g : ℝ. f ·_ℝ g =_ℝ g ·_ℝ f -/
+def mul_comm_R :
+    Derivable F al Premises (Γ := Γ)
+      (Formula.all rTy (Formula.all rTy
+        (eq_R (Term.app2 Term.mul_R (.var (.vs .vz)) (.var .vz))
+              (Term.app2 Term.mul_R (.var .vz) (.var (.vs .vz)))))) :=
+  univ_gen (univ_gen (mul_comm_R_core (.var (.vs .vz)) (.var .vz)))
+
 -- ── `<_ℝ` moves to a later index, and `lt_trans_R` ──────────────────────────
 --
 -- `lt_R f g` is `∃n. 2^{-n} ≤ℚ ĝ(n+1) −ℚ f̂(n+1)`, so transitivity has to combine two
@@ -3219,6 +3552,13 @@ end OrderedFieldAxioms
 #print axioms add_neg_R_core
 #print axioms cauchyState_neg
 #print axioms cauchyfy_neg
+#print axioms cauchyState_congr
+#print axioms cauchyfy_congr
+#print axioms eq_R_of_cauchyfy_eqQ
+#print axioms mul_R_apply
+#print axioms mul_R_pointwise_comm
+#print axioms mul_comm_R
+#print axioms mul_comm_R_core
 -- The `<_ℝ` shift estimate. `lt_trans_R` itself is NOT here: it is still `sorryAx`, through
 -- `lt_trans_R_core`, and the note there says why. These three are the mathematics of it.
 #print axioms lt_shift1
