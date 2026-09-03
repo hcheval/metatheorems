@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Horatiu
 -/
 import Metatheorems.RealNumbers.Field
+import Metatheorems.RealNumbers.Bounds
 
 namespace Metatheorems
 
@@ -385,6 +386,78 @@ def cauchy_complete_R :
                 (const_R (.app Term.pow2neg_Q (.var .vz))))))) :=
   sorry
 
+/-- The estimate behind `abs_R_bound`, at the bound index `x₀` of the context `nat :: Γ'`:
+`(|β|_ℝ)^(x₀+1) −_ℚ ((β(0)+1)_ℝ)^(x₀+1) <_ℚ 2^{-x₀}`.
+
+The whole content is `(|β|_ℝ)^(s) ≤_ℚ ⟨β(0)+1⟩_ℚ`:
+
+    X̂(s) ≤ |X̂(s)| ≤ |X̂(0)| + |X̂(0) − X̂(s)| ≤ |β(0)|_ℚ + 2^{-0} ≤ ⟨β(0)⟩ + 1 = ⟨β(0)+1⟩
+
+with `abs_le_encode` (a code dominates the magnitude it encodes) supplying the third step
+and the telescope from index `0` (`cauchyfy_shift_le`, worth `2^{-0} = 1`) the second. The
+right-hand side cauchyfies to exactly `⟨β(0)+1⟩` (`cauchyfy_embed`), and `sub_lt_of_le`
+turns the `≤` into the strict bound against `0 <_ℚ 2^{-x₀}`. -/
+private def abs_R_bound_est {Γ' : Ctx ι} (β : Term F (Ty.nat :: Γ') (realTy ι)) :
+    Derivable F al Premises (Γ := Ty.nat :: Γ')
+      (lt_Q
+        (Term.app2 Term.sub_Q
+          (Term.app2 Term.cauchyfy (.app Term.abs_R β) (.app .succ (.var .vz)))
+          (Term.app2 Term.cauchyfy
+            (.app Term.embed_nat_R (.app .succ (.app β Term.zero)))
+            (.app .succ (.var .vz))))
+        (.app Term.pow2neg_Q (.var .vz))) :=
+  let s : Term F (Ty.nat :: Γ') Ty.nat := .app .succ (.var .vz)
+  let X : Term F (Ty.nat :: Γ') (realTy ι) := .app Term.abs_R β
+  let Xs : Term F (Ty.nat :: Γ') Ty.nat := Term.app2 Term.cauchyfy X s
+  let X0 : Term F (Ty.nat :: Γ') Ty.nat := Term.app2 Term.cauchyfy X Term.zero
+  let c0 : Term F (Ty.nat :: Γ') Ty.nat := .app β Term.zero
+  let E : Term F (Ty.nat :: Γ') (realTy ι) := .app Term.embed_nat_R (.app .succ c0)
+  let Es : Term F (Ty.nat :: Γ') Ty.nat := Term.app2 Term.cauchyfy E s
+  let target : Term F (Ty.nat :: Γ') Ty.nat := .app Term.encode_nat_Q (.app .succ c0)
+  let D : Term F (Ty.nat :: Γ') Ty.nat := .app Term.abs_Q (Term.app2 Term.sub_Q X0 Xs)
+  -- X̂(s) ≤ |X̂(s)| ≤ |X̂(0)| + |X̂(0) − X̂(s)|
+  let h1 : Derivable F al Premises (le_Q Xs (.app Term.abs_Q Xs)) := le_Q_self_abs Xs
+  let h2 : Derivable F al Premises
+      (le_Q (.app Term.abs_Q Xs) (Term.app2 Term.add_Q (.app Term.abs_Q X0) D)) :=
+    abs_Q_le_add_diff Xs X0
+  -- |X̂(0) − X̂(s)| ≤ 2^{-0} =₀ 1
+  let h3 : Derivable F al Premises (le_Q D Term.one_Q) :=
+    Derivable.mp (cauchyfy_shift_le X Term.zero s)
+      (le_Q_congr _ _ _ _
+        (eqQ_of_nat_eq'
+          (abs_Q_congr_nat
+            (qfer_no_premise_nat_nf (add_zero_l s)
+              (r := Term.app2 Term.sub_Q X0.weaken
+                (Term.app2 Term.cauchyfy X.weaken (.var .vz)))
+              (by qb_nf; rfl) (by qb_nf; rfl))))
+        (eqQ_of_nat_eq' pow2neg_zero_eq_one))
+  -- X̂(0) =₀ |β(0)|_ℚ, so |X̂(0)| ≤ ⟨β(0)⟩ by code-dominates
+  let e_all : Derivable F al Premises (Formula.eq0 X0 (.app Term.abs_Q c0)) :=
+    qtrans (qtrans (cauchyfy_zero X) (abs_R_apply β Term.zero))
+      (abs_Q_congr_nat (cauchyfy_zero β))
+  let h4 : Derivable F al Premises
+      (le_Q (.app Term.abs_Q X0) (.app Term.encode_nat_Q c0)) :=
+    Derivable.mp (abs_le_encode c0)
+      (le_Q_congr _ _ _ _
+        (eqQsym (eqQtrans (eqQ_of_nat_eq' (abs_Q_congr_nat e_all)) (abs_Q_abs_Q c0)))
+        (eq_Q_refl_inst _))
+  -- assemble: X̂(s) ≤ ⟨β(0)⟩ + 1 =_ℚ ⟨β(0)+1⟩ =₀ Ê(s)
+  let h5 : Derivable F al Premises
+      (le_Q Xs (Term.app2 Term.add_Q (.app Term.encode_nat_Q c0) Term.one_Q)) :=
+    leQt (leQt h1 h2)
+      (Derivable.mp (Derivable.mp h3 (Derivable.mp h4 and_intro))
+        (le_Q_add_both (.app Term.abs_Q X0) D (.app Term.encode_nat_Q c0) Term.one_Q))
+  let h7 : Derivable F al Premises (le_Q Xs target) :=
+    Derivable.mp h5
+      (le_Q_congr _ _ _ _ (eq_Q_refl_inst Xs) (eqQsym (encode_succ c0)))
+  let h8 : Derivable F al Premises (Formula.eq0 Es target) :=
+    cauchyfy_embed (.app .succ c0) s
+  let h9 : Derivable F al Premises (le_Q Xs Es) :=
+    Derivable.mp h7
+      (le_Q_congr _ _ _ _ (eq_Q_refl_inst Xs) (eqQsym (eqQ_of_nat_eq' h8)))
+  sub_lt_of_le Xs Es (.app Term.pow2neg_Q (.var .vz)) h9
+    (zero_lt_pow2neg_Q (.var .vz))
+
 /-- Kohlenbach p. 430 (cited as Remark `rmrk:bound-on-real` in `real-numbers.tex`):
 
     `|α|_ℝ ≤_ℝ (α(0) + 1)_ℝ`
@@ -398,7 +471,12 @@ def abs_R_bound :
         (le_R (Term.app Term.abs_R (.var .vz))
               (Term.app Term.embed_nat_R
                 (.app .succ (Term.app (.var .vz) Term.zero))))) :=
-  sorry
+  univ_gen
+    (le_R_of_bound (.app Term.abs_R (.var .vz))
+      (.app Term.embed_nat_R (.app .succ (Term.app (.var .vz) Term.zero)))
+      (by
+        rw [abs_R_app_weaken, embed_nat_R_app_weaken]
+        exact abs_R_bound_est (Term.var Var.vz).weaken))
 
 end OrderedFieldAxioms
 
