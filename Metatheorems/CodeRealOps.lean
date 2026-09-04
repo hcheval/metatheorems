@@ -254,9 +254,13 @@ end Formulas
 -- Section 5: `codeReal` of the sequences the ℝ-layer constants build
 -- ============================================================================
 
+/-- A constant code passes every check. -/
+theorem isCauchyCode_const (q : ℕ) : IsCauchyCode (fun _ => q) := fun _ => by
+  rw [sub_self, abs_zero]; positivity
+
 /-- A constant code denotes its rational. -/
 theorem codeReal_const (q : ℕ) : codeReal (fun _ => q) = qval q :=
-  codeReal_eq_of_tendsto (fun k => by rw [sub_self, abs_zero]; positivity) tendsto_const_nhds
+  codeReal_eq_of_tendsto (isCauchyCode_const q) tendsto_const_nhds
 
 /-- `(x)◦` denotes `x`, for `x ≥ 0`. -/
 theorem codeReal_roundR (x : ℝ) (hx : 0 ≤ x) : codeReal (roundR x) = x :=
@@ -296,35 +300,42 @@ private theorem mul_est {a₁ a₂ c₁ c₂ A C ε δ : ℚ}
     _ < ε * C + A * ε := add_lt_add_of_le_of_lt h1 h2
     _ ≤ δ := hbnd
 
+/-- **The sequence `mul_R` builds passes every check**, for **all** `f g`. The index shift
+`b = f(0) + g(0) + 2` is what makes it so: `|f̂| ≤ f(0)+1`, `|ĝ| ≤ g(0)+1`, and `b ≤ 2^b`.
+Named separately from `codeReal_mulR` because `codeReal_subR` asks for a check-passing
+subtrahend, and CAT(0)'s CN axiom subtracts a `mul_R` term. -/
+theorem isCauchyCode_mulR (f g : ℕ → ℕ) :
+    IsCauchyCode (fun n => mulQN (cauchyfyN f (n + (f 0 + g 0 + 2)))
+        (cauchyfyN g (n + (f 0 + g 0 + 2)))) := by
+  intro k
+  simp only [qval_mulQN]
+  have e : k + 1 + (f 0 + g 0 + 2) = k + (f 0 + g 0 + 2) + 1 := by omega
+  rw [e]
+  have ha := cauchyfyN_step f (k + (f 0 + g 0 + 2))
+  have hc := cauchyfyN_step g (k + (f 0 + g 0 + 2))
+  rw [abs_sub_comm] at ha hc
+  have hA := abs_qval_cauchyfyN_le f (k + (f 0 + g 0 + 2) + 1)
+  have hC := abs_qval_cauchyfyN_le g (k + (f 0 + g 0 + 2))
+  refine mul_est ha hc hA hC (by positivity) (by positivity) ?_
+  have hb2 : ((f 0 + g 0 + 2 : ℕ) : ℚ) ≤ 2 ^ (f 0 + g 0 + 2) := by
+    exact_mod_cast (Nat.lt_two_pow_self (n := f 0 + g 0 + 2)).le
+  have hsum : (1 / 2 ^ (k + (f 0 + g 0 + 2) + 1)) * ((g 0 : ℚ) + 1)
+      + ((f 0 : ℚ) + 1) * (1 / 2 ^ (k + (f 0 + g 0 + 2) + 1))
+      = ((f 0 + g 0 + 2 : ℕ) : ℚ) / 2 ^ (k + (f 0 + g 0 + 2) + 1) := by
+    push_cast; ring
+  rw [hsum, div_le_div_iff₀ (by positivity) (by positivity)]
+  calc ((f 0 + g 0 + 2 : ℕ) : ℚ) * 2 ^ (k + 1)
+      ≤ 2 ^ (f 0 + g 0 + 2) * 2 ^ (k + 1) :=
+        mul_le_mul_of_nonneg_right hb2 (by positivity)
+    _ = 1 * 2 ^ (k + (f 0 + g 0 + 2) + 1) := by ring
+
 /-- The sequence `mul_R` builds — with its index shift `b = f(0) + g(0) + 2` — denotes the
-product, for **all** `f g`. The shift is what makes the sequence pass the check:
-`|f̂| ≤ f(0)+1`, `|ĝ| ≤ g(0)+1`, and `b ≤ 2^b`. -/
+product, for **all** `f g`. -/
 theorem codeReal_mulR (f g : ℕ → ℕ) :
     codeReal (fun n => mulQN (cauchyfyN f (n + (f 0 + g 0 + 2)))
         (cauchyfyN g (n + (f 0 + g 0 + 2))))
       = codeReal f * codeReal g := by
-  refine codeReal_eq_of_tendsto ?_ ?_
-  · intro k
-    simp only [qval_mulQN]
-    have e : k + 1 + (f 0 + g 0 + 2) = k + (f 0 + g 0 + 2) + 1 := by omega
-    rw [e]
-    have ha := cauchyfyN_step f (k + (f 0 + g 0 + 2))
-    have hc := cauchyfyN_step g (k + (f 0 + g 0 + 2))
-    rw [abs_sub_comm] at ha hc
-    have hA := abs_qval_cauchyfyN_le f (k + (f 0 + g 0 + 2) + 1)
-    have hC := abs_qval_cauchyfyN_le g (k + (f 0 + g 0 + 2))
-    refine mul_est ha hc hA hC (by positivity) (by positivity) ?_
-    have hb2 : ((f 0 + g 0 + 2 : ℕ) : ℚ) ≤ 2 ^ (f 0 + g 0 + 2) := by
-      exact_mod_cast (Nat.lt_two_pow_self (n := f 0 + g 0 + 2)).le
-    have hsum : (1 / 2 ^ (k + (f 0 + g 0 + 2) + 1)) * ((g 0 : ℚ) + 1)
-        + ((f 0 : ℚ) + 1) * (1 / 2 ^ (k + (f 0 + g 0 + 2) + 1))
-        = ((f 0 + g 0 + 2 : ℕ) : ℚ) / 2 ^ (k + (f 0 + g 0 + 2) + 1) := by
-      push_cast; ring
-    rw [hsum, div_le_div_iff₀ (by positivity) (by positivity)]
-    calc ((f 0 + g 0 + 2 : ℕ) : ℚ) * 2 ^ (k + 1)
-        ≤ 2 ^ (f 0 + g 0 + 2) * 2 ^ (k + 1) :=
-          mul_le_mul_of_nonneg_right hb2 (by positivity)
-      _ = 1 * 2 ^ (k + (f 0 + g 0 + 2) + 1) := by ring
+  refine codeReal_eq_of_tendsto (isCauchyCode_mulR f g) ?_
   · simp only [qval_mulQN]
     push_cast
     exact ((codeReal_tendsto f).comp (tendsto_add_atTop_nat _)).mul
@@ -397,6 +408,13 @@ theorem codeReal_interp_mul_R (f g : Term F Γ (realTy ι)) (env : Ctx.interpret
   simp only [Term.app2, Term.interpret, interpret_mul_R_fun]
   exact codeReal_mulR _ _
 
+/-- A `mul_R` term passes every check — what `codeReal_interp_sub_R` needs of a subtrahend
+that is a product (CAT(0)'s CN axiom). -/
+theorem isCauchyCode_interp_mul_R (f g : Term F Γ (realTy ι)) (env : Ctx.interpret X Γ) :
+    IsCauchyCode (Term.interpret si (Term.app2 Term.mul_R f g) env) := by
+  simp only [Term.app2, Term.interpret, interpret_mul_R_fun]
+  exact isCauchyCode_mulR _ _
+
 theorem codeReal_interp_sub_R (f g : Term F Γ (realTy ι)) (env : Ctx.interpret X Γ)
     (hg : IsCauchyCode (Term.interpret si g env)) :
     codeReal (Term.interpret si (Term.app2 Term.sub_R f g) env)
@@ -441,8 +459,11 @@ end Interp
 #print axioms interpret_le_R_pu_of_codeReal_le
 #print axioms interpret_eq_R_of_codeReal_eq
 #print axioms codeReal_roundR
+#print axioms isCauchyCode_const
 #print axioms codeReal_addR
+#print axioms isCauchyCode_mulR
 #print axioms codeReal_mulR
+#print axioms isCauchyCode_interp_mul_R
 #print axioms codeReal_negR_of_isCauchyCode
 #print axioms codeReal_absR
 #print axioms codeReal_clamp01

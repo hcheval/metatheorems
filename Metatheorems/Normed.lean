@@ -433,8 +433,12 @@ noncomputable def NormedModel.eqXInterp (M : NormedModel) :
     EqXInterp (fun () => M.E) Normed.F M.si :=
   M.toMetricModel.eqXInterp_gen M.si (fun _ _ => rfl)
 
-/-- The axioms hold in the model. Not discharged here, for the same reason as
-`WHyperbolicModel.AxiomsHold`. -/
+/-- The axioms hold in the model. **NOT discharged — this is the one remaining obligation of
+the space tower**, and it is NOT a pattern to copy. W-hyperbolic and CAT(0) have no such
+definition and no `hax` binder any more: their `axiomsHold` are theorems, stated inline
+(`WHyperbolicModel.axiomsHold`, `CAT0Model.axiomsHold`). A surviving `AxiomsHold` binder means
+"not done yet", not "this is how spaces are built". Discharging it needs `codeReal`-level
+evaluation of the norm and scalar-multiplication constants, which does not exist yet. -/
 def NormedModel.AxiomsHold (M : NormedModel) : Prop :=
   ∀ {Γ : Ctx MetricSpace.ι} (A : Formula Normed.F Γ), Normed.Premises ⟨Γ, A⟩ →
     ∀ env : Ctx.interpret (fun () => M.E) Γ, Formula.interpret M.si A env

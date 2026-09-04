@@ -145,25 +145,112 @@ structure CAT0Model extends WHyperbolicModel where
     d z (W x y (1/2)) * d z (W x y (1/2))
       ≤ (1/2) * (d z x * d z x) + (1/2) * (d z y * d z y) - (1/4) * (d x y * d x y)
 
-/-- The premises hold in the model — the W-hyperbolic `AxiomsHold` extended by CN. As there,
-not discharged here; see `WHyperbolicModel.AxiomsHold`. -/
-def CAT0Model.AxiomsHold (M : CAT0Model) : Prop :=
-  ∀ {Γ : Ctx MetricSpace.ι} (A : Formula WHyperbolic.F Γ), CAT0.Premises ⟨Γ, A⟩ →
-    ∀ env : Ctx.interpret (fun () => M.carrier) Γ, Formula.interpret M.si A env
+-- ============================================================================
+-- The constants and CN in the model
+-- ============================================================================
+
+section AxiomsInModel
+
+variable {X : MetricSpace.ι → Type} {si : SpaceInterp X WHyperbolic.F} {Γ : Ctx MetricSpace.ι}
+
+/-- `½` evaluates to the constant code `⟨2^{-1}⟩ℚ`. -/
+theorem CAT0.interp_half_R (env : Ctx.interpret X Γ) :
+    Term.interpret si (CAT0.half_R (Γ := Γ)) env = fun _ => QBridge.pow2negQN 1 := by
+  funext n
+  simp only [Term.interpret, QBridge.interpret_pow2neg_Q_fun]
+  rfl
+
+/-- `¼` evaluates to the constant code `⟨2^{-2}⟩ℚ`. -/
+theorem CAT0.interp_quarter_R (env : Ctx.interpret X Γ) :
+    Term.interpret si (CAT0.quarter_R (Γ := Γ)) env = fun _ => QBridge.pow2negQN 2 := by
+  funext n
+  simp only [Term.interpret, QBridge.interpret_pow2neg_Q_fun]
+  rfl
+
+theorem CAT0.codeReal_interp_half_R (env : Ctx.interpret X Γ) :
+    codeReal (Term.interpret si (CAT0.half_R (Γ := Γ)) env) = 1 / 2 := by
+  rw [CAT0.interp_half_R, codeReal_const, QBridge.qval_pow2negQN]
+  norm_num
+
+theorem CAT0.codeReal_interp_quarter_R (env : Ctx.interpret X Γ) :
+    codeReal (Term.interpret si (CAT0.quarter_R (Γ := Γ)) env) = 1 / 4 := by
+  rw [CAT0.interp_quarter_R, codeReal_const, QBridge.qval_pow2negQN]
+  norm_num
+
+theorem CAT0.isCauchyCode_interp_half_R (env : Ctx.interpret X Γ) :
+    IsCauchyCode (Term.interpret si (CAT0.half_R (Γ := Γ)) env) := by
+  rw [CAT0.interp_half_R]; exact isCauchyCode_const _
+
+theorem CAT0.isCauchyCode_interp_quarter_R (env : Ctx.interpret X Γ) :
+    IsCauchyCode (Term.interpret si (CAT0.quarter_R (Γ := Γ)) env) := by
+  rw [CAT0.interp_quarter_R]; exact isCauchyCode_const _
+
+/-- The `[0,1]`-retraction is the identity at `½` — what makes `W(x,y,clamp01 ½)` in the model
+be `W(x,y,½)`. -/
+theorem clampReal_half : clampReal (1 / 2) = 1 / 2 :=
+  clampReal_of_mem _ (by norm_num) (by norm_num)
+
+/-- (CN) in the model, at arbitrary terms. Same route as `WHyperbolicModel.W1_holds`; the two
+new ingredients are the constants' `codeReal` and `isCauchyCode_interp_mul_R`, which is what
+`codeReal_interp_sub_R` asks of the subtracted `¼·d(x,y)²`. -/
+theorem CAT0Model.CN_holds (M : CAT0Model) (s t u : Term WHyperbolic.F Γ xTy)
+    (env : Ctx.interpret (fun () => M.carrier) Γ) :
+    Formula.interpret M.si
+      (le_R_pu
+        (Term.app2 Term.mul_R
+          (Term.app2 WHyperbolic.d s
+            (Term.app3 WHyperbolic.W t u (.app Term.clamp01 CAT0.half_R)))
+          (Term.app2 WHyperbolic.d s
+            (Term.app3 WHyperbolic.W t u (.app Term.clamp01 CAT0.half_R))))
+        (Term.app2 Term.sub_R
+          (Term.app2 Term.add_R
+            (Term.app2 Term.mul_R CAT0.half_R
+              (Term.app2 Term.mul_R (Term.app2 WHyperbolic.d s t) (Term.app2 WHyperbolic.d s t)))
+            (Term.app2 Term.mul_R CAT0.half_R
+              (Term.app2 Term.mul_R (Term.app2 WHyperbolic.d s u) (Term.app2 WHyperbolic.d s u))))
+          (Term.app2 Term.mul_R CAT0.quarter_R
+            (Term.app2 Term.mul_R (Term.app2 WHyperbolic.d t u) (Term.app2 WHyperbolic.d t u)))))
+      env := by
+  apply interpret_le_R_pu_of_codeReal_le
+  simp only [M.codeReal_interp_dist, codeReal_interp_add_R, codeReal_interp_mul_R,
+    codeReal_interp_sub_R, isCauchyCode_interp_mul_R, codeReal_interp_clamp01,
+    CAT0.codeReal_interp_half_R, CAT0.codeReal_interp_quarter_R, clampReal_half, M.interp_W]
+  exact M.CN _ _ _
+
+/-- **The five axioms hold in the model.** (W1)–(W4) are `WHyperbolicModel.axiomsHold`; CN is
+`CN_holds`. With this, `spremise`, `soundness` and both metatheorems take no hypothesis about
+the model beyond `CAT0Model` itself. -/
+theorem CAT0Model.axiomsHold (M : CAT0Model) :
+    ∀ {Γ : Ctx MetricSpace.ι} (A : Formula WHyperbolic.F Γ), CAT0.Premises ⟨Γ, A⟩ →
+      ∀ env : Ctx.interpret (fun () => M.carrier) Γ, Formula.interpret M.si A env := by
+  intro Γ A hA env
+  rcases hA with h | h
+  · exact M.toWHyperbolicModel.axiomsHold A h env
+  · subst h
+    intro z x y
+    exact M.CN_holds _ _ _ _
+
+/-- Non-vacuity: `CN` is a premise, and `axiomsHold` applied to it yields the interpreted
+axiom at any environment. -/
+example (M : CAT0Model) {Γ : Ctx MetricSpace.ι} (env : Ctx.interpret (fun () => M.carrier) Γ) :
+    Formula.interpret M.si (CAT0.ax_CN (Γ := Γ)) env :=
+  M.axiomsHold _ (Or.inr rfl) env
+
+end AxiomsInModel
 
 /-- Premise realizers, by `srealizer_of_pu` — CN is purely universal like the rest. -/
-def CAT0Model.spremise (M : CAT0Model) (hax : M.AxiomsHold) :
+def CAT0Model.spremise (M : CAT0Model) :
     ∀ (Γ : Ctx MetricSpace.ι) (B : Formula WHyperbolic.F Γ),
       CAT0.Premises ⟨Γ, B⟩ → SRealizer M.si B :=
   fun Γ B hp =>
-    srealizer_of_pu B (CAT0.premises_pu Γ B hp) (CAT0.premises_vf Γ B hp) (hax B hp)
+    srealizer_of_pu B (CAT0.premises_pu Γ B hp) (CAT0.premises_vf Γ B hp) (M.axiomsHold B hp)
 
-/-- Semantic soundness for a CAT(0) model, given that its axioms hold. -/
-theorem CAT0Model.soundness (M : CAT0Model) (hax : M.AxiomsHold)
+/-- Semantic soundness for a CAT(0) model. -/
+theorem CAT0Model.soundness (M : CAT0Model)
     {Γ : Ctx MetricSpace.ι} {allowed : Allowed} {A : Formula WHyperbolic.F Γ}
     (h : Derivable WHyperbolic.F allowed CAT0.Premises A) :
     ∀ env : Ctx.interpret (fun () => M.carrier) Γ, Formula.interpret M.si A env :=
-  M.soundness_gen M.si (fun _ _ => rfl) hax h
+  M.soundness_gen M.si (fun _ _ => rfl) M.axiomsHold h
 
 -- ============================================================================
 -- The CAT(0) metatheorems
@@ -172,7 +259,7 @@ theorem CAT0Model.soundness (M : CAT0Model) (hax : M.AxiomsHold)
 /-- **The CAT(0) metatheorem** (extended input). Majorants and equality interpretation are
 the W-hyperbolic ones — CN adds a premise, not a constant, so the bound `Φ` is exactly as
 uniform as before. -/
-theorem CAT0Model.cat0_metatheorem (M : CAT0Model) (hax : M.AxiomsHold)
+theorem CAT0Model.cat0_metatheorem (M : CAT0Model)
     {ρ : Ty MetricSpace.ι} {B₀ C₀ : Formula WHyperbolic.F [Ty.nat, ρ]}
     (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
     (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
@@ -185,11 +272,11 @@ theorem CAT0Model.cat0_metatheorem (M : CAT0Model) (hax : M.AxiomsHold)
         M.abstractMajorizability.toRel.maj ρ x_star x →
         (∀ u : Nat, u ≤ Φ x_star → Formula.interpret M.si B₀ (u, (x, ()))) →
         ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret M.si C₀ (v, (x, ())) :=
-  syntactic_general_metatheorem M.eqXInterp (M.spremise hax) M.abstractMajorizability
+  syntactic_general_metatheorem M.eqXInterp M.spremise M.abstractMajorizability
     hB_qf hB_vf hC_qf hC_vf prf
 
 /-- **The CAT(0) metatheorem, from a classical proof.** -/
-theorem CAT0Model.cat0_metatheorem_classical (M : CAT0Model) (hax : M.AxiomsHold)
+theorem CAT0Model.cat0_metatheorem_classical (M : CAT0Model)
     {ρ : Ty MetricSpace.ι} {B₀ C₀ : Formula WHyperbolic.F [Ty.nat, ρ]}
     (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
     (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
@@ -203,7 +290,7 @@ theorem CAT0Model.cat0_metatheorem_classical (M : CAT0Model) (hax : M.AxiomsHold
         (∀ u : Nat, u ≤ Φ x_star → Formula.interpret M.si B₀ (u, (x, ()))) →
         ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret M.si C₀ (v, (x, ())) :=
   syntactic_general_metatheorem_classical M.eqXInterp
-    (ntStable_of_pu CAT0.premises_pu) (M.spremise hax)
+    (ntStable_of_pu CAT0.premises_pu) M.spremise
     M.abstractMajorizability hB_qf hB_vf hC_qf hC_vf prf
 
 -- ============================================================================
@@ -212,6 +299,11 @@ theorem CAT0Model.cat0_metatheorem_classical (M : CAT0Model) (hax : M.AxiomsHold
 
 #print axioms CAT0.premises_pu
 #print axioms CAT0.CN
+#print axioms CAT0.codeReal_interp_half_R
+#print axioms CAT0.codeReal_interp_quarter_R
+#print axioms CAT0Model.CN_holds
+#print axioms CAT0Model.axiomsHold
+#print axioms CAT0Model.spremise
 #print axioms CAT0Model.soundness
 #print axioms CAT0Model.cat0_metatheorem
 #print axioms CAT0Model.cat0_metatheorem_classical

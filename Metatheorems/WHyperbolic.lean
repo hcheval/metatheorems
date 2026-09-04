@@ -385,13 +385,13 @@ noncomputable def WHyperbolicModel.eqXInterp (M : WHyperbolicModel) :
 -- The premises in the model
 -- ============================================================================
 
-/-- **The four axioms hold in the model, at every environment** — the shape of the `hprem` of
-`Soundness.lean`. Unlike there, the premise set is four fixed formulas and the model already
-assumes their content, so this is not a hypothesis but a theorem: `WHyperbolicModel.axiomsHold`
-below. -/
-def WHyperbolicModel.AxiomsHold (M : WHyperbolicModel) : Prop :=
-  ∀ {Γ : Ctx MetricSpace.ι} (A : Formula WHyperbolic.F Γ), WHyperbolic.Premises ⟨Γ, A⟩ →
-    ∀ env : Ctx.interpret (fun () => M.carrier) Γ, Formula.interpret M.si A env
+-- There is deliberately no named `AxiomsHold : Prop` here. The statement below has the shape
+-- of `MetricModel.soundness_gen`'s `hprem` (and of `Soundness.lean`'s), but unlike there the
+-- premise set is four fixed formulas over a model that already carries their content, so it is
+-- a theorem, not a hypothesis. A named `Prop` for it once existed and was what let an earlier
+-- pass write `(hax : M.AxiomsHold)` as a binder on `spremise`/`soundness`/the metatheorems and
+-- justify it by analogy with `hprem` — a hidden `sorry`. The analogy fails because
+-- `Soundness.lean`'s premise set is an abstract parameter; these are not.
 
 section AxiomsInModel
 
@@ -495,7 +495,9 @@ theorem WHyperbolicModel.W4_holds (s t u v : Term WHyperbolic.F Γ xTy)
 /-- **The four axioms hold in the model.** The one obligation the W-hyperbolic instantiation
 owed; with it, `spremise` and both metatheorems below take no hypothesis about the model
 beyond `WHyperbolicModel` itself. -/
-theorem WHyperbolicModel.axiomsHold : M.AxiomsHold := by
+theorem WHyperbolicModel.axiomsHold :
+    ∀ {Γ : Ctx MetricSpace.ι} (A : Formula WHyperbolic.F Γ), WHyperbolic.Premises ⟨Γ, A⟩ →
+      ∀ env : Ctx.interpret (fun () => M.carrier) Γ, Formula.interpret M.si A env := by
   intro Γ A hA env
   rcases hA with h | h | h | h <;> subst h
   · intro z x y l
