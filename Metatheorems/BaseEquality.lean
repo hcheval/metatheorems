@@ -265,10 +265,57 @@ def eqAtType_trans_base {Γ : Ctx ι} (i : ι) (s t u : Term F Γ (Ty.base i)) :
     · pexact hle
   · pexact hsum
 
+/-- **The chained triangle inequality**: `⊢ d(x,w) ≤_ℝ (d(x,y) +_ℝ d(y,z)) +_ℝ d(z,w)`.
+
+The project's first *derived* object-level theorem about a space — everything else said about
+metric, W-hyperbolic, CAT(0) or normed spaces so far is either an axiom, a model fact, or a
+statement about the encoding itself.
+
+It needs nothing but free constructors: `Derivable.dist_tri` twice (no `.premise`, no proof
+mode at the axiom, so it holds in **every** `Derivable F al Premises`), and the non-strict
+order package of `RealNumbers/LeOrder.lean` — transitivity, left additive monotonicity, and
+`le_R_of_eq_R_core` to re-associate the sum.
+
+Chaining two triangle inequalities was **impossible before that package existed**: `dist_tri`
+delivers its conclusion as `le_R_pu`, and the `≤_ℝ` API was conversions only — no `le_R_trans`,
+no monotonicity. That is why this file, and the four space files above it, previously derived
+nothing at all. -/
+def dist_tri_chain {Γ : Ctx ι} (i : ι) (x y z w : Term F Γ (Ty.base i)) :
+    Derivable F al Premises
+      (le_R (Term.app2 (Term.dist i) x w)
+        (Term.app2 Term.add_R
+          (Term.app2 Term.add_R
+            (Term.app2 (Term.dist i) x y) (Term.app2 (Term.dist i) y z))
+          (Term.app2 (Term.dist i) z w))) :=
+  let dxy : Term F Γ (realTy ι) := Term.app2 (Term.dist i) x y
+  let dyz : Term F Γ (realTy ι) := Term.app2 (Term.dist i) y z
+  let dzw : Term F Γ (realTy ι) := Term.app2 (Term.dist i) z w
+  let dyw : Term F Γ (realTy ι) := Term.app2 (Term.dist i) y w
+  let dxw : Term F Γ (realTy ι) := Term.app2 (Term.dist i) x w
+  let rassoc : Term F Γ (realTy ι) := Term.app2 Term.add_R dxy (Term.app2 Term.add_R dyz dzw)
+  let lassoc : Term F Γ (realTy ι) := Term.app2 Term.add_R (Term.app2 Term.add_R dxy dyz) dzw
+  by
+  pmode
+  papplym (le_R_trans_core dxw rassoc lassoc)
+  psplit
+  · papplym (le_R_trans_core dxw (Term.app2 Term.add_R dxy dyw) rassoc)
+    psplit
+    · -- `d(x,w) ≤ℝ d(x,y) +ℝ d(y,w)` — the constructor, converted out of `le_R_pu`
+      pthm (Derivable.mp (Derivable.dist_tri i x y w)
+        (le_R_of_le_R_pu dxw (Term.app2 Term.add_R dxy dyw)))
+    · -- `d(y,w) ≤ℝ d(y,z) +ℝ d(z,w)`, under `d(x,y) +ℝ ·`
+      papplym (le_R_add_mono_l_core dxy dyw (Term.app2 Term.add_R dyz dzw))
+      pthm (Derivable.mp (Derivable.dist_tri i y z w)
+        (le_R_of_le_R_pu dyw (Term.app2 Term.add_R dyz dzw)))
+  · -- re-associate: `a +ℝ (b +ℝ c) =ℝ (a +ℝ b) +ℝ c`
+    papplym (le_R_of_eq_R_core rassoc lassoc)
+    pthm (Derivable.mp (add_assoc_R_core dxy dyz dzw) (eq_R_sym_core lassoc rassoc))
+
 -- Axiom hygiene: base-type equality is an equivalence, with nothing assumed.
 #print axioms eqAtType_refl_base
 #print axioms eqAtType_sym_base
 #print axioms eqAtType_trans_base
 #print axioms dist_nonneg
+#print axioms dist_tri_chain
 
 end Metatheorems

@@ -14,6 +14,7 @@ import Metatheorems.RealNumbers.Mul
 import Metatheorems.RealNumbers.OrderBounds
 import Metatheorems.RealNumbers.Approx
 import Metatheorems.RealNumbers.Order
+import Metatheorems.RealNumbers.LeOrder
 import Metatheorems.RealNumbers.Metric
 import Metatheorems.RealNumbers.Interval
 
@@ -32,6 +33,7 @@ order:
 | `Field` | the additive axioms (`add_zero_R`, `add_comm_R`, `add_assoc_R`), the `le_R`/`le_R_pu` bridges, the ℚ rearrangements |
 | `Negation` | `cauchyState_neg`/`cauchyfy_neg`, `add_neg_R`, `cauchyState_congr`/`cauchyfy_congr` |
 | `Mul` | `mul_R_apply`, `mul_comm_R`, `mul_one_R`, `mul_R_check`/`cauchyfy_mul_R`, `mul_assoc_R`, `distrib_R` — the multiplicative side, complete |
+| `LeOrder` | the **non-strict** order package (2026-09-04): `le_R_refl`, `le_R_trans`, `le_R_of_eq_R_core`, `lt_imp_le_R_core`, `le_R_antisymm_core`, `le_R_congr`, additive monotonicity on either side and two-sided — plus the one-sided telescope `leR_pair_step`/`leR_tail`/`leR_le`/`leR_strict` that transitivity needs. None of this existed before; `≤_ℝ` had only the `Field.lean` conversions, so two `Derivable.dist_tri`s could not be chained |
 | `Order` | `lt_irrefl_R`, `lt_add_R`/`lt_mul_pos_R`/`archimedean_R`, `zero_lt_one_R`, `lt_shift*`, `lt_trans_R` — all proved; this row said "(sorried)" until 2026-09-04, two days after they closed |
 | `QBounds` | ℚ-code bounds: `abs_le_encode` (a code dominates its magnitude), `rat_num_le_self`, the encode-parts cluster, `exp2_add`, `sub_lt_of_le` — pure ℚ/ℕ, sits beside `Defs` |
 | `Bounds` | `cauchyfy_mag_le`, `abs_R_apply`/`embed_nat_R_apply`, `cauchyfy_embed` — the cauchyfy-level magnitude layer |
@@ -188,5 +190,25 @@ namespace Metatheorems
 #print axioms clamp01_le_one_core
 #print axioms clamp01_eq
 #print axioms clamp01_eq_core
+-- The NON-STRICT order package (`RealNumbers/LeOrder.lean`, 2026-09-04). Before it the ℝ
+-- layer had reflexivity/transitivity/monotonicity for `<_ℝ` and *nothing* for `≤_ℝ` beyond
+-- the `le_R`/`le_R_pu`/bound conversions in `Field.lean`, so two `Derivable.dist_tri`s could
+-- not be chained. `BaseEquality.dist_tri_chain` is the first consumer.
+#print axioms leR_pair_step
+#print axioms leR_tail
+#print axioms leR_le
+#print axioms leR_strict
+#print axioms le_R_refl_core
+#print axioms le_R_refl
+#print axioms le_R_of_eq_R_core
+#print axioms lt_irrefl_R_core
+#print axioms lt_imp_le_R_core
+#print axioms le_R_trans_core
+#print axioms le_R_trans
+#print axioms le_R_antisymm_core
+#print axioms le_R_congr
+#print axioms le_R_add_mono_r_core
+#print axioms le_R_add_mono_l_core
+#print axioms le_R_add_mono_core
 
 end Metatheorems
