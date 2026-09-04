@@ -832,16 +832,43 @@ def sInduction {A : Formula F (Ty.nat :: Γ)}
        exact hiff.mp hconc⟩
 
 
+/-- The **term** realizing equality at a base type: `wTy (eqAtType (.base i) s t)` is
+`nat →ₜ unit`, so `λn.⋆` is the only closed inhabitant up to the interpretation.
+
+Was the `EqXInterp.realizeTerm` field. It became definable when base equality stopped being
+an abstract predicate (2026-09-02); the field outlived that change by two days. -/
+def eqAtTypeBaseRealizeTerm (i : ι) {Γ : Ctx ι} (s t : Term F Γ (Ty.base i)) :
+    Term F Γ (wTy (eqAtType (Ty.base i) s t)) :=
+  Term.lam Term.unitI
+
+/-- `eqAtTypeBaseRealizeTerm` is correct wherever the two sides are semantically equal.
+
+Was the `EqXInterp.realizeTerm_sound` field, and it **collapses into `realize`**: the witness
+type `ℕ → Unit` is a subsingleton, so the interpretation of `λn.⋆` is *forced* to equal the
+witness of the semantic realizer `realize` already provides. No new model input. -/
+theorem eqAtTypeBase_realizeTerm_sound {si : SpaceInterp X F} (eqxi : EqXInterp X F si)
+    (i : ι) {Γ : Ctx ι} (s t : Term F Γ (Ty.base i)) (env : Ctx.interpret X Γ)
+    (h : Term.interpret si s env = Term.interpret si t env)
+    (y : dialecticaCounter X (eqAtType (Ty.base i) s t)) :
+    dialecticaMatrix si (eqAtType (Ty.base i) s t) env
+      (Term.interpret si (eqAtTypeBaseRealizeTerm i s t) env) y := by
+  have R := eqxi.realize i s t env h
+  have hw : Term.interpret si (eqAtTypeBaseRealizeTerm i s t) env = R.val :=
+    (eqAtTypeBaseWitness_subsingleton X i s t).elim _ _
+  rw [hw]
+  exact R.property y
+
 /-- A **term** realizing `eqAtType ρ s t`, given that the two sides are semantically
 equal. Recursion on `ρ`: trivial at `nat` and `unit`, componentwise at products, a `lam`
-at arrows, and `eqxi.realizeTerm` at the base types. -/
+at arrows, and `eqAtTypeBaseRealizeTerm` at the base types. -/
 def sEqAtType {si : SpaceInterp X F} (eqxi : EqXInterp X F si) :
     ∀ (ρ : Ty ι) {Γ : Ctx ι} (s t : Term F Γ ρ),
       (∀ env : Ctx.interpret X Γ, Term.interpret si s env = Term.interpret si t env) →
       SRealizer si (eqAtType ρ s t)
   | .nat,      _, _, _, h => ⟨.unitI, fun env _ => h env⟩
   | .base i,   _, s, t, h =>
-      ⟨eqxi.realizeTerm i s t, fun env y => eqxi.realizeTerm_sound i s t env (h env) y⟩
+      ⟨eqAtTypeBaseRealizeTerm i s t,
+       fun env y => eqAtTypeBase_realizeTerm_sound eqxi i s t env (h env) y⟩
   | .unit,     _, _, _, _ => ⟨.unitI, fun _ _ => rfl⟩
   | .prod ρ' τ, _, s, t, h =>
       let r₁ := sEqAtType eqxi ρ' (.fst s) (.fst t) (fun env => congrArg Prod.fst (h env))
@@ -965,7 +992,7 @@ def sQfer {si : SpaceInterp X F} (eqxi : EqXInterp X F si)
     (fun env w y hA₀ => by
       have ssC : Subsingleton (ℂ X A₀) := (dialecticaWitness_subsingleton A₀ hqf hvf).2
       have ssW : Subsingleton (𝕎 X (eqAtType σ (r.subst0 s) (r.subst0 t))) :=
-        dialecticaWitness_eqAtType_ss si eqxi σ (r.subst0 s) (r.subst0 t)
+        dialecticaWitness_eqAtType_ss (X := X) σ (r.subst0 s) (r.subst0 t)
       simp only [Term.interpret, Term.interpret_weaken, Ctx.lookup] at hA₀ ⊢
       -- the induction hypothesis, as a semantic realizer of the equation
       have hfull : dialecticaRealizerCtx si (eqAtType ρ s t) env :=
@@ -1091,6 +1118,433 @@ def sAC {si : SpaceInterp X F} {ρ τ : Ty ι} {A : Formula F (τ :: ρ :: Γ)} 
 end Rules
 
 -- ============================================================================
+-- The witness terms, with no model in sight
+-- ============================================================================
+
+/-! ### `wt*` — the term half of every rule combinator, on its own
+
+`SRealizer si A` is `{ t : Term F Γ (wTy A) // <property mentioning si> }`. The **payload's
+type mentions no `si`**; only the property does. And every `s*` combinator above builds its
+payload from the payloads of its sub-realizers by pure syntax — `SRealizer.imp f g _` is
+`⟨.mkPair f g, _⟩`, `sMP a ab` is `⟨.app (.fst ab.val) a.val, _⟩`, and so on.
+
+So the extracted realizer is a function of the **derivation tree alone**; the model is
+packaging. The `wt*` definitions below are exactly those payloads, taking sub-*terms* where
+the `s*` take sub-*realizers*, and `extractTerm` (below) runs `syntactic_soundness`'s
+recursion through them with no `si`, no `X`, and no `eqxi`. Each `<name>_val` lemma pins the
+correspondence, and every one of them holds by `rfl`.
+
+This is the `ConstMajorants` pattern one layer down: the `Prop`/model-parameterized API is
+untouched, the computational one is added beside it. -/
+
+section WitnessTerms
+
+/-- Term half of `SRealizer.imp`. -/
+def wtImp {Γ : Ctx ι} {A B : Formula F Γ} (f : Term F Γ (wTy A →ₜ wTy B))
+    (g : Term F Γ (wTy A →ₜ cTy B →ₜ cTy A)) : Term F Γ (wTy (A →ᶠ B)) :=
+  .mkPair f g
+
+/-- Term half of `sExfalso`. -/
+def wtExfalso {Γ : Ctx ι} (A : Formula F Γ) : Term F Γ (wTy (⊥ᶠ →ᶠ A)) :=
+  wtImp (.lam (Term.weaken (defaultWTerm A))) (.lam (.lam .unitI))
+
+/-- Term half of `sAndWeak`. -/
+def wtAndWeak {Γ : Ctx ι} (A B : Formula F Γ) : Term F Γ (wTy (A ∧ᶠ B →ᶠ A)) :=
+  wtImp (.lam (.fst (.var .vz)))
+    (.lam (.lam (.mkPair (.var .vz) (Term.weaken (Term.weaken (defaultCTerm B))))))
+
+/-- Term half of `sAndPerm`. -/
+def wtAndPerm {Γ : Ctx ι} (A B : Formula F Γ) : Term F Γ (wTy (A ∧ᶠ B →ᶠ B ∧ᶠ A)) :=
+  wtImp (.lam (.mkPair (.snd (.var .vz)) (.fst (.var .vz))))
+    (.lam (.lam (.mkPair (.snd (.var .vz)) (.fst (.var .vz)))))
+
+/-- Term half of `sOrWeak`. -/
+def wtOrWeak {Γ : Ctx ι} (A B : Formula F Γ) : Term F Γ (wTy (A →ᶠ A ∨ᶠ B)) :=
+  wtImp (.lam (.mkPair .zero (.mkPair (.var .vz) (Term.weaken (defaultWTerm B)))))
+    (.lam (.lam (.fst (.var .vz))))
+
+/-- Term half of `sOrPerm`. -/
+def wtOrPerm {Γ : Ctx ι} (A B : Formula F Γ) : Term F Γ (wTy (A ∨ᶠ B →ᶠ B ∨ᶠ A)) :=
+  wtImp
+    (.lam (.mkPair (Term.natCase (.fst (.var .vz)) (.app .succ .zero) .zero)
+      (.mkPair (.snd (.snd (.var .vz))) (.fst (.snd (.var .vz))))))
+    (.lam (.lam (.mkPair (.snd (.var .vz)) (.fst (.var .vz)))))
+
+/-- Term half of `sOrContract`. -/
+def wtOrContract {Γ : Ctx ι} (A : Formula F Γ) : Term F Γ (wTy (A ∨ᶠ A →ᶠ A)) :=
+  wtImp
+    (.lam (Term.natCase (.fst (.var .vz)) (.fst (.snd (.var .vz))) (.snd (.snd (.var .vz)))))
+    (.lam (.lam (.mkPair (.var .vz) (.var .vz))))
+
+/-- Term half of `sAndContract`. The one rule whose witness term mentions `matrixTerm`. -/
+def wtAndContract {Γ : Ctx ι} (A : Formula F Γ) : Term F Γ (wTy (A →ᶠ A ∧ᶠ A)) :=
+  wtImp (.lam (.mkPair (.var .vz) (.var .vz)))
+    (.lam (.lam (Term.natCase
+      (matrixTerm (fun v => .vs (.vs v)) A (.var (.vs .vz)) (.fst (.var .vz)))
+      (.snd (.var .vz)) (.fst (.var .vz)))))
+
+/-- Term half of `sMP`. -/
+def wtMP {Γ : Ctx ι} {A B : Formula F Γ} (a : Term F Γ (wTy A))
+    (ab : Term F Γ (wTy (A →ᶠ B))) : Term F Γ (wTy B) :=
+  .app (.fst ab) a
+
+/-- Term half of `sSyllogism`. -/
+def wtSyllogism {Γ : Ctx ι} {A B C : Formula F Γ} (ab : Term F Γ (wTy (A →ᶠ B)))
+    (bc : Term F Γ (wTy (B →ᶠ C))) : Term F Γ (wTy (A →ᶠ C)) :=
+  wtImp
+    (.lam (.app (Term.weaken (.fst bc)) (.app (Term.weaken (.fst ab)) (.var .vz))))
+    (.lam (.lam (.app (.app (Term.weaken (Term.weaken (.snd ab))) (.var (.vs .vz)))
+      (.app (.app (Term.weaken (Term.weaken (.snd bc)))
+          (.app (Term.weaken (Term.weaken (.fst ab))) (.var (.vs .vz))))
+        (.var .vz)))))
+
+/-- Term half of `sExportation`. -/
+def wtExportation {Γ : Ctx ι} {A B C : Formula F Γ} (h : Term F Γ (wTy (A ∧ᶠ B →ᶠ C))) :
+    Term F Γ (wTy (A →ᶠ B →ᶠ C)) :=
+  wtImp
+    (.lam (.mkPair
+      (.lam (.app (Term.weaken (Term.weaken (.fst h)))
+        (.mkPair (.var (.vs .vz)) (.var .vz))))
+      (.lam (.lam (.snd (.app (.app (Term.weaken (Term.weaken (Term.weaken (.snd h))))
+        (.mkPair (.var (.vs (.vs .vz))) (.var (.vs .vz)))) (.var .vz)))))))
+    (.lam (.lam (.fst (.app (.app (Term.weaken (Term.weaken (.snd h)))
+      (.mkPair (.var (.vs .vz)) (.fst (.var .vz)))) (.snd (.var .vz))))))
+
+/-- Term half of `sImportation`. -/
+def wtImportation {Γ : Ctx ι} {A B C : Formula F Γ} (h : Term F Γ (wTy (A →ᶠ B →ᶠ C))) :
+    Term F Γ (wTy (A ∧ᶠ B →ᶠ C)) :=
+  wtImp
+    (.lam (.app (.fst (.app (Term.weaken (.fst h)) (.fst (.var .vz)))) (.snd (.var .vz))))
+    (.lam (.lam (.mkPair
+      (.app (.app (Term.weaken (Term.weaken (.snd h))) (.fst (.var (.vs .vz))))
+        (.mkPair (.snd (.var (.vs .vz))) (.var .vz)))
+      (.app (.app (.snd (.app (Term.weaken (Term.weaken (.fst h)))
+          (.fst (.var (.vs .vz))))) (.snd (.var (.vs .vz)))) (.var .vz)))))
+
+/-- Term half of `sExpansion`. -/
+def wtExpansion {Γ : Ctx ι} {A B C : Formula F Γ} (h : Term F Γ (wTy (A →ᶠ B))) :
+    Term F Γ (wTy (C ∨ᶠ A →ᶠ C ∨ᶠ B)) :=
+  wtImp
+    (.lam (.mkPair (.fst (.var .vz)) (.mkPair (.fst (.snd (.var .vz)))
+      (.app (Term.weaken (.fst h)) (.snd (.snd (.var .vz)))))))
+    (.lam (.lam (.mkPair (.fst (.var .vz))
+      (.app (.app (Term.weaken (Term.weaken (.snd h)))
+        (.snd (.snd (.var (.vs .vz))))) (.snd (.var .vz))))))
+
+/-- Term half of `sSym0`. -/
+def wtSym0 {Γ : Ctx ι} (s t : Term F Γ Ty.nat) :
+    Term F Γ (wTy (Formula.eq0 s t →ᶠ Formula.eq0 t s)) :=
+  wtImp (.lam .unitI) (.lam (.lam .unitI))
+
+/-- Term half of `sTrans0`. -/
+def wtTrans0 {Γ : Ctx ι} (s t u : Term F Γ Ty.nat) :
+    Term F Γ (wTy (Formula.eq0 s t ∧ᶠ Formula.eq0 t u →ᶠ Formula.eq0 s u)) :=
+  wtImp (.lam .unitI) (.lam (.lam (.mkPair .unitI .unitI)))
+
+/-- Term half of `sForallAx`. -/
+def wtForallAx {Γ : Ctx ι} {ρ : Ty ι} (A : Formula F (ρ :: Γ)) (t : Term F Γ ρ) :
+    Term F Γ (wTy (Formula.all ρ A →ᶠ A.subst0 t)) :=
+  let hw : wTy (A.subst0 t) = wTy A := (wTy_cTy_substF A (Term.subst0_map t)).1
+  let hc : cTy (A.subst0 t) = cTy A := (wTy_cTy_substF A (Term.subst0_map t)).2
+  wtImp
+    (.lam (Term.castTy hw.symm (.app (.var .vz) (Term.weaken t))))
+    (.lam (.lam (.mkPair (Term.weaken (Term.weaken t)) (Term.castTy hc (.var .vz)))))
+
+/-- Term half of `sExistAx`. -/
+def wtExistAx {Γ : Ctx ι} {ρ : Ty ι} (A : Formula F (ρ :: Γ)) (t : Term F Γ ρ) :
+    Term F Γ (wTy (A.subst0 t →ᶠ Formula.ex ρ A)) :=
+  let hw : wTy (A.subst0 t) = wTy A := (wTy_cTy_substF A (Term.subst0_map t)).1
+  let hc : cTy (A.subst0 t) = cTy A := (wTy_cTy_substF A (Term.subst0_map t)).2
+  wtImp
+    (.lam (.mkPair (Term.weaken t) (Term.castTy hw (.var .vz))))
+    (.lam (.lam (Term.castTy hc.symm (.var .vz))))
+
+/-- Term half of `sUnivGen`. -/
+def wtUnivGen {Γ : Ctx ι} {ρ : Ty ι} (A : Formula F Γ) (r : Term F Γ (wTy A)) :
+    Term F Γ (wTy (Formula.all ρ (A.weakenBy ρ))) :=
+  let hw : wTy (A.weakenBy ρ) = wTy A := (wTy_cTy_renameF A Term.Renaming.shift).1
+  .lam (Term.castTy hw.symm (Term.weaken r))
+
+/-- Term half of `sSuccNeZero`. -/
+def wtSuccNeZero {Γ : Ctx ι} : Term F Γ
+    (wTy ((Formula.all Ty.nat
+      (Formula.eq0 (.app .succ (.var .vz)) .zero →ᶠ ⊥ᶠ) : Formula F Γ))) :=
+  .lam (.mkPair (.lam .unitI) (.lam (.lam .unitI)))
+
+/-- Term half of `sSuccInj`. -/
+def wtSuccInj {Γ : Ctx ι} : Term F Γ
+    (wTy ((Formula.all Ty.nat (Formula.all Ty.nat
+      (Formula.eq0 (.app .succ (.var (.vs .vz))) (.app .succ (.var .vz))
+        →ᶠ Formula.eq0 (.var (.vs .vz)) (.var .vz))) : Formula F Γ))) :=
+  .lam (.lam (.mkPair (.lam .unitI) (.lam (.lam .unitI))))
+
+/-- Term half of `sForallRule`. -/
+def wtForallRule {Γ : Ctx ι} {ρ : Ty ι} {B : Formula F Γ} {A : Formula F (ρ :: Γ)}
+    (h : Term F (ρ :: Γ) (wTy (Formula.weakenBy ρ B →ᶠ A))) :
+    Term F Γ (wTy (B →ᶠ Formula.all ρ A)) :=
+  let hw : wTy (Formula.weakenBy ρ B) = wTy B := (wTy_cTy_renameF B Term.Renaming.shift).1
+  let hc : cTy (Formula.weakenBy ρ B) = cTy B := (wTy_cTy_renameF B Term.Renaming.shift).2
+  let rn : Term.Renaming (ρ :: Γ) (ρ :: wTy B :: Γ) :=
+    Term.Renaming.ext Term.Renaming.shift
+  let sb : Term.Subst F (ρ :: Γ) (cTy (Formula.all ρ A) :: wTy B :: Γ) := fun v =>
+    match v with
+    | .vz   => .fst (.var .vz)
+    | .vs w => .var (.vs (.vs w))
+  let hf := h.rename rn
+  let hg := h.subst sb
+  wtImp
+    (.lam (.lam (.app (.fst hf) (Term.castTy hw.symm (.var (.vs .vz))))))
+    (.lam (.lam (Term.castTy hc
+      (.app (.app (.snd hg) (Term.castTy hw.symm (.var (.vs .vz)))) (.snd (.var .vz))))))
+
+/-- Term half of `sExistRule`. -/
+def wtExistRule {Γ : Ctx ι} {ρ : Ty ι} {B : Formula F Γ} {A : Formula F (ρ :: Γ)}
+    (h : Term F (ρ :: Γ) (wTy (A →ᶠ Formula.weakenBy ρ B))) :
+    Term F Γ (wTy (Formula.ex ρ A →ᶠ B)) :=
+  let hw : wTy (Formula.weakenBy ρ B) = wTy B := (wTy_cTy_renameF B Term.Renaming.shift).1
+  let hc : cTy (Formula.weakenBy ρ B) = cTy B := (wTy_cTy_renameF B Term.Renaming.shift).2
+  let sb1 : Term.Subst F (ρ :: Γ) (wTy (Formula.ex ρ A) :: Γ) := fun v =>
+    match v with
+    | .vz   => .fst (.var .vz)
+    | .vs w => .var (.vs w)
+  let sb2 : Term.Subst F (ρ :: Γ) (cTy B :: wTy (Formula.ex ρ A) :: Γ) := fun v =>
+    match v with
+    | .vz   => .fst (.var (.vs .vz))
+    | .vs w => .var (.vs (.vs w))
+  wtImp
+    (.lam (Term.castTy hw (.app (.fst (h.subst sb1)) (.snd (.var .vz)))))
+    (.lam (.lam (.app (.app (.snd (h.subst sb2)) (.snd (.var (.vs .vz))))
+      (Term.castTy hc.symm (.var .vz)))))
+
+/-- Term half of `sInduction`: a `Term.prec` at the object-level witness type. -/
+def wtInduction {Γ : Ctx ι} {A : Formula F (Ty.nat :: Γ)}
+    (hbase : Term F Γ (wTy (A.subst0 Term.zero)))
+    (hstep : Term F Γ (wTy (Formula.all Ty.nat
+      (A →ᶠ Formula.substVar0 A (Term.app Term.succ (.var .vz)))))) :
+    Term F Γ (wTy (Formula.all Ty.nat A)) :=
+  let hw0 : wTy (A.subst0 Term.zero) = wTy A := (wTy_cTy_substF A (Term.subst0_map _)).1
+  let hwsv : wTy (A.substVar0 (Term.app Term.succ (.var .vz))) = wTy A :=
+    (wTy_cTy_substF A (Formula.Term.substVar0_map _)).1
+  let base' : Term F (Ty.nat :: Γ) (wTy A) := Term.castTy hw0 (Term.weaken hbase)
+  let step' : Term F (Ty.nat :: Γ) (wTy A →ₜ Ty.nat →ₜ wTy A) :=
+    .lam (.lam (Term.castTy hwsv
+      (.app (.fst (.app (Term.weaken (Term.weaken (Term.weaken hstep))) (.var .vz)))
+        (.var (.vs .vz)))))
+  .lam (Term.app3 (.prec (wTy A)) base' step' (.var .vz))
+
+/-- Term half of `sQfer`. -/
+def wtQfer {Γ : Ctx ι} {A₀ : Formula F Γ} {ρ σ : Ty ι} {s t : Term F Γ ρ}
+    (r : Term F (ρ :: Γ) σ) (ih : Term F Γ (wTy (A₀ →ᶠ eqAtType ρ s t))) :
+    Term F Γ (wTy (A₀ →ᶠ eqAtType σ (r.subst0 s) (r.subst0 t))) :=
+  wtImp
+    (.lam (Term.weaken (defaultWTerm (eqAtType σ (r.subst0 s) (r.subst0 t)))))
+    (.lam (.lam (.app (.app (Term.weaken (Term.weaken (.snd ih))) (.var (.vs .vz)))
+      (Term.weaken (Term.weaken (defaultCTerm (eqAtType ρ s t)))))))
+
+/-- Term half of `sMarkov`. **No `Classical.choice` here**: the choice `sMarkov` uses lives
+entirely in its `Prop` half (`Classical.not_not`, `Classical.em`). -/
+def wtMarkov {Γ : Ctx ι} {ρ : Ty ι} (A₀ : Formula F (ρ :: Γ)) :
+    Term F Γ (wTy (¬ᶠ(¬ᶠ(Formula.ex ρ A₀)) →ᶠ Formula.ex ρ A₀)) :=
+  let nex : Term F Γ (wTy (¬ᶠ(Formula.ex ρ A₀))) :=
+    .mkPair (.lam .unitI) (.lam (.lam (Term.defaultOf (cTy A₀))))
+  wtImp
+    (.lam (.mkPair
+      (.fst (.fst (.app (.app (.snd (.var .vz)) (Term.weaken nex)) .unitI)))
+      (Term.defaultOf (wTy A₀))))
+    (.lam (.lam (.mkPair (Term.weaken (Term.weaken nex)) .unitI)))
+
+/-- Term half of `sIP`. -/
+def wtIP {Γ : Ctx ι} {ρ σ : Ty ι} (A₀ : Formula F (σ :: Γ)) (B : Formula F (ρ :: Γ)) :
+    Term F Γ (wTy ((Formula.all σ A₀ →ᶠ Formula.ex ρ B) →ᶠ
+      Formula.ex ρ ((Formula.all σ A₀).weakenBy ρ →ᶠ B))) :=
+  let hWA : wTy ((Formula.all σ A₀).weakenBy ρ) = wTy (Formula.all σ A₀) :=
+    (wTy_cTy_renameF (Formula.all σ A₀) Term.Renaming.shift).1
+  let hCA : cTy ((Formula.all σ A₀).weakenBy ρ) = cTy (Formula.all σ A₀) :=
+    (wTy_cTy_renameF (Formula.all σ A₀) Term.Renaming.shift).2
+  wtImp
+    (.lam (.mkPair
+      (.fst (.app (.fst (.var .vz)) (.lam (Term.defaultOf (wTy A₀)))))
+      (.mkPair
+        (.lam (.snd (.app (.fst (.var (.vs .vz))) (Term.castTy hWA (.var .vz)))))
+        (.lam (.lam (Term.castTy hCA.symm
+          (.app (.app (.snd (.var (.vs (.vs .vz)))) (Term.castTy hWA (.var (.vs .vz))))
+            (.var .vz))))))))
+    (.lam (.lam (.mkPair (Term.castTy hWA (.fst (.var .vz))) (.snd (.var .vz)))))
+
+/-- Term half of `sAC`. -/
+def wtAC {Γ : Ctx ι} {ρ τ : Ty ι} (A : Formula F (τ :: ρ :: Γ)) :
+    Term F Γ (wTy ((Formula.all ρ (Formula.ex τ A)) →ᶠ
+      Formula.ex (ρ →ₜ τ) (Formula.all ρ (Formula.substF Formula.acSubst A)))) :=
+  let hwA : wTy (Formula.substF Formula.acSubst A) = wTy A :=
+    (wTy_cTy_substF A (Formula.acSubst (ρ := ρ) (τ := τ))).1
+  let hcA : cTy (Formula.substF Formula.acSubst A) = cTy A :=
+    (wTy_cTy_substF A (Formula.acSubst (ρ := ρ) (τ := τ))).2
+  wtImp
+    (.lam (.mkPair
+      (.lam (.fst (.app (.var (.vs .vz)) (.var .vz))))
+      (.lam (Term.castTy hwA.symm (.snd (.app (.var (.vs .vz)) (.var .vz)))))))
+    (.lam (.lam (.mkPair (.fst (.var .vz)) (Term.castTy hcA (.snd (.var .vz))))))
+
+end WitnessTerms
+
+-- ============================================================================
+-- The `wt*` lemmas: each `s*` combinator's payload IS its `wt*`
+-- ============================================================================
+
+section WitnessTermLemmas
+
+variable {si : SpaceInterp X F}
+
+@[simp] theorem sExfalso_val {Γ : Ctx ι} (A : Formula F Γ) :
+    (sExfalso (si := si) (A := A)).val = wtExfalso A := rfl
+
+@[simp] theorem sAndWeak_val {Γ : Ctx ι} (A B : Formula F Γ) :
+    (sAndWeak (si := si) (A := A) (B := B)).val = wtAndWeak A B := rfl
+
+@[simp] theorem sAndPerm_val {Γ : Ctx ι} (A B : Formula F Γ) :
+    (sAndPerm (si := si) (A := A) (B := B)).val = wtAndPerm A B := rfl
+
+@[simp] theorem sOrWeak_val {Γ : Ctx ι} (A B : Formula F Γ) :
+    (sOrWeak (si := si) (A := A) (B := B)).val = wtOrWeak A B := rfl
+
+@[simp] theorem sOrPerm_val {Γ : Ctx ι} (A B : Formula F Γ) :
+    (sOrPerm (si := si) (A := A) (B := B)).val = wtOrPerm A B := rfl
+
+@[simp] theorem sOrContract_val {Γ : Ctx ι} (A : Formula F Γ) :
+    (sOrContract (si := si) (A := A)).val = wtOrContract A := rfl
+
+@[simp] theorem sAndContract_val {Γ : Ctx ι} (A : Formula F Γ) :
+    (sAndContract (si := si) (A := A)).val = wtAndContract A := rfl
+
+@[simp] theorem sMP_val {Γ : Ctx ι} {A B : Formula F Γ} (hA : SRealizer si A)
+    (hAB : SRealizer si (A →ᶠ B)) : (sMP hA hAB).val = wtMP hA.val hAB.val := rfl
+
+@[simp] theorem sSyllogism_val {Γ : Ctx ι} {A B C : Formula F Γ}
+    (hAB : SRealizer si (A →ᶠ B)) (hBC : SRealizer si (B →ᶠ C)) :
+    (sSyllogism hAB hBC).val = wtSyllogism hAB.val hBC.val := rfl
+
+@[simp] theorem sExportation_val {Γ : Ctx ι} {A B C : Formula F Γ}
+    (h : SRealizer si (A ∧ᶠ B →ᶠ C)) : (sExportation h).val = wtExportation h.val := rfl
+
+@[simp] theorem sImportation_val {Γ : Ctx ι} {A B C : Formula F Γ}
+    (h : SRealizer si (A →ᶠ B →ᶠ C)) : (sImportation h).val = wtImportation h.val := rfl
+
+@[simp] theorem sExpansion_val {Γ : Ctx ι} {A B C : Formula F Γ}
+    (h : SRealizer si (A →ᶠ B)) :
+    (sExpansion (C := C) h).val = wtExpansion (C := C) h.val := rfl
+
+@[simp] theorem sRefl0_val {Γ : Ctx ι} (t : Term F Γ Ty.nat) :
+    (sRefl0 (si := si) (t := t)).val = .unitI := rfl
+
+@[simp] theorem sSym0_val {Γ : Ctx ι} (s t : Term F Γ Ty.nat) :
+    (sSym0 (si := si) (s := s) (t := t)).val = wtSym0 s t := rfl
+
+@[simp] theorem sTrans0_val {Γ : Ctx ι} (s t u : Term F Γ Ty.nat) :
+    (sTrans0 (si := si) (s := s) (t := t) (u := u)).val = wtTrans0 s t u := rfl
+
+@[simp] theorem sForallAx_val {Γ : Ctx ι} {ρ : Ty ι} (A : Formula F (ρ :: Γ))
+    (t : Term F Γ ρ) : (sForallAx (si := si) (A := A) t).val = wtForallAx A t := rfl
+
+@[simp] theorem sExistAx_val {Γ : Ctx ι} {ρ : Ty ι} (A : Formula F (ρ :: Γ))
+    (t : Term F Γ ρ) : (sExistAx (si := si) (A := A) t).val = wtExistAx A t := rfl
+
+@[simp] theorem sUnivGen_val {Γ : Ctx ι} {ρ : Ty ι} {A : Formula F Γ} (r : SRealizer si A) :
+    (sUnivGen (ρ := ρ) r).val = wtUnivGen (ρ := ρ) A r.val := rfl
+
+@[simp] theorem sSuccNeZero_val {Γ : Ctx ι} :
+    (sSuccNeZero (si := si) (Γ := Γ)).val = wtSuccNeZero := rfl
+
+@[simp] theorem sSuccInj_val {Γ : Ctx ι} :
+    (sSuccInj (si := si) (Γ := Γ)).val = wtSuccInj := rfl
+
+@[simp] theorem sForallRule_val {Γ : Ctx ι} {ρ : Ty ι} {B : Formula F Γ}
+    {A : Formula F (ρ :: Γ)} (h : SRealizer si (Formula.weakenBy ρ B →ᶠ A)) :
+    (sForallRule h).val = wtForallRule h.val := rfl
+
+@[simp] theorem sExistRule_val {Γ : Ctx ι} {ρ : Ty ι} {B : Formula F Γ}
+    {A : Formula F (ρ :: Γ)} (h : SRealizer si (A →ᶠ Formula.weakenBy ρ B)) :
+    (sExistRule h).val = wtExistRule h.val := rfl
+
+@[simp] theorem sInduction_val {Γ : Ctx ι} {A : Formula F (Ty.nat :: Γ)}
+    (hbase : SRealizer si (A.subst0 Term.zero))
+    (hstep : SRealizer si (Formula.all Ty.nat
+      (A →ᶠ Formula.substVar0 A (Term.app Term.succ (.var .vz))))) :
+    (sInduction hbase hstep).val = wtInduction hbase.val hstep.val := rfl
+
+@[simp] theorem sQfer_val {Γ : Ctx ι} (eqxi : EqXInterp X F si) {A₀ : Formula F Γ}
+    {ρ σ : Ty ι} {s t : Term F Γ ρ} {r : Term F (ρ :: Γ) σ}
+    (hqf : A₀.isQF = true) (hvf : A₀.isVFree = true)
+    (ih : SRealizer si (A₀ →ᶠ eqAtType ρ s t)) :
+    (sQfer eqxi (σ := σ) (r := r) hqf hvf ih).val = wtQfer r ih.val := rfl
+
+@[simp] theorem sMarkov_val {Γ : Ctx ι} {ρ : Ty ι} {A₀ : Formula F (ρ :: Γ)}
+    (hqf : A₀.isQF = true) (hvf : A₀.isVFree = true) :
+    (sMarkov (si := si) hqf hvf).val = wtMarkov A₀ := rfl
+
+@[simp] theorem sIP_val {Γ : Ctx ι} {ρ σ : Ty ι} {A₀ : Formula F (σ :: Γ)}
+    {B : Formula F (ρ :: Γ)} (hqf : A₀.isQF = true) (hvf : A₀.isVFree = true) :
+    (sIP (si := si) (ρ := ρ) (B := B) hqf hvf).val = wtIP A₀ B := rfl
+
+@[simp] theorem sAC_val {Γ : Ctx ι} {ρ τ : Ty ι} {A : Formula F (τ :: ρ :: Γ)} :
+    (sAC (si := si) (A := A)).val = wtAC A := rfl
+
+/-- **The realizing term of a purely universal ∨-free formula is the default witness term.**
+`wTy` of `∀x₁…∀xₖ.A_qf` bottoms out in `Ty.unit`, and `srealizer_of_pu`'s `lam`/`mkPair`
+stack is exactly what `Term.defaultOf` builds there. So its payload carries no information at
+all — which is why `extractTerm` needs no model input for any of `srealizer_of_pu`'s
+clients. -/
+theorem srealizer_of_pu_val :
+    ∀ {Γ : Ctx ι} (B : Formula F Γ) (hpu : B.isPurelyUniversal = true) (hvf : B.isVFree = true)
+      (htrue : ∀ env : Ctx.interpret X Γ, Formula.interpret si B env),
+      (srealizer_of_pu B hpu hvf htrue).val = defaultWTerm B
+  | _, .all _ A, hpu, hvf, htrue => by
+      show Term.lam (srealizer_of_pu A hpu hvf _).val = _
+      rw [srealizer_of_pu_val A hpu hvf]; rfl
+  | _, .and A B, hpu, hvf, htrue => by
+      have hpuA : A.isPurelyUniversal = true := by
+        simp only [Formula.isPurelyUniversal, Bool.and_eq_true] at hpu; exact hpu.1
+      have hpuB : B.isPurelyUniversal = true := by
+        simp only [Formula.isPurelyUniversal, Bool.and_eq_true] at hpu; exact hpu.2
+      have hvfA : A.isVFree = true := by
+        simp only [Formula.isVFree, Bool.and_eq_true] at hvf; exact hvf.1
+      have hvfB : B.isVFree = true := by
+        simp only [Formula.isVFree, Bool.and_eq_true] at hvf; exact hvf.2
+      show Term.mkPair (srealizer_of_pu A hpuA hvfA _).val
+             (srealizer_of_pu B hpuB hvfB _).val = _
+      rw [srealizer_of_pu_val A hpuA hvfA, srealizer_of_pu_val B hpuB hvfB]; rfl
+  | _, .bot,     _, _, _ => rfl
+  | _, .eq0 _ _, _, _, _ => rfl
+  | _, .or _ _,  _, _, _ => rfl
+  | _, .imp _ _, _, _, _ => rfl
+  | _, .ex _ _,  _, _, _ => rfl
+
+/-- **The realizing term of `eqAtType ρ s t` is the default witness term**, at every type
+`ρ`. At a base type this is `eqAtTypeBaseRealizeTerm = λn.⋆ = Term.defaultOf (nat →ₜ unit)`;
+the other cases are the same statement one constructor down.
+
+This is what makes `sEqAtType` — and hence `rec_zero`, `rec_succ`, `beta_eq`, `dist_self`,
+`qfer` — model-independent on the term side. -/
+theorem sEqAtType_val (eqxi : EqXInterp X F si) :
+    ∀ (ρ : Ty ι) {Γ : Ctx ι} (s t : Term F Γ ρ)
+      (h : ∀ env : Ctx.interpret X Γ, Term.interpret si s env = Term.interpret si t env),
+      (sEqAtType eqxi ρ s t h).val = defaultWTerm (eqAtType ρ s t)
+  | .nat,      _, _, _, _ => rfl
+  | .base _,   _, _, _, _ => rfl
+  | .unit,     _, _, _, _ => rfl
+  | .prod ρ' τ, _, s, t, h => by
+      show Term.mkPair (sEqAtType eqxi ρ' _ _ _).val (sEqAtType eqxi τ _ _ _).val = _
+      rw [sEqAtType_val eqxi ρ' (Term.fst s) (Term.fst t),
+        sEqAtType_val eqxi τ (Term.snd s) (Term.snd t)]
+      rfl
+  | .arr ρ' τ, _, s, t, h => by
+      show Term.lam (sEqAtType eqxi τ _ _ _).val = _
+      rw [sEqAtType_val eqxi τ (Term.app (Term.weaken s) (.var .vz))
+        (Term.app (Term.weaken t) (.var .vz))]
+      rfl
+
+end WitnessTermLemmas
+
+-- ============================================================================
 -- Syntactic Dialectica soundness
 -- ============================================================================
 
@@ -1148,6 +1602,133 @@ def syntactic_soundness (eqxi : EqXInterp X F si)
   | _, _, .ip _ hqf hvf     => sIP hqf hvf
   | _, _, .ac _             => sAC
   | _, _, .qfac _ _ _       => sAC
+  | _, _, .lem h_lem        => absurd h_lem (by decide)
+
+-- ============================================================================
+-- Extraction with no model
+-- ============================================================================
+
+/-- **The extracted realizer, as a function of the derivation alone.**
+
+`syntactic_soundness` produces an `SRealizer si A = { t : Term F Γ (wTy A) // … }`; its
+payload's *type* mentions no `si`, and — by the `wt*` lemmas above — neither does the way
+each case builds it. `extractTerm` is that recursion with the model deleted: **no `si`, no
+`X`, no `eqxi`, and nothing `noncomputable`**. `extractTerm_eq` below proves it agrees with
+`syntactic_soundness` at every derivation.
+
+Why this matters: every model in the project routes through Mathlib `ℝ`, so `si` is
+`noncomputable` and `#eval` on anything mentioning it is impossible. `extractTerm` makes the
+realizing term of a derivation **at a space** evaluable — see
+`Probes/ExtractTermDemo.lean`. -/
+def extractTerm (sp : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → Term F Γ' (wTy B)) :
+    {Γ : Ctx ι} → {A : Formula F Γ} →
+    @Derivable ι κ F Allowed.extended Premises Γ A → Term F Γ (wTy A)
+  | _, _, .premise hp       => sp _ _ hp
+  | _, _, .or_contract      => wtOrContract _
+  | _, _, .and_contract     => wtAndContract _
+  | _, _, .or_weak          => wtOrWeak _ _
+  | _, _, .and_weak         => wtAndWeak _ _
+  | _, _, .or_perm          => wtOrPerm _ _
+  | _, _, .and_perm         => wtAndPerm _ _
+  | _, _, .exfalso          => wtExfalso _
+  | _, _, .forall_ax t      => wtForallAx _ t
+  | _, _, .exist_ax t _     => wtExistAx _ t
+  | _, _, .mp hA hAB        => wtMP (extractTerm sp hA) (extractTerm sp hAB)
+  | _, _, .syllogism h₁ h₂  => wtSyllogism (extractTerm sp h₁) (extractTerm sp h₂)
+  | _, _, .exportation h'   => wtExportation (extractTerm sp h')
+  | _, _, .importation h'   => wtImportation (extractTerm sp h')
+  | _, _, .expansion h'     => wtExpansion (extractTerm sp h')
+  | _, _, .forall_rule h'   => wtForallRule (extractTerm sp h')
+  | _, _, .exist_rule h'    => wtExistRule (extractTerm sp h')
+  | _, _, .univ_gen h'      => wtUnivGen _ (extractTerm sp h')
+  | _, _, .succ_ne_zero     => wtSuccNeZero
+  | _, _, .succ_inj         => wtSuccInj
+  -- the four "equality" rules and the two pseudometric ones are purely universal, so their
+  -- realizing term is the information-free default (`sEqAtType_val`, `srealizer_of_pu_val`)
+  | _, _, .rec_zero         => defaultWTerm _
+  | _, _, .rec_succ         => defaultWTerm _
+  | _, _, .beta_eq _ _      => defaultWTerm _
+  | _, _, .dist_self _ _    => defaultWTerm _
+  | _, _, .dist_comm _ _ _  => defaultWTerm _
+  | _, _, .dist_tri _ _ _ _ => defaultWTerm _
+  | _, _, .refl0            => .unitI
+  | _, _, .sym0             => wtSym0 _ _
+  | _, _, .trans0           => wtTrans0 _ _ _
+  | _, _, .qfer _ _ h'      => wtQfer _ (extractTerm sp h')
+  | _, _, .induction hb hs  => wtInduction (extractTerm sp hb) (extractTerm sp hs)
+  | _, _, .markov _ _ _     => wtMarkov _
+  | _, _, .ip _ _ _         => wtIP _ _
+  | _, _, .ac _             => wtAC _
+  | _, _, .qfac _ _ _       => wtAC _
+  | _, _, .lem h_lem        => absurd h_lem (by decide)
+
+/-- **The bridge.** `syntactic_soundness`'s payload is `extractTerm`'s output, at every
+derivation, model and premise realizer. So nothing is lost by extracting without a model:
+the `si`-parameterized API keeps its exact statements, and the computational one sits beside
+it. -/
+theorem extractTerm_eq (eqxi : EqXInterp X F si)
+    (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B) :
+    ∀ {Γ : Ctx ι} {A : Formula F Γ} (prf : @Derivable ι κ F Allowed.extended Premises Γ A),
+      (syntactic_soundness eqxi spremise prf).val
+        = extractTerm (fun Γ' B hp => (spremise Γ' B hp).val) prf
+  | _, _, .premise _        => rfl
+  | _, _, .or_contract      => rfl
+  | _, _, .and_contract     => rfl
+  | _, _, .or_weak          => rfl
+  | _, _, .and_weak         => rfl
+  | _, _, .or_perm          => rfl
+  | _, _, .and_perm         => rfl
+  | _, _, .exfalso          => rfl
+  | _, _, .forall_ax _      => rfl
+  | _, _, .exist_ax _ _     => rfl
+  | _, _, .mp hA hAB        => by
+      show wtMP (syntactic_soundness eqxi spremise hA).val
+             (syntactic_soundness eqxi spremise hAB).val = wtMP _ _
+      rw [extractTerm_eq eqxi spremise hA, extractTerm_eq eqxi spremise hAB]
+  | _, _, .syllogism h₁ h₂  => by
+      show wtSyllogism (syntactic_soundness eqxi spremise h₁).val
+             (syntactic_soundness eqxi spremise h₂).val = wtSyllogism _ _
+      rw [extractTerm_eq eqxi spremise h₁, extractTerm_eq eqxi spremise h₂]
+  | _, _, .exportation h'   => by
+      show wtExportation (syntactic_soundness eqxi spremise h').val = wtExportation _
+      rw [extractTerm_eq eqxi spremise h']
+  | _, _, .importation h'   => by
+      show wtImportation (syntactic_soundness eqxi spremise h').val = wtImportation _
+      rw [extractTerm_eq eqxi spremise h']
+  | _, _, .expansion h'     => by
+      show wtExpansion (syntactic_soundness eqxi spremise h').val = wtExpansion _
+      rw [extractTerm_eq eqxi spremise h']
+  | _, _, .forall_rule h'   => by
+      show wtForallRule (syntactic_soundness eqxi spremise h').val = wtForallRule _
+      rw [extractTerm_eq eqxi spremise h']
+  | _, _, .exist_rule h'    => by
+      show wtExistRule (syntactic_soundness eqxi spremise h').val = wtExistRule _
+      rw [extractTerm_eq eqxi spremise h']
+  | _, _, .univ_gen h'      => by
+      show wtUnivGen _ (syntactic_soundness eqxi spremise h').val = wtUnivGen _ _
+      rw [extractTerm_eq eqxi spremise h']
+  | _, _, .succ_ne_zero     => rfl
+  | _, _, .succ_inj         => rfl
+  | _, _, .rec_zero         => sEqAtType_val eqxi _ _ _ _
+  | _, _, .rec_succ         => sEqAtType_val eqxi _ _ _ _
+  | _, _, .beta_eq _ _      => sEqAtType_val eqxi _ _ _ _
+  | _, _, .dist_self _ _    => sEqAtType_val eqxi _ _ _ _
+  | _, _, .dist_comm _ _ _  => srealizer_of_pu_val _ _ _ _
+  | _, _, .dist_tri _ _ _ _ => srealizer_of_pu_val _ _ _ _
+  | _, _, .refl0            => rfl
+  | _, _, .sym0             => rfl
+  | _, _, .trans0           => rfl
+  | _, _, .qfer _ _ h'      => by
+      show wtQfer _ (syntactic_soundness eqxi spremise h').val = wtQfer _ _
+      rw [extractTerm_eq eqxi spremise h']
+  | _, _, .induction hb hs  => by
+      show wtInduction (syntactic_soundness eqxi spremise hb).val
+             (syntactic_soundness eqxi spremise hs).val = wtInduction _ _
+      rw [extractTerm_eq eqxi spremise hb, extractTerm_eq eqxi spremise hs]
+  | _, _, .markov _ _ _     => rfl
+  | _, _, .ip _ _ _         => rfl
+  | _, _, .ac _             => rfl
+  | _, _, .qfac _ _ _       => rfl
   | _, _, .lem h_lem        => absurd h_lem (by decide)
 
 end Soundness

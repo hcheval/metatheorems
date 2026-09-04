@@ -503,6 +503,13 @@ as past tense.
 `nat ×ₜ unit`. The witness type is therefore `ℕ → Unit`: a subsingleton, canonically
 inhabited, and syntactically realized by `λn.⋆`. Nothing about the model enters.
 
+*(2026-09-04: because nothing about the model enters, those four **stopped being fields**.
+They are now `eqAtTypeBaseWitness` / `eqAtTypeBaseCounter` /
+`eqAtTypeBaseWitness_subsingleton` in `Dialectica/Defs.lean` and `eqAtTypeBaseRealizeTerm` in
+`Dialectica/Syntactic.lean`, and `realizeTerm_sound` collapsed into `realize`
+— see `eqAtTypeBase_realizeTerm_sound`. `EqXInterp` has four fields, all model facts. The
+paragraph above is what should have retired them in 2026-09-02; it took two days.)*
+
 **The five semantic fields all stall on one missing piece, and it is not a metric fact.**
 `realize`, `extract`, `realizeTerm_sound`, `dist_comm_holds` and `dist_tri_holds` each ask for
 `Formula.interpret M.si (eq_R … ) env` or the `le_R_pu` analogue — that is, for the *value*
@@ -768,30 +775,12 @@ theorem MetricModel.dist_tri_interp (M : MetricModel) (i : MetricSpace.ι)
 /-- The `EqXInterp` a metric model induces. -/
 noncomputable def MetricModel.eqXInterp (M : MetricModel) :
     EqXInterp (fun () => M.carrier) MetricSpace.F M.si where
-  -- `wTy (eq_R _ _) = nat →ₜ unit`, so the witness type is `ℕ → Unit`.
-  witnessSubsingleton := fun _ _ _ _ => ⟨fun _ _ => funext fun _ => rfl⟩
-  witnessDefault := fun i _ s t => dialecticaDefaultWitness M.si (eqAtType (Ty.base i) s t)
-  counterDefault := fun i _ s t => dialecticaDefaultCounter M.si (eqAtType (Ty.base i) s t)
   -- `eq_R` is purely universal and ∨-free, so a realizer carries no information and the whole
   -- content is the model fact `eqAtType_base_holds`.
   realize := fun () {_Γ} s t env h =>
     realizer_of_pu_at M.si _ rfl rfl env (M.eqAtType_base_holds s t env h)
   -- The bridge read the other way, plus `M.d_eq_zero` (separation).
   extract := fun i {_Γ} s t env r => M.eqAtType_base_extract i s t env r
-  -- MISSING: as `realize` — the realizing term `λn.⋆` carries no information, so this field
-  -- is exactly the model fact `realize` needs.
-  realizeTerm := fun _ _ _ _ => Term.lam Term.unitI
-  -- The witness type is `ℕ → Unit`, a subsingleton, so the realizing *term* carries no
-  -- information either: its interpretation is forced to equal the semantic realizer's witness.
-  realizeTerm_sound := fun () {_Γ} s t env h y => by
-    have R := realizer_of_pu_at M.si (eqAtType (Ty.base ()) s t) rfl rfl env
-      (M.eqAtType_base_holds s t env h)
-    have hsub : Subsingleton
-        (dialecticaWitness (fun () => M.carrier) (eqAtType (Ty.base ()) s t)) :=
-      ⟨fun _ _ => funext fun _ => rfl⟩
-    have hw : Term.interpret M.si (Term.lam Term.unitI) env = R.val := hsub.elim _ _
-    rw [hw]
-    exact R.property y
   -- `M.d_comm` makes the two sides interpret to the same `ℕ → ℕ`; what is left is `0 < 2^{-n}`.
   dist_comm_holds := fun i {_Γ} x y env => M.dist_comm_interp i x y env
   -- `M.d_triangle` plus `Rounding.qval_roundR_dist_le` on the three distances, and the
@@ -861,12 +850,19 @@ and is discharged inline. One of the three unconstructed hypotheses this theorem
 carry has therefore ceased to exist rather than been satisfied.
 
 **`eqxi` is gone too, as of the `dist_nonneg` session**: it is discharged internally with
-`MetricModel.eqXInterp`. That is the honest state, and it comes at a price stated loudly
-here — **`MetricModel.eqXInterp` has five `sorry`-ed fields**, so this theorem now depends on
-`sorryAx` where before it merely *assumed* an `EqXInterp` nobody could build. Nothing was
-lost: re-abstracting a hypothesis with exactly one intended inhabitant is a `sorry` moved into
-a binder (ARCHITECTURE.md §3). The five fields all wait on one missing evaluation bridge; see
-the note above `MetricModel.eqXInterp`.
+`MetricModel.eqXInterp`. The principle behind that is still the one to keep: re-abstracting a
+hypothesis with exactly one intended inhabitant is a `sorry` moved into a binder
+(ARCHITECTURE.md §3).
+
+⚠ **The rest of this paragraph used to say `MetricModel.eqXInterp` has five `sorry`-ed fields
+and that this theorem therefore depends on `sorryAx`. Both statements are FALSE and have been
+since 2026-09-03**, when the evaluation bridge closed all five. This theorem is
+`[propext, Classical.choice, Quot.sound]` — see the `#print axioms` block at the bottom of the
+file, which is the authority. The claim was left standing for two days while the file's own
+evidence contradicted it; corrected 2026-09-04 during the `EqXInterp` vestige refactor, which
+also reduced the structure from nine fields to **four**, so "five fields" no longer names
+anything either. Treat prose in this file as dated commentary and the `#print axioms` block as
+current.
 
 Historical note, kept because it is the shape of a mistake worth not repeating: `spremise`
 was where `MetricModel`'s `d_self`/`d_comm`/`d_triangle` were *going* to be consumed. They

@@ -990,35 +990,70 @@ theorem Formula.isPurelyExistential_of_qf {ι κ : Type} {F : κ → Ty ι} {Γ 
   | all _ _ => exact hqf
 
 -- ============================================================================
+-- Base-type equality is *defined*, so its Dialectica data is computable
+-- ============================================================================
+
+/-! Until 2026-09-02 base-type equality was an **abstract** predicate `EqX i s t`, and
+nothing could be said about its Dialectica witness/counter types — hence four fields of
+`EqXInterp` (`witnessSubsingleton`, `witnessDefault`, `counterDefault`, `realizeTerm`) which
+had to be *supplied* by each theory.
+
+With `eqAtType (.base i) s t ≡ eq_R (d_i s t) 0ℝ` fixed, `eq_R` is `Formula.all .nat <QF>`,
+so `wTy` of it is `nat →ₜ unit` and `cTy` is `nat ×ₜ unit` **by `rfl`** — at every `ι`, `κ`,
+`Γ`, `s`, `t`. All four are therefore outright definable, and the fields were vestigial.
+The definitions below replace them; see also `eqAtTypeBaseRealizeTerm` in
+`Dialectica/Syntactic.lean`, which needs `wTy` and so lives one module up. -/
+
+theorem wTy_eqAtType_base {ι κ : Type} {F : κ → Ty ι} (i : ι) {Γ : Ctx ι}
+    (s t : Term F Γ (Ty.base i)) :
+    wTy (eqAtType (Ty.base i) s t) = (Ty.nat →ₜ Ty.unit) := rfl
+
+theorem cTy_eqAtType_base {ι κ : Type} {F : κ → Ty ι} (i : ι) {Γ : Ctx ι}
+    (s t : Term F Γ (Ty.base i)) :
+    cTy (eqAtType (Ty.base i) s t) = (Ty.nat ×ₜ Ty.unit) := rfl
+
+/-- The canonical Dialectica witness for equality at a base type: the witness type is
+`ℕ → Unit`, so `fun _ => ()` is the only inhabitant. Was `EqXInterp.witnessDefault`. -/
+def eqAtTypeBaseWitness {ι κ : Type} (X : ι → Type) {F : κ → Ty ι} (i : ι) {Γ : Ctx ι}
+    (s t : Term F Γ (Ty.base i)) : dialecticaWitness X (eqAtType (Ty.base i) s t) :=
+  fun _ => ()
+
+/-- The canonical Dialectica counter for equality at a base type: the counter type is
+`ℕ × Unit`. Was `EqXInterp.counterDefault`. -/
+def eqAtTypeBaseCounter {ι κ : Type} (X : ι → Type) {F : κ → Ty ι} (i : ι) {Γ : Ctx ι}
+    (s t : Term F Γ (Ty.base i)) : dialecticaCounter X (eqAtType (Ty.base i) s t) :=
+  (0, ())
+
+/-- The witness type for equality at a base type is a subsingleton — it is `ℕ → Unit`.
+Was `EqXInterp.witnessSubsingleton`. -/
+theorem eqAtTypeBaseWitness_subsingleton {ι κ : Type} (X : ι → Type) {F : κ → Ty ι} (i : ι)
+    {Γ : Ctx ι} (s t : Term F Γ (Ty.base i)) :
+    Subsingleton (dialecticaWitness X (eqAtType (Ty.base i) s t)) :=
+  ⟨fun _ _ => funext fun _ => rfl⟩
+
+-- ============================================================================
 -- EqX interface for the Dialectica proof (Def. of "purely universal" EqX)
 -- ============================================================================
 
-/-- The Dialectica interface for base-type equality predicates.
+/-- The Dialectica interface for base-type equality at each base type `X_i`.
 
-For the Dialectica soundness proof to work, each `EqX i s t` must be
-"trivially Dialectica-realized" — i.e., the document's condition that
-`=_{X_i}` is a purely universal formula. This structure packages the
-five conditions needed in the inductive argument:
+**What this structure is for, since 2026-09-04.** It asks *only for model facts* — things
+that are true of the space and are not derivable from the syntax. Everything that the
+2026-09-02 "base equality is defined" refactor made computable has been removed from it and
+lives as an ordinary definition (`eqAtTypeBaseWitness`, `eqAtTypeBaseCounter`,
+`eqAtTypeBaseWitness_subsingleton` above; `eqAtTypeBaseRealizeTerm` and
+`eqAtTypeBase_realizeTerm_sound` in `Dialectica/Syntactic.lean`).
 
-1. The witness type is a subsingleton (so witnesses are canonical).
-2. A canonical witness exists.
-3. A canonical counter exists.
-4. Semantic equality implies a Dialectica realizer ("soundness of EqX").
-5. A Dialectica realizer implies semantic equality ("completeness of EqX").
+The four remaining fields:
 
-Concrete theories (e.g. metric spaces) supply an `EqXInterp` instance
-for their chosen equality predicate. -/
+1. `realize` — semantic equality gives a Dialectica realizer; needs `d(x,x) = 0`.
+2. `extract` — a realizer gives semantic equality; needs *separation*, `d(x,y) = 0 → x = y`.
+3. `dist_comm_holds` — the model fact behind `Derivable.dist_comm`.
+4. `dist_tri_holds` — the model fact behind `Derivable.dist_tri`.
+
+Concrete theories (e.g. metric spaces) supply an `EqXInterp` for their model. -/
 structure EqXInterp {ι κ : Type} (X : ι → Type) (F : κ → Ty ι)
     (si : SpaceInterp X F) where
-  /-- The witness type for `EqX i s t` is a subsingleton (purely universal). -/
-  witnessSubsingleton : ∀ (i : ι) {Γ : Ctx ι} (s t : Term F Γ (Ty.base i)),
-      Subsingleton (dialecticaWitness X (eqAtType (Ty.base i) s t))
-  /-- A canonical Dialectica witness for `EqX i s t`. -/
-  witnessDefault : ∀ (i : ι) {Γ : Ctx ι} (s t : Term F Γ (Ty.base i)),
-      dialecticaWitness X (eqAtType (Ty.base i) s t)
-  /-- A canonical Dialectica counter for `EqX i s t`. -/
-  counterDefault : ∀ (i : ι) {Γ : Ctx ι} (s t : Term F Γ (Ty.base i)),
-      dialecticaCounter X (eqAtType (Ty.base i) s t)
   /-- From semantic equality, build a Dialectica realizer for `EqX i s t`. -/
   realize : ∀ (i : ι) {Γ : Ctx ι} (s t : Term F Γ (Ty.base i)) (env : Ctx.interpret X Γ),
       Term.interpret si s env = Term.interpret si t env →
@@ -1027,20 +1062,6 @@ structure EqXInterp {ι κ : Type} (X : ι → Type) (F : κ → Ty ι)
   extract : ∀ (i : ι) {Γ : Ctx ι} (s t : Term F Γ (Ty.base i)) (env : Ctx.interpret X Γ),
       dialecticaRealizerCtx si (eqAtType (Ty.base i) s t) env →
       Term.interpret si s env = Term.interpret si t env
-  /-- A **term** realizing `EqX i s t`, for the syntactic development.
-
-      `realize` above produces a semantic value, which cannot be majorized. The
-      equality predicate of a space must therefore also be realized *syntactically* —
-      the syntactic analogue of condition 4. For `ι = Empty` this is vacuous. -/
-  realizeTerm : ∀ (i : ι) {Γ : Ctx ι} (s t : Term F Γ (Ty.base i)),
-      Term F Γ (wTy (eqAtType (Ty.base i) s t))
-  /-- `realizeTerm` is correct wherever the two sides are semantically equal. -/
-  realizeTerm_sound : ∀ (i : ι) {Γ : Ctx ι} (s t : Term F Γ (Ty.base i))
-      (env : Ctx.interpret X Γ),
-      Term.interpret si s env = Term.interpret si t env →
-      ∀ y : dialecticaCounter X (eqAtType (Ty.base i) s t),
-        dialecticaMatrix si (eqAtType (Ty.base i) s t) env
-          (Term.interpret si (realizeTerm i s t) env) y
   /-- `si.distInterp i` is symmetric, in the sense the object language asserts.
 
       `Derivable.dist_comm` is a constructor, so Dialectica soundness owes its truth in the

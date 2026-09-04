@@ -208,7 +208,7 @@ def eqAtType_default_ctr {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ) :
     ℂ X (eqAtType ρ s t) :=
   match ρ, s, t with
   | .nat,      _, _  => ()
-  | .base i,   s, t  => eqxi.counterDefault i s t
+  | .base i,   s, t  => eqAtTypeBaseCounter X i s t
   | .unit,     _, _  => ()
   | .prod ρ' τ, s, t =>
     (eqAtType_default_ctr ρ' (Term.fst s) (Term.fst t), eqAtType_default_ctr τ (Term.snd s) (Term.snd t))
@@ -221,7 +221,7 @@ def eqAtType_default_wit {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ) :
     𝕎 X (eqAtType ρ s t) :=
   match ρ, s, t with
   | .nat,      _, _  => ()
-  | .base i,   s, t  => eqxi.witnessDefault i s t
+  | .base i,   s, t  => eqAtTypeBaseWitness X i s t
   | .unit,     _, _  => ()
   | .prod ρ' τ, s, t =>
     (eqAtType_default_wit ρ' (Term.fst s) (Term.fst t), eqAtType_default_wit τ (Term.snd s) (Term.snd t))
@@ -230,14 +230,15 @@ def eqAtType_default_wit {Γ : Ctx ι} (ρ : Ty ι) (s t : Term F Γ ρ) :
 
 /-- The witness type for `eqAtType ρ s t` is a subsingleton.
     At `nat` the witness is `Unit`; at `base i` this follows from `EqX` being purely
-    universal (encoded in `eqxi.witnessSubsingleton`); at function types the witness
+    universal (`eqAtTypeBaseWitness_subsingleton`, a theorem since base equality is
+    *defined*); at function types the witness
     is a function into a subsingleton, which is again a subsingleton. -/
-lemma dialecticaWitness_eqAtType_ss (eqxi : EqXInterp X F si) (ρ : Ty ι) :
+lemma dialecticaWitness_eqAtType_ss (ρ : Ty ι) :
     ∀ {Γ : Ctx ι} (s t : Term F Γ ρ),
     Subsingleton (𝕎 X (eqAtType ρ s t)) := by
   induction ρ with
   | nat    => intro Γ s t; simp only [eqAtType, dialecticaWitness]; exact ⟨fun _ _ => rfl⟩
-  | base i => intro Γ s t; exact eqxi.witnessSubsingleton i s t
+  | base i => intro Γ s t; exact eqAtTypeBaseWitness_subsingleton X i s t
   | unit   => intro Γ s t; simp only [eqAtType, dialecticaWitness]; exact ⟨fun _ _ => rfl⟩
   | prod ρ' τ ih_ρ ih_τ =>
     intro Γ s t
@@ -319,9 +320,9 @@ def dialectica_qfer {Γ : Ctx ι} {A₀ : Formula F Γ} {ρ σ : Ty ι}
   have ssC : Subsingleton (ℂ X A₀) :=
     (dialecticaWitness_subsingleton A₀ hqf hvf).2
   have ssW_σ : Subsingleton (𝕎 X (eqAtType σ (r.subst0 s) (r.subst0 t))) :=
-    dialecticaWitness_eqAtType_ss si eqxi σ (r.subst0 s) (r.subst0 t)
-  let yρ_default := eqAtType_default_ctr si eqxi ρ s t
-  let wσ_default := eqAtType_default_wit si eqxi σ (r.subst0 s) (r.subst0 t)
+    dialecticaWitness_eqAtType_ss (X := X) σ (r.subst0 s) (r.subst0 t)
+  let yρ_default := eqAtType_default_ctr si ρ s t
+  let wσ_default := eqAtType_default_wit (X := X) σ (r.subst0 s) (r.subst0 t)
   obtain ⟨⟨U₀, Y₀⟩, hprop⟩ := ih env
   refine ⟨⟨fun _ => wσ_default, fun xA₀ _ => Y₀ xA₀ yρ_default⟩, ?_⟩
   intro ⟨xA₀, yEqσ⟩ hA₀

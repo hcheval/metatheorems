@@ -57,16 +57,11 @@ def siE : SpaceInterp XEmpty FEmpty where
   zeroInterp i := i.elim
   distInterp i := i.elim
 
-/-- `EqXInterp` at `ι = Empty`: every one of the nine fields begins `∀ (i : ι)`, so with no
+/-- `EqXInterp` at `ι = Empty`: every one of the four fields begins `∀ (i : ι)`, so with no
 base types each is `fun i => i.elim`. This is why `ι = Empty` is the cheap setting. -/
 def eqxiE : EqXInterp XEmpty FEmpty siE where
-  witnessSubsingleton := fun i => i.elim
-  witnessDefault      := fun i => i.elim
-  counterDefault      := fun i => i.elim
   realize             := fun i => i.elim
   extract             := fun i => i.elim
-  realizeTerm         := fun i => i.elim
-  realizeTerm_sound   := fun i => i.elim
   dist_comm_holds     := fun i => i.elim
   dist_tri_holds      := fun i => i.elim
 

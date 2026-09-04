@@ -2,6 +2,7 @@ import Metatheorems.Probes.BoundLemmasP2
 import Metatheorems.Probes.BoundProbe
 import Metatheorems.Probes.CombinatorLemmas
 import Metatheorems.Probes.ConjBoundDemo
+import Metatheorems.Probes.ExtractTermDemo
 import Metatheorems.Probes.GeneralMatricesDemo
 import Metatheorems.Probes.HilbertDemo
 import Metatheorems.Probes.P1

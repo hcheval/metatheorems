@@ -240,22 +240,9 @@ theorem MetricModel.dist_tri_interp_gen
 noncomputable def MetricModel.eqXInterp_gen
     (hd : ∀ x y, si.distInterp () x y = Rounding.roundR (M.d x y)) :
     EqXInterp (fun () => M.carrier) F si where
-  witnessSubsingleton := fun _ _ _ _ => ⟨fun _ _ => funext fun _ => rfl⟩
-  witnessDefault := fun i _ s t => dialecticaDefaultWitness si (eqAtType (Ty.base i) s t)
-  counterDefault := fun i _ s t => dialecticaDefaultCounter si (eqAtType (Ty.base i) s t)
   realize := fun () {_Γ} s t env h =>
     realizer_of_pu_at si _ rfl rfl env (M.eqAtType_base_holds_gen si hd s t env h)
   extract := fun i {_Γ} s t env r => M.eqAtType_base_extract_gen si hd i s t env r
-  realizeTerm := fun _ _ _ _ => Term.lam Term.unitI
-  realizeTerm_sound := fun () {_Γ} s t env h y => by
-    have R := realizer_of_pu_at si (eqAtType (Ty.base ()) s t) rfl rfl env
-      (M.eqAtType_base_holds_gen si hd s t env h)
-    have hsub : Subsingleton
-        (dialecticaWitness (fun () => M.carrier) (eqAtType (Ty.base ()) s t)) :=
-      ⟨fun _ _ => funext fun _ => rfl⟩
-    have hw : Term.interpret si (Term.lam Term.unitI) env = R.val := hsub.elim _ _
-    rw [hw]
-    exact R.property y
   dist_comm_holds := fun i {_Γ} x y env => M.dist_comm_interp_gen si hd i x y env
   dist_tri_holds := fun i {_Γ} x y z env => M.dist_tri_interp_gen si hd i x y z env
 

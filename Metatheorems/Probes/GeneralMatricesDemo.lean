@@ -51,13 +51,8 @@ def gSiE : SpaceInterp gXE gFE where
   distInterp i := i.elim
 
 def gEqxiE : EqXInterp gXE gFE gSiE where
-  witnessSubsingleton := fun i => i.elim
-  witnessDefault      := fun i => i.elim
-  counterDefault      := fun i => i.elim
   realize             := fun i => i.elim
   extract             := fun i => i.elim
-  realizeTerm         := fun i => i.elim
-  realizeTerm_sound   := fun i => i.elim
   dist_comm_holds     := fun i => i.elim
   dist_tri_holds      := fun i => i.elim
 
