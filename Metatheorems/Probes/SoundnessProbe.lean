@@ -112,7 +112,8 @@ variable (M : MetricModel)
 /-- Soundness, ASSUMED. -/
 abbrev Soundness : Prop :=
   ∀ {Γ : Ctx MetricSpace.ι} (A : Formula MetricSpace.F Γ),
-    @Derivable MetricSpace.ι MetricSpace.F Allowed.extended MetricSpace.Premises Γ A →
+    @Derivable MetricSpace.ι MetricSpace.ι MetricSpace.F Allowed.extended
+      MetricSpace.Premises Γ A →
     ∀ env : Ctx.interpret (fun () => M.carrier) Γ, Formula.interpret M.si A env
 
 variable (snd : Soundness M)

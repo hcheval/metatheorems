@@ -1,0 +1,41 @@
+import Metatheorems.Probes.BoundLemmasP2
+import Metatheorems.Probes.BoundProbe
+import Metatheorems.Probes.CombinatorLemmas
+import Metatheorems.Probes.GeneralMatricesDemo
+import Metatheorems.Probes.HilbertDemo
+import Metatheorems.Probes.P1
+import Metatheorems.Probes.QComm
+import Metatheorems.Probes.R1
+import Metatheorems.Probes.RwArrow
+import Metatheorems.Probes.RwBase
+import Metatheorems.Probes.SeqMpBoundProbe
+import Metatheorems.Probes.SoundnessProbe
+import Metatheorems.Probes.SyntacticND
+import Metatheorems.Probes.TinyBoundDemo
+import Metatheorems.Probes.WBoundDemo
+
+/-!
+# Probe sweep target
+
+`Metatheorems/Probes/` is **not** reachable from `Metatheorems.lean`, deliberately — the
+probes are experiments and measurements, not library content, and several are expensive.
+The cost of that is that `lake build` never type-checks them, so they rot silently.
+
+They did: the `ι`/`κ` split (`3089af9`+`f17fddc`) left **five** probe files with
+`@Derivable ι F …` one argument short, and each was found by accident, weeks apart —
+`BoundProbe` and `SeqMpBoundProbe` while writing `CombinatorLemmas`, `TinyBoundDemo` while
+writing `WBoundDemo`, and `SoundnessProbe`/`SyntacticND` only by sweeping all sixteen by hand.
+
+This file exists so that never happens again:
+
+    lake build Probes
+
+builds every probe that is *supposed* to build. It is NOT in `defaultTargets`, so a plain
+`lake build` is unaffected in speed. Run it after any change to `Term`'s or `Derivable`'s
+indices, and after any refactor that touches an inductive's constructors.
+
+**`Metatheorems.Probes.CounterSideProbe` is deliberately absent.** It exhausts memory
+(`INTERNAL PANIC: out of memory` even under a 12 GB cap) and holds the project's only
+permitted `sorry`; it is a record of a measurement, not something to keep green. Do not add
+it here — that would make this target unusable, which is how the rot started.
+-/

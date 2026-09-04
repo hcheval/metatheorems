@@ -12,7 +12,7 @@ def syntactic_nd_soundness
     (nts : NTStableD Premises)
     (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B)
     {Γ : Ctx ι} {A : Formula F Γ}
-    (h : @Derivable ι F Allowed.classical Premises Γ A) :
+    (h : @Derivable ι ι F Allowed.classical Premises Γ A) :
     SRealizer si Aᴺᵀ :=
   syntactic_soundness eqxi spremise
     ((negTrans_sound nts h).castAllowed (by constructor <;> decide))

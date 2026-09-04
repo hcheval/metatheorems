@@ -16,3 +16,9 @@ rev = "v4.28.0"
 
 [[lean_lib]]
 name = "Metatheorems"
+
+# Sweep target for Metatheorems/Probes/, which the umbrella deliberately does not import.
+# Not in defaultTargets: `lake build` stays fast. Run `lake build Probes` after any change
+# to Term's/Derivable's indices. See Probes.lean for why this exists.
+[[lean_lib]]
+name = "Probes"
