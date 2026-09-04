@@ -359,6 +359,24 @@ noncomputable def WHyperbolicModel.constMajorants (M : WHyperbolicModel) (n₀ :
 
 section ComputesDemo
 
+/-!
+**What these examples are, and what they are NOT.** The extraction pipeline is
+
+    Derivable → syntactic_soundness → extractUTerm/extractVTerm → closedMajorizer → numeral
+
+and everything below starts at the **last** stage, applying `closedMajorizer` to a
+*hand-written closed term*. **No derivation appears anywhere in this section.** So these
+demonstrate that the majorization layer computes at this model's constants, and that
+`WMajorant` genuinely discards its real argument — they do **not** exhibit a bound extracted
+from a proof.
+
+The only place in the project where a `Derivable` actually reaches `closedMajorizer` is
+`Probes/TinyBoundDemo.lean`: a 12-constructor derivation built by hand from raw constructors
+at `ι = Empty`. **Nothing at the space level has gone end-to-end from a derivation**, and
+doing so is the open work — see CLAUDE.md Track A. Read the numbers below as majorants of
+terms, not as mined bounds.
+-/
+
 /-- **The uniformity, kernel-checked**: for *any* closed real `f`, the majorant of
 `W(0_X, 0_X, f)` is `n₀` — `max n₀ n₀`, with `f` never consulted. -/
 example (M : WHyperbolicModel) (n₀ : ℕ) (h : M.d M.ref M.zeroX ≤ (n₀ : ℝ))
