@@ -108,18 +108,18 @@ def tDummyOuter : Formula tFE ([] : Ctx Empty) := Formula.eq0 Term.zero Term.zer
 
 /-- Step 1: `∃v C₀` is derivable unconditionally in context `[x:nat]`. -/
 def tExDerivation :
-    @Derivable Empty tFE Allowed.extended tPremE [Ty.nat] (Formula.ex Ty.nat tC0) :=
+    @Derivable Empty Empty tFE Allowed.extended tPremE [Ty.nat] (Formula.ex Ty.nat tC0) :=
   Derivable.mp Derivable.refl0 (Derivable.exist_ax (Term.var Var.vz) tC0)
 
 /-- Step 2: weaken into `(∀u B₀) →ᶠ (∃v C₀)`, in context `[x:nat]`. -/
 def tInner :
-    @Derivable Empty tFE Allowed.extended tPremE [Ty.nat]
+    @Derivable Empty Empty tFE Allowed.extended tPremE [Ty.nat]
       (Formula.all Ty.nat tB0 →ᶠ Formula.ex Ty.nat tC0) :=
   Derivable.mp tExDerivation (Derivable.exportation Derivable.and_weak)
 
 /-- Step 3: weaken again by the dummy premise, so `forall_rule` can fire. -/
 def tInnerWeakened :
-    @Derivable Empty tFE Allowed.extended tPremE [Ty.nat]
+    @Derivable Empty Empty tFE Allowed.extended tPremE [Ty.nat]
       (Formula.weakenBy Ty.nat tDummyOuter →ᶠ
         (Formula.all Ty.nat tB0 →ᶠ Formula.ex Ty.nat tC0)) :=
   Derivable.mp tInner (Derivable.exportation Derivable.and_weak)
@@ -129,7 +129,7 @@ def tInnerWeakened :
 The final shape is exactly `Formula.all ρ (Formula.imp (Formula.all .nat B₀) (Formula.ex .nat
 C₀))` with `ρ := Ty.nat` — what `syntactic_general_metatheorem` expects. -/
 def tFinal :
-    @Derivable Empty tFE Allowed.extended tPremE []
+    @Derivable Empty Empty tFE Allowed.extended tPremE []
       (Formula.all Ty.nat (Formula.all Ty.nat tB0 →ᶠ Formula.ex Ty.nat tC0)) :=
   Derivable.mp Derivable.refl0 (Derivable.forall_rule tInnerWeakened)
 
