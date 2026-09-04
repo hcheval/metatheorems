@@ -5,6 +5,7 @@ Authors: Horatiu
 -/
 import Metatheorems.MetricTransfer
 import Metatheorems.CodeReal
+import Metatheorems.CodeRealOps
 import Metatheorems.BaseEquality
 
 namespace Metatheorems
@@ -39,8 +40,9 @@ Track C item C0.
 
 **The project's first non-empty `Premises`.** All four axioms are purely universal
 (`le_R_pu`, `eq_R` and base-type `eqAtType` are all `∀n` over a QF body) and ∨-free, so a
-premise realizer is `srealizer_of_pu` applied to the axiom's *truth in the model* — which is
-the one thing this file does not discharge; see `WHyperbolicModel.AxiomsHold`.
+premise realizer is `srealizer_of_pu` applied to the axiom's *truth in the model* —
+`WHyperbolicModel.axiomsHold`, proved from the model's `W1`–`W4` through the `codeReal`
+homomorphism lemmas of `CodeRealOps.lean`.
 
 ## The model
 
@@ -383,34 +385,145 @@ noncomputable def WHyperbolicModel.eqXInterp (M : WHyperbolicModel) :
 -- The premises in the model
 -- ============================================================================
 
-/-- **The four axioms hold in the model, at every environment** — stated as the `hprem` of
-`Soundness.lean`.
-
-**Not discharged in this file.** Doing so needs the semantic evaluation of `mul_R`, `sub_R`,
-`abs_R` and `clamp01`, and the fact that `codeReal` of the resulting code is the corresponding
-real arithmetic on `codeReal` of the arguments — i.e. the half of the evaluation bridge
-(`QValBridge.lean`) above `add_R`, which stops there because the metric model needed nothing
-more. See the report accompanying this file. The premise realizer `spremise` and both
-metatheorems below take this as an explicit hypothesis, exactly as `Soundness.lean` does. -/
+/-- **The four axioms hold in the model, at every environment** — the shape of the `hprem` of
+`Soundness.lean`. Unlike there, the premise set is four fixed formulas and the model already
+assumes their content, so this is not a hypothesis but a theorem: `WHyperbolicModel.axiomsHold`
+below. -/
 def WHyperbolicModel.AxiomsHold (M : WHyperbolicModel) : Prop :=
   ∀ {Γ : Ctx MetricSpace.ι} (A : Formula WHyperbolic.F Γ), WHyperbolic.Premises ⟨Γ, A⟩ →
     ∀ env : Ctx.interpret (fun () => M.carrier) Γ, Formula.interpret M.si A env
 
+section AxiomsInModel
+
+variable (M : WHyperbolicModel) {Γ : Ctx MetricSpace.ι}
+
+/-- `W` evaluates: `W(s,t,r) ↦ W(⟦s⟧, ⟦t⟧, clampReal (codeReal ⟦r⟧))`, by definition of `si`. -/
+theorem WHyperbolicModel.interp_W (s t : Term WHyperbolic.F Γ xTy)
+    (r : Term WHyperbolic.F Γ rTy) (env : Ctx.interpret (fun () => M.carrier) Γ) :
+    Term.interpret M.si (Term.app3 WHyperbolic.W s t r) env
+      = M.W (Term.interpret M.si s env) (Term.interpret M.si t env)
+          (clampReal (codeReal (Term.interpret M.si r env))) := rfl
+
+/-- The distance evaluates to the real distance at the `codeReal` level: `(d(x,y))◦` denotes
+`d(x,y)`. Stated with `Term.dist ()` rather than the abbreviation `WHyperbolic.d`, so it
+matches both spellings (the unfolded `eqAtType` produces the former). -/
+theorem WHyperbolicModel.codeReal_interp_dist (s t : Term WHyperbolic.F Γ xTy)
+    (env : Ctx.interpret (fun () => M.carrier) Γ) :
+    codeReal (Term.interpret M.si (Term.app2 (Term.dist ()) s t) env)
+      = M.d (Term.interpret M.si s env) (Term.interpret M.si t env) := by
+  rw [M.interp_dist_gen M.si (fun _ _ => rfl) s t env, codeReal_roundR _ (M.d_nonneg _ _)]
+
+/-- (W1) in the model, at arbitrary terms. `≤ℝ` is read off `≤` on the denoted reals
+(`interpret_le_R_pu_of_codeReal_le`); every operation on the right is evaluated by its
+`codeReal` homomorphism lemma; the double clamp inside `W` collapses since the clamped value
+is already in `[0,1]`. -/
+theorem WHyperbolicModel.W1_holds (s t u : Term WHyperbolic.F Γ xTy)
+    (r : Term WHyperbolic.F Γ rTy) (env : Ctx.interpret (fun () => M.carrier) Γ) :
+    Formula.interpret M.si
+      (le_R_pu
+        (Term.app2 WHyperbolic.d s (Term.app3 WHyperbolic.W t u (.app Term.clamp01 r)))
+        (Term.app2 Term.add_R
+          (Term.app2 Term.mul_R (Term.app2 Term.sub_R Term.one_R (.app Term.clamp01 r))
+            (Term.app2 WHyperbolic.d s t))
+          (Term.app2 Term.mul_R (.app Term.clamp01 r) (Term.app2 WHyperbolic.d s u)))) env := by
+  apply interpret_le_R_pu_of_codeReal_le
+  simp only [M.codeReal_interp_dist, codeReal_interp_add_R, codeReal_interp_mul_R,
+    codeReal_interp_sub_R, codeReal_interp_one_R, codeReal_interp_clamp01,
+    isCauchyCode_interp_clamp01, M.interp_W, clampReal_of_mem, clampReal_nonneg,
+    clampReal_le_one]
+  exact M.W1 _ _ _ _ (clampReal_nonneg _) (clampReal_le_one _)
+
+/-- (W2) in the model, at arbitrary terms. -/
+theorem WHyperbolicModel.W2_holds (s t : Term WHyperbolic.F Γ xTy)
+    (r r' : Term WHyperbolic.F Γ rTy) (env : Ctx.interpret (fun () => M.carrier) Γ) :
+    Formula.interpret M.si
+      (eq_R
+        (Term.app2 WHyperbolic.d
+          (Term.app3 WHyperbolic.W s t (.app Term.clamp01 r))
+          (Term.app3 WHyperbolic.W s t (.app Term.clamp01 r')))
+        (Term.app2 Term.mul_R
+          (.app Term.abs_R
+            (Term.app2 Term.sub_R (.app Term.clamp01 r) (.app Term.clamp01 r')))
+          (Term.app2 WHyperbolic.d s t))) env := by
+  apply interpret_eq_R_of_codeReal_eq
+  simp only [M.codeReal_interp_dist, codeReal_interp_mul_R, codeReal_interp_abs_R,
+    codeReal_interp_sub_R, codeReal_interp_clamp01, isCauchyCode_interp_clamp01, M.interp_W,
+    clampReal_of_mem, clampReal_nonneg, clampReal_le_one]
+  exact M.W2 _ _ _ _ (clampReal_nonneg _) (clampReal_le_one _)
+    (clampReal_nonneg _) (clampReal_le_one _)
+
+/-- (W3) in the model, at arbitrary terms. `=_X` is `d(·,·) =ℝ 0ℝ`; the model's `W3` makes the
+two points equal and `d_self` finishes. The parameter `1 − λ̃` is in `[0,1]`, so the clamp
+inside the second `W` is the identity on it. -/
+theorem WHyperbolicModel.W3_holds (s t : Term WHyperbolic.F Γ xTy)
+    (r : Term WHyperbolic.F Γ rTy) (env : Ctx.interpret (fun () => M.carrier) Γ) :
+    Formula.interpret M.si
+      (eqAtType xTy
+        (Term.app3 WHyperbolic.W s t (.app Term.clamp01 r))
+        (Term.app3 WHyperbolic.W t s
+          (Term.app2 Term.sub_R Term.one_R (.app Term.clamp01 r)))) env := by
+  simp only [eqAtType]
+  apply interpret_eq_R_of_codeReal_eq
+  have h0 := clampReal_nonneg (codeReal (Term.interpret M.si r env))
+  have h1 := clampReal_le_one (codeReal (Term.interpret M.si r env))
+  have h0' : 0 ≤ 1 - clampReal (codeReal (Term.interpret M.si r env)) := by linarith
+  have h1' : 1 - clampReal (codeReal (Term.interpret M.si r env)) ≤ 1 := by linarith
+  simp only [codeReal_interp_zero_R, M.codeReal_interp_dist, M.interp_W,
+    codeReal_interp_sub_R, codeReal_interp_one_R, codeReal_interp_clamp01,
+    isCauchyCode_interp_clamp01, clampReal_of_mem, clampReal_nonneg, clampReal_le_one, h0', h1']
+  rw [← M.W3 (Term.interpret M.si s env) (Term.interpret M.si t env) _ h0 h1, M.d_self]
+
+/-- (W4) in the model, at arbitrary terms. -/
+theorem WHyperbolicModel.W4_holds (s t u v : Term WHyperbolic.F Γ xTy)
+    (r : Term WHyperbolic.F Γ rTy) (env : Ctx.interpret (fun () => M.carrier) Γ) :
+    Formula.interpret M.si
+      (le_R_pu
+        (Term.app2 WHyperbolic.d
+          (Term.app3 WHyperbolic.W s u (.app Term.clamp01 r))
+          (Term.app3 WHyperbolic.W t v (.app Term.clamp01 r)))
+        (Term.app2 Term.add_R
+          (Term.app2 Term.mul_R (Term.app2 Term.sub_R Term.one_R (.app Term.clamp01 r))
+            (Term.app2 WHyperbolic.d s t))
+          (Term.app2 Term.mul_R (.app Term.clamp01 r) (Term.app2 WHyperbolic.d u v)))) env := by
+  apply interpret_le_R_pu_of_codeReal_le
+  simp only [M.codeReal_interp_dist, codeReal_interp_add_R, codeReal_interp_mul_R,
+    codeReal_interp_sub_R, codeReal_interp_one_R, codeReal_interp_clamp01,
+    isCauchyCode_interp_clamp01, M.interp_W, clampReal_of_mem, clampReal_nonneg,
+    clampReal_le_one]
+  exact M.W4 _ _ _ _ _ (clampReal_nonneg _) (clampReal_le_one _)
+
+/-- **The four axioms hold in the model.** The one obligation the W-hyperbolic instantiation
+owed; with it, `spremise` and both metatheorems below take no hypothesis about the model
+beyond `WHyperbolicModel` itself. -/
+theorem WHyperbolicModel.axiomsHold : M.AxiomsHold := by
+  intro Γ A hA env
+  rcases hA with h | h | h | h <;> subst h
+  · intro z x y l
+    exact M.W1_holds _ _ _ _ _
+  · intro x y l m
+    exact M.W2_holds _ _ _ _ _
+  · intro x y l
+    exact M.W3_holds _ _ _ _
+  · intro x y z w l
+    exact M.W4_holds _ _ _ _ _ _
+
+end AxiomsInModel
+
 /-- **Premise realizers**: every axiom is purely universal and ∨-free, so `srealizer_of_pu`
-turns its truth in the model into a realizing term. This is the whole of `spremise`. -/
-def WHyperbolicModel.spremise (M : WHyperbolicModel) (hax : M.AxiomsHold) :
+turns its truth in the model (`axiomsHold`) into a realizing term. -/
+def WHyperbolicModel.spremise (M : WHyperbolicModel) :
     ∀ (Γ : Ctx MetricSpace.ι) (B : Formula WHyperbolic.F Γ),
       WHyperbolic.Premises ⟨Γ, B⟩ → SRealizer M.si B :=
   fun Γ B hp =>
     srealizer_of_pu B (WHyperbolic.premises_pu Γ B hp) (WHyperbolic.premises_vf Γ B hp)
-      (hax B hp)
+      (M.axiomsHold B hp)
 
-/-- **Semantic soundness for a W-hyperbolic model**, given that its axioms hold. -/
-theorem WHyperbolicModel.soundness (M : WHyperbolicModel) (hax : M.AxiomsHold)
+/-- **Semantic soundness for a W-hyperbolic model.** -/
+theorem WHyperbolicModel.soundness (M : WHyperbolicModel)
     {Γ : Ctx MetricSpace.ι} {allowed : Allowed} {A : Formula WHyperbolic.F Γ}
     (h : Derivable WHyperbolic.F allowed WHyperbolic.Premises A) :
     ∀ env : Ctx.interpret (fun () => M.carrier) Γ, Formula.interpret M.si A env :=
-  M.soundness_gen M.si (fun _ _ => rfl) hax h
+  M.soundness_gen M.si (fun _ _ => rfl) M.axiomsHold h
 
 -- ============================================================================
 -- The W-hyperbolic metatheorems
@@ -420,7 +533,7 @@ theorem WHyperbolicModel.soundness (M : WHyperbolicModel) (hax : M.AxiomsHold)
 `W` in the signature and the four axioms as premises: from a derivation of
 `∀x^ρ (∀u B₀ → ∃v C₀)` from (W1)–(W4), a bound `Φ` depending only on a majorant of `x` —
 and, through `WMajorant`, on no `[0,1]`-parameter anywhere in `x`. -/
-theorem WHyperbolicModel.w_metatheorem (M : WHyperbolicModel) (hax : M.AxiomsHold)
+theorem WHyperbolicModel.w_metatheorem (M : WHyperbolicModel)
     {ρ : Ty MetricSpace.ι} {B₀ C₀ : Formula WHyperbolic.F [Ty.nat, ρ]}
     (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
     (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
@@ -433,11 +546,11 @@ theorem WHyperbolicModel.w_metatheorem (M : WHyperbolicModel) (hax : M.AxiomsHol
         M.abstractMajorizability.toRel.maj ρ x_star x →
         (∀ u : Nat, u ≤ Φ x_star → Formula.interpret M.si B₀ (u, (x, ()))) →
         ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret M.si C₀ (v, (x, ())) :=
-  syntactic_general_metatheorem M.eqXInterp (M.spremise hax) M.abstractMajorizability
+  syntactic_general_metatheorem M.eqXInterp M.spremise M.abstractMajorizability
     hB_qf hB_vf hC_qf hC_vf prf
 
 /-- **The W-hyperbolic metatheorem, from a classical proof.** -/
-theorem WHyperbolicModel.w_metatheorem_classical (M : WHyperbolicModel) (hax : M.AxiomsHold)
+theorem WHyperbolicModel.w_metatheorem_classical (M : WHyperbolicModel)
     {ρ : Ty MetricSpace.ι} {B₀ C₀ : Formula WHyperbolic.F [Ty.nat, ρ]}
     (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
     (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
@@ -451,7 +564,7 @@ theorem WHyperbolicModel.w_metatheorem_classical (M : WHyperbolicModel) (hax : M
         (∀ u : Nat, u ≤ Φ x_star → Formula.interpret M.si B₀ (u, (x, ()))) →
         ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret M.si C₀ (v, (x, ())) :=
   syntactic_general_metatheorem_classical M.eqXInterp
-    (ntStable_of_pu WHyperbolic.premises_pu) (M.spremise hax)
+    (ntStable_of_pu WHyperbolic.premises_pu) M.spremise
     M.abstractMajorizability hB_qf hB_vf hC_qf hC_vf prf
 
 -- ============================================================================
@@ -793,6 +906,13 @@ end WSelf
 #print axioms WHyperbolicModel.abstractMajorizability
 #print axioms WHyperbolicModel.constMajorants
 #print axioms WHyperbolicModel.eqXInterp
+#print axioms WHyperbolicModel.codeReal_interp_dist
+#print axioms WHyperbolicModel.W1_holds
+#print axioms WHyperbolicModel.W2_holds
+#print axioms WHyperbolicModel.W3_holds
+#print axioms WHyperbolicModel.W4_holds
+#print axioms WHyperbolicModel.axiomsHold
+#print axioms WHyperbolicModel.spremise
 #print axioms WHyperbolicModel.soundness
 #print axioms WHyperbolicModel.w_metatheorem
 #print axioms WHyperbolicModel.w_metatheorem_classical

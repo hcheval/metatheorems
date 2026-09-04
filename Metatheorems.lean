@@ -22,6 +22,8 @@ import Metatheorems.CAT0
 import Metatheorems.Normed
 import Metatheorems.QVal
 import Metatheorems.QValBridge
+import Metatheorems.QValBridgeMul
+import Metatheorems.CodeRealOps
 import Metatheorems.ProofMode.Packing
 import Metatheorems.ProofMode.Display
 import Metatheorems.ProofMode.Tactics
