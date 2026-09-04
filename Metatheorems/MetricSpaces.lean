@@ -971,10 +971,13 @@ defined rather than parameterised, and its equivalence properties are theorems
 and are supplied inline.
 
 **And `eqxi` is now discharged rather than assumed**, by `MetricModel.eqXInterp` — so all
-three of the hypotheses this theorem once carried have gone. Read the loud caveat on
-`MetricModel.metric_metatheorem`: `eqXInterp` has five `sorry`-ed fields, so this theorem
-depends on `sorryAx`. That is the truthful accounting of what instantiating to metric spaces
-still owes, and it was previously hidden inside the `eqxi` binder. -/
+three of the hypotheses this theorem once carried have gone.
+
+⚠ This paragraph used to add that `eqXInterp` has five `sorry`-ed fields and that this theorem
+therefore depends on `sorryAx`. **False since 2026-09-03**, when the evaluation bridge closed
+all five; the structure now has four fields, all model facts. Corrected 2026-09-04 — this was
+the second copy of the same stale claim in this file. The `#print axioms` block at the bottom
+is the authority: `[propext, Classical.choice, Quot.sound]`. -/
 theorem MetricModel.metric_metatheorem_classical (M : MetricModel)
     {ρ : Ty MetricSpace.ι} {B₀ C₀ : Formula MetricSpace.F [Ty.nat, ρ]}
     (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
