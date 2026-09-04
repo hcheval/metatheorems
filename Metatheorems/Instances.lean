@@ -24,18 +24,25 @@ hypotheses:
 | our structure | built from | how |
 |---|---|---|
 | `MetricModel` | any `[MetricSpace X]` + a point | `d := dist`; six Mathlib lemmas |
-| `NormedModel` | any normed space over `ℝ` | `{ E := E }` — no axiom fields |
+| `NormedModel` | any **nontrivial** normed space over `ℝ` | `{ E := E }` — no axiom fields |
 | `WHyperbolicModel` | any Mathlib normed space | `W x y λ := (1−λ)•x + λ•y`, the segment map |
 | `CAT0Model` | any Mathlib real inner-product space | CN **with equality** — the median law |
 
 Combined with `NormedModel.axiomsHold`, `WHyperbolicModel.axiomsHold` and
-`CAT0Model.axiomsHold`, this closes the loop: **the normed, W-hyperbolic and CAT(0)
-metatheorems apply to every Mathlib real normed space (the first two) / real inner-product
-space (the third), end to end, with no hypothesis beyond the Mathlib typeclasses.**
+`CAT0Model.axiomsHold`, this closes the loop: **the normed metatheorem applies to every
+*nontrivial* Mathlib real normed space, and the W-hyperbolic and CAT(0) metatheorems to every
+Mathlib real normed / real inner-product space, end to end, with no hypothesis beyond the
+Mathlib typeclasses.**
+
+The nontriviality side condition is confined to `NormedModel`, and it is not bookkeeping:
+`Normed.ax_norm_one` (Kohlenbach's (9), `‖1_X‖ =ℝ 1ℝ`) is *false* in the zero space.
+`WHyperbolicModel` and `CAT0Model` are over `WHyperbolic.F`, a different signature with no
+`1_X`, so `WHyperbolicModel.ofNormed` and `CAT0Model.ofInner` are untouched by it and still
+take only the two/three Mathlib instances.
 
 `NormedModel` is not an imitation of Mathlib's notion — it is a bundling of it (`E : Type`
-plus the two instance fields, no axioms of its own), so `ofNormed` is essentially the identity
-and the instances come straight back out.
+plus the three instance fields, no axioms of its own), so `ofNormed` is essentially the
+identity and the instances come straight back out.
 
 ## Two mechanical hazards, both paid for here
 
@@ -59,6 +66,9 @@ would need the structures generalised first.
 All three space theories are covered. Normed spaces were the last to join (2026-09-04): until
 `NormedModel.axiomsHold` was proved, `ofNormed` gave a model but the normed metatheorem still
 carried an `AxiomsHold` binder, so it was inhabited-but-not-applicable. No such gap remains.
+
+`ℝ` witnesses all of it — and `Nontrivial ℝ` is an instance, so the added binder costs the
+examples below nothing.
 -/
 
 -- ============================================================================
@@ -82,10 +92,16 @@ def MetricModel.ofMetricSpace (X : Type) [MetricSpace X] (pt : X) : MetricModel 
 -- Normed spaces
 -- ============================================================================
 
-/-- **Any Mathlib normed space over `ℝ` is a `NormedModel`** — definitionally, since
-`NormedModel` bundles exactly `E` with its two instances and asserts nothing further. -/
-abbrev NormedModel.ofNormed (E : Type) [NormedAddCommGroup E] [NormedSpace ℝ E] :
-    NormedModel :=
+/-- **Any *nontrivial* Mathlib normed space over `ℝ` is a `NormedModel`** — definitionally,
+since `NormedModel` bundles exactly `E` with its three instances and asserts nothing further.
+
+`[Nontrivial E]` is what interprets `1_X` and validates Kohlenbach's axiom (9),
+`‖1_X‖ =ℝ 1ℝ` — false in the zero space, so the hypothesis is not removable. Carrying it as a
+*typeclass* rather than as an explicit unit vector is what keeps this the identity: the
+normalisation `‖v‖⁻¹ • v` happens once, inside `NormedModel.unitVec`, not at every
+instantiation site. -/
+abbrev NormedModel.ofNormed (E : Type) [NormedAddCommGroup E] [NormedSpace ℝ E]
+    [Nontrivial E] : NormedModel :=
   { E := E }
 
 /-- The Mathlib instance comes back out, so the bundling loses nothing. -/
@@ -170,7 +186,7 @@ noncomputable abbrev CAT0Model.ofInner (E : Type)
 /-- **Every Mathlib normed space satisfies the object-level normed-space axioms.**
 `NormedModel.axiomsHold` at `ofNormed`; no hypothesis beyond the typeclasses. -/
 theorem NormedModel.ofNormed_axiomsHold (E : Type)
-    [NormedAddCommGroup E] [NormedSpace ℝ E] :
+    [NormedAddCommGroup E] [NormedSpace ℝ E] [Nontrivial E] :
     ∀ {Γ : Ctx MetricSpace.ι} (A : Formula Normed.F Γ), Normed.Premises ⟨Γ, A⟩ →
       ∀ env : Ctx.interpret (fun () => (NormedModel.ofNormed E).E) Γ,
         Formula.interpret (NormedModel.ofNormed E).si A env :=

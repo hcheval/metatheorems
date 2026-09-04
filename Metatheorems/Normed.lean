@@ -14,13 +14,16 @@ namespace Metatheorems
 # Real normed linear spaces
 
 Kohlenbach's `A^ω[X,‖·‖]`: the case the `ι`/`κ` split was done for. One base type `X`
-(`ι = Unit`) and **three** function constants over it (`κ = Normed.κ`):
+(`ι = Unit`) and **five** function constants over it (`κ = Normed.κ`):
 
-    +   : X →ₜ X →ₜ X          smul : ℝ →ₜ X →ₜ X          ‖·‖ : X →ₜ ℝ
+    +   : X →ₜ X →ₜ X     smul : ℝ →ₜ X →ₜ X     ‖·‖ : X →ₜ ℝ     − : X →ₜ X     1_X : X
+
+`1_X` is *nullary* — a constant of type `X`, which the framework supports directly (`Term.func`
+at a base type). `−` is **primitive**, not `(−1)·x`; see "Why `−` is primitive" below.
 
 The metric is still the structural `Term.dist ()`, so the pseudometric theory and the whole
 metric `EqXInterp` (`MetricTransfer.lean`) are inherited; what ties `d` to the norm is an
-**axiom**, `d(x,y) =ℝ ‖x + (−1)·y‖`, and `x =_X y` is, as everywhere, `d(x,y) =ℝ 0ℝ`.
+**axiom**, `d(x,y) =ℝ ‖x + (−y)‖`, and `x =_X y` is, as everywhere, `d(x,y) =ℝ 0ℝ`.
 
 ## Two differences from the hyperbolic case
 
@@ -33,16 +36,34 @@ metric `EqXInterp` (`MetricTransfer.lean`) are inherited; what ties `d` to the n
   literal `0`. Where `MetricModel.constMajorants` takes `n₀ ≥ d(a, 0_X)` as an input,
   `NormedModel.constMajorants` takes nothing. On that axis normed is cheaper than metric.
 
+## Why `−` is primitive — the majorant, and what it says about encodings
+
+`smulMajorant f n = (f 0 + 1)·n`, so with `−x := (−1)·x` negation would be majorized by
+`(negOne(0) + 1)·n`, where `negOne(0)` is **the ℚ-code for `−1` under the sign-magnitude
+Cantor-pairing encoding of `Terms/Rational.lean`**. That factor is an artifact of the coding
+with no mathematical content whatever, and it would appear verbatim in every extracted bound
+that so much as subtracts. With `−` primitive the majorant is
+
+    negMajorant = fun (n : ℕ) => n
+
+**exactly**, because `‖−x‖ = ‖x‖` and base-majorization at `X` *is* `‖x‖ ≤ n`. The lesson
+generalises past this file: **a defined operation inherits the majorant of its definiens, so
+anything routed through the real/rational encoding pays an encoding-sized constant.** When the
+mathematics has a tight majorant, make the operation a constant and axiomatise it.
+
 ## The model
 
-Mathlib's `NormedAddCommGroup E` + `NormedSpace ℝ E`, with `d x y := ‖x − y‖`. The `MetricModel`
-it induces (separation is `norm_sub_eq_zero`) feeds `MetricTransfer.lean` unchanged.
+Mathlib's `NormedAddCommGroup E` + `NormedSpace ℝ E` + `Nontrivial E`, with `d x y := ‖x − y‖`.
+The `MetricModel` it induces (separation is `norm_sub_eq_zero`) feeds `MetricTransfer.lean`
+unchanged. Nontriviality is what interprets `1_X`: `NormedModel.unitVec` is `‖v‖⁻¹ • v` for a
+`v ≠ 0` supplied by `exists_ne 0`, and `norm_unitVec` is `norm_smul_inv_norm`.
 
 ## Axioms
 
-The vector-space axioms (1)–(8) with `−x := (−1)·x`, the two norm axioms, and the `d`/norm
-link. All eleven are purely universal and ∨-free, and **all eleven hold in every real normed
-space** (`NormedModel.axiomsHold` below).
+The vector-space axioms (1)–(8) — including `x + (−x) =_X 0_X` at the *primitive* `−` — the
+three norm axioms (`‖α·x‖`, the triangle inequality, `‖−x‖ =ℝ ‖x‖`), nontriviality
+`‖1_X‖ =ℝ 1ℝ`, and the `d`/norm link. All thirteen are purely universal and ∨-free, and
+**all thirteen hold in every nontrivial real normed space** (`NormedModel.axiomsHold` below).
 
 **Checked against Kohlenbach's `A^ω[X,‖·‖]`** (Applied Proof Theory §17.3, pp. 411–412) on
 2026-09-04. His signature is `0_X, 1_X, +_X, −_X, ·_X, ‖·‖_X`, with `x =_X y :≡ ‖x −_X y‖ =ℝ 0`
@@ -55,15 +76,30 @@ w.r.t. `=_X`* in purely universal form (he says so, p. 412); ours (9)–(10) are
 norm axioms he notes are derivable from them. The converse derivation — his (4)–(8) from our
 list — goes through because every `=_X` fact it needs is a closed theorem, so `qfer` supplies
 the congruences; it has been checked on paper, **not in Lean**. His (1)–(3) are our `Derivable`
-pseudometric constructors carried across the link (11). Two deliberate omissions:
+pseudometric constructors carried across the link (13).
 
-* **No `1_X`, no (9).** (9) is nontriviality (Kohlenbach: "a Skolemized form of expressing
-  that the normed space is nontrivial"), used in the book only to interpret `1_X`. Our theory
-  is therefore weaker — it also holds in the trivial space — and a book statement mentioning
-  `1_X` cannot be transcribed verbatim.
-* **No `−_X` constant.** `(−1)·x` instead; the book's `x −_X y` is itself sugar for
-  `+_X(x, −_X y)`, and in the model `−x = (−1)•x` (`neg_one_smul`). The cost is a looser
-  majorant: negation goes through `smul`'s `(α*(0)+1)·n` rather than the identity.
+**Both former omissions are now closed** (2026-09-04). The signature is his, modulo his `−_X`
+being binary-sugar `x −_X y :≡ +_X(x, −_X y)`, which we spell out at the two use sites:
+
+* **`1_X` and (9) are in.** `ax_norm_one : ‖1_X‖ =ℝ 1ℝ` — Kohlenbach's (9), "a Skolemized form
+  of expressing that the normed space is nontrivial". A book statement mentioning `1_X` is now
+  transcribable verbatim, and the model must be nontrivial.
+* **`−_X` is a primitive constant.** *Which axiomatisation:* **Kohlenbach's.** He has `−_X` in
+  the signature and axiomatises it *directly* — inside (0), the vector-space axioms, as
+  `x +_X (−_X x) =_X 0_X`, plus the norm axiom (7) `‖(−x) − (−y)‖ = ‖x−y‖`. He does **not**
+  relate `−` to `·_X` by an axiom `−x =_X (−1)·x`; in his theory, as in ordinary algebra, that
+  is a *derived* identity. We follow him: our (4) is `x + (−x) =_X 0_X` at the primitive `−`,
+  and our (12) `‖−x‖ =ℝ ‖x‖` is his (7) in the "usual" form, the same relation ours (9)/(10)
+  bear to his (4)–(8).
+
+  One honest consequence, since our (4) *replaces* the old `x + (−1)·x =_X 0_X` rather than
+  joining it: the new theory is not literally a superset of the old one along that single
+  formula. It is a consequence on paper (`(−1)x = −x` in any vector space) but the object-level
+  derivation would need extensionality of `·_X` in its *scalar* argument w.r.t. `=ℝ`, which
+  `qfer` does not supply (`qfer` is `=₀`). Both formulas are true in every normed model, so
+  nothing about the *models* changed; only what is derivable from the axiom list, and only in
+  that one direction. Adding `−x =_X (−1)·x` as a further axiom would close it, at the price
+  of an axiom Kohlenbach does not have.
 -/
 
 open Formula
@@ -72,17 +108,21 @@ open Formula
 -- Signature
 -- ============================================================================
 
-/-- The three function constants. -/
+/-- The five function constants. `one` is nullary — a *point* of `X`. -/
 inductive Normed.κ
   | add
   | smul
   | norm
+  | neg
+  | one
 
-/-- `+ : X →ₜ X →ₜ X`, `smul : ℝ →ₜ X →ₜ X`, `‖·‖ : X →ₜ ℝ`. -/
+/-- `+ : X →ₜ X →ₜ X`, `smul : ℝ →ₜ X →ₜ X`, `‖·‖ : X →ₜ ℝ`, `− : X →ₜ X`, `1_X : X`. -/
 def Normed.F : Normed.κ → Ty MetricSpace.ι
   | .add  => xTy →ₜ xTy →ₜ xTy
   | .smul => realTy MetricSpace.ι →ₜ xTy →ₜ xTy
   | .norm => xTy →ₜ realTy MetricSpace.ι
+  | .neg  => xTy →ₜ xTy
+  | .one  => xTy
 
 abbrev Normed.vadd {Γ : Ctx MetricSpace.ι} : Term Normed.F Γ (xTy →ₜ xTy →ₜ xTy) :=
   Term.func Normed.κ.add
@@ -100,9 +140,13 @@ abbrev Normed.d {Γ : Ctx MetricSpace.ι} :
 
 abbrev Normed.zero {Γ : Ctx MetricSpace.ι} : Term Normed.F Γ xTy := Term.zeroX ()
 
-/-- `−1ℝ`, the scalar that gives additive inverses. -/
-abbrev Normed.negOne {Γ : Ctx MetricSpace.ι} : Term Normed.F Γ (realTy MetricSpace.ι) :=
-  .app Term.neg_R Term.one_R
+/-- `− : X →ₜ X`, the primitive additive inverse. -/
+abbrev Normed.vneg {Γ : Ctx MetricSpace.ι} : Term Normed.F Γ (xTy →ₜ xTy) :=
+  Term.func Normed.κ.neg
+
+/-- `1_X`, the unit vector — a nullary constant of type `X`. -/
+abbrev Normed.one {Γ : Ctx MetricSpace.ι} : Term Normed.F Γ xTy :=
+  Term.func Normed.κ.one
 
 -- ============================================================================
 -- The axioms
@@ -129,11 +173,11 @@ def Normed.ax_add_zero {Γ : Ctx MetricSpace.ι} : Formula Normed.F Γ :=
   Formula.all xTy
     (eqAtType xTy (Term.app2 Normed.vadd (.var .vz) Normed.zero) (.var .vz))
 
-/-- (4) `∀x. x + (−1)·x =_X 0_X`. -/
+/-- (4) `∀x. x + (−x) =_X 0_X` — at the **primitive** `−`, as in Kohlenbach's (0). -/
 def Normed.ax_add_neg {Γ : Ctx MetricSpace.ι} : Formula Normed.F Γ :=
   Formula.all xTy
     (eqAtType xTy
-      (Term.app2 Normed.vadd (.var .vz) (Term.app2 Normed.vsmul Normed.negOne (.var .vz)))
+      (Term.app2 Normed.vadd (.var .vz) (.app Normed.vneg (.var .vz)))
       Normed.zero)
 
 /-- (5) `∀α x y. α·(x + y) =_X α·x + α·y`. -/
@@ -184,57 +228,109 @@ def Normed.ax_norm_add {Γ : Ctx MetricSpace.ι} : Formula Normed.F Γ :=
       (.app Normed.vnorm (Term.app2 Normed.vadd (.var (.vs .vz)) (.var .vz)))
       (Term.app2 Term.add_R (.app Normed.vnorm (.var (.vs .vz))) (.app Normed.vnorm (.var .vz)))))
 
-/-- (11) `∀x y. d(x,y) =ℝ ‖x + (−1)·y‖` — the metric is the norm distance. -/
+/-- (11) `‖1_X‖ =ℝ 1ℝ` — Kohlenbach's (9), nontriviality in Skolemized form. No quantifier:
+`1_X` is a constant. -/
+def Normed.ax_norm_one {Γ : Ctx MetricSpace.ι} : Formula Normed.F Γ :=
+  eq_R (.app Normed.vnorm Normed.one) Term.one_R
+
+/-- (12) `∀x. ‖−x‖ =ℝ ‖x‖` — Kohlenbach's (7) in the "usual" (non-difference) form. -/
+def Normed.ax_norm_neg {Γ : Ctx MetricSpace.ι} : Formula Normed.F Γ :=
+  Formula.all xTy
+    (eq_R
+      (.app Normed.vnorm (.app Normed.vneg (.var .vz)))
+      (.app Normed.vnorm (.var .vz)))
+
+/-- (13) `∀x y. d(x,y) =ℝ ‖x + (−y)‖` — the metric is the norm distance, at Kohlenbach's
+`x −_X y :≡ +_X(x, −_X y)`. -/
 def Normed.ax_dist {Γ : Ctx MetricSpace.ι} : Formula Normed.F Γ :=
   Formula.all xTy (Formula.all xTy
     (eq_R
       (Term.app2 Normed.d (.var (.vs .vz)) (.var .vz))
       (.app Normed.vnorm
         (Term.app2 Normed.vadd (.var (.vs .vz))
-          (Term.app2 Normed.vsmul Normed.negOne (.var .vz))))))
+          (.app Normed.vneg (.var .vz))))))
 
 -- ============================================================================
 -- The premise set
 -- ============================================================================
 
-/-- The eleven axioms, in every context. -/
+/-- The thirteen axioms, in every context. -/
 def Normed.Premises : PremiseSet Normed.F
   | ⟨_, A⟩ =>
       A = Normed.ax_add_comm ∨ A = Normed.ax_add_assoc ∨ A = Normed.ax_add_zero
       ∨ A = Normed.ax_add_neg ∨ A = Normed.ax_smul_add ∨ A = Normed.ax_add_smul
       ∨ A = Normed.ax_smul_smul ∨ A = Normed.ax_one_smul ∨ A = Normed.ax_norm_smul
-      ∨ A = Normed.ax_norm_add ∨ A = Normed.ax_dist
+      ∨ A = Normed.ax_norm_add ∨ A = Normed.ax_norm_one ∨ A = Normed.ax_norm_neg
+      ∨ A = Normed.ax_dist
 
 theorem Normed.premises_pu :
     ∀ (Γ' : Ctx MetricSpace.ι) (B : Formula Normed.F Γ'),
       Normed.Premises ⟨Γ', B⟩ → B.isPurelyUniversal = true := by
   intro Γ' B h
-  rcases h with h | h | h | h | h | h | h | h | h | h | h <;> subst h <;> rfl
+  rcases h with h | h | h | h | h | h | h | h | h | h | h | h | h <;> subst h <;> rfl
 
 theorem Normed.premises_vf :
     ∀ (Γ' : Ctx MetricSpace.ι) (B : Formula Normed.F Γ'),
       Normed.Premises ⟨Γ', B⟩ → B.isVFree = true := by
   intro Γ' B h
-  rcases h with h | h | h | h | h | h | h | h | h | h | h <;> subst h <;> rfl
+  rcases h with h | h | h | h | h | h | h | h | h | h | h | h | h <;> subst h <;> rfl
 
-/-- `⊢ (11)`, the `d`/norm link — the axiom a derivation about the metric reaches for. -/
+-- The `Or`-chains below use `<|` rather than nested parentheses. With thirteen disjuncts the
+-- paren form is write-only and miscounts silently into a parse error far from the cause.
+
+/-- `⊢ (13)`, the `d`/norm link — the axiom a derivation about the metric reaches for.
+Last of the thirteen, so twelve `Or.inr`. -/
 def Normed.dist_ax {Γ : Ctx MetricSpace.ι} {a : Allowed} :
     Derivable Normed.F a Normed.Premises (Normed.ax_dist (Γ := Γ)) :=
-  .premise (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
-    (Or.inr rfl))))))))))
+  .premise <| Or.inr <| Or.inr <| Or.inr <| Or.inr <| Or.inr <| Or.inr <| Or.inr <| Or.inr <|
+    Or.inr <| Or.inr <| Or.inr <| Or.inr <| rfl
+
+/-- `⊢ (11)`, nontriviality. Eleventh, so ten `Or.inr` then `Or.inl`. -/
+def Normed.norm_one_ax {Γ : Ctx MetricSpace.ι} {a : Allowed} :
+    Derivable Normed.F a Normed.Premises (Normed.ax_norm_one (Γ := Γ)) :=
+  .premise <| Or.inr <| Or.inr <| Or.inr <| Or.inr <| Or.inr <| Or.inr <| Or.inr <| Or.inr <|
+    Or.inr <| Or.inr <| Or.inl rfl
+
+/-- `⊢ (12)`, `‖−x‖ =ℝ ‖x‖`. Twelfth, so eleven `Or.inr` then `Or.inl`. -/
+def Normed.norm_neg_ax {Γ : Ctx MetricSpace.ι} {a : Allowed} :
+    Derivable Normed.F a Normed.Premises (Normed.ax_norm_neg (Γ := Γ)) :=
+  .premise <| Or.inr <| Or.inr <| Or.inr <| Or.inr <| Or.inr <| Or.inr <| Or.inr <| Or.inr <|
+    Or.inr <| Or.inr <| Or.inr <| Or.inl rfl
 
 -- ============================================================================
 -- The model
 -- ============================================================================
 
-/-- **A normed model**: a Mathlib real normed space. -/
+/-- **A normed model**: a Mathlib real normed space, **nontrivial**.
+
+Nontriviality is carried as an *instance field* rather than as an explicit unit vector plus
+`‖·‖ = 1`, because that is what keeps `NormedModel` a pure bundling of Mathlib typeclasses:
+`Instances.lean`'s `ofNormed` stays the identity `{ E := E }`, gaining only a `[Nontrivial E]`
+binder, instead of having to construct and verify a witness at the instantiation site. The unit
+vector is built once, here, by `NormedModel.unitVec`. -/
 structure NormedModel where
   /-- The carrier. -/
   E : Type
   [normedGroup : NormedAddCommGroup E]
   [normedSpace : NormedSpace ℝ E]
+  [nontrivial : Nontrivial E]
 
-attribute [instance] NormedModel.normedGroup NormedModel.normedSpace
+attribute [instance] NormedModel.normedGroup NormedModel.normedSpace NormedModel.nontrivial
+
+/-- Some nonzero vector — the content of `Nontrivial E`. -/
+noncomputable def NormedModel.someNonzero (M : NormedModel) : M.E :=
+  Classical.choose (exists_ne (0 : M.E))
+
+theorem NormedModel.someNonzero_ne (M : NormedModel) : M.someNonzero ≠ 0 :=
+  Classical.choose_spec (exists_ne (0 : M.E))
+
+/-- **The interpretation of `1_X`**: a vector of norm exactly `1`, normalising
+`someNonzero`. -/
+noncomputable def NormedModel.unitVec (M : NormedModel) : M.E :=
+  (‖M.someNonzero‖)⁻¹ • M.someNonzero
+
+@[simp] theorem NormedModel.norm_unitVec (M : NormedModel) : (‖M.unitVec‖) = 1 :=
+  norm_smul_inv_norm M.someNonzero_ne
 
 /-- The metric model `d(x,y) := ‖x − y‖`, reference point and `0_X` both `0`. An `abbrev`, so
 that `M.toMetricModel.carrier` is `M.E` at elaboration time. -/
@@ -252,13 +348,15 @@ noncomputable abbrev NormedModel.toMetricModel (M : NormedModel) : MetricModel w
   zeroX := 0
   ref := 0
 
-/-- The interpretation of the three constants: `+`, `α • x` through `codeReal`, and
-`(‖x‖)◦`. -/
+/-- The interpretation of the five constants: `+`, `α • x` through `codeReal`, `(‖x‖)◦`,
+negation, and the unit vector. -/
 noncomputable def NormedModel.funcInterp (M : NormedModel) :
     (c : Normed.κ) → Ty.interpret (fun () => M.E) (Normed.F c)
   | .add  => fun x y => x + y
   | .smul => fun f x => codeReal f • x
   | .norm => fun x => Rounding.roundR (‖x‖)
+  | .neg  => fun x => -x
+  | .one  => M.unitVec
 
 /-- The `SpaceInterp`. -/
 noncomputable def NormedModel.si (M : NormedModel) : SpaceInterp (fun () => M.E) Normed.F where
@@ -319,6 +417,92 @@ scalars are unrestricted, and `|r_α| ≤ α(0) + 1 ≤ α*(0) + 1` is all a maj
 def NormedModel.smulMajorant (M : NormedModel) :
     Ty.interpret (fun () => M.E) (realTy MetricSpace.ι →ₜ xTy →ₜ xTy).hat :=
   fun (f : ℕ → ℕ) (n : ℕ) => ((f 0 + 1) * n : ℕ)
+
+/-- **`− ↦ λn. n`, exactly.** `‖−x‖ = ‖x‖`, and base-majorization at `X` *is* `‖x‖ ≤ n`, so
+negation is majorized by the identity with nothing to spare. Contrast `smulMajorant`: had `−x`
+stayed `(−1)·x`, this would be `λn. (negOne(0) + 1)·n`, whose factor is a ℚ-encoding artifact.
+Compare `WHyperbolicModel.WMajorant = λn₁ n₂ _. max n₁ n₂`. -/
+def NormedModel.negMajorant (M : NormedModel) :
+    Ty.interpret (fun () => M.E) (xTy →ₜ xTy).hat :=
+  fun (n : ℕ) => n
+
+/-- **`1_X ↦ 1`.** `‖1_X‖ = 1` *is* base-majorization by `1`. -/
+def NormedModel.oneMajorant (M : NormedModel) :
+    Ty.interpret (fun () => M.E) xTy.hat :=
+  (1 : ℕ)
+
+theorem NormedModel.neg_maj_at (M : NormedModel) (N : ℕ) :
+    ∀ n ≥ N, bezemMaj (X := fun () => M.E) M.toMetricModel.base (xTy →ₜ xTy)
+      M.negMajorant (M.si.funcInterp .neg) := by
+  intro _ _
+  unfold NormedModel.negMajorant
+  refine ⟨?_, ?_⟩
+  · intro n x hx
+    rw [M.bezem_base_iff] at hx ⊢
+    change (‖-x‖) ≤ Nat.cast (R := ℝ) n
+    rwa [norm_neg]
+  · intro _ _ h
+    exact h
+
+theorem NormedModel.one_maj_at (M : NormedModel) (N : ℕ) :
+    ∀ n ≥ N, bezemMaj (X := fun () => M.E) M.toMetricModel.base xTy
+      M.oneMajorant (M.si.funcInterp .one) := by
+  intro _ _
+  rw [M.bezem_base_iff]
+  change (‖M.unitVec‖) ≤ ((1 : ℕ) : ℝ)
+  rw [M.norm_unitVec]
+  norm_num
+
+/-- A vector of norm exactly `n`, for the tightness results below. Needs nontriviality —
+in the trivial space no such vector exists for `n > 0`, which is the second thing (11) buys. -/
+theorem NormedModel.norm_nsmul_unitVec (M : NormedModel) (n : ℕ) :
+    (‖(n : ℝ) • M.unitVec‖) = (n : ℝ) := by
+  rw [norm_smul, Real.norm_eq_abs, M.norm_unitVec, mul_one, abs_of_nonneg (by positivity)]
+
+/-- **`negMajorant` is TIGHT — pointwise minimal.** *Every* majorant `g` of negation satisfies
+`g n ≥ n` at every `n`, so `fun n => n` cannot be improved anywhere: nothing smaller at any
+single argument is a majorant. This is the control for the deliverable, stated positively. -/
+theorem NormedModel.neg_maj_lower_bound (M : NormedModel)
+    (g : Ty.interpret (fun () => M.E) (xTy →ₜ xTy).hat)
+    (hg : bezemMaj (X := fun () => M.E) M.toMetricModel.base (xTy →ₜ xTy)
+      g (M.si.funcInterp .neg)) (n : ℕ) :
+    n ≤ g n := by
+  have hx : bezemMaj (X := fun () => M.E) M.toMetricModel.base xTy n ((n : ℝ) • M.unitVec) := by
+    rw [M.bezem_base_iff, M.norm_nsmul_unitVec]
+  have h := hg.1 n ((n : ℝ) • M.unitVec) hx
+  rw [M.bezem_base_iff] at h
+  -- `funcInterp .neg x` is `-x` by `rfl`, but not syntactically, so `rw` needs the `change`
+  have h2 : (‖-((n : ℝ) • M.unitVec)‖) ≤ Nat.cast (R := ℝ) (g n) := h
+  rw [norm_neg, M.norm_nsmul_unitVec] at h2
+  exact_mod_cast h2
+
+/-- **`oneMajorant` is TIGHT.** Every majorant of `1_X` is `≥ 1`, since `‖1_X‖ = 1`. -/
+theorem NormedModel.one_maj_lower_bound (M : NormedModel)
+    (m : Ty.interpret (fun () => M.E) xTy.hat)
+    (hm : bezemMaj (X := fun () => M.E) M.toMetricModel.base xTy m (M.si.funcInterp .one)) :
+    @LE.le ℕ _ 1 m := by
+  rw [M.bezem_base_iff] at hm
+  have h1 : (1 : ℝ) ≤ Nat.cast (R := ℝ) m := by
+    rwa [show (M.si.funcInterp .one : M.E) = M.unitVec from rfl, M.norm_unitVec] at hm
+  exact_mod_cast h1
+
+/-- **Control, proved rather than merely observed to fail**: `λn. n − 1` — the smallest
+perturbation of `negMajorant` downwards — is *not* a majorant of negation, in any model. Any
+`g` with `g n < n` at even one `n` is refuted the same way by `neg_maj_lower_bound`. -/
+theorem NormedModel.negMajorant_pred_not_maj (M : NormedModel) :
+    ¬ bezemMaj (X := fun () => M.E) M.toMetricModel.base (xTy →ₜ xTy)
+        (fun (n : ℕ) => n - 1) (M.si.funcInterp .neg) := by
+  intro h
+  have := M.neg_maj_lower_bound _ h 1
+  simp at this
+
+/-- Same for `1_X`: `0` does not majorize it. -/
+theorem NormedModel.oneMajorant_zero_not_maj (M : NormedModel) :
+    ¬ bezemMaj (X := fun () => M.E) M.toMetricModel.base xTy (0 : ℕ)
+        (M.si.funcInterp .one) := by
+  intro h
+  have := M.one_maj_lower_bound _ h
+  simp at this
 
 theorem NormedModel.add_maj_at (M : NormedModel) (N : ℕ) :
     ∀ n ≥ N, bezemMaj (X := fun () => M.E) M.toMetricModel.base (xTy →ₜ xTy →ₜ xTy)
@@ -386,6 +570,8 @@ theorem NormedModel.func_maj (M : NormedModel) (c : Normed.κ) :
   | add => exact ⟨fun _ => M.addMajorant, M.add_maj_at 0⟩
   | smul => exact ⟨fun _ => M.smulMajorant, M.smul_maj_at 0⟩
   | norm => exact ⟨fun _ => M.normMajorant, M.norm_maj_at 0⟩
+  | neg => exact ⟨fun _ => M.negMajorant, M.neg_maj_at 0⟩
+  | one => exact ⟨fun _ => M.oneMajorant, M.one_maj_at 0⟩
 
 /-- `0_X = a`, so `0` majorizes it. -/
 theorem NormedModel.zeroX_maj_zero (M : NormedModel) :
@@ -420,10 +606,14 @@ noncomputable def NormedModel.constMajorants (M : NormedModel) :
     | .add => M.addMajorant
     | .smul => M.smulMajorant
     | .norm => M.normMajorant
+    | .neg => M.negMajorant
+    | .one => M.oneMajorant
   funcM_maj := fun c => match c with
     | .add => M.add_maj_at 0
     | .smul => M.smul_maj_at 0
     | .norm => M.norm_maj_at 0
+    | .neg => M.neg_maj_at 0
+    | .one => M.one_maj_at 0
   zeroXM := fun _ _ => 0
   zeroXM_maj := fun () _ _ => M.zeroX_maj_zero
   distM := fun _ _ => M.toMetricModel.distMajorant
@@ -487,6 +677,15 @@ theorem NormedModel.interp_norm (s : Term Normed.F Γ xTy)
 theorem NormedModel.interp_zero (env : Ctx.interpret (fun () => M.E) Γ) :
     Term.interpret M.si (Normed.zero (Γ := Γ)) env = 0 := rfl
 
+/-- `−` evaluates to Mathlib negation. -/
+theorem NormedModel.interp_neg (s : Term Normed.F Γ xTy)
+    (env : Ctx.interpret (fun () => M.E) Γ) :
+    Term.interpret M.si (Term.app Normed.vneg s) env = -Term.interpret M.si s env := rfl
+
+/-- `1_X` evaluates to the unit vector. -/
+theorem NormedModel.interp_one (env : Ctx.interpret (fun () => M.E) Γ) :
+    Term.interpret M.si (Normed.one (Γ := Γ)) env = M.unitVec := rfl
+
 /-- `(‖x‖)◦` denotes `‖x‖` — `codeReal_roundR`, composed with `interp_norm`. -/
 theorem NormedModel.codeReal_interp_norm (s : Term Normed.F Γ xTy)
     (env : Ctx.interpret (fun () => M.E) Γ) :
@@ -502,12 +701,6 @@ theorem NormedModel.codeReal_interp_dist (s t : Term Normed.F Γ xTy)
       = (‖Term.interpret M.si s env - Term.interpret M.si t env‖) := by
   rw [M.toMetricModel.interp_dist_gen M.si (fun _ _ => rfl) s t env,
     codeReal_roundR _ (norm_nonneg _)]
-
-/-- `−1ℝ` denotes `−1`: `1ℝ` is a constant code, so `neg_R`'s side condition is free. -/
-theorem NormedModel.codeReal_interp_negOne (env : Ctx.interpret (fun () => M.E) Γ) :
-    codeReal (Term.interpret M.si (Normed.negOne (Γ := Γ)) env) = -1 := by
-  rw [Normed.negOne, codeReal_interp_neg_R _ _ (isCauchyCode_interp_one_R _),
-    codeReal_interp_one_R]
 
 /-- `=_X` between terms whose values coincide. `MetricTransfer`'s `eqAtType_base_holds_gen`
 at `d(x,y) := ‖x − y‖`; this is what the eight vector-space axioms reduce to. -/
@@ -546,14 +739,14 @@ theorem NormedModel.add_zero_holds (s : Term Normed.F Γ xTy)
   simp only [M.interp_add, M.interp_zero]
   exact add_zero _
 
-/-- (4) in the model: `x + (−1)·x = 0`, by `neg_one_smul`. -/
+/-- (4) in the model: `x + (−x) = 0` at the primitive negation. -/
 theorem NormedModel.add_neg_holds (s : Term Normed.F Γ xTy)
     (env : Ctx.interpret (fun () => M.E) Γ) :
     Formula.interpret M.si
       (eqAtType xTy
-        (Term.app2 Normed.vadd s (Term.app2 Normed.vsmul Normed.negOne s)) Normed.zero) env := by
+        (Term.app2 Normed.vadd s (.app Normed.vneg s)) Normed.zero) env := by
   apply M.eqX_of_eq
-  simp only [M.interp_add, M.interp_smul, M.interp_zero, M.codeReal_interp_negOne, neg_one_smul]
+  simp only [M.interp_add, M.interp_neg, M.interp_zero]
   exact add_neg_cancel _
 
 /-- (5) in the model. -/
@@ -622,27 +815,41 @@ theorem NormedModel.norm_add_holds (s t : Term Normed.F Γ xTy)
   simp only [M.codeReal_interp_norm, M.interp_add, codeReal_interp_add_R]
   exact norm_add_le _ _
 
-/-- (11) in the model: `d(x,y) = ‖x − y‖ = ‖x + (−1)·y‖`. -/
+/-- (11) in the model: `‖1_X‖ = 1`, by construction of the unit vector. -/
+theorem NormedModel.norm_one_holds (env : Ctx.interpret (fun () => M.E) Γ) :
+    Formula.interpret M.si
+      (eq_R (.app Normed.vnorm (Normed.one (Γ := Γ))) Term.one_R) env := by
+  apply interpret_eq_R_of_codeReal_eq
+  rw [M.codeReal_interp_norm, codeReal_interp_one_R, M.interp_one, M.norm_unitVec]
+
+/-- (12) in the model: `‖−x‖ = ‖x‖`, Mathlib's `norm_neg`. -/
+theorem NormedModel.norm_neg_holds (s : Term Normed.F Γ xTy)
+    (env : Ctx.interpret (fun () => M.E) Γ) :
+    Formula.interpret M.si
+      (eq_R (.app Normed.vnorm (.app Normed.vneg s)) (.app Normed.vnorm s)) env := by
+  apply interpret_eq_R_of_codeReal_eq
+  rw [M.codeReal_interp_norm, M.codeReal_interp_norm, M.interp_neg, norm_neg]
+
+/-- (13) in the model: `d(x,y) = ‖x − y‖ = ‖x + (−y)‖`. -/
 theorem NormedModel.dist_holds (s t : Term Normed.F Γ xTy)
     (env : Ctx.interpret (fun () => M.E) Γ) :
     Formula.interpret M.si
       (eq_R
         (Term.app2 Normed.d s t)
         (.app Normed.vnorm
-          (Term.app2 Normed.vadd s (Term.app2 Normed.vsmul Normed.negOne t)))) env := by
+          (Term.app2 Normed.vadd s (.app Normed.vneg t)))) env := by
   apply interpret_eq_R_of_codeReal_eq
-  simp only [M.codeReal_interp_dist, M.codeReal_interp_norm, M.interp_add, M.interp_smul,
-    M.codeReal_interp_negOne, neg_one_smul]
+  simp only [M.codeReal_interp_dist, M.codeReal_interp_norm, M.interp_add, M.interp_neg]
   rw [sub_eq_add_neg]
 
-/-- **The eleven axioms hold in the model.** With this, `spremise`, `soundness` and both
+/-- **The thirteen axioms hold in the model.** With this, `spremise`, `soundness` and both
 metatheorems take no hypothesis about the model beyond `NormedModel` itself — the last
 `AxiomsHold` binder in the space tower is gone. -/
 theorem NormedModel.axiomsHold :
     ∀ {Γ : Ctx MetricSpace.ι} (A : Formula Normed.F Γ), Normed.Premises ⟨Γ, A⟩ →
       ∀ env : Ctx.interpret (fun () => M.E) Γ, Formula.interpret M.si A env := by
   intro Γ A hA env
-  rcases hA with h | h | h | h | h | h | h | h | h | h | h <;> subst h
+  rcases hA with h | h | h | h | h | h | h | h | h | h | h | h | h <;> subst h
   · intro x y
     exact M.add_comm_holds _ _ _
   · intro x y z
@@ -663,6 +870,9 @@ theorem NormedModel.axiomsHold :
     exact M.norm_smul_holds _ _ _
   · intro x y
     exact M.norm_add_holds _ _ _
+  · exact M.norm_one_holds _
+  · intro x
+    exact M.norm_neg_holds _ _
   · intro x y
     exact M.dist_holds _ _ _
 
@@ -677,6 +887,24 @@ example {Γ : Ctx MetricSpace.ι} (env : Ctx.interpret (fun () => M.E) Γ) :
 example {Γ : Ctx MetricSpace.ι} (env : Ctx.interpret (fun () => M.E) Γ) :
     Formula.interpret M.si (Normed.ax_add_comm (Γ := Γ)) env :=
   M.axiomsHold _ (Or.inl rfl) env
+
+/-- Non-vacuity for the **new** nontriviality axiom (11): `ax_norm_one` is a premise, and
+`axiomsHold` yields `‖1_X‖ =ℝ 1ℝ` at any environment. -/
+example {Γ : Ctx MetricSpace.ι} (env : Ctx.interpret (fun () => M.E) Γ) :
+    Formula.interpret M.si (Normed.ax_norm_one (Γ := Γ)) env :=
+  M.axiomsHold _ (Or.inr <| Or.inr <| Or.inr <| Or.inr <| Or.inr <| Or.inr <| Or.inr <|
+    Or.inr <| Or.inr <| Or.inr <| Or.inl rfl) env
+
+/-- Non-vacuity for the **new** negation axiom (12). -/
+example {Γ : Ctx MetricSpace.ι} (env : Ctx.interpret (fun () => M.E) Γ) :
+    Formula.interpret M.si (Normed.ax_norm_neg (Γ := Γ)) env :=
+  M.axiomsHold _ (Or.inr <| Or.inr <| Or.inr <| Or.inr <| Or.inr <| Or.inr <| Or.inr <|
+    Or.inr <| Or.inr <| Or.inr <| Or.inr <| Or.inl rfl) env
+
+/-- Non-vacuity for the restated (4), `x + (−x) =_X 0_X` at the primitive `−`. -/
+example {Γ : Ctx MetricSpace.ι} (env : Ctx.interpret (fun () => M.E) Γ) :
+    Formula.interpret M.si (Normed.ax_add_neg (Γ := Γ)) env :=
+  M.axiomsHold _ (Or.inr <| Or.inr <| Or.inr <| Or.inl rfl) env
 
 end AxiomsInModel
 
@@ -731,14 +959,28 @@ theorem NormedModel.normed_metatheorem_classical (M : NormedModel)
 -- ============================================================================
 
 #print axioms Normed.premises_pu
+#print axioms Normed.premises_vf
+#print axioms Normed.dist_ax
+#print axioms Normed.norm_one_ax
+#print axioms Normed.norm_neg_ax
+#print axioms NormedModel.norm_nsmul_unitVec
+#print axioms NormedModel.neg_maj_lower_bound
+#print axioms NormedModel.one_maj_lower_bound
+#print axioms NormedModel.negMajorant_pred_not_maj
+#print axioms NormedModel.oneMajorant_zero_not_maj
 #print axioms NormedModel.smul_maj_at
 #print axioms NormedModel.abstractMajorizability
 #print axioms NormedModel.constMajorants
 #print axioms NormedModel.eqXInterp
 #print axioms NormedModel.codeReal_interp_norm
 #print axioms NormedModel.codeReal_interp_dist
-#print axioms NormedModel.codeReal_interp_negOne
+#print axioms NormedModel.norm_unitVec
+#print axioms NormedModel.negMajorant
+#print axioms NormedModel.neg_maj_at
+#print axioms NormedModel.one_maj_at
 #print axioms NormedModel.add_neg_holds
+#print axioms NormedModel.norm_one_holds
+#print axioms NormedModel.norm_neg_holds
 #print axioms NormedModel.smul_smul_holds
 #print axioms NormedModel.norm_smul_holds
 #print axioms NormedModel.norm_add_holds
