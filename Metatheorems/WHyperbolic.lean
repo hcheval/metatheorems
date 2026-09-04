@@ -369,6 +369,45 @@ example (M : WHyperbolicModel) (n₀ : ℕ) (h : M.d M.ref M.zeroX ≤ (n₀ : �
     WHyperbolicModel.abstractMajorizability, bezemAbstract, Term.app3,
     WHyperbolicModel.WMajorant]
 
+/-- **The same uniformity carried into a literal.** `MetricSpaces.lean`'s demo is
+`901 = closedMajorizer (M.constMajorants 5 h) (d 0_X 0_X) 0`. Wrapping an argument in an
+arbitrary convex combination leaves that number **unchanged**: `W(0_X,0_X,f)` majorizes to
+`max 5 5 = 5`, exactly as `0_X` does, so the composite is still `901` — for every closed
+real `f`. The parameter is absent from the arithmetic, not merely bounded in it. -/
+example (M : WHyperbolicModel) (h : M.d M.ref M.zeroX ≤ ((5 : ℕ) : ℝ))
+    (f : Term WHyperbolic.F [] rTy) :
+    (901 : ℕ) = closedMajorizer (M.constMajorants 5 h)
+      (Term.app2 WHyperbolic.d
+        (Term.app3 WHyperbolic.W (Term.zeroX ()) (Term.zeroX ()) f)
+        (Term.zeroX ())) ((0 : ℕ)) := by
+  simp only [closedMajorizer, termMajorizer, WHyperbolicModel.constMajorants,
+    WHyperbolicModel.abstractMajorizability, bezemAbstract, Term.app2, Term.app3,
+    WHyperbolicModel.WMajorant, MetricModel.distMajorant_apply]
+  decide
+
+/-- **Nesting does not accumulate** — the sharper form. Three arbitrary, distinct parameters
+`f`, `g`, `k` in nested convex combinations, and the bound is still `901`. A majorant that
+paid a factor per nesting could not do this; `WMajorant`'s `max` is idempotent on equal
+arguments, so depth is free.
+
+Non-degeneracy is checked and is *positive* evidence here: claiming `902` makes `decide`
+report the proposition **false**, exhibiting the residual
+`902 = pairN (2 * ((max 5 5 + 5) * 2^(0+1))) (2^(0+1) - 1)` — in which `f`, `g`, `k` do not
+appear at all. That absence is the uniformity. -/
+example (M : WHyperbolicModel) (h : M.d M.ref M.zeroX ≤ ((5 : ℕ) : ℝ))
+    (f g k : Term WHyperbolic.F [] rTy) :
+    (901 : ℕ) = closedMajorizer (M.constMajorants 5 h)
+      (Term.app2 WHyperbolic.d
+        (Term.app3 WHyperbolic.W
+          (Term.app3 WHyperbolic.W (Term.zeroX ()) (Term.zeroX ()) f)
+          (Term.app3 WHyperbolic.W (Term.zeroX ()) (Term.zeroX ()) g)
+          k)
+        (Term.zeroX ())) ((0 : ℕ)) := by
+  simp only [closedMajorizer, termMajorizer, WHyperbolicModel.constMajorants,
+    WHyperbolicModel.abstractMajorizability, bezemAbstract, Term.app2, Term.app3,
+    WHyperbolicModel.WMajorant, MetricModel.distMajorant_apply]
+  decide
+
 end ComputesDemo
 
 -- ============================================================================
