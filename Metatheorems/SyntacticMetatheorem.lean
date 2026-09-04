@@ -237,6 +237,201 @@ theorem syntactic_general_metatheorem_classical
     (fun x v => Formula.interpret si C₀ (v, (x, ())))
     (Term.interpret si Ut ()) (Term.interpret si Vt ()) U_star V_star hU hV hUV
 
+-- ============================================================================
+-- The classical metatheorem with the bound as DATA
+-- ============================================================================
+
+/-- The realizing term for the prenexified, negatively translated statement — the classical
+route's analogue of `syntactic_soundness … prf`.
+
+It exists as a `def` rather than as a `let` inside a proof for two reasons. First, CLAUDE.md
+hard rule 4: as a `let`-value an enormous realizer makes every later defeq check try to
+`whnf` it. Second, `syntactic_general_metatheorem_classical_at` below must mention the
+extracted terms in its *value* component, which a tactic-mode `obtain` cannot reach. -/
+def prenexRealizer
+    (eqxi : EqXInterp X F si)
+    (nts : NTStableD Premises)
+    (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B)
+    {ρ : Ty ι} {B₀ C₀ : Formula F [Ty.nat, ρ]}
+    (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
+    (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
+    (prf : @Derivable ι κ F Allowed.classical Premises []
+      (Formula.all ρ (Formula.imp (Formula.all .nat B₀) (Formula.ex .nat C₀)))) :
+    SRealizer si (Formula.all ρ (¬ᶠ¬ᶠ(Formula.ex Ty.nat (Formula.ex Ty.nat
+      (B₀.weakenBy Ty.nat →ᶠ C₀.renameF (Term.Renaming.ext Term.Renaming.shift)))))) :=
+  syntactic_soundness eqxi spremise
+    (classical_to_prenex_extended nts hB_qf hB_vf hC_qf hC_vf prf)
+
+/-- The classical route's `U` functional, as a closed term. Unlike `extractedUTerm` this goes
+*through* the surviving `¬¬` at the term level, challenging it with the default `¬E`-witness
+(`extractUTermP`). -/
+def extractedUTermP
+    (eqxi : EqXInterp X F si)
+    (nts : NTStableD Premises)
+    (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B)
+    {ρ : Ty ι} {B₀ C₀ : Formula F [Ty.nat, ρ]}
+    (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
+    (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
+    (prf : @Derivable ι κ F Allowed.classical Premises []
+      (Formula.all ρ (Formula.imp (Formula.all .nat B₀) (Formula.ex .nat C₀)))) :
+    Term F ([] : Ctx ι) (ρ →ₜ Ty.nat) :=
+  extractUTermP
+    (P := B₀.weakenBy Ty.nat →ᶠ C₀.renameF (Term.Renaming.ext Term.Renaming.shift))
+    (prenexRealizer eqxi nts spremise hB_qf hB_vf hC_qf hC_vf prf).val
+
+/-- The classical route's `V` functional — the witness — as a closed term. -/
+def extractedVTermP
+    (eqxi : EqXInterp X F si)
+    (nts : NTStableD Premises)
+    (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B)
+    {ρ : Ty ι} {B₀ C₀ : Formula F [Ty.nat, ρ]}
+    (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
+    (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
+    (prf : @Derivable ι κ F Allowed.classical Premises []
+      (Formula.all ρ (Formula.imp (Formula.all .nat B₀) (Formula.ex .nat C₀)))) :
+    Term F ([] : Ctx ι) (ρ →ₜ Ty.nat) :=
+  extractVTermP
+    (P := B₀.weakenBy Ty.nat →ᶠ C₀.renameF (Term.Renaming.ext Term.Renaming.shift))
+    (prenexRealizer eqxi nts spremise hB_qf hB_vf hC_qf hC_vf prf).val
+
+/-- **The extraction half of the classical metatheorem**, over an *abstract* realizer of the
+prenexified, negatively translated statement: challenged at `U`, the premise yields the
+conclusion at `V`. No majorizability in sight.
+
+**`w` must be a variable, not the applied `prenexRealizer`.** This is the whole reason the
+lemma is stated separately rather than inlined into `syntactic_extraction_classical` below.
+`syntactic_general_metatheorem_classical` gets its realizer from `obtain ⟨w, hw⟩`, so `w` is
+an opaque local and `Term.interpret si w` is stuck; written directly against
+`(prenexRealizer …).val` the `simp only [dialecticaMatrix]` step tries to reduce the realizer
+itself and the elaboration dies at a `whnf` heartbeat timeout with no error to point at. Same
+family as CLAUDE.md hard rule 4 and trap 12. -/
+theorem extraction_of_prenex_realizer
+    {ρ : Ty ι} {B₀ C₀ : Formula F [Ty.nat, ρ]}
+    (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
+    (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
+    (w : SRealizer si (Formula.all ρ (¬ᶠ¬ᶠ(Formula.ex Ty.nat (Formula.ex Ty.nat
+      (B₀.weakenBy Ty.nat →ᶠ C₀.renameF (Term.Renaming.ext Term.Renaming.shift))))))) :
+    ∀ x : Ty.interpret X ρ,
+      Formula.interpret si B₀
+        (Term.interpret si (extractUTermP
+          (P := B₀.weakenBy Ty.nat →ᶠ
+            C₀.renameF (Term.Renaming.ext Term.Renaming.shift)) w.val) () x, (x, ())) →
+      Formula.interpret si C₀
+        (Term.interpret si (extractVTermP
+          (P := B₀.weakenBy Ty.nat →ᶠ
+            C₀.renameF (Term.Renaming.ext Term.Renaming.shift)) w.val) () x, (x, ())) := by
+  classical
+  intro x hBx
+  have hB'_qf : (B₀.weakenBy Ty.nat).isQF = true := by
+    rw [show (B₀.weakenBy Ty.nat).isQF = B₀.isQF from isQF_weakenBy B₀, hB_qf]
+  have hB'_vf : (B₀.weakenBy Ty.nat).isVFree = true := by
+    rw [show (B₀.weakenBy Ty.nat).isVFree = B₀.isVFree from isVFree_weakenBy B₀, hB_vf]
+  have hC'_qf :
+      (C₀.renameF (Term.Renaming.ext (σ := Ty.nat)
+        (Term.Renaming.shift (σ := Ty.nat)))).isQF = true := by
+    rw [show (C₀.renameF (Term.Renaming.ext (σ := Ty.nat)
+        (Term.Renaming.shift (σ := Ty.nat)))).isQF = C₀.isQF from
+      isQF_renameF _ C₀, hC_qf]
+  have hC'_vf :
+      (C₀.renameF (Term.Renaming.ext (σ := Ty.nat)
+        (Term.Renaming.shift (σ := Ty.nat)))).isVFree = true := by
+    rw [show (C₀.renameF (Term.Renaming.ext (σ := Ty.nat)
+        (Term.Renaming.shift (σ := Ty.nat)))).isVFree = C₀.isVFree from
+      isVFree_renameF _ C₀, hC_vf]
+  -- move to the raw projections, which is the shape the matrix produces
+  rw [interpret_extractUTermP w.val x] at hBx
+  rw [interpret_extractVTermP w.val x]
+  -- the ¬¬-challenge: any `¬E`-witness will do (see `syntactic_general_metatheorem_classical`)
+  have key := w.property ()
+    (x, (Ty.interpret_default si
+           (wTy (¬ᶠ(Formula.ex Ty.nat (Formula.ex Ty.nat
+             (B₀.weakenBy Ty.nat →ᶠ
+               C₀.renameF (Term.Renaming.ext (σ := Ty.nat)
+                 (Term.Renaming.shift (σ := Ty.nat)))))))), ()))
+  simp only [Formula.neg, dialecticaMatrix] at key
+  rw [dialecticaMatrix_iff_interpFormula si (B₀.weakenBy Ty.nat) hB'_qf hB'_vf,
+      dialecticaMatrix_iff_interpFormula si
+        (C₀.renameF (Term.Renaming.ext (σ := Ty.nat)
+          (Term.Renaming.shift (σ := Ty.nat)))) hC'_qf hC'_vf] at key
+  -- back from B₀'/C₀' to B₀/C₀
+  have hb : ∀ u v : Nat, Formula.interpret si (B₀.weakenBy Ty.nat) (v, (u, (x, ()))) =
+      Formula.interpret si B₀ (u, (x, ())) := fun u v =>
+    Formula.interpret_renameF_gen si (Term.Renaming.shift (σ := Ty.nat)) B₀
+      (v, (u, (x, ()))) (u, (x, ())) (fun {_} _ => rfl)
+  have hc : ∀ u v : Nat,
+      Formula.interpret si (C₀.renameF (Term.Renaming.ext (σ := Ty.nat)
+          (Term.Renaming.shift (σ := Ty.nat))))
+        (v, (u, (x, ()))) = Formula.interpret si C₀ (v, (x, ())) := fun u v =>
+    Formula.interpret_renameF_gen si
+      (Term.Renaming.ext (σ := Ty.nat) (Term.Renaming.shift (σ := Ty.nat))) C₀
+      (v, (u, (x, ()))) (v, (x, ()))
+      (fun {_} vv => match vv with | .vz => rfl | .vs _ => rfl)
+  by_contra hCn
+  exact key (fun himp => hCn (Eq.mp (hc _ _) (himp (Eq.mpr (hb _ _) hBx))))
+
+/-- `extraction_of_prenex_realizer` at the realizer a classical derivation actually produces.
+The two statements match by delta on `extractedUTermP`/`extractedVTermP` — a cheap unfolding
+that never enters the realizer. -/
+theorem syntactic_extraction_classical
+    (eqxi : EqXInterp X F si)
+    (nts : NTStableD Premises)
+    (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B)
+    {ρ : Ty ι} {B₀ C₀ : Formula F [Ty.nat, ρ]}
+    (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
+    (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
+    (prf : @Derivable ι κ F Allowed.classical Premises []
+      (Formula.all ρ (Formula.imp (Formula.all .nat B₀) (Formula.ex .nat C₀)))) :
+    ∀ x : Ty.interpret X ρ,
+      Formula.interpret si B₀
+        (Term.interpret si (extractedUTermP eqxi nts spremise hB_qf hB_vf hC_qf hC_vf prf) () x,
+          (x, ())) →
+      Formula.interpret si C₀
+        (Term.interpret si (extractedVTermP eqxi nts spremise hB_qf hB_vf hC_qf hC_vf prf) () x,
+          (x, ())) :=
+  extraction_of_prenex_realizer hB_qf hB_vf hC_qf hC_vf
+    (prenexRealizer eqxi nts spremise hB_qf hB_vf hC_qf hC_vf prf)
+
+/-- **The classical metatheorem with the bound as DATA.**
+
+`syntactic_general_metatheorem_classical` with a `Subtype` in place of the `∃`, so `Φ` is
+*available* rather than merely known to exist. Stands to it exactly as
+`syntactic_general_metatheorem_at` stands to `syntactic_general_metatheorem`, and for the
+same reason takes a `ConstMajorants`: `majorant_of_closed_term` returns a `Prop`-existential,
+which cannot be eliminated into a `Type`-valued goal, so the majorants must come from
+`closedMajorizer`.
+
+This is the entry point a *classical* derivation needs in order to produce a numeral.
+CLAUDE.md's Track D1 recorded it as the missing half of the `_at` work; `Probes/LemBoundDemo.lean`
+is its first client, and the first extraction in the project from a derivation containing
+`Derivable.lem`. -/
+def syntactic_general_metatheorem_classical_at
+    (eqxi : EqXInterp X F si)
+    (nts : NTStableD Premises)
+    (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B)
+    {am : AbstractMajorizability si} (cm : ConstMajorants am)
+    {ρ : Ty ι} {B₀ C₀ : Formula F [Ty.nat, ρ]}
+    (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
+    (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
+    (prf : @Derivable ι κ F Allowed.classical Premises []
+      (Formula.all ρ (Formula.imp (Formula.all .nat B₀) (Formula.ex .nat C₀)))) :
+    { Φ : Ty.interpret X ρ.hat → Nat //
+      ∀ (x : Ty.interpret X ρ) (x_star : Ty.interpret X ρ.hat),
+        am.toRel.maj ρ x_star x →
+        (∀ u : Nat, u ≤ Φ x_star → Formula.interpret si B₀ (u, (x, ()))) →
+        ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret si C₀ (v, (x, ())) } :=
+  ⟨coreBound
+      (closedMajorizer cm (extractedUTermP eqxi nts spremise hB_qf hB_vf hC_qf hC_vf prf))
+      (closedMajorizer cm (extractedVTermP eqxi nts spremise hB_qf hB_vf hC_qf hC_vf prf)),
+   metatheorem_core_of_majorants_at am.toRel
+     (fun x u => Formula.interpret si B₀ (u, (x, ())))
+     (fun x v => Formula.interpret si C₀ (v, (x, ())))
+     _ _ _ _
+     (closedMajorizer_maj cm
+       (extractedUTermP eqxi nts spremise hB_qf hB_vf hC_qf hC_vf prf))
+     (closedMajorizer_maj cm
+       (extractedVTermP eqxi nts spremise hB_qf hB_vf hC_qf hC_vf prf))
+     (syntactic_extraction_classical eqxi nts spremise hB_qf hB_vf hC_qf hC_vf prf)⟩
+
 end Metatheorem
 
 -- ============================================================================
