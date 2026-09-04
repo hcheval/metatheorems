@@ -20,6 +20,7 @@ import Metatheorems.CodeReal
 import Metatheorems.WHyperbolic
 import Metatheorems.CAT0
 import Metatheorems.Normed
+import Metatheorems.Instances
 import Metatheorems.QVal
 import Metatheorems.QValBridge
 import Metatheorems.QValBridgeMul
