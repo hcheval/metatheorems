@@ -13,6 +13,7 @@ import Metatheorems.Probes.RwBase
 import Metatheorems.Probes.SeqMpBoundProbe
 import Metatheorems.Probes.SoundnessProbe
 import Metatheorems.Probes.SyntacticND
+import Metatheorems.Probes.TermPrintDemo
 import Metatheorems.Probes.TinyBoundDemo
 import Metatheorems.Probes.TriangleBoundDemo
 import Metatheorems.Probes.UPremiseDemo
