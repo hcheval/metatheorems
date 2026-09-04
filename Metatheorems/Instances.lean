@@ -28,9 +28,10 @@ hypotheses:
 | `WHyperbolicModel` | any Mathlib normed space | `W x y λ := (1−λ)•x + λ•y`, the segment map |
 | `CAT0Model` | any Mathlib real inner-product space | CN **with equality** — the median law |
 
-Combined with `WHyperbolicModel.axiomsHold` and `CAT0Model.axiomsHold`, this closes the loop:
-**the W-hyperbolic and CAT(0) metatheorems apply to every Mathlib normed space / real
-inner-product space, end to end, with no hypothesis beyond the Mathlib typeclasses.**
+Combined with `NormedModel.axiomsHold`, `WHyperbolicModel.axiomsHold` and
+`CAT0Model.axiomsHold`, this closes the loop: **the normed, W-hyperbolic and CAT(0)
+metatheorems apply to every Mathlib real normed space (the first two) / real inner-product
+space (the third), end to end, with no hypothesis beyond the Mathlib typeclasses.**
 
 `NormedModel` is not an imitation of Mathlib's notion — it is a bundling of it (`E : Type`
 plus the two instance fields, no axioms of its own), so `ofNormed` is essentially the identity
@@ -55,10 +56,9 @@ The four W-axiom identities are all discharged by Mathlib's `module` tactic; han
 `ℝ`, `EuclideanSpace ℝ (Fin n)`, and essentially every concrete example. A space in `Type u`
 would need the structures generalised first.
 
-**Normed spaces are deliberately absent from the "closes the loop" claim**: `ofNormed` gives
-the model, but `NormedModel.AxiomsHold` is still an undischarged binder (see `Normed.lean`),
-so the normed metatheorem is inhabited-but-not-yet-applicable. That is the one remaining gap
-in the tower.
+All three space theories are covered. Normed spaces were the last to join (2026-09-04): until
+`NormedModel.axiomsHold` was proved, `ofNormed` gave a model but the normed metatheorem still
+carried an `AxiomsHold` binder, so it was inhabited-but-not-applicable. No such gap remains.
 -/
 
 -- ============================================================================
@@ -167,6 +167,15 @@ noncomputable abbrev CAT0Model.ofInner (E : Type)
 -- The payoff: the axioms hold in these models, with no hypotheses
 -- ============================================================================
 
+/-- **Every Mathlib normed space satisfies the object-level normed-space axioms.**
+`NormedModel.axiomsHold` at `ofNormed`; no hypothesis beyond the typeclasses. -/
+theorem NormedModel.ofNormed_axiomsHold (E : Type)
+    [NormedAddCommGroup E] [NormedSpace ℝ E] :
+    ∀ {Γ : Ctx MetricSpace.ι} (A : Formula Normed.F Γ), Normed.Premises ⟨Γ, A⟩ →
+      ∀ env : Ctx.interpret (fun () => (NormedModel.ofNormed E).E) Γ,
+        Formula.interpret (NormedModel.ofNormed E).si A env :=
+  (NormedModel.ofNormed E).axiomsHold
+
 /-- **Every Mathlib normed space satisfies the object-level W-hyperbolic axioms.**
 `WHyperbolicModel.axiomsHold` at `ofNormed`; no hypothesis beyond the typeclasses. -/
 theorem WHyperbolicModel.ofNormed_axiomsHold (E : Type)
@@ -197,6 +206,7 @@ noncomputable example : MetricModel := MetricModel.ofMetricSpace ℝ 0
 #print axioms NormedModel.ofNormed
 #print axioms WHyperbolicModel.ofNormed
 #print axioms CAT0Model.ofInner
+#print axioms NormedModel.ofNormed_axiomsHold
 #print axioms WHyperbolicModel.ofNormed_axiomsHold
 #print axioms CAT0Model.ofInner_axiomsHold
 

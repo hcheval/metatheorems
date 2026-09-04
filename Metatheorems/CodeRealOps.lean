@@ -436,6 +436,21 @@ theorem codeReal_interp_zero_R (env : Ctx.interpret X Γ) :
     codeReal (Term.interpret si (Term.zero_R (F := F) (Γ := Γ)) env) = 0 := by
   rw [interpret_zero_R, codeReal_const, qval_zero_code, Rat.cast_zero]
 
+/-- `1ℝ` is a constant code, so it passes every check — what `codeReal_interp_neg_R` asks of
+its argument when the argument is `1ℝ` (the normed-space `−1ℝ`). -/
+theorem isCauchyCode_interp_one_R (env : Ctx.interpret X Γ) :
+    IsCauchyCode (Term.interpret si (Term.one_R (F := F) (Γ := Γ)) env) := by
+  rw [interpret_one_R]; exact isCauchyCode_const _
+
+/-- `neg_R` on a check-passing argument denotes the negation. Same side condition as
+`codeReal_interp_sub_R`, for the same reason: `neg_R` never `cauchyfy`s its argument. -/
+theorem codeReal_interp_neg_R (r : Term F Γ (realTy ι)) (env : Ctx.interpret X Γ)
+    (hr : IsCauchyCode (Term.interpret si r env)) :
+    codeReal (Term.interpret si (Term.app Term.neg_R r) env)
+      = - codeReal (Term.interpret si r env) := by
+  simp only [Term.interpret, interpret_neg_R_fun]
+  exact codeReal_negR_of_isCauchyCode hr
+
 theorem isCauchyCode_interp_clamp01 (r : Term F Γ (realTy ι)) (env : Ctx.interpret X Γ) :
     IsCauchyCode (Term.interpret si (Term.app Term.clamp01 r) env) := by
   simp only [Term.interpret, interpret_clamp01_fun]
@@ -469,5 +484,7 @@ end Interp
 #print axioms codeReal_clamp01
 #print axioms codeReal_interp_mul_R
 #print axioms codeReal_interp_clamp01
+#print axioms isCauchyCode_interp_one_R
+#print axioms codeReal_interp_neg_R
 
 end Metatheorems

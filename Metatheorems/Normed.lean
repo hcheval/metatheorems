@@ -5,6 +5,7 @@ Authors: Horatiu
 -/
 import Metatheorems.MetricTransfer
 import Metatheorems.CodeReal
+import Metatheorems.CodeRealOps
 import Mathlib.Analysis.Normed.Module.Basic
 
 namespace Metatheorems
@@ -40,9 +41,29 @@ it induces (separation is `norm_sub_eq_zero`) feeds `MetricTransfer.lean` unchan
 ## Axioms
 
 The vector-space axioms (1)–(8) with `−x := (−1)·x`, the two norm axioms, and the `d`/norm
-link. All eleven are purely universal and ∨-free. The exact list should be checked against
-Kohlenbach's Definition for `A^ω[X,‖·‖]` before it is relied on; what is fixed here is the
-*shape* — every axiom is a `∀`-closure of `=_X`, `=ℝ` or `≤ℝ` between terms.
+link. All eleven are purely universal and ∨-free, and **all eleven hold in every real normed
+space** (`NormedModel.axiomsHold` below).
+
+**Checked against Kohlenbach's `A^ω[X,‖·‖]`** (Applied Proof Theory §17.3, pp. 411–412) on
+2026-09-04. His signature is `0_X, 1_X, +_X, −_X, ·_X, ‖·‖_X`, with `x =_X y :≡ ‖x −_X y‖ =ℝ 0`
+and no `d_X`; his axioms are **(0)** "the purely universal vector space axioms formulated with
+`=_X`" — exactly our (1)–(8) — followed by nine norm axioms in *difference* form, (1)–(3)
+`‖x−x‖=0`, `‖x−y‖=‖y−x‖`, the triangle inequality, (4) `‖αx−αy‖=|α|‖x−y‖`,
+(5) `‖αx−βx‖=|α−β|‖x‖`, (6) `‖(x+y)−(u+v)‖≤‖x−u‖+‖y−v‖`, (7) `‖(−x)−(−y)‖=‖x−y‖`,
+(8) `|‖x‖−‖y‖|≤‖x−y‖`, (9) `‖1_X‖=1`. His (4)–(8) are the *extensionality of the operations
+w.r.t. `=_X`* in purely universal form (he says so, p. 412); ours (9)–(10) are the "usual"
+norm axioms he notes are derivable from them. The converse derivation — his (4)–(8) from our
+list — goes through because every `=_X` fact it needs is a closed theorem, so `qfer` supplies
+the congruences; it has been checked on paper, **not in Lean**. His (1)–(3) are our `Derivable`
+pseudometric constructors carried across the link (11). Two deliberate omissions:
+
+* **No `1_X`, no (9).** (9) is nontriviality (Kohlenbach: "a Skolemized form of expressing
+  that the normed space is nontrivial"), used in the book only to interpret `1_X`. Our theory
+  is therefore weaker — it also holds in the trivial space — and a book statement mentioning
+  `1_X` cannot be transcribed verbatim.
+* **No `−_X` constant.** `(−1)·x` instead; the book's `x −_X y` is itself sugar for
+  `+_X(x, −_X y)`, and in the model `−x = (−1)•x` (`neg_one_smul`). The cost is a looser
+  majorant: negation goes through `smul`'s `(α*(0)+1)·n` rather than the identity.
 -/
 
 open Formula
@@ -433,30 +454,249 @@ noncomputable def NormedModel.eqXInterp (M : NormedModel) :
     EqXInterp (fun () => M.E) Normed.F M.si :=
   M.toMetricModel.eqXInterp_gen M.si (fun _ _ => rfl)
 
-/-- The axioms hold in the model. **NOT discharged — this is the one remaining obligation of
-the space tower**, and it is NOT a pattern to copy. W-hyperbolic and CAT(0) have no such
-definition and no `hax` binder any more: their `axiomsHold` are theorems, stated inline
-(`WHyperbolicModel.axiomsHold`, `CAT0Model.axiomsHold`). A surviving `AxiomsHold` binder means
-"not done yet", not "this is how spaces are built". Discharging it needs `codeReal`-level
-evaluation of the norm and scalar-multiplication constants, which does not exist yet. -/
-def NormedModel.AxiomsHold (M : NormedModel) : Prop :=
-  ∀ {Γ : Ctx MetricSpace.ι} (A : Formula Normed.F Γ), Normed.Premises ⟨Γ, A⟩ →
-    ∀ env : Ctx.interpret (fun () => M.E) Γ, Formula.interpret M.si A env
+-- ============================================================================
+-- The premises in the model
+-- ============================================================================
 
-def NormedModel.spremise (M : NormedModel) (hax : M.AxiomsHold) :
+-- As in `WHyperbolic.lean`/`CAT0.lean`: no named `AxiomsHold : Prop`. `axiomsHold` below has
+-- the shape of `MetricModel.soundness_gen`'s `hprem`, spelled out inline, and is a theorem.
+
+section AxiomsInModel
+
+variable (M : NormedModel) {Γ : Ctx MetricSpace.ι}
+
+/-- `+` evaluates to vector addition, by definition of `si`. -/
+theorem NormedModel.interp_add (s t : Term Normed.F Γ xTy)
+    (env : Ctx.interpret (fun () => M.E) Γ) :
+    Term.interpret M.si (Term.app2 Normed.vadd s t) env
+      = Term.interpret M.si s env + Term.interpret M.si t env := rfl
+
+/-- `smul` evaluates to `r_α • x`: the scalar arrives as a real through `codeReal`. -/
+theorem NormedModel.interp_smul (r : Term Normed.F Γ rTy) (s : Term Normed.F Γ xTy)
+    (env : Ctx.interpret (fun () => M.E) Γ) :
+    Term.interpret M.si (Term.app2 Normed.vsmul r s) env
+      = codeReal (Term.interpret M.si r env) • Term.interpret M.si s env := rfl
+
+/-- `‖·‖` evaluates to `(‖x‖)◦`. -/
+theorem NormedModel.interp_norm (s : Term Normed.F Γ xTy)
+    (env : Ctx.interpret (fun () => M.E) Γ) :
+    Term.interpret M.si (Term.app Normed.vnorm s) env
+      = Rounding.roundR (‖Term.interpret M.si s env‖) := rfl
+
+/-- `0_X` evaluates to the zero vector. -/
+theorem NormedModel.interp_zero (env : Ctx.interpret (fun () => M.E) Γ) :
+    Term.interpret M.si (Normed.zero (Γ := Γ)) env = 0 := rfl
+
+/-- `(‖x‖)◦` denotes `‖x‖` — `codeReal_roundR`, composed with `interp_norm`. -/
+theorem NormedModel.codeReal_interp_norm (s : Term Normed.F Γ xTy)
+    (env : Ctx.interpret (fun () => M.E) Γ) :
+    codeReal (Term.interpret M.si (Term.app Normed.vnorm s) env)
+      = (‖Term.interpret M.si s env‖) := by
+  rw [M.interp_norm, codeReal_roundR _ (norm_nonneg _)]
+
+/-- The structural distance denotes `‖x − y‖`. Stated with `Term.dist ()` so it matches the
+unfolded `eqAtType` as well as `Normed.d`. -/
+theorem NormedModel.codeReal_interp_dist (s t : Term Normed.F Γ xTy)
+    (env : Ctx.interpret (fun () => M.E) Γ) :
+    codeReal (Term.interpret M.si (Term.app2 (Term.dist ()) s t) env)
+      = (‖Term.interpret M.si s env - Term.interpret M.si t env‖) := by
+  rw [M.toMetricModel.interp_dist_gen M.si (fun _ _ => rfl) s t env,
+    codeReal_roundR _ (norm_nonneg _)]
+
+/-- `−1ℝ` denotes `−1`: `1ℝ` is a constant code, so `neg_R`'s side condition is free. -/
+theorem NormedModel.codeReal_interp_negOne (env : Ctx.interpret (fun () => M.E) Γ) :
+    codeReal (Term.interpret M.si (Normed.negOne (Γ := Γ)) env) = -1 := by
+  rw [Normed.negOne, codeReal_interp_neg_R _ _ (isCauchyCode_interp_one_R _),
+    codeReal_interp_one_R]
+
+/-- `=_X` between terms whose values coincide. `MetricTransfer`'s `eqAtType_base_holds_gen`
+at `d(x,y) := ‖x − y‖`; this is what the eight vector-space axioms reduce to. -/
+theorem NormedModel.eqX_of_eq (s t : Term Normed.F Γ xTy)
+    (env : Ctx.interpret (fun () => M.E) Γ)
+    (h : Term.interpret M.si s env = Term.interpret M.si t env) :
+    Formula.interpret M.si (eqAtType xTy s t) env :=
+  M.toMetricModel.eqAtType_base_holds_gen M.si (fun _ _ => rfl) s t env h
+
+/-- (1) in the model, at arbitrary terms. -/
+theorem NormedModel.add_comm_holds (s t : Term Normed.F Γ xTy)
+    (env : Ctx.interpret (fun () => M.E) Γ) :
+    Formula.interpret M.si
+      (eqAtType xTy (Term.app2 Normed.vadd s t) (Term.app2 Normed.vadd t s)) env := by
+  apply M.eqX_of_eq
+  simp only [M.interp_add]
+  -- `_root_`: the bare name resolves to the object-level `Metatheorems.add_comm`, a `Derivable`
+  exact _root_.add_comm _ _
+
+/-- (2) in the model. -/
+theorem NormedModel.add_assoc_holds (s t u : Term Normed.F Γ xTy)
+    (env : Ctx.interpret (fun () => M.E) Γ) :
+    Formula.interpret M.si
+      (eqAtType xTy
+        (Term.app2 Normed.vadd (Term.app2 Normed.vadd s t) u)
+        (Term.app2 Normed.vadd s (Term.app2 Normed.vadd t u))) env := by
+  apply M.eqX_of_eq
+  simp only [M.interp_add]
+  exact _root_.add_assoc _ _ _
+
+/-- (3) in the model. -/
+theorem NormedModel.add_zero_holds (s : Term Normed.F Γ xTy)
+    (env : Ctx.interpret (fun () => M.E) Γ) :
+    Formula.interpret M.si (eqAtType xTy (Term.app2 Normed.vadd s Normed.zero) s) env := by
+  apply M.eqX_of_eq
+  simp only [M.interp_add, M.interp_zero]
+  exact add_zero _
+
+/-- (4) in the model: `x + (−1)·x = 0`, by `neg_one_smul`. -/
+theorem NormedModel.add_neg_holds (s : Term Normed.F Γ xTy)
+    (env : Ctx.interpret (fun () => M.E) Γ) :
+    Formula.interpret M.si
+      (eqAtType xTy
+        (Term.app2 Normed.vadd s (Term.app2 Normed.vsmul Normed.negOne s)) Normed.zero) env := by
+  apply M.eqX_of_eq
+  simp only [M.interp_add, M.interp_smul, M.interp_zero, M.codeReal_interp_negOne, neg_one_smul]
+  exact add_neg_cancel _
+
+/-- (5) in the model. -/
+theorem NormedModel.smul_add_holds (r : Term Normed.F Γ rTy) (s t : Term Normed.F Γ xTy)
+    (env : Ctx.interpret (fun () => M.E) Γ) :
+    Formula.interpret M.si
+      (eqAtType xTy
+        (Term.app2 Normed.vsmul r (Term.app2 Normed.vadd s t))
+        (Term.app2 Normed.vadd (Term.app2 Normed.vsmul r s) (Term.app2 Normed.vsmul r t)))
+      env := by
+  apply M.eqX_of_eq
+  simp only [M.interp_add, M.interp_smul]
+  exact smul_add _ _ _
+
+/-- (6) in the model: the object-level `+ℝ` on the scalars is evaluated by
+`codeReal_interp_add_R`. -/
+theorem NormedModel.add_smul_holds (r r' : Term Normed.F Γ rTy) (s : Term Normed.F Γ xTy)
+    (env : Ctx.interpret (fun () => M.E) Γ) :
+    Formula.interpret M.si
+      (eqAtType xTy
+        (Term.app2 Normed.vsmul (Term.app2 Term.add_R r r') s)
+        (Term.app2 Normed.vadd (Term.app2 Normed.vsmul r s) (Term.app2 Normed.vsmul r' s)))
+      env := by
+  apply M.eqX_of_eq
+  simp only [M.interp_add, M.interp_smul, codeReal_interp_add_R]
+  exact add_smul _ _ _
+
+/-- (7) in the model, via `codeReal_interp_mul_R`. -/
+theorem NormedModel.smul_smul_holds (r r' : Term Normed.F Γ rTy) (s : Term Normed.F Γ xTy)
+    (env : Ctx.interpret (fun () => M.E) Γ) :
+    Formula.interpret M.si
+      (eqAtType xTy
+        (Term.app2 Normed.vsmul (Term.app2 Term.mul_R r r') s)
+        (Term.app2 Normed.vsmul r (Term.app2 Normed.vsmul r' s))) env := by
+  apply M.eqX_of_eq
+  simp only [M.interp_smul, codeReal_interp_mul_R]
+  exact mul_smul _ _ _
+
+/-- (8) in the model. -/
+theorem NormedModel.one_smul_holds (s : Term Normed.F Γ xTy)
+    (env : Ctx.interpret (fun () => M.E) Γ) :
+    Formula.interpret M.si (eqAtType xTy (Term.app2 Normed.vsmul Term.one_R s) s) env := by
+  apply M.eqX_of_eq
+  simp only [M.interp_smul, codeReal_interp_one_R]
+  exact one_smul _ _
+
+/-- (9) in the model: `‖α·x‖ =ℝ |α|·‖x‖` is Mathlib's `norm_smul`. -/
+theorem NormedModel.norm_smul_holds (r : Term Normed.F Γ rTy) (s : Term Normed.F Γ xTy)
+    (env : Ctx.interpret (fun () => M.E) Γ) :
+    Formula.interpret M.si
+      (eq_R
+        (.app Normed.vnorm (Term.app2 Normed.vsmul r s))
+        (Term.app2 Term.mul_R (.app Term.abs_R r) (.app Normed.vnorm s))) env := by
+  apply interpret_eq_R_of_codeReal_eq
+  simp only [M.codeReal_interp_norm, M.interp_smul, codeReal_interp_mul_R, codeReal_interp_abs_R]
+  rw [norm_smul, Real.norm_eq_abs]
+
+/-- (10) in the model: the triangle inequality of the norm. -/
+theorem NormedModel.norm_add_holds (s t : Term Normed.F Γ xTy)
+    (env : Ctx.interpret (fun () => M.E) Γ) :
+    Formula.interpret M.si
+      (le_R_pu
+        (.app Normed.vnorm (Term.app2 Normed.vadd s t))
+        (Term.app2 Term.add_R (.app Normed.vnorm s) (.app Normed.vnorm t))) env := by
+  apply interpret_le_R_pu_of_codeReal_le
+  simp only [M.codeReal_interp_norm, M.interp_add, codeReal_interp_add_R]
+  exact norm_add_le _ _
+
+/-- (11) in the model: `d(x,y) = ‖x − y‖ = ‖x + (−1)·y‖`. -/
+theorem NormedModel.dist_holds (s t : Term Normed.F Γ xTy)
+    (env : Ctx.interpret (fun () => M.E) Γ) :
+    Formula.interpret M.si
+      (eq_R
+        (Term.app2 Normed.d s t)
+        (.app Normed.vnorm
+          (Term.app2 Normed.vadd s (Term.app2 Normed.vsmul Normed.negOne t)))) env := by
+  apply interpret_eq_R_of_codeReal_eq
+  simp only [M.codeReal_interp_dist, M.codeReal_interp_norm, M.interp_add, M.interp_smul,
+    M.codeReal_interp_negOne, neg_one_smul]
+  rw [sub_eq_add_neg]
+
+/-- **The eleven axioms hold in the model.** With this, `spremise`, `soundness` and both
+metatheorems take no hypothesis about the model beyond `NormedModel` itself — the last
+`AxiomsHold` binder in the space tower is gone. -/
+theorem NormedModel.axiomsHold :
+    ∀ {Γ : Ctx MetricSpace.ι} (A : Formula Normed.F Γ), Normed.Premises ⟨Γ, A⟩ →
+      ∀ env : Ctx.interpret (fun () => M.E) Γ, Formula.interpret M.si A env := by
+  intro Γ A hA env
+  rcases hA with h | h | h | h | h | h | h | h | h | h | h <;> subst h
+  · intro x y
+    exact M.add_comm_holds _ _ _
+  · intro x y z
+    exact M.add_assoc_holds _ _ _ _
+  · intro x
+    exact M.add_zero_holds _ _
+  · intro x
+    exact M.add_neg_holds _ _
+  · intro a x y
+    exact M.smul_add_holds _ _ _ _
+  · intro a b x
+    exact M.add_smul_holds _ _ _ _
+  · intro a b x
+    exact M.smul_smul_holds _ _ _ _
+  · intro x
+    exact M.one_smul_holds _ _
+  · intro a x
+    exact M.norm_smul_holds _ _ _
+  · intro x y
+    exact M.norm_add_holds _ _ _
+  · intro x y
+    exact M.dist_holds _ _ _
+
+/-- Non-vacuity: `ax_norm_add` is a premise, and `axiomsHold` applied to it yields the
+interpreted axiom at any environment. -/
+example {Γ : Ctx MetricSpace.ι} (env : Ctx.interpret (fun () => M.E) Γ) :
+    Formula.interpret M.si (Normed.ax_norm_add (Γ := Γ)) env :=
+  M.axiomsHold _ (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr (Or.inr
+    (Or.inl rfl)))))))))) env
+
+/-- Non-vacuity, `=_X` shape: `ax_add_comm` is a premise and the interpreted axiom follows. -/
+example {Γ : Ctx MetricSpace.ι} (env : Ctx.interpret (fun () => M.E) Γ) :
+    Formula.interpret M.si (Normed.ax_add_comm (Γ := Γ)) env :=
+  M.axiomsHold _ (Or.inl rfl) env
+
+end AxiomsInModel
+
+/-- Premise realizers, by `srealizer_of_pu` — every axiom is purely universal and ∨-free. -/
+def NormedModel.spremise (M : NormedModel) :
     ∀ (Γ : Ctx MetricSpace.ι) (B : Formula Normed.F Γ),
       Normed.Premises ⟨Γ, B⟩ → SRealizer M.si B :=
   fun Γ B hp =>
-    srealizer_of_pu B (Normed.premises_pu Γ B hp) (Normed.premises_vf Γ B hp) (hax B hp)
+    srealizer_of_pu B (Normed.premises_pu Γ B hp) (Normed.premises_vf Γ B hp)
+      (M.axiomsHold B hp)
 
-theorem NormedModel.soundness (M : NormedModel) (hax : M.AxiomsHold)
+/-- **Semantic soundness for a normed model.** -/
+theorem NormedModel.soundness (M : NormedModel)
     {Γ : Ctx MetricSpace.ι} {allowed : Allowed} {A : Formula Normed.F Γ}
     (h : Derivable Normed.F allowed Normed.Premises A) :
     ∀ env : Ctx.interpret (fun () => M.E) Γ, Formula.interpret M.si A env :=
-  M.toMetricModel.soundness_gen M.si (fun _ _ => rfl) hax h
+  M.toMetricModel.soundness_gen M.si (fun _ _ => rfl) M.axiomsHold h
 
 /-- **The normed-space metatheorem** (extended input). -/
-theorem NormedModel.normed_metatheorem (M : NormedModel) (hax : M.AxiomsHold)
+theorem NormedModel.normed_metatheorem (M : NormedModel)
     {ρ : Ty MetricSpace.ι} {B₀ C₀ : Formula Normed.F [Ty.nat, ρ]}
     (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
     (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
@@ -467,11 +707,11 @@ theorem NormedModel.normed_metatheorem (M : NormedModel) (hax : M.AxiomsHold)
         M.abstractMajorizability.toRel.maj ρ x_star x →
         (∀ u : Nat, u ≤ Φ x_star → Formula.interpret M.si B₀ (u, (x, ()))) →
         ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret M.si C₀ (v, (x, ())) :=
-  syntactic_general_metatheorem M.eqXInterp (M.spremise hax) M.abstractMajorizability
+  syntactic_general_metatheorem M.eqXInterp M.spremise M.abstractMajorizability
     hB_qf hB_vf hC_qf hC_vf prf
 
 /-- **The normed-space metatheorem, from a classical proof.** -/
-theorem NormedModel.normed_metatheorem_classical (M : NormedModel) (hax : M.AxiomsHold)
+theorem NormedModel.normed_metatheorem_classical (M : NormedModel)
     {ρ : Ty MetricSpace.ι} {B₀ C₀ : Formula Normed.F [Ty.nat, ρ]}
     (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
     (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
@@ -483,7 +723,7 @@ theorem NormedModel.normed_metatheorem_classical (M : NormedModel) (hax : M.Axio
         (∀ u : Nat, u ≤ Φ x_star → Formula.interpret M.si B₀ (u, (x, ()))) →
         ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret M.si C₀ (v, (x, ())) :=
   syntactic_general_metatheorem_classical M.eqXInterp
-    (ntStable_of_pu Normed.premises_pu) (M.spremise hax)
+    (ntStable_of_pu Normed.premises_pu) M.spremise
     M.abstractMajorizability hB_qf hB_vf hC_qf hC_vf prf
 
 -- ============================================================================
@@ -495,6 +735,16 @@ theorem NormedModel.normed_metatheorem_classical (M : NormedModel) (hax : M.Axio
 #print axioms NormedModel.abstractMajorizability
 #print axioms NormedModel.constMajorants
 #print axioms NormedModel.eqXInterp
+#print axioms NormedModel.codeReal_interp_norm
+#print axioms NormedModel.codeReal_interp_dist
+#print axioms NormedModel.codeReal_interp_negOne
+#print axioms NormedModel.add_neg_holds
+#print axioms NormedModel.smul_smul_holds
+#print axioms NormedModel.norm_smul_holds
+#print axioms NormedModel.norm_add_holds
+#print axioms NormedModel.dist_holds
+#print axioms NormedModel.axiomsHold
+#print axioms NormedModel.spremise
 #print axioms NormedModel.soundness
 #print axioms NormedModel.normed_metatheorem
 #print axioms NormedModel.normed_metatheorem_classical
