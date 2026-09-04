@@ -15,6 +15,11 @@ import Metatheorems.BaseEquality
 import Metatheorems.Soundness
 import Metatheorems.Rounding
 import Metatheorems.MetricSpaces
+import Metatheorems.MetricTransfer
+import Metatheorems.CodeReal
+import Metatheorems.WHyperbolic
+import Metatheorems.CAT0
+import Metatheorems.Normed
 import Metatheorems.QVal
 import Metatheorems.QValBridge
 import Metatheorems.ProofMode.Packing
