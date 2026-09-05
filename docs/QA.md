@@ -105,8 +105,10 @@ rewrite of `Term`.
 
 ### 6. What is the trust base?
 
-Lean 4's kernel plus Mathlib, and nothing else: **there is no `sorry` anywhere in
-`Metatheorems/`**, and no custom axiom. `Metatheorems/Headline.lean` (`lake build
+Lean 4's kernel plus Mathlib, and nothing else: **the library has no `sorry` and no custom
+axiom**. A source grep over `Metatheorems/` finds exactly one `sorry`, in
+`Metatheorems/Probes/CounterSideProbe.lean:288,293` — a record of a measurement that exhausts
+memory, deliberately excluded from the sweep target `Probes.lean` and reachable from nothing. `Metatheorems/Headline.lean` (`lake build
 Metatheorems.Headline`) prints `#print axioms` for every headline declaration in one place —
 `soundness`, `all_closed_terms_majorizable`, the seven term-route metatheorems, the five
 monotone ones, the four space instantiations, `mct_p1`/`mct_p2`/`real_mct_p2`,
@@ -146,7 +148,7 @@ def pmFinal : D [] (Formula.all pTy (Formula.all Ty.nat tB →ᶠ Formula.ex Ty.
   pexact h1
 ```
 
-Around forty tactics exist (`ProofMode/Tactics.lean`): `pintro`, `papply`, `pexact`,
+Forty-odd tactics exist (43 `elab`/`macro` declarations in `ProofMode/Tactics.lean`): `pintro`, `papply`, `pexact`,
 `pexists`, `pobtain`, `pinduction`, `prw`/`prwby` (rewriting by quantifier-free extensionality,
 in the goal or in a hypothesis), `pcases`, `pleft`/`pright`, `psym`, `pthm`. The goal displays
 as a named-hypothesis box with object-level notation. The scale it carries:
@@ -229,8 +231,9 @@ metatheorem with the semantic bridge and yields Mathlib metastability with the e
 
 ### 13. Does soundness hold — is the proof system connected to the models at all?
 
-`Soundness.lean:262`: `Derivable F allowed Premises A → ∀ env, Formula.interpret si A env`, all
-39 constructors, zero sorry, general in `{ι} {X} {F}`. It takes five model facts as section
+`Soundness.lean:262`: `Derivable F allowed Premises A → ∀ env, Formula.interpret si A env`,
+**every** constructor of `Derivable` (39 as of the 2026-09-05 product β/η rules), zero sorry,
+general in `{ι} {X} {F}`. It takes five model facts as section
 variables and each is forced by a named constructor: `hprem` by `premise`; `hdist_self` by
 `dist_self` **and** by `beta_eq`/`rec_zero`/`rec_succ`/`qfer` (all four "equality" constructors
 collapse to reflexivity of `=_X`); `hdist_comm` and `hdist_tri` by their own constructors; and
