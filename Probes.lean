@@ -12,7 +12,11 @@ import Metatheorems.Probes.RwArrow
 import Metatheorems.Probes.RwBase
 import Metatheorems.Probes.SeqMpBoundProbe
 import Metatheorems.Probes.SoundnessProbe
+import Metatheorems.Probes.MonotoneSpike
 import Metatheorems.Probes.SyntacticND
+import Metatheorems.Probes.SizeProbe
+import Metatheorems.Probes.ProductRulesDemo
+import Metatheorems.Probes.MonotoneSpike
 import Metatheorems.Probes.TermPrintDemo
 import Metatheorems.Probes.TinyBoundDemo
 import Metatheorems.Probes.TriangleBoundDemo

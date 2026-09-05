@@ -736,3 +736,166 @@ metric one, not more expensive.
 The λ-vs-combinators trade (our `arrow_intro` = Lemma 17.80) is in `CLAUDE.md`, not here; it is
 a difference in *term language*, not in the metatheorem's statement. The `AbstractMajorizability`
 vs Def. 6.0.1 field count is discussed there too.
+
+## 14. The monotone functional interpretation: bounds without realizer terms (2026-09-05)
+
+**Status: design settled by a passed gate (`Probes/MonotoneSpike.lean`); refactor not started.**
+This section records why the extraction pipeline is being re-based, what the new object is, what
+the spike established, and what the plan is. `CLAUDE.md` has the measurements; this has the
+reasoning.
+
+### 14.1 The problem, stated with the numbers that separated it into two
+
+The pipeline since `syntactic-witnesses` is: `syntactic_soundness` builds a Dialectica realizer
+as a closed object-language `Term`; `closedMajorizer` majorizes that term; the metatheorem's
+`Φ` is built from the majorants. It produces kernel-checked numerals on derivations of ~12
+raw constructors and nothing beyond. Two measurements on 2026-09-05 (`SizeProbe`,
+`LemBoundDemo`) showed that "nothing beyond" is **two problems, not one**:
+
+| stall | term size | what the kernel is doing |
+|---|---|---|
+| `ConjBoundDemo.acFinal` (one `and_contract`) | **2,529 nodes** — smaller than `Term.add_Q` | executing `Term.weaken`/`rename` over dependent indices with `Eq.rec` casts, on the way to a tiny term (`Eq.rec ↦ 16074`, `Term.rename ↦ 2566`, `Var.rec ↦ 1073`) |
+| the classical route (any derivation) | does not fit in 12 GB under `#eval` | `negTrans_sound` hands Dialectica **85k constructors** for a 12-constructor input (≈230× per node) |
+
+And underneath both, a representation fact: `dag = tree` for every realizer measured by
+pointer identity, because `Term.weaken` is a copying recursion and every `wt*` combinator
+weakens its arguments. The compiled evaluator preserves no sharing either.
+
+So the term route has a **structural** cost — the bound path runs through `Term`, and every
+step of exposing a `Term`'s constructors to the kernel costs renaming traffic — independent of
+how big the term ends up. Making the term smaller does not help; not having a term does.
+
+### 14.2 The book's tool, and exactly what it changes
+
+Kohlenbach, *Applied Proof Theory* Ch. 9, Thm 9.1 (pp. 141–145). The monotone functional
+interpretation (MFI) proves `∃x (t* maj x ∧ ∀a,y A_D(x a, y, a))`: the extracted datum is the
+**majorant `t*`**; the realizer `x` is existential. Its proof (p. 142) is explicit about the
+division of labour, and we follow it exactly:
+
+- **Leaves (axioms), including the Δ-axioms**: take Dialectica's closed realizer and majorize
+  it by "every closed term is majorizable" — Howard's Prop. 6.6, our `termMajorizer_maj`.
+  Nothing changes here; leaf realizers are fixed-size combinators.
+- **Rules (MP, syllogism, …), p. 144 case 5**: the majorant is *composed from the
+  sub-majorants* — `t*_4 := λa. t*_3 (t*_1 a)`. Never the composed realizer.
+- **`A → A∧A`, p. 143 case 1**: `t*_Y := λ… max(y', y'')`. The book calls contraction "by far
+  the most complicated axiom" for the usual interpretation; the monotone one is a `max`. This
+  is our `sAndContract`, which branches on `matrixTerm` — the one combinator that flips
+  `ConjBoundDemo` from reducing to stuck.
+- **Induction, p. 144 case 7**: `t* := t^M`, a `max`-recursion. This is `sInduction`, Track A
+  item 2.
+
+MFI does **not** remove composition's duplication — case 5's counter side still mentions the
+sub-majorants more than once; on paper that is free because terms are DAGs by notation.
+What removes it *for us* is the second decision:
+
+### 14.3 The decision: majorants are semantic values at the hat type
+
+`Ty.hat` sends `base _ ↦ nat` and is homomorphic on `→`/`×`, so `Ty.interpret X ρ.hat` is
+built from `ℕ`, `unit`, `×`, `→` and **never mentions the carrier**, at any `ι`. Therefore the
+majorant can be a **Lean value**, not a `Term`:
+
+```
+MRealizer cm A :=
+  { tstar : ℕ → Ctx.interpret X (Γ.map Ty.hat) → Ty.interpret X (wTy A).hat //
+    ∃ x : (Ctx.interpret X Γ → 𝕎 X A),                       -- one functional of the env
+      (∀ env y, dialecticaMatrix si A env (x env) y) ∧
+      (∀ n ≥ am.N, ∀ env* env, MajEnv am Γ env* env → am.maj _ (tstar n env*) (x env)) ∧
+      (self-majorization of tstar in its hat environment) }
+```
+
+— `termMajorizer_maj`'s statement lifted from terms to derivations. Consequences:
+
+- **No `Term` on the bound path.** No `weaken`, no `rename`, no `Var`, no cast from a term
+  index. What remains is the recursion over the derivation (`Derivable.rec ↦ 27` in the same
+  profile that had `Eq.rec ↦ 16074`).
+- **Evaluation of `Φ x*` is natural-number arithmetic** — `max`, `+`, `Nat.rec`, composition —
+  which the kernel accelerates and `decide` closes.
+- **Duplication becomes benign**: the kernel's `Expr` is a DAG with a `whnf` cache keyed on
+  the expression, and `#eval` shares outright. Three mentions of a sub-majorant at the same
+  argument are one computation.
+- **Both engines open**: `#eval` for a number instantly with compiler trust, `decide` for the
+  kernel certificate.
+- **Cost**: the majorant is not syntax. Reification back to `Term F [] ρ.hat` for printing is
+  a later metaprogram over a *named* combinator vocabulary (`majMax`, `majComp`, `majRec`, the
+  `ConstMajorants` fields) — pattern-match on the names, as `#hilbert` does for derivations.
+  Build the recursion from named combinators, not inlined lambdas, so that stays cheap.
+
+The metatheorem's *statement* already returns `Φ : Ty.interpret X ρ.hat → Nat`, semantic. So
+nothing at the theorem level weakens; only the internal object changes.
+
+### 14.4 What the spike established (gate G0)
+
+`Probes/MonotoneSpike.lean`, nine constructors — exactly `acFinal`'s — at the W-hyperbolic
+model with `triCm M h`. **`(1709 : ℕ) = mfiU … (acSpike M h) (5, 9)` by `rfl` in ≈207 ms**,
+against 200,000 heartbeats exhausted on the term route; `V` `1709`; `1708`/`1710`/`0`
+refuted; `U` at `(5,1)` is `349`; the contraction-free control has no `max` in its normal
+form, so the `max` is provably contraction's. Three design facts came out of it:
+
+1. **`MaxCompat` is a genuine field of the majorizability structure.** "`max` of two majorants
+   majorizes" needs `maj a c → selfMaj b b → maj (maxT a b) c` and two siblings; the abstract
+   structure has no `max`, so they are not derivable from its 20 fields. True of every
+   `bezem*` instance. The book has them free because its `maj` is Howard's concrete relation;
+   our abstraction must state them. Per the standing check (CLAUDE.md, `EqXInterp` section):
+   it is about the relation, all instances satisfy it, none for free — a field.
+2. **The realizer's `∃` is hoisted outside the environment quantifier.** The per-environment
+   form `∀ env* env, MajEnv → ∃ x, …` cannot close `forall_rule`: the IH supplies realizers only
+   at majorized `z`, and one chosen at `z*` need not be majorized by `tstar` at another
+   `z'* ≽ z`. `∃ x : env → 𝕎 A` is the book's `(+)` verbatim (`x` a functional of the free
+   variables), needs no choice, and is stronger; the per-environment form is a corollary.
+3. **A self-majorization conjunct is carried**, as in `termMajorizer_maj`, because
+   `arrow_intro`'s second clause at `forall_rule` needs hat-monotonicity of the majorant.
+
+### 14.5 The plan
+
+Additive throughout; nothing existing is deleted until G3.
+
+- **Reused verbatim**: `dialectica_soundness_ctx'` and all of `Lemmas.lean` (the existential
+  `x`), `termMajorizer`/`closedMajorizer`/`ConstMajorants` (the leaf case), the `wapp_*`/
+  `capp_*` lemmas of `SeqMpBoundProbe`/`CounterSideProbe`/`CombinatorLemmas` (they *are* the
+  rule cases, promoted out of `Probes/`), `general_metatheorem_extract` (the semantic
+  extraction half — vestigial until now because nothing could majorize semantic `U V`; MFI is
+  precisely what does), `metatheorem_core_of_majorants_at` (unchanged), `extractTerm` and the
+  printers (realizer syntax on demand).
+- **Lane A** — `Dialectica/Monotone.lean`: `MaxCompat` promoted into `AbstractMajorizability`,
+  the 27 remaining cases (leaf strategy for axioms incl. `markov`/`ip`/`ac`/`qfac`;
+  composition for `importation`/`expansion`/`exist_rule`/`univ_gen`/`qfer`; `max` for
+  `or_contract`/`or_perm`), `premise` via `srealizer_of_pu_val`'s default term. **Gate G1**:
+  `tFinalTwice`'s `U` is a genuine `max(1709, 901)` that crosses over between `(5,9)` and
+  `(5,1)`.
+- **Lane B** — `induction` as the book's `t^M` (`Nat.rec` with `max`; the one case with real
+  content, review by hand), and `monotone_general_metatheorem_at` = `general_metatheorem_extract`
+  + MFI projections + `metatheorem_core_of_majorants_at`; the `∃`/`_at` split collapses since
+  `cm` is an input. **Gate G2**: `dist_tri_chain`'s `Φ` — the first bound from a proof with
+  content, and where the `pm_*` unfolding cost gets measured on the new recursion.
+- **G3**: `mct_p2`'s `Φ`, named and evaluated, against `Reference/MCT.lean` via the `K := 2^k`
+  bridge. Then the term-route `_at` entry points are retired.
+- **Explicitly out of scope**: the classical route's ×230 from `negTrans_sound` — a fix to the
+  translation, not to the interpretation (§14.1, second row).
+
+### 14.6 What this does to earlier decisions
+
+The design table's "Dialectica realizer: Subtype, not `∃`, so the witness is extractable"
+stays true and stops being the *bound's* mechanism. The realizer remains available as a term
+via `extractTerm` for anyone who wants it; the bound no longer waits for it. The
+`syntactic-witnesses` merge (realizers as `Term`s so `all_closed_terms_majorizable` applies)
+was the right move for what it bought — majorants without a total majorizer — and MFI is the
+same idea one level up: majorants from the *derivation's* syntax rather than the *term's*,
+which is why `general_metatheorem`'s original shape comes back into use.
+
+## 14. The monotone functional interpretation — what the bound path should be (2026-09-05)
+
+This section records a design decision taken after gate G0 (`Probes/MonotoneSpike.lean`)
+passed, and the reasoning that led to it. It changes what "the extracted object" means in this
+project. Status: **decided, not yet built**; the refactor lanes are at the end.
+
+### 14.1 The problem, measured, and why it is two problems
+
+The bound pipeline was `syntactic_soundness` (a Dialectica realizer as a closed object `Term`)
+→ `extractUTerm`/`extractVTerm` → `closedMajorizer`. It produced kernel-checked numerals only on
+derivations with no `and_contract` and no induction; one `and_contract` (`ConjBoundDemo.acFinal`)
+was a `whnf` timeout on the counter side. Three measurements separated what was going on:
+
+1. **The stalling term is small.** `SizeProbe`: `acFinal`'s realizer is 2,529 nodes, built
+   instantly by `#eval`. The kernel was not choking on size; it was *executing*
+   `Term.weaken`/`Term.rename` over dependent indices with `Eq.rec` casts on the way to a tiny
+   term (`Eq.rec ↦ 16074`, `Term
