@@ -872,6 +872,30 @@ Additive throughout; nothing existing is deleted until G3.
 - **Explicitly out of scope**: the classical route's ×230 from `negTrans_sound` — a fix to the
   translation, not to the interpretation (§14.1, second row).
 
+**Status of the plan (2026-09-05, after Lanes A and B).** Lane A: `Monotone.lean`, every
+constructor, G1 passed (`Probes/MonotoneLaneA.lean`). Lane B: `MonotoneMetatheorem.lean`
+(`monotone_general_metatheorem_at`, `_at_gen`; `mfi_extract_core` is the extraction half over
+an abstract `MRealizer`, and `general_metatheorem_extract` turned out not to be the right
+reuse — it fixes the realizer, the MFI's is existential), `Probes/MonotoneLaneB.lean` (G2),
+`Probes/MonotoneMCT.lean` (G3; `mct_bound_p2_at`, `mctPhi` named). **G2 and G3 both stop at
+the same node, and it is neither the recursion nor the proof mode nor induction**: the
+proof-mode layer reduces in the *kernel* (449-constructor derivation, counter side, ≈2 s;
+Meta `rfl` is the wrong instrument at a space — no `whnf` cache with free `M`, `h`), and the
+`induction` case reduces on a real `pinduction` (`V(5)=5`, `V(9)=9` through `recMaj`). What
+stops is every `Eq.mpr`/`seq_cast` whose equation is a `closed_subst`/`anorm` normalisation:
+the kernel's K-rule reduction must check the two formula indices definitionally equal, i.e.
+compute `Term.subst` through `cauchyfy` (G2, `le_R_pu_of_le_R`'s one `canorm`, 12 GB) or
+through `Term.ofNat`/`monus` per hypothesis per cast (G3, `mct_descent`). That is the
+delta-expansion pathology of "Build cost" reappearing as a *cast*, one level up: the lemma
+that avoided the computation produces the cast that forces it. **So the next item is not in
+§14's list**: an `Eq.mpr`-commutation lemma for `monotone_soundness` (the
+`syntactic_soundness_eqmpr` shape) applied by `simp` with the equation given, so casts are
+rewritten and never reduced — the `wit_seq_*` programme one level up, or `canorm`-free
+proof-mode lemmas. Until then the term-route `_at` entry points stay. The CLAUDE.md entry
+has the numbers. Note also that this file carries **two** `## 14` headings; the second (from
+"what the bound path should be") is a truncated partial duplicate of this one and ends
+mid-sentence — left as found, to be resolved by the owner.
+
 ### 14.6 What this does to earlier decisions
 
 The design table's "Dialectica realizer: Subtype, not `∃`, so the witness is extractable"
