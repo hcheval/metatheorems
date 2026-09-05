@@ -223,6 +223,8 @@ macro "mnorm" : tactic =>
                Term.Subst.ext_vz, Term.Subst.ext_vs, Term.weaken_var, Term.app2,
                Term.weaken_subst0, subst_subst0_map_weaken, Term.weaken_subst_ext,
                weaken_substVar0, ProofMode.succVar0, closed_subst, add_closed_subst,
+               abs_R_closed_subst, sub_R_closed_subst, add_R_closed_subst, neg_R_closed_subst,
+               zero_R_closed_subst, one_R_closed_subst, mul_R_closed_subst,
                weakenBy_eq0, weakenBy_and, weakenBy_bot, Formula.weakenBy_imp,
                le_Q_weakenBy, lt_Q_weakenBy, le_R_weakenBy,
                Term.rename, Term.rename_shift, rename_vs_eq_weaken,
