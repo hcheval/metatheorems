@@ -63,10 +63,20 @@ fixed twice over — same formula, and for two of the three, same derivation ter
 ## THE RESULT — a negative one, and excluded middle is NOT the cause
 
 The classical route **does not reduce to a numeral, on the smallest derivation that exists.**
-`#eval lTermSize` on each of `lUtLem`, `lVtLem`, `lUtNoLem`, `lVtNoLem` gives
-`INTERNAL PANIC: out of memory` at a 12 GB virtual cap, and `lUtNoLem` still OOMs at 20 GB.
-There are therefore no numeral theorems for the classical extractors in this file; a file of
-`whnf` timeouts is not a green build.
+The bound `rfl` — `(0 : Nat) = closedMajorizer lCmE lUtNoLem 5` — is a
+`(deterministic) timeout at whnf`, with no limit raised. There are therefore no numeral
+theorems for the classical extractors in this file; a file of `whnf` timeouts is not a green
+build. The verbatim reproduction is at the bottom of this docstring.
+
+**A measurement error, recorded because the rule it broke is this project's own.** The first
+pass reported instead that `#eval lTermSize` OOMs at 12 GB and still OOMs at 20 GB, and
+concluded from that. `lTermSize` is a structural tree traversal, i.e. exactly
+`sizeWithoutSharing` — which CLAUDE.md's Track A item 1 bans in favour of `Expr.numObjs`,
+because the measured tree/DAG ratio in this project is ≈10⁵. So that OOM is a fact about the
+*tree*, which was already known to be astronomical, and it says nothing about whether the
+bound reduces. The kernel's `whnf` caches where `#eval` does not, so they are different
+engines and only the `rfl` is evidence. The OOM figures are kept out of the table below for
+that reason.
 
 **But `lUtNoLem` uses no LEM.** It is `close lInner`, the same term as the control. So the
 cost is the *route* — `classical_to_prenex_extended` (prenexify → negative translation →
@@ -81,22 +91,46 @@ The control in the same file, same model, same `bezemConstMajorantsEmpty`:
 | route | derivation | `U` at `x*=5` | `V` at `x*=5` |
 |---|---|---|---|
 | extended (`…_metatheorem_at`) | `lFinalExt` | **0** (`rfl`) | **5** (`rfl`) |
-| classical (`…_classical_at`) | `lFinalNoLem` | OOM > 20 GB | OOM > 20 GB |
-| classical, with LEM | `lFinalLem` | OOM > 20 GB | OOM > 20 GB |
+| classical (`…_classical_at`) | `lFinalNoLem` | `whnf` timeout | `whnf` timeout |
+| classical, with LEM | `lFinalLem` | `whnf` timeout | `whnf` timeout |
 
 `lVtExt_at_5_ne_4` is the non-degeneracy control for the two that do reduce (trap 12: a `rfl`
 where both sides stick at a common point proves nothing).
 
-**What is NOT established: where inside the route the blow-up lives.** The type level is not
-the explanation — `tySize (wTy stmt) = 19` against `tySize (wTy pstmt') = 93`, and
-`cTy` 7 against 39, a factor of ≈5 in the *type*, which is nothing. So it is the term, and the
-two candidates are (a) `negTrans_sound` multiplying the derivation's constructor count, and
-(b) `syntactic_soundness`'s duplicating combinators (`sSyllogism` copies its arguments 3× and
-2×, `sExportation`/`sImportation` 3×) compounding over the larger derivation at the measured
-≈×2-per-4-constructors rate. **Do not guess between them.** CLAUDE.md records that exactly
-this kind of guess was made and was wrong for the Stage-B stall (`Term.monus`/`Term.pd`,
-refuted by `set_option diagnostics true`); the same diagnostic run is the way to settle this
-one, and it has not been done.
+## Where the stall actually is — measured, not guessed
+
+`set_option diagnostics true` on the stalling `rfl`, at threshold 500:
+
+    Eq.rec ↦ 6312,  Term.rec ↦ 1985,  Term.rename ↦ 1930
+    (reducible: Eq.ndrec ↦ 6312, Term.casesOn ↦ 1985, Ty.casesOn ↦ 577)
+
+**Nothing from the negative translation appears at all** — no `negTrans`, no
+`syntactic_soundness`, no `SRealizer.imp`, no `sSyllogism`. `whnf` never gets that far. What
+it is doing is **dependent-cast (`Eq.rec`) and renaming traffic**, which is *the same
+signature* as the Stage-B stall recorded in CLAUDE.md's Track A item 1
+(`Eq.rec ↦ 60474`, `Term.rec ↦ 10847`, `Term.rename ↦ 10504`) — and an order of magnitude
+smaller here.
+
+**So the classical route is not blocked by a classicality-specific cost.** It is blocked by
+the cast/rename commutation debt the counter side already owes, reached by a different path:
+`classical_to_prenex_extended` moves the matrix under a `weakenBy`/`renameF` pair, and every
+such move leaves `Eq.rec` casts that `whnf` must push through before it can see a constructor.
+The restructuring target is therefore the same one item 1 names — cast/rename commutation, not
+arithmetic and not the translation — and a fix there unblocks both.
+
+Two corollaries worth keeping. The type level is **not** the explanation, and this was checked
+rather than assumed: `tySize (wTy stmt) = 19` against `tySize (wTy pstmt') = 93`, and `cTy` 7
+against 39 — a factor of ≈5, nothing. And the counts are small in absolute terms (6312, not
+60474), so this reads as a constant factor over budget rather than a divergence.
+
+## Reproduction
+
+The stalling theorems are necessarily not in this file. Paste into a scratch file importing
+this one to re-run either half:
+
+    set_option diagnostics true in
+    set_option diagnostics.threshold 500 in
+    theorem probeU : (0 : Nat) = closedMajorizer lCmE lUtNoLem (5 : Nat) := by rfl
 -/
 
 namespace Metatheorems
