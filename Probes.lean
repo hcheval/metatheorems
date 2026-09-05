@@ -10,6 +10,7 @@ import Metatheorems.Probes.PapplyDemo
 import Metatheorems.Probes.QComm
 import Metatheorems.Probes.R1
 import Metatheorems.Probes.RevTriangleDemo
+import Metatheorems.Probes.WHyperbolicLemmasDemo
 import Metatheorems.Probes.RwArrow
 import Metatheorems.Probes.RwBase
 import Metatheorems.Probes.SeqMpBoundProbe
