@@ -773,6 +773,13 @@ local notation "ms" => monotone_soundness eqxi spremise cm
     (congrArg ((Formula.all ρ A).weakenBy ρ →ᶠ ·) (Formula.subst0_weakenUnder A))]
   rfl
 
+/-- `Formula.subst0_weakenUnder` with `subst0` unfolded — the shape `ex_and_left`'s cast
+carries (`simp only [Formula.subst0] at h` inside it). -/
+theorem substF_subst0map_weakenUnder {ρ : Ty ι} (A : Formula F (ρ :: Γ)) :
+    Formula.substF (Term.subst0_map (.var .vz : Term F (ρ :: Γ) ρ))
+      (Formula.renameF (Term.Renaming.ext Term.Renaming.shift) A) = A :=
+  Formula.subst0_weakenUnder A
+
 @[mfi_memo] theorem MRealizer.seqAllI_nil {ρ : Ty ι} {A : Formula F (ρ :: Γ)}
     (h : MRealizer cm (pack (([] : HCtx F Γ).map (Formula.weakenBy ρ)) A)) :
     MRealizer.seqAllI eqxi spremise cm [] h
@@ -865,6 +872,41 @@ transparency, which is exactly the comparison of a formula before and after norm
 that the casts exist to avoid — measured as an `isDefEq` heartbeat timeout inside `simp`
 (2026-09-05). -/
 attribute [mfi_memo] monotone_soundness_eqmpr monotone_soundness_eqmp monotone_soundness_subst
+
+section ExAndLeft
+
+variable {ι κ : Type} {X : ι → Type} {F : κ → Ty ι} {si : SpaceInterp X F}
+    {am : AbstractMajorizability si} {P : PremiseSet F}
+    (eqxi : EqXInterp X F si)
+    (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), P ⟨Γ', B⟩ → SRealizer si B)
+    (cm : ConstMajorants am) {Γ : Ctx ι}
+
+local notation "ms" => monotone_soundness eqxi spremise cm
+
+/-- `ex_and_left` (inside `exist_imp_pull`, i.e. under every `pobtain`) is
+`importation (exist_rule (exportation (Eq.mp _ (exist_ax (var vz) _))))`; its transport,
+exposed. Placed after the equation theorems are in the set, which the proof runs — without the
+`transportTo` simproc (the two transports differ only in their proof) — discharging the one side
+condition with `substF_subst0map_weakenUnder`. -/
+@[mfi_memo] theorem ms_ex_and_left {ρ : Ty ι} {A : Formula F (ρ :: Γ)} {B : Formula F Γ} :
+    ms (ex_and_left (a := Allowed.extended) (Premises := P) (A := A) (B := B))
+      = .importation cm (.existRule cm (.exportation cm
+          (MRealizer.transport
+            (congrArg (· →ᶠ Formula.ex ρ (Formula.renameF (Term.Renaming.ext Term.Renaming.shift)
+              (A ∧ᶠ Formula.weakenBy ρ B)))
+              (substF_subst0map_weakenUnder (A ∧ᶠ Formula.weakenBy ρ B)))
+            (.ofSRealizer cm (sExistAx
+              (A := Formula.renameF (Term.Renaming.ext Term.Renaming.shift)
+                (A ∧ᶠ Formula.weakenBy ρ B)) (.var .vz)))))) := by
+  unfold ex_and_left
+  simp (config := { implicitDefEqProofs := false }) only [mfi_memo, -mfiTransportNF]
+  rw [ms_eqmp_congr eqxi spremise cm
+    (congrArg (· →ᶠ Formula.ex ρ (Formula.renameF (Term.Renaming.ext Term.Renaming.shift)
+      (A ∧ᶠ Formula.weakenBy ρ B)))
+      (substF_subst0map_weakenUnder (A ∧ᶠ Formula.weakenBy ρ B)))]
+  rfl
+
+end ExAndLeft
 
 -- ============================================================================
 -- Axiom hygiene — verify by name, after a completed `lake build`

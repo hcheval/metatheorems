@@ -11,39 +11,115 @@ import Metatheorems.Probes.MonotoneMCT
 # Gates for the `mfi_memo` programme (MFI Lane D1)
 
 `Dialectica/MonotoneSeq.lean` pushes `monotone_soundness` through the proof-mode packaging
-layer and the casts. This file runs the three gates the lane was given, with the instrument
-`mfi_push` (below) + `kernel_rfl` (`Probes/MonotoneLaneB.lean`).
+layer and the casts. This file runs the gates with the instrument `mfi_push` (below) +
+`kernel_rfl` (`Probes/MonotoneLaneB.lean`).
 
-## STATE (WIP commit, 2026-09-05) — read this first if continuing
+## STATE (wrap-up, 2026-09-05) — read this first if continuing
 
-* **G-D1 (a) PASSES** (`d2c_is_3`): Lane B's stalling read-out verbatim — the counter
-  transformer of `le_R_pu_of_le_R dxw Tq` (3 `Eq.mpr` from one `canorm`) fed the challenge
-  index `3` returns `3`; on Lane B it was a 12 GB `std::bad_alloc` (`MonotoneLaneB.lean`,
-  finding 3). Kernel ≈ 3.7 s including the proof term; `4` refuted.
-* **G-D1 (b) NOT YET** (`pu_*`, in the `-- WIP:` block): the premise-slot statement
-  `∀q (∀n [d(x,w) ≤ T]ₙ → ∃v [d(x,w) ≤ T]ᵥ)` with the premise converted through
-  `le_R_of_le_R_pu` (4167 constructors, `pobtain` = `pm_exE`, `pinst`, 4 `Eq.mpr`) **and**
-  `le_R_pu_of_le_R`. First attempt: 12 GB `std::bad_alloc` at build. Not localised. What to
-  do next: the bisection recipe below (crash-safe file log; `mfi_report`; then the
-  proof-term walk with `addDecl` per `congrArg`/`Eq.trans` node — the scratch tool that found
-  item 3 below). Suspects, in order: (i) a cast shape not in the set yet (`pm_exE`'s
-  `seq_allI` at `A →ᶠ weakenBy ρ B` puts `exist_imp_pull` = `eipComb` in the goal — it
-  unfolds via the attribute, but its `forall_ax_vz` sits under `pair_h`; check the
-  `mfi_report` heads are empty); (ii) a definitional gap of the kind in item 3 from another
-  rfl-lemma (`ms_seq_exE` is not rfl; `ms_pm_exE` is an application — check with
-  `implicitDefEqProofs := false` that every step has a proof); (iii) the kernel's own
-  reduction of `MRealizer.existRule`'s `cast (dialecticaCounter_weaken …)`.
-* **G-D2, G-D3 not attempted yet.** The reachable-definition lists to unfold are in the
-  scratch (`D1_reach.out`): `final` reaches 289 derivation defs, `mct_p2` 60.
-* **Diagnosis of the earlier `a₂` vs `a₂T` mismatch (resolved, item 3 below):** with
+Lane D1 was stopped by the supervisor before G-D2/G-D3, because Lane C found that the
+composition combinators of `Dialectica/Monotone.lean` (`MRealizer.syllogism` uses
+`hAB.val n e` three times, unshared) cost ×5 per nested syllogism in the kernel; the gates are
+to be re-run on top of a sharing fix in that file. Everything below is what the build shows.
+
+### The `mfi_memo` entries (`Dialectica/MonotoneSeq.lean`)
+
+Δ-generic, by structural recursion on the hypothesis context `Δ` (each holds at every `Δ`,
+never traversing the sub-derivation): `ms_seq_of_thm`, `ms_seq_mp`, `ms_seq_id`,
+`ms_seq_allI`, `ms_seq_induction`. Δ-uniform, no recursion needed (`subst h; rfl` / `rfl`):
+`ms_seq_cast` (a `transport` along `congrArg (pack Δ) h`), `ms_seq_mono`. Cast entries:
+`ms_eqmp_congr`, `ms_eqmpr_congr` (the formula equation is in the term), plus Lane B's
+`monotone_soundness_eqmpr/_eqmp/_subst` tagged in, and the simproc `mfiTransportNF`
+(`transport ↦ transportTo` at the kernel-normalised hat type). Exposure entries for casts inside
+closed kernel theorems: `ms_forall_ax_vz`, `ms_ex_and_left`; the theorems
+`forall_imp_pull/_push`, `exist_imp_pull`, `forall_mono`, `imp_mono_right`, `pair_h` unfold under
+the set; `MRealizer.seqAllI_nil/_cons`, `seqInduction_nil/_cons`, `fipComb_eq`, `eipComb_eq`,
+`fipushComb_eq`, `fmSComb_eq` unfold the Δ-recursive combinators at a literal `Δ`. One `rfl`
+restatement per derived `seq_*`/`pm_*` (`ms_seq_intro` … `ms_pm_qfac`, 43 of them). The 39
+equation theorems `monotone_soundness.eq_1 … eq_39` are in the set (never the unfold target —
+header item 3 below). All entries are at `monotone_soundness`'s own axiom list
+`[propext, Classical.choice, Quot.sound]` (the `#print axioms` block of `MonotoneSeq.lean`);
+the Δ-recursive combinators `seqOfThm`/`seqMp`/`seqId`/`seqAllI`/`seqInduction` likewise.
+
+### The two non-vacuity controls (type-correct, wrong right-hand sides; both FAIL)
+
+1. `ms_seq_id` at `Δ = [A, A]`: claim `ms (seq_id (.hs .hz)) = MRealizer.seqId … .hz`
+   (the two variables have the same type). `simp only [mfi_memo]; rfl` fails with
+   `⊢ MRealizer.seqId eqxi spremise cm HVar.hz.hs = MRealizer.seqId eqxi spremise cm HVar.hz`
+   — the entry transmits the variable index.
+2. `ms_seq_of_thm` at `Δ = [A]`, `B := A`: claim `= MRealizer.seqOfThm cm [] (iComb cm A)`
+   (same type as the real `seqOfThm [] (mp (ms h) (kComb A A))`). `rw [ms_seq_of_thm]; rfl`
+   fails with `⊢ MRealizer.seqOfThm cm [A] (ms h) = MRealizer.seqOfThm cm [] (MRealizer.iComb cm A)`.
+
+### G-D1 (a) PASSES — `d2c_is_3`
+
+Lane B's stalling read-out verbatim: the counter transformer of `le_R_pu_of_le_R dxw Tq`
+(650 constructors, 3 `Eq.mpr` from one `canorm`) fed the challenge index `3` returns `3`; on
+Lane B it was a 12 GB `std::bad_alloc` (`MonotoneLaneB.lean`, finding 3). Kernel ≈ 3.7 s
+including the proof term; `4` refuted (`d2c_ne_4`). Open form (`M`, `h` variables).
+
+### G-D1 (b) — what reduces and what does not (all measured 2026-09-05, 12 GB cap)
+
+* **`d1c_is_3` PASSES** (live below): the counter transformer of `le_R_of_le_R_pu dxw Tq` —
+  4167 constructors, `pobtain` (`pm_exE`, so `ex_and_left`/`exist_imp_pull`), `pinst`, 4
+  `Eq.mpr` — fed the `le_R` challenge `((3, default), ())` returns index `3`. Open form: kernel
+  23.8 s. Closed model (`WHyperbolicModel.ofNormed ℝ`, no free variables): kernel 13.5 s,
+  **peak RSS 8.4 GB** (sampled by `ps` every 2 s), `4` refuted. After `mfi_push` the goal has
+  **no** `monotone_soundness` head left and every cast is a `transportTo` (`mfi_report`
+  heads: `mp_form` ×4, `and_proj2` ×4 — cast-free theorems, folded on purpose — and 180
+  `transportTo`); the simp proof term alone (`∃ x, x = …` closed by `⟨_, rfl⟩`) kernel-checks
+  in 0.25 s. So the pass is complete on this derivation and the cost is the kernel's *value*
+  reduction only.
+* **The whole `pu_*` statement does NOT reduce** (kept in the `-- WIP:` block below, out of
+  the build): `∀q (∀n [d(x,w) ≤ T]ₙ → ∃v [d(x,w) ≤ T]ᵥ)` with the premise consumed through
+  `le_R_of_le_R_pu` **and** `le_R_pu_of_le_R`, then `tail` (`forall_ax sq ⟶ exist_ax sq`),
+  under `forall_rule`/`and_weak`/`refl0` as `puFinal`. `U`, `V`, `Φ` at `x* = (5,5)` are
+  12 GB `std::bad_alloc` / `INTERNAL PANIC: out of memory` in the kernel's reduction of the
+  value, at the open form and at the closed model alike. The push itself succeeds (18,437
+  objects, 40 cast nodes, all `transportTo`), and the proof term alone kernel-checks in 0.25 s.
+  **Association-sensitive**: the same derivation with the inner syllogism re-associated —
+  `syllogism (syllogism d1x d2) tail` instead of `syllogism d1x (syllogism d2 tail)` (identical
+  after β) — kernel-checked `U = 901` once in 22.3 s (`D1_pu2` scratch) and panicked on the next
+  run (`D1_pu`, 57 s), i.e. it sits at the memory cap; the other association panics every time.
+  Both proof terms check in 0.25 s. This is the ×5-per-nested-syllogism cost Lane C found.
+* **What does NOT explain it (each tested)**: (i) free variables — the closed model panics the
+  same way; (ii) `kernel_rfl` vs `Kernel.whnf` — `Kernel.whnf` of the same value reaches the
+  literal (23 s, `d1c`) where `Kernel.isDefEq (lit 3) e` panics, so the two kernel entry points
+  differ in *memory*, not in what they can compute; `of_decide_eq_true (Eq.refl true)`
+  (`Nat.decEq` route) panics too; (iii) a missing entry — no `monotone_soundness` head
+  survives; (iv) a definitional gap in the proof term — it checks in 0.25 s.
+* **Two instrument bugs found on the way, both fixed in `mfi_disch` below.** (1) `try a; try b`
+  parses as `try (a; try b)`: when `q_cons_norm` failed, `canorm` was silently skipped, one
+  side condition stayed open as a reflexive-looking `X = X'` (the two sides differ by
+  `Term.rename shift` vs `Term.weaken`), the entry did not fire, and the raw `Eq.mpr` reached the
+  kernel — that was *the* 12 GB OOM on `d1c` for most of the lane. One `try` per line. (2) Never
+  close such a residual with `with_reducible rfl`: the kernel then has to decide `X ≡ X'` through
+  the ℚ constants — a second 12 GB OOM, measured.
+* **The `a₂` vs `a₂T` mismatch (resolved earlier in the lane, kept for the record)**: with
   `monotone_soundness` passed as an unfold target, simp reduced `ms forall_ax_vz` by smart
-  unfolding — Meta ran the K-rule through the `Eq.mp` and recorded no proof; the `Eq.trans`
-  chain therefore ended at `seqAllI [P] …` (`a₂T`) while the goal already showed the fully
-  rewritten `seqMp …` (`a₂`), and the kernel had to close that definitional gap = re-run
-  the K-rule = `std::bad_alloc`. Fixed by the 39 equation theorems + `implicitDefEqProofs :=
-  false`.
+  unfolding (Meta ran the K-rule through the `Eq.mp` and recorded no proof), so the `Eq.trans`
+  chain ended at `MRealizer.seqAllI [P] …` (`a₂T`) while the goal already showed the fully
+  rewritten `MRealizer.seqMp …` (`a₂`); the kernel had to close that definitional gap = re-run
+  the K-rule = `std::bad_alloc`. They first differ at the outermost head (`seqAllI` vs `seqMp`);
+  the 39 equation theorems + `implicitDefEqProofs := false` remove the gap (header item 3).
 
-## G-D1 — `le_R_pu_of_le_R` (3 `Eq.mpr` from one `canorm`) is LIVE.  (a) PASSES.
+### G-D2, G-D3: not attempted (stopped before them).
+
+### Next step for a fresh agent (after Lane C's sharing fix in `Monotone.lean`)
+
+Re-run the `-- WIP:` block below unchanged (`pu_U_5_5` first). If it still panics: the staged
+route prototyped in the lane's scratch (`D1_stage.lean`, not committed) — `rfl` equations for the
+applied projections of the outer combinators (`mfiU_eq`, `MRealizer.mp_val`,
+`syllogism_val_fst/_snd`, `forallRule_val_fst/_snd`, `exportation_val_*`, `ofSRealizer_val`,
+`tm_sAndWeak_fst`) rewritten with `implicitDefEqProofs := false`, then a tactic that reifies
+the innermost first-order-typed sub-value (`Nat`/`Unit`/`×` after `Kernel.whnf` of its type) to
+a literal by kernel deep-whnf, certifies `sub = lit` as its own `Eq.refl` aux theorem and
+rewrites it in (reducible `kabstract`) — so each kernel call carries one stage. It ran two
+trivial stages; the third candidate was still the whole value because the U read-out goes
+through `and_weak`'s `termMajorizer` *as data* and the val-equations did not fire on
+`↑(MRealizer.forallRule …)` — the remaining work is the matching of those equations (see the
+`after val` goal in `D1_stage.log`: `(((↑(MRealizer.forallRule …`). Do **not** unfold
+`MRealizer.*` with plain `simp only [MRealizer.syllogism, …]`: it unfolds (65k objects) and the
+definitional steps it records then OOM the kernel.
 
 ## The instrument, and the three things that had to be true for it to work
 
@@ -75,11 +151,16 @@ smallest derivation that fails without it):
    kernel-checks in milliseconds. `MRealizer.transport_rfl` is likewise kept **out** of the
    set (its implicit `B'` unifies with `B` at default transparency — the same comparison).
 
-`mfi_disch` is `canorm`'s own normaliser, each stage under `try` (a stage that closes the
-goal must not make the next fail with "no goals"); the `Eq.mpr` side condition `pack Δ B =
-pack Δ' B'` is what `ms_eqmpr_congr` leaves when its `hB` is not in the term (the aux-theorem
-`_proof_i` casts `canorm` emits) — proof irrelevance matches the pattern and the discharger
-proves the equation the way `canorm` did.
+`mfi_disch` is `canorm`'s own normaliser, each stage under its own `try` on its own line (a
+stage that closes the goal must not make the next fail with "no goals"; and `try a; try b` on
+one line is `try (a; try b)`), then `pack`/`List.map`/`Term.weaken`/`shift` unfolding; the
+`Eq.mpr` side condition `pack Δ B = pack Δ' B'` is what `ms_eqmpr_congr` leaves when its
+`hB` is not in the term (the aux-theorem `_proof_i` casts `canorm` emits) — proof irrelevance
+matches the pattern and the discharger proves the equation the way `canorm` did. The `pack`
+stage is for a cast created across a `pintro` (`le_R_of_le_R_pu`'s second `canorm`), whose
+two sides are `pack Δ (B →ᶠ ⊥)` and `pack (B :: Δ) ⊥`: true by `pack`'s equations, invisible
+to `canorm`. A side condition the discharger does not close must stay open (the entry then
+does not fire and `mfi_report` shows the surviving cast) — never `rfl` it shut.
 
 `Elab.async` is off in this file: two 12 GB kernel reductions in parallel look like one OOM.
 -/
@@ -98,9 +179,15 @@ open TriangleBoundDemo (triCm)
 -- ============================================================================
 
 /-- The discharger for the `Eq.mpr` side conditions `pack Δ B = pack Δ' B'`: the normaliser
-that produced the cast (`canorm`), each stage under `try` — a stage that closes the goal must
-not make the next one fail with "no goals". -/
-macro "mfi_disch" : tactic => `(tactic| (try q_cons_norm; try canorm))
+that produced the cast (`canorm`), each stage under its own `try` on its own line — `try a;
+try b` is `try (a; try b)`, which skipped `canorm` whenever `q_cons_norm` failed — then
+`pack`/`List.map` unfolding (a cast created across a `pintro`) and `Term.weaken`/`shift`
+unfolding (`canorm` dissolves `shift` on the side it rewrote, and the other side still says
+`weaken`). No reflexivity closer, deliberately: see the header. -/
+macro "mfi_disch" : tactic =>
+  `(tactic| (try q_cons_norm
+             try canorm
+             try simp only [ProofMode.pack, List.map, Term.weaken, Term.Renaming.shift]))
 
 /-- **The pass.** `mfi_memo` with explicit proofs for every step (`implicitDefEqProofs :=
 false` — a definitional step is one the kernel must re-run, and at a cast that is the K-rule
@@ -184,13 +271,50 @@ theorem d2c_ne_4 : (4 : ℕ) ≠ d2c M h := by
 end Model
 
 -- ============================================================================
--- G-D1 (b): the premise-slot statement, the premise converted through BOTH conversions
+-- G-D1 (b): `le_R_of_le_R_pu` — the other conversion, `pobtain`/`pinst`, 4 `Eq.mpr`
 -- ============================================================================
 
 theorem concT_pu : concT.isPurelyUniversal = true := rfl
 
 /-- `le_R_pu dxw Tq →ᶠ le_R dxw Tq` — 4167 constructors, 4 `Eq.mpr`. -/
 def d1x : D [qTy] (le_R_pu dxw Tq →ᶠ le_R dxw Tq) := le_R_of_le_R_pu dxw Tq
+
+section Model
+variable (M : WHyperbolicModel) (h : M.d M.ref M.zeroX ≤ ((5 : ℕ) : ℝ))
+
+/-- The majorant of the default witness of `le_R_pu dxw Tq`. -/
+noncomputable def wpu : Ty.interpret (XM M) (wTy (le_R_pu dxw Tq)).hat :=
+  termMajorizer (triCm M h) (defaultWTerm (le_R_pu dxw Tq)) 0 (xs M, ())
+
+/-- The majorant of the default counter of `le_R dxw Tq`. -/
+noncomputable def cle : Ty.interpret (XM M) (cTy (le_R dxw Tq)).hat :=
+  termMajorizer (triCm M h) (defaultCTerm (le_R dxw Tq)) 0 (xs M, ())
+
+/-- The challenge on `le_R dxw Tq`: the `∃`-witness index `3`, the rest default. -/
+noncomputable def cnt3le : Ty.interpret (XM M) (cTy (le_R dxw Tq)).hat :=
+  (((3 : ℕ), (cle M h).1.2), ())
+
+/-- The counter side of `le_R_of_le_R_pu dxw Tq` at challenge `3`: the index handed back to
+`le_R_pu`. -/
+noncomputable def d1c : ℕ :=
+  (((mr M h d1x).val 0 (xs M, ())).2 (wpu M h) (cnt3le M h)).1
+
+/-- **G-D1 (b), the conversion alone.** The index passes through `pobtain`/`pinst` and the
+four casts: `3`. Kernel 23.8 s (open form); 13.5 s and 8.4 GB peak at the closed model
+`WHyperbolicModel.ofNormed ℝ`. -/
+theorem d1c_is_3 : (3 : ℕ) = d1c M h := by
+  unfold d1c mr d1x
+  mfi_push [le_R_of_le_R_pu]
+  kernel_rfl
+
+theorem d1c_ne_4 : (4 : ℕ) ≠ d1c M h := by
+  rw [← d1c_is_3 M h]; decide
+
+end Model
+
+-- ============================================================================
+-- G-D1 (b), the whole statement — NOT reducing (12 GB), kept out of the build
+-- ============================================================================
 
 /-- `∀n [d(x,w) ≤ T]ₙ → ∃v [d(x,w) ≤ T]ᵥ`, the premise consumed through `le_R_of_le_R_pu`,
 `le_R_pu_of_le_R`, then instantiated at `sq` and generalised. -/
@@ -205,6 +329,11 @@ def puInnerW : D [qTy] (Formula.weakenBy qTy dummy →ᶠ
 def puFinal : D [] (Formula.all qTy (Formula.all Ty.nat concT →ᶠ Formula.ex Ty.nat concT)) :=
   .mp .refl0 (.forall_rule puInnerW)
 
+/-- The other association of the same proof: `syllogism (syllogism d1x d2) tail`. Reduced once
+in 22.3 s and panicked on the next run — at the memory cap, not below it. -/
+def puInnerR : D [qTy] (Formula.all Ty.nat concT →ᶠ Formula.ex Ty.nat concT) :=
+  .syllogism (.syllogism d1x d2) tail
+
 section Model
 variable (M : WHyperbolicModel) (h : M.d M.ref M.zeroX ≤ ((5 : ℕ) : ℝ))
 
@@ -212,10 +341,11 @@ variable (M : WHyperbolicModel) (h : M.d M.ref M.zeroX ≤ ((5 : ℕ) : ℝ))
 noncomputable def xs7 : Ty.interpret (XM M) qTy.hat :=
   (((7 : ℕ), (5 : ℕ)), (((5 : ℕ), (5 : ℕ)), fun _ => (1 : ℕ)))
 
-/- -- WIP: G-D1 (b). With `d1x` (`le_R_of_le_R_pu`, 4167 constructors, `pobtain` = `pm_exE`,
-`pinst`, 4 `Eq.mpr`) in the premise path this is a 12 GB `std::bad_alloc` at the first attempt
-(2026-09-05); not yet localised — see the header, "State". The (a) read-out through
-`le_R_pu_of_le_R` alone is live above.
+/- -- WIP: G-D1 (b), the whole statement. Every theorem below is a 12 GB `std::bad_alloc` /
+`INTERNAL PANIC: out of memory` in the kernel's reduction of the value (2026-09-05), at the
+open form and at the closed model alike; the push succeeds (18,437 objects, 40 casts, all
+`transportTo`, no `monotone_soundness` head left) and the proof term alone kernel-checks in
+0.25 s. See the header. Re-run unchanged after the sharing fix in `Dialectica/Monotone.lean`.
 
 theorem pu_U_5_5 : (901 : ℕ) = mfiU (triCm M h) (mr M h puFinal) (xs M) := by
   unfold mr puFinal puInnerW puInner d1x d2 tail
@@ -255,6 +385,8 @@ end Model
 
 #print axioms d2c_is_3
 #print axioms d2c_ne_4
+#print axioms d1c_is_3
+#print axioms d1c_ne_4
 
 end MonotoneMemoGates
 end Metatheorems
