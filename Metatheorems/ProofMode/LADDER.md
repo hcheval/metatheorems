@@ -220,6 +220,87 @@ means normalising the Dialectica interpretation of the whole derivation, and p�
 enough that the elaborator does not get there. Stating the type is the fix; raising
 `maxHeartbeats` is not.
 
+## Rung 8 — unified apply (2026-09-05)
+
+Not a proof; a tactic. `papply h` and `papplym e` were two elabs sharing one defect: each
+elaborated the rule, counted its antecedents by walking `Formula.imp` with `whnfD` +
+`isDefEq` **inside `withoutModifyingState`**, threw the assignments away, and then handed
+the user's *syntax* back to `refine pm_mp (pm_have $eStx) ?_` to be elaborated and unified a
+second time. Now there is one `papply term`: a bare identifier that names a hypothesis is
+the hypothesis, anything else is a kernel theorem; `papplym e` is a macro for `papply e`;
+the two forward forms `papply h in k with m` / `papplym e in h with k` and `pthm` are
+untouched.
+
+**As implemented.** The theorem is elaborated once by `elabRuleInCtx`, *open* — `Γ` pinned,
+the formula a metavariable, exactly `pthm`'s first attempt; pinning first is what diverged
+on `mct_p1` (above). Only if that fails is it retried against the goal's formula behind
+0, 1, 2, 3 antecedent placeholders (the `rfl`-side-condition case). The conclusion is then
+unified with the goal in the live metavariable context — `withReducible` first, default
+transparency as the fallback — peeling one arrow per failure (arrows exposed as written,
+then by `whnfR`, then by `whnfD`). The `pm_mp` chain is built as an `Expr` with the goal's
+`ι κ F a Premises Γ ns Δ` read off the `SeqD` application and the antecedents as
+synthetic-opaque goals; no `exprToSyntax`, no second elaboration. A `_` the conclusion does
+not determine is left as a trailing goal, as Lean's `apply` does, and is fixed by whatever
+proves the antecedent mentioning it (`PapplyDemo.trans_midpoint`).
+
+**What it bought, measured** (`Probes/PapplyDemo.lean`):
+
+- The rung-6a spelling `papplym (succ_congr_imp (s := pdᵗ x₁) (t := x₀))` elaborates. Its
+  recorded failure, `x₀: the context has 0 named variable(s)`, came from the *second*
+  elaboration — the `refine` re-elaborated the raw syntax with no `Γ` pinned, so the tokens
+  resolved against the outer context. The first, pinned elaboration had always succeeded.
+- `papply (lt_Q_add_both _ _ _ _)` reads all four terms off the goal. Retrofitted at three
+  sites in `RealNumbers/Cauchyfy.lean` (`add_R_check`: `le_lt_Q_trans`, `lt_Q_congr`,
+  `lt_Q_add_both`), 47 lines of spelled-out terms removed for 9 added (three of them
+  comments); `add_R_check` stays `[propext, Quot.sound]`. Note that `_` placeholders *also* worked under the old
+  tactic — `refine`'s second unification found them — so the gain there is one elaboration
+  instead of two, not new expressiveness; the named-argument-with-tokens case is the one that
+  was genuinely closed.
+- The error path no longer indexes `etyArgs`: the message is built from the inferred type's
+  last argument. The panic in trap 12 was the pre-split 6-argument `Derivable` read at
+  `[6]!`; after the split it was in bounds by coincidence, and the two ill-formed-argument
+  probes already gave readable messages at `10104d9`.
+
+**Transparency per site**, via `-D pm.papply.trace=true` on the seven measured files (93
+applications traced; the forward forms and `pthm` are not traced): 72 matched at
+**reducible**, 14 at **default**, 0 needed a pinned elaboration, 3 needed `whnfD` to expose
+an arrow. Every default match is one of two shapes: a goal spelled out as
+`eq0 (lt_Q_dec …) 0` against a rule concluding `lt_Q …` (`BaseEquality`, `LeOrder`,
+`Cauchyfy` — the `prw`-must-see-inside convention forces the spelled-out form), or a
+`weakenBy`/`¬ᶠ`-wrapped hypothesis (`MCTLazy`'s `N`, `snz1`; `Arith`'s `ihB`). Every goal
+containing `Term.cauchyfy` matched at reducible, so the default fallback never walks into
+the recursor on a successful match. On a *failing* match it still would — the fallback is
+the old behaviour, not a fix for trap 12.
+
+**Timings**, `lake env lean` per file, best of two, same 12 GB cap, another agent building
+on the same 15 GB machine throughout:
+
+| file | before | after | |
+|---|---|---|---|
+| `ProofMode/MCT.lean` | 6.43 s | 6.40 s | 0 theorem-path sites; all `papply … in` |
+| `ProofMode/MCTLazy.lean` | 7.59 s | 8.50 s | **+12%**, see below |
+| `ProofMode/Arith.lean` | 5.61 s | 5.52 s | |
+| `BaseEquality.lean` | 2.96 s | 2.41 s | −19% |
+| `RealNumbers/LeOrder.lean` | 3.18 s | 2.62 s | −18% |
+| `RealNumbers/Cauchyfy.lean` (pre-retrofit source) | 4.61 s | 4.25 s | −8% |
+| `RealNumbers/Cauchyfy.lean` (retrofitted) | — | 4.12 s | |
+
+`MCTLazy` has exactly two changed sites (`papply N`, `papply snz1`, both hypotheses, one
+antecedent), so a stable 0.9 s from the tactic is implausible; a controlled A/B — the same
+file with the old elab inlined as `papply_old` at those two sites, six interleaved pairs in
+the same build state — gave new **7.88 / 9.2 s** (min / median, one 20.5 s outlier) against
+old **8.18 / 8.5 s**. The minimum favours the new tactic by 4%, the median disfavours it by
+8%, and a run-to-run spread of 7.9–20.5 s on an unchanged file says the machine, not the
+tactic, is what was measured. The per-site work is the old work plus one failing
+`withReducible` `isDefEq` and one `whnfR` for the default-match sites; no fallback to the
+old path was warranted on this evidence, and none was added. Re-time on a quiet machine
+before reading the +12% as real.
+
+**What was not done.** `papply … in k with m` and `papplym … in h with k` still go through
+`refine`/`pexact` syntax, unchanged. The `?m.54` metavariables in the "does not conclude the
+goal" message are the rule's undetermined implicits, printed as such. The 16-arrow cap on
+the walk is inherited.
+
 ## The rule for the ladder
 
 A rung is done when the script compiles with no `sorry` **and** mentions no internal

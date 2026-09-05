@@ -969,20 +969,25 @@ was the right move for what it bought — majorants without a total majorizer �
 same idea one level up: majorants from the *derivation's* syntax rather than the *term's*,
 which is why `general_metatheorem`'s original shape comes back into use.
 
-## 14. The monotone functional interpretation — what the bound path should be (2026-09-05)
+### 14.7 Status (2026-09-05, evening) — where the MFI work lives and what it has shown
 
-This section records a design decision taken after gate G0 (`Probes/MonotoneSpike.lean`)
-passed, and the reasoning that led to it. It changes what "the extracted object" means in this
-project. Status: **decided, not yet built**; the refactor lanes are at the end.
-
-### 14.1 The problem, measured, and why it is two problems
-
-The bound pipeline was `syntactic_soundness` (a Dialectica realizer as a closed object `Term`)
-→ `extractUTerm`/`extractVTerm` → `closedMajorizer`. It produced kernel-checked numerals only on
-derivations with no `and_contract` and no induction; one `and_contract` (`ConjBoundDemo.acFinal`)
-was a `whnf` timeout on the counter side. Three measurements separated what was going on:
-
-1. **The stalling term is small.** `SizeProbe`: `acFinal`'s realizer is 2,529 nodes, built
-   instantly by `#eval`. The kernel was not choking on size; it was *executing*
-   `Term.weaken`/`Term.rename` over dependent indices with `Eq.rec` casts on the way to a tiny
-   term (`Eq.rec ↦ 16074`, `Term
+The refactor is on the integration branch `mfi` (worktree `.worktrees/mfi`), deliberately
+**unmerged into `main`** until a bound with mathematical content reduces; the per-lane record
+is in that branch's copy of `CLAUDE.md`. Landed there: Lane A (full `monotone_soundness`, all
+39 constructors, `MaxCompat` as fields, gate G1 — the `and_contract` crossover `max(1709, 901)`
+by `rfl`), Lane B (`monotone_general_metatheorem_at`/`_gen`; a cast-free proof-mode derivation
+at a space gives `U = V = Φ = 901` in the kernel; `pinduction` reduces through the book's
+`t^M`), Lane B' (`MRealizer.transport`, the `Eq.mpr` entry; a directly reachable ℚ cast
+reduces to a numeral), Lane C (the fused NT+MFI recursion `monotone_nd_soundness` on classical
+derivations and `monotone_general_metatheorem_classical_at`; NT-stability is no longer needed
+because the premise case takes an `MRealizer` at `Bᴺᵀ`). Two obstacles remain, both named by
+measurement: (1) casts left by `anorm`/`canorm`/`qfer_*_nf` sit *under* the `pm_*`/`seq_*`
+layer, where the entry cannot reach them without commutation lemmas for that layer (Lane D1,
+in progress); (2) **the composition combinators re-evaluate their sub-majorants** —
+`MRealizer.syllogism` uses `hAB.val n e` three times and `hBC.val n e` twice, and neither the
+kernel nor the compiled evaluator shares them, so nested syllogisms cost ×5 per level (kernel
+dies at ≈8, evaluator at 3; `prenexify` has 134). That is the Dialectica exponential in its
+last hiding place, and it applies to every route equally; §14.1's "×230 from `negTrans_sound`"
+is a linear factor that fusion removed and that was invisible behind it. Next: `let`-sharing
+in the combinators and `prenexify` as one hand-written leaf, measured on a synthetic
+syllogism chain before anything else.

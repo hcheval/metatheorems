@@ -38,7 +38,7 @@ Status: ✅ have · ❌ missing · — not applicable.
 | `mlDestructBot` | `pcontradiction h` | ✅ |
 | `mlExact "H"` | `pexact h` | ✅ |
 | `mlAssumption` | `passumption` | ✅ |
-| `mlApply "H"` | `papply h` | ✅ peels as many antecedents as needed |
+| `mlApply "H"` | `papply h` | ✅ peels as many antecedents as needed; since rung 8 the same tactic takes a kernel theorem (`papply e`), so `papplym` is an alias |
 | `mlApply "H" in "H0"` | `papply h in k with m` | ✅ |
 | `mlConj "H1" "H2" as "HC"` | `pconj h k with m` | ✅ |
 | `mlAssert ("H" : phi)` | `phave h : A` | ✅ |
@@ -51,7 +51,7 @@ Status: ✅ have · ❌ missing · — not applicable.
 | theirs | ours | |
 |---|---|---|
 | `mlExactMeta` | `pthm e` | ✅ |
-| `mlApplyMeta term` | `papplym e` | ✅ |
+| `mlApplyMeta term` | `papply e` (alias `papplym e`) | ✅ implicit arguments and `_` placeholders are read off the goal (rung 8) |
 | `mlAdd` | `pfrom h := e` | ✅ |
 | `mlApplyMeta term in "H"` | `papplym e in h with k` | ✅ |
 | `mlRewrite term at n` | `prw e`, `prw e at n` | ✅ both sides like `rw`, or one occurrence, numbered left to right across the goal |

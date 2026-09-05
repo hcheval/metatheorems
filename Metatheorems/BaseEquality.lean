@@ -311,11 +311,78 @@ def dist_tri_chain {Γ : Ctx ι} (i : ι) (x y z w : Term F Γ (Ty.base i)) :
     papplym (le_R_of_eq_R_core rassoc lassoc)
     pthm (Derivable.mp (add_assoc_R_core dxy dyz dzw) (eq_R_sym_core lassoc rassoc))
 
+/-- **The reverse triangle inequality**: `⊢ d(x,z) −ℝ d(y,z) ≤ℝ d(x,y)`.
+
+`Derivable.dist_tri` at `(x,y,z)` gives `d(x,z) ≤ℝ d(x,y) +ℝ d(y,z)`; moving `d(y,z)` to
+the left is `le_sub_R_of_le_add_core` (`RealNumbers/LeOrder.lean`), whose section comment
+records the accounting: as a *direct* estimate the statement is tight — every finite reading
+index overshoots `2^{-n}` — but it is derived instead from right monotonicity and the
+cancellation `(g +ℝ h) +ℝ (−ℝ h) ≤ℝ g`, so the only telescope it spends is the one inside
+`le_R_trans_core`. Free constructors only: holds in every `Derivable F al Premises`. -/
+def dist_rev_tri {Γ : Ctx ι} (i : ι) (x y z : Term F Γ (Ty.base i)) :
+    Derivable F al Premises
+      (le_R (Term.app2 Term.sub_R
+              (Term.app2 (Term.dist i) x z) (Term.app2 (Term.dist i) y z))
+            (Term.app2 (Term.dist i) x y)) :=
+  let dxz : Term F Γ (realTy ι) := Term.app2 (Term.dist i) x z
+  let dxy : Term F Γ (realTy ι) := Term.app2 (Term.dist i) x y
+  let dyz : Term F Γ (realTy ι) := Term.app2 (Term.dist i) y z
+  Derivable.mp
+    (Derivable.mp (Derivable.dist_tri i x y z)
+      (le_R_of_le_R_pu dxz (Term.app2 Term.add_R dxy dyz)))
+    (le_sub_R_of_le_add_core dxz dxy dyz)
+
+/-- **The reverse triangle inequality, other orientation**: `⊢ d(y,z) −ℝ d(x,z) ≤ℝ d(x,y)`.
+`dist_rev_tri` at `(y,x,z)` gives it with `d(y,x)` on the right; `dist_comm` and
+`le_R_of_eq_R_core` turn that into `d(x,y)`. -/
+def dist_rev_tri' {Γ : Ctx ι} (i : ι) (x y z : Term F Γ (Ty.base i)) :
+    Derivable F al Premises
+      (le_R (Term.app2 Term.sub_R
+              (Term.app2 (Term.dist i) y z) (Term.app2 (Term.dist i) x z))
+            (Term.app2 (Term.dist i) x y)) :=
+  let dyx : Term F Γ (realTy ι) := Term.app2 (Term.dist i) y x
+  let dxy : Term F Γ (realTy ι) := Term.app2 (Term.dist i) x y
+  let w : Term F Γ (realTy ι) :=
+    Term.app2 Term.sub_R (Term.app2 (Term.dist i) y z) (Term.app2 (Term.dist i) x z)
+  by
+  pmode
+  papply (le_R_trans_core w dyx dxy)
+  psplit
+  · pthm (dist_rev_tri i y x z)
+  · papply (le_R_of_eq_R_core dyx dxy)
+    pthm (Derivable.dist_comm i y x)
+
+/-- **The reverse triangle inequality, absolute form**: `⊢ |d(x,z) −ℝ d(y,z)|ℝ ≤ℝ d(x,y)`.
+The two orientations, with `−ℝ (d(x,z) −ℝ d(y,z)) =ℝ d(y,z) −ℝ d(x,z)` (`neg_sub_R_core`)
+bridging the second, fed to `abs_R_le_of_le_le_core`. -/
+def dist_rev_tri_abs {Γ : Ctx ι} (i : ι) (x y z : Term F Γ (Ty.base i)) :
+    Derivable F al Premises
+      (le_R (.app Term.abs_R (Term.app2 Term.sub_R
+              (Term.app2 (Term.dist i) x z) (Term.app2 (Term.dist i) y z)))
+            (Term.app2 (Term.dist i) x y)) :=
+  let dxz : Term F Γ (realTy ι) := Term.app2 (Term.dist i) x z
+  let dyz : Term F Γ (realTy ι) := Term.app2 (Term.dist i) y z
+  let dxy : Term F Γ (realTy ι) := Term.app2 (Term.dist i) x y
+  let w : Term F Γ (realTy ι) := Term.app2 Term.sub_R dxz dyz
+  by
+  pmode
+  papply (abs_R_le_of_le_le_core w dxy)
+  psplit
+  · pthm (dist_rev_tri i x y z)
+  · papply (le_R_trans_core (.app Term.neg_R w) (Term.app2 Term.sub_R dyz dxz) dxy)
+    psplit
+    · papply (le_R_of_eq_R_core (.app Term.neg_R w) (Term.app2 Term.sub_R dyz dxz))
+      pthm (neg_sub_R_core dxz dyz)
+    · pthm (dist_rev_tri' i x y z)
+
 -- Axiom hygiene: base-type equality is an equivalence, with nothing assumed.
 #print axioms eqAtType_refl_base
 #print axioms eqAtType_sym_base
 #print axioms eqAtType_trans_base
 #print axioms dist_nonneg
 #print axioms dist_tri_chain
+#print axioms dist_rev_tri
+#print axioms dist_rev_tri'
+#print axioms dist_rev_tri_abs
 
 end Metatheorems

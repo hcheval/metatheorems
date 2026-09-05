@@ -39,8 +39,10 @@ import Metatheorems.ProofMode.Examples
 import Metatheorems.ProofMode.Arith
 import Metatheorems.ProofMode.Rewrite
 import Metatheorems.MCTStatement
+import Metatheorems.RealMCTStatement
 import Metatheorems.ProofMode.MCT
 import Metatheorems.ProofMode.MCTLazy
+import Metatheorems.ProofMode.RealMCT
 import Metatheorems.Probes.P1
 import Metatheorems.Probes.R1
 import Metatheorems.Probes.RwBase

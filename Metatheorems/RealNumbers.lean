@@ -17,6 +17,7 @@ import Metatheorems.RealNumbers.Order
 import Metatheorems.RealNumbers.LeOrder
 import Metatheorems.RealNumbers.Metric
 import Metatheorems.RealNumbers.Interval
+import Metatheorems.RealNumbers.MCTLemmas
 
 /-!
 # Real Numbers in WE-HA^{ω} — umbrella module
@@ -210,5 +211,42 @@ namespace Metatheorems
 #print axioms le_R_add_mono_r_core
 #print axioms le_R_add_mono_l_core
 #print axioms le_R_add_mono_core
+-- Subtraction (2026-09-05): the ℝ content of the reverse triangle inequality
+-- (`BaseEquality.dist_rev_tri`). Tight as a direct estimate, but *no new estimate* — right
+-- monotonicity, then the cancellation `(g +ℝ h) +ℝ (−ℝ h) ≤ℝ g`, chained by `le_R_trans_core`;
+-- the two `=ℝ` facts hold on the nose at every index.
+#print axioms sub_R_eq_add_neg_R_core
+#print axioms neg_sub_R_core
+#print axioms add_neg_cancel_le_R_core
+#print axioms le_sub_R_of_le_add_core
+#print axioms abs_R_le_of_le_le_core
+-- The ℝ-MCT assembly (`RealNumbers/MCTLemmas.lean`, 2026-09-05): constants, cancellation,
+-- absolute value, the sample lower bound, the window drop, transport along ℕ-equalities and
+-- the antitone chain over ℝ — everything `ProofMode/RealMCT.lean` consumes. All algebra over
+-- `LeOrder.lean`; no new estimate.
+#print axioms sub_Q_nonpos_of_le
+#print axioms lt_pow2neg_of_le
+#print axioms le_Q_add_of_le_sub
+#print axioms const_R_mono
+#print axioms const_R_le_add
+#print axioms const_R_le_sub
+#print axioms zero_lt_const_R
+#print axioms zero_lt_pow2neg_R
+#print axioms le_abs_R
+#print axioms neg_le_abs_R
+#print axioms neg_R_nonpos_of_nonneg
+#print axioms abs_R_le_self_of_nonneg
+#print axioms le_R_zero_add
+#print axioms le_add_sub_R
+#print axioms add_sub_cancel_le_R_core
+#print axioms le_add_neg_cancel_R
+#print axioms le_R_add_cancel_r_core
+#print axioms sub_R_nonneg_of_le
+#print axioms le_add_of_sub_le
+#print axioms le_add_of_abs_sub_le
+#print axioms const_le_R_of_sample
+#print axioms window_drop
+#print axioms ProofMode.le_R_app_congr_l
+#print axioms ProofMode.antitone_chain_R
 
 end Metatheorems
