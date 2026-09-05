@@ -893,6 +893,26 @@ def negTrans_beta_eq
       (eqAtType τ (Term.app (Term.lam body) u) (Term.subst0 body u)).negTrans :=
   negTrans_pu_axiom (eqAtType_isPU τ _ _) (.beta_eq body u)
 
+-- ── Product β/η — the `beta_eq` family, same `negTrans_pu_axiom` route ──────
+
+def negTrans_pair_fst
+    {Γ : Ctx ι} {ρ τ : Ty ι} {a : Term F Γ ρ} {b : Term F Γ τ} :
+    Derivable F Allowed.nt_target Premises
+      (eqAtType ρ (Term.fst (Term.mkPair a b)) a).negTrans :=
+  negTrans_pu_axiom (eqAtType_isPU ρ _ _) (.pair_fst a b)
+
+def negTrans_pair_snd
+    {Γ : Ctx ι} {ρ τ : Ty ι} {a : Term F Γ ρ} {b : Term F Γ τ} :
+    Derivable F Allowed.nt_target Premises
+      (eqAtType τ (Term.snd (Term.mkPair a b)) b).negTrans :=
+  negTrans_pu_axiom (eqAtType_isPU τ _ _) (.pair_snd a b)
+
+def negTrans_pair_eta
+    {Γ : Ctx ι} {ρ τ : Ty ι} {p : Term F Γ (Ty.prod ρ τ)} :
+    Derivable F Allowed.nt_target Premises
+      (eqAtType (Ty.prod ρ τ) (Term.mkPair (Term.fst p) (Term.snd p)) p).negTrans :=
+  negTrans_pu_axiom (eqAtType_isPU (Ty.prod ρ τ) _ _) (.pair_eta p)
+
 -- ── The pseudometric axioms ─────────────────────────────────────────────────
 -- All three are Π⁰₁ (`eq_R` and `le_R_pu` are `∀n. QF` by construction), so each is an
 -- instance of `negTrans_pu_axiom` exactly like `rec_zero`/`rec_succ`/`beta_eq` above.
@@ -1143,6 +1163,9 @@ def negTrans_sound {Γ : Ctx ι} {A : Formula F Γ}
   | .rec_zero              => negTrans_rec_zero
   | .rec_succ              => negTrans_rec_succ
   | .beta_eq body u        => negTrans_beta_eq
+  | .pair_fst a b          => negTrans_pair_fst
+  | .pair_snd a b          => negTrans_pair_snd
+  | .pair_eta p            => negTrans_pair_eta
   | .dist_self i x         => negTrans_dist_self i x
   | .dist_comm i x y       => negTrans_dist_comm i x y
   | .dist_tri i x y z      => negTrans_dist_tri i x y z

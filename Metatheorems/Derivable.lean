@@ -163,6 +163,21 @@ inductive Derivable {ι κ : Type} (F : κ → Ty ι)
                    Derivable F allowed Premises
       (eqAtType τ (Term.app (Term.lam body) u) (Term.subst0 body u))
 
+  -- Product β/η-equality (for the primitive `mkPair`/`fst`/`snd`; added 2026-09-05).
+  -- Same family as `beta_eq`: the two sides have definitionally equal interpretations,
+  -- so every pass over `Derivable` handles them with the line `beta_eq` uses. Without them
+  -- `fst (mkPair a b) =_ρ a` was underivable — the wall `general_metatheorem_classical`'s
+  -- `∃u∃v` collapse and `Probes/ConjBoundDemo.lean`'s nested existentials both hit.
+  | pair_fst     : (a : Term F Γ ρ) → (b : Term F Γ τ) →
+                   Derivable F allowed Premises
+      (eqAtType ρ (Term.fst (Term.mkPair a b)) a)
+  | pair_snd     : (a : Term F Γ ρ) → (b : Term F Γ τ) →
+                   Derivable F allowed Premises
+      (eqAtType τ (Term.snd (Term.mkPair a b)) b)
+  | pair_eta     : (p : Term F Γ (Ty.prod ρ τ)) →
+                   Derivable F allowed Premises
+      (eqAtType (Ty.prod ρ τ) (Term.mkPair (Term.fst p) (Term.snd p)) p)
+
   -- Recursor (§9.6, eq. 9.54)
   | rec_zero     : Derivable F allowed Premises
       (eqAtType ρ (Term.app3 (Term.prec ρ) y z Term.zero) y)
@@ -285,6 +300,9 @@ def Derivable.castAllowed {ι κ : Type} {F : κ → Ty ι}
   | .succ_ne_zero     => .succ_ne_zero
   | .succ_inj         => .succ_inj
   | .beta_eq b u      => .beta_eq b u
+  | .pair_fst a b     => .pair_fst a b
+  | .pair_snd a b     => .pair_snd a b
+  | .pair_eta p       => .pair_eta p
   | .rec_zero         => .rec_zero
   | .rec_succ         => .rec_succ
   | .dist_self i x    => .dist_self i x

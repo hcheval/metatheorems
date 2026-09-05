@@ -694,6 +694,10 @@ def dialectica_soundness_ctx' {Γ : Ctx ι} {A : Formula F Γ}
   | .beta_eq body u => fun env =>
       eqAtType_from_semEq si eqxi _ _ _ env (by
         simp [Term.interpret, Term.interpret_subst0])
+  -- Product β/η: the `beta_eq` family, with definitionally equal sides.
+  | .pair_fst a b => fun env => eqAtType_from_semEq si eqxi _ _ _ env rfl
+  | .pair_snd a b => fun env => eqAtType_from_semEq si eqxi _ _ _ env rfl
+  | .pair_eta p   => fun env => eqAtType_from_semEq si eqxi _ _ _ env rfl
   -- The pseudometric axioms. `dist_self` is `eqAtType (.base i) x x` — literally `eq_R
   -- (d x x) 0ℝ` — so `realize` at the reflexive instance covers it. The other two are not of
   -- that shape. `EqXInterp` owes only the two *model facts* `dist_comm_holds`/

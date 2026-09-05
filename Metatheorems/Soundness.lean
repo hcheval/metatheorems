@@ -18,7 +18,8 @@ hypotheses (section `variable`s, so that the recursion re-applies them automatic
 
 * `hprem`       — every premise is true in the model.  Forced by `Derivable.premise`.
 * `hdist_self`  — `d_i(x,x) =ℝ 0ℝ`.  Forced by `Derivable.dist_self`, and *also* by
-                  `beta_eq`, `rec_zero`, `rec_succ` and `qfer`, all of which assert an
+                  `beta_eq`, `pair_fst`/`pair_snd`/`pair_eta`, `rec_zero`, `rec_succ` and
+                  `qfer`, all of which assert an
                   `eqAtType` between two terms with equal interpretations; at a base type
                   `eqAtType` is `d_i(·,·) =ℝ 0ℝ`, so reflexivity of `=_X` is exactly this
                   model fact.  (This is the obstruction `Probes/SoundnessProbe.lean`
@@ -303,6 +304,17 @@ theorem soundness {Γ : Ctx ι} {A : Formula F Γ}
     intro env
     refine interp_eqAtType_of_interp_eq si hdist_self _ _ _ _ env ?_
     simp only [Term.interpret, Term.interpret_subst0]
+  -- product β/η: the two sides' interpretations are definitionally equal
+  -- (`(a,b).1 ≡ a`, and `Prod` η is definitional for structures)
+  | pair_fst a b =>
+    intro env
+    exact interp_eqAtType_of_interp_eq si hdist_self _ _ _ _ env rfl
+  | pair_snd a b =>
+    intro env
+    exact interp_eqAtType_of_interp_eq si hdist_self _ _ _ _ env rfl
+  | pair_eta p =>
+    intro env
+    exact interp_eqAtType_of_interp_eq si hdist_self _ _ _ _ env rfl
   | rec_zero =>
     intro env
     refine interp_eqAtType_of_interp_eq si hdist_self _ _ _ _ env ?_
