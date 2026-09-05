@@ -952,6 +952,22 @@ def sBetaEq {ρ τ : Ty ι} {body : Term F (ρ :: Γ) τ} {u : Term F Γ ρ} :
     SRealizer si (eqAtType τ (Term.app (.lam body) u) (Term.subst0 body u)) :=
   sEqAtType eqxi τ _ _ (fun _ => by simp [Term.interpret, Term.interpret_subst0])
 
+/-- Product β, first projection. The `beta_eq` family: the two sides' interpretations are
+definitionally equal (`(⟦a⟧,⟦b⟧).1 ≡ ⟦a⟧`), so the semantic equation is `rfl`. -/
+def sPairFst {ρ τ : Ty ι} {a : Term F Γ ρ} {b : Term F Γ τ} :
+    SRealizer si (eqAtType ρ (Term.fst (Term.mkPair a b)) a) :=
+  sEqAtType eqxi ρ _ _ (fun _ => rfl)
+
+/-- Product β, second projection. -/
+def sPairSnd {ρ τ : Ty ι} {a : Term F Γ ρ} {b : Term F Γ τ} :
+    SRealizer si (eqAtType τ (Term.snd (Term.mkPair a b)) b) :=
+  sEqAtType eqxi τ _ _ (fun _ => rfl)
+
+/-- Product η. `Prod` η is definitional for structures, so `(⟦p⟧.1, ⟦p⟧.2) ≡ ⟦p⟧`. -/
+def sPairEta {ρ τ : Ty ι} {p : Term F Γ (Ty.prod ρ τ)} :
+    SRealizer si (eqAtType (Ty.prod ρ τ) (Term.mkPair (Term.fst p) (Term.snd p)) p) :=
+  sEqAtType eqxi (Ty.prod ρ τ) _ _ (fun _ => rfl)
+
 /-- Reflexivity of the base-type distance. `eqAtType (.base i) x x` *is*
 `eq_R (d x x) 0ℝ`, so this is `sEqAtType` at the reflexive instance — no new hypothesis. -/
 def sDistSelf (i : ι) (x : Term F Γ (Ty.base i)) :
@@ -1589,6 +1605,9 @@ def syntactic_soundness (eqxi : EqXInterp X F si)
   | _, _, .rec_zero        => sRecZero eqxi
   | _, _, .rec_succ        => sRecSucc eqxi
   | _, _, .beta_eq _ _     => sBetaEq eqxi
+  | _, _, .pair_fst _ _    => sPairFst eqxi
+  | _, _, .pair_snd _ _    => sPairSnd eqxi
+  | _, _, .pair_eta _      => sPairEta eqxi
   | _, _, .dist_self i x   => sDistSelf eqxi i x
   | _, _, .dist_comm i x y => sDistComm eqxi i x y
   | _, _, .dist_tri i x y z => sDistTri eqxi i x y z
@@ -1643,11 +1662,14 @@ def extractTerm (sp : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B
   | _, _, .univ_gen h'      => wtUnivGen _ (extractTerm sp h')
   | _, _, .succ_ne_zero     => wtSuccNeZero
   | _, _, .succ_inj         => wtSuccInj
-  -- the four "equality" rules and the two pseudometric ones are purely universal, so their
+  -- the seven "equality" rules and the two pseudometric ones are purely universal, so their
   -- realizing term is the information-free default (`sEqAtType_val`, `srealizer_of_pu_val`)
   | _, _, .rec_zero         => defaultWTerm _
   | _, _, .rec_succ         => defaultWTerm _
   | _, _, .beta_eq _ _      => defaultWTerm _
+  | _, _, .pair_fst _ _     => defaultWTerm _
+  | _, _, .pair_snd _ _     => defaultWTerm _
+  | _, _, .pair_eta _       => defaultWTerm _
   | _, _, .dist_self _ _    => defaultWTerm _
   | _, _, .dist_comm _ _ _  => defaultWTerm _
   | _, _, .dist_tri _ _ _ _ => defaultWTerm _
@@ -1712,6 +1734,9 @@ theorem extractTerm_eq (eqxi : EqXInterp X F si)
   | _, _, .rec_zero         => sEqAtType_val eqxi _ _ _ _
   | _, _, .rec_succ         => sEqAtType_val eqxi _ _ _ _
   | _, _, .beta_eq _ _      => sEqAtType_val eqxi _ _ _ _
+  | _, _, .pair_fst _ _     => sEqAtType_val eqxi _ _ _ _
+  | _, _, .pair_snd _ _     => sEqAtType_val eqxi _ _ _ _
+  | _, _, .pair_eta _       => sEqAtType_val eqxi _ _ _ _
   | _, _, .dist_self _ _    => sEqAtType_val eqxi _ _ _ _
   | _, _, .dist_comm _ _ _  => srealizer_of_pu_val _ _ _ _
   | _, _, .dist_tri _ _ _ _ => srealizer_of_pu_val _ _ _ _
