@@ -13,6 +13,8 @@ import Metatheorems.SyntacticMetatheorem
 import Metatheorems.Dialectica.Monotone
 import Metatheorems.Dialectica.MonotoneMemo
 import Metatheorems.Dialectica.MonotoneND
+import Metatheorems.Dialectica.MfiMemoAttr
+import Metatheorems.Dialectica.MonotoneSeq
 import Metatheorems.MonotoneMetatheorem
 import Metatheorems.MonotoneMetatheoremClassical
 import Metatheorems.RealNumbers
