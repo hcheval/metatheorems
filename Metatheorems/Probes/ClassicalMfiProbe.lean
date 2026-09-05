@@ -121,14 +121,21 @@ classical `syllogism` is three `MRealizer.syllogism`s (counter side uses `hAB` 3
 depths — ARCHITECTURE §14.2's "MFI does not remove composition's duplication; on paper it is
 free because terms are DAGs by notation" hitting at k ≈ 8, and `prenexify` has 134.
 
-**Next step** (not started): (1) `#eval` the same projections — hat-level ℕ values, NOT a
-composed `Term.interpret`, so hard rule 3 does not apply — to get the numbers with compiler
-trust (the evaluator shares by pointer); a first attempt (`proj 8/32/128` and the four gate
-values in one file) exceeded a 10-minute cap, so run ONE at a time with `timeout` and report
-which sizes finish; (2) if the numbers are wanted kernel-checked, the classical route needs a
-majorant representation with explicit sharing (`let`-bound sub-majorants evaluated once —
-Lane D1's memo direction), not more hand-writing: with the leaves gone, nothing per node is
-left to hand-write.
+**Compiled evaluator (`#eval` of the hat-level ℕ projection — not a composed
+`Term.interpret`, so hard rule 3 does not apply): ALSO NEGATIVE beyond k = 2.** Same synthetic
+chain, one value per run, `timeout` per run: k=0 → `5` (22 s wall, all olean loading),
+k=2 → `5` (17 s wall, same), k=3 → **no result in 400 s**, k=4 → **no result in 240 s**, the
+`lean` process at 100 % CPU throughout (CPU time = elapsed, RSS flat at the 6.1 GB of mmapped
+oleans — compute-bound, not memory-bound, not a hang). The evaluator is call-by-value and
+shares *values* by pointer but re-evaluates every *application* `hAB.val n e` at every call
+site inside the composed counter-side closures, so the same fan-out that is ×5 per syllogism
+in the kernel is far steeper in the interpreter. The gate values on `lFinalNoLem`/`lFinalLem`
+(134 nested `syllogism`s from `prenexify`) were therefore not attempted on the evaluator.
+
+**Next step** (not started): the classical route needs a majorant representation with
+explicit sharing — `let`-bound sub-majorants evaluated once, Lane D1's memo direction — not
+more hand-writing: with the leaves gone, nothing per node is left to hand-write, and both
+the kernel and the evaluator die on the same nesting.
 -/
 
 /-!
@@ -144,19 +151,21 @@ And **NT-stability is gone**: `monotone_nd_soundness`'s premise case takes an `M
 the translated premise directly, so no `NTStableD` argument appears anywhere on this route
 (`lNts` is unused by it).
 
-**Gate G-C1 / G-C2 (reduce to a numeral): NEGATIVE — kernel `std::bad_alloc` at 12 GB.**
-The fused recursion removes negTrans_sound's blow-up, but the classical bound's kernel
-REDUCTION still exhausts 12 GB — now dominated by `prenexify` (347 constructors, with LEM) plus
-the `¬¬`-combinator leaves `monotone_nd_soundness` inserts (`neg_neg_mp`, `neg_neg_imp_rev`,
-`nn_all_nn`, …), each realized by `syntactic_soundness` of a fixed combinator. So MFI moved the
-OOM from elaboration (term route, `#eval`/reduction of the 85k term) to a *different* kernel
-reduction, and did not make the classical numeral reducible by bare `kernel_rfl`.
+**Gate G-C1 / G-C2 (reduce to a numeral): NEGATIVE — kernel `std::bad_alloc` at 12 GB
+(65 s wall, 25 s user: memory-bound).** The fused recursion removes negTrans_sound's blow-up,
+but the classical bound's kernel REDUCTION still exhausts 12 GB, and did not make the classical
+numeral reducible by bare `kernel_rfl`.
 
-**Localised.** The difference is exactly `prenexify` + the NT layer, NOT MFI itself:
-`CGate.extR = monotone_soundness … lFinalExt` — the SAME derivation at `Allowed.extended`, MFI,
-**no prenexify, no NT** — reduces to `U = 0`, `V = 5` by `kernel_rfl` in ≈17 s (`extU5`,
-`extV5` below, both PASS). The classical route's OOM is the prenexify+NT reduction, not the
-monotone interpretation, which is the same conclusion part C0 reached for the term route.
+**Localised — corrected in the second pass.** The FIRST pass attributed the OOM to "`prenexify`
+plus the `¬¬`-combinator leaves realized by `syntactic_soundness`". That was not tested before
+being written; the second pass hand-wrote every per-node leaf (`MonotoneNDLeaves.lean`) and the
+OOM is unchanged, so the leaves were NOT the cause. What the measurements support (STATUS block
+above): `lFinalNoLem` alone through the fused recursion reduces (37 ms); `prenexify` alone OOMs;
+a bare chain of k classical `syllogism`s grows ≈ ×5 per syllogism and OOMs at k = 8. The wall is
+the nesting depth of `prenexify`'s 134 `syllogism`s under the `¬¬`-combinators' counter sides.
+The control still stands: `CGate.extR = monotone_soundness … lFinalExt` — the SAME derivation at
+`Allowed.extended`, MFI, **no prenexify, no NT** — reduces to `U = 0`, `V = 5` by `kernel_rfl`
+in ≈17 s (`extU5`, `extV5` below, both PASS).
 
 **Reproduction of the OOM (kept out of the file — a file of errors is not a green build):**
 
@@ -171,10 +180,9 @@ monotone interpretation, which is the same conclusion part C0 reached for the te
     -- is the same: type-checks, reduction OOMs. Excluded-middle is invisible under the prenexify
     -- cost, exactly as `LemBoundDemo` found for the term route.
 
-The next step, out of scope here (brief: do not start the fused NT+MFI simp programme), is a
-`monotone_nd_soundness`-commutation simp set (the `MonotoneMemo`/`wit_seq_*` idea one layer
-down) so the leaves are rewritten rather than reduced — the only route that has produced a
-numeral from a large term in this project (`seq_mp_11_numeral`).
+The next step is stated in the STATUS block above (a shared/memoised majorant representation);
+a `monotone_nd_soundness`-commutation simp set, the first pass's suggestion, would rewrite
+leaves that no longer exist.
 -/
 
 open LemBoundDemo (lFinalExt)

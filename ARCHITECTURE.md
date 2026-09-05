@@ -926,8 +926,11 @@ the NT-stability condition disappears.** §14.5 listed "the classical route's ×
 the interpretation." Lane C makes that fix: `Dialectica/MonotoneND.lean`'s `monotone_nd_soundness`
 interprets a **classical** derivation directly into `MRealizer cm Aᴺᵀ`, so the 85,180-node
 `negTrans_sound` output is never built. The recursion mirrors `negTrans_sound` arm for arm: the
-fixed `¬¬`-combinators it inlines per node are **leaves** (`leafM = ofSRealizer ∘
-syntactic_soundness`), recursive results compose with Lane A's `MRealizer.mp`/`.syllogism`/… ,
+fixed `¬¬`-combinators it inlines per node are **hand-written monotone realizers**
+(`Dialectica/MonotoneNDLeaves.lean`: `dnnIntroF`, `nnMpF`, `nnImpRevF`, `expF`, `impF`,
+`expansionF`, `dnnLemF`, `nnAllNnF`; explicit hat-level majorants, `Prop` halves by the
+`maj_auto` dispatcher — `leafM = ofSRealizer ∘ syntactic_soundness` remains only for axiom
+terms), recursive results compose with Lane A's `MRealizer.mp`/`.syllogism`/… ,
 and the eigenvariable/QF-ER/induction cases go through `MRealizer.forallRule`/`existRule`/
 `univGen`/`qfer`/`induction` (`ndForallRule`/…/`ndInduction`). The consequence worth keeping:
 **NT-stability vanishes.** `negTrans_sound` needs `nts : NTStableD Premises` because its premise
@@ -942,12 +945,19 @@ existing `spremise` through `negTrans_iff_pu`, so the space models add nothing.
 `metatheorem_core_of_majorants_at`, SAME statement as the term-route classical metatheorem, all
 `[propext, Classical.choice, Quot.sound]`, no `sorryAx`. So the classical bound no longer OOMs
 at ELABORATION. **But the numeral REDUCTION still OOMs** (gate G-C1/G-C2, `Probes/ClassicalMfiProbe.lean`):
-`std::bad_alloc` at 12 GB, now dominated by `prenexify` (347 constructors, LEM) + the
-`¬¬`-combinator leaves, not by `negTrans_sound`. Localised exactly: the same 12-node derivation
-at `Allowed.extended` under MFI, *without* prenexify/NT, reduces to `U=0`, `V=5` in ≈17 s
-(`extU5`/`extV5`, PASS). MFI thus moved the classical OOM from elaboration to a *different*
-kernel reduction; making the classical numeral reduce needs a `monotone_nd_soundness`-commutation
-simp set (the `MonotoneMemo`/`wit_seq_*` idea one layer down), the new "out of scope".
+`std::bad_alloc` at 12 GB. The first pass attributed this to "`prenexify` + the `¬¬`-combinator
+leaves"; hand-writing every leaf left the OOM unchanged, so that was wrong. Measured with the
+leaves hand-written: `lFinalNoLem` alone through the fused recursion reduces in 37 ms;
+`prenexify` alone (134 `syllogism`s) OOMs; a bare chain of k classical `syllogism`s grows ≈ ×5
+per syllogism (k=2 140 ms, k=4 3.7 s, k=8 OOM). The wall is §14.2's own caveat — MFI does not
+remove composition's duplication — realised as the counter-side fan-out of nested `syllogism`s
+under the `¬¬`-combinators, with kernel `whnf` sharing nothing across binder depths. The
+compiled evaluator (`#eval` of the hat-level ℕ) hits the same wall earlier (k ≤ 2 instant,
+k=3 no result in 400 s, CPU-bound), because call-by-value shares values, not the re-evaluated
+applications inside composed closures. Control: the same 12-node derivation at
+`Allowed.extended` under MFI, *without* prenexify/NT, reduces to `U=0`, `V=5` in ≈17 s
+(`extU5`/`extV5`, PASS). Making the classical numeral reduce needs a majorant representation
+with explicit sharing (Lane D1's memo direction), the new "out of scope".
 
 ### 14.6 What this does to earlier decisions
 
