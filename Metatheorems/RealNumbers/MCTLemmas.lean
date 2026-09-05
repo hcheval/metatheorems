@@ -4,9 +4,15 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Horatiu
 -/
 import Metatheorems.RealNumbers.LeOrder
-import Metatheorems.ProofMode.Arith
 
 namespace Metatheorems
+
+/-! **No `import Metatheorems.ProofMode.Arith` here.** That module declares the *global*
+notations `S`, `+ᵗ`, `∸ᵗ`, `*ᵗ`, `pdᵗ`; importing it from a module below the `RealNumbers`
+umbrella leaks them into every importer of the umbrella, and `MetricSpaces.lean` uses `S` as
+an identifier (found 2026-09-05: the full build broke at `MetricSpaces.lean:717` with
+"unexpected token 'S'"). So this file spells `S t` as `.app .succ t`, `s +ᵗ t` as
+`Term.app2 Term.add s t`, and carries its own copy of `anorm_cons`'s rule list (`mcons`). -/
 
 /-!
 # The ℝ lemmas the ℝ-MCT derivation needs (`REAL_MCT.md` §5, revised)
@@ -213,9 +219,21 @@ rename push/fold pair, and a `_weaken'` cleanup for every closed constant the de
 mentions. The goal is that a hypothesis weakened by `pforall` and a lemma instance elaborated
 with the weakening *coercion* agree syntactically, so `pexact` never has to unfold a closed
 constant under a rename (CLAUDE.md trap 12). `∀`-hypotheses keep their `weakenBy` wrapper,
-which is what `pspecialize`/`pinst` match on. -/
+which is what `pspecialize`/`pinst` match on.
+
+`mcons` is `ProofMode.Arith`'s `anorm_cons`, copied verbatim (that module cannot be imported
+here; see the note at the top of the file). -/
+macro "mcons" : tactic =>
+  `(tactic| simp only [
+      Formula.subst0_renameF_ext, Formula.substF_subst0_map_renameF_ext,
+      Formula.substF_cons_renameF_ext,
+      Term.subst_subst0_map_rename_ext, Term.subst_cons_rename_ext,
+      Term.subst_cons_weaken, Term.Subst.cons_vz, Term.Subst.cons_vs,
+      Term.rename_comp, Term.rename_shift, Term.Renaming.comp_apply,
+      Term.Renaming.shift])
+
 macro "mnorm" : tactic =>
-  `(tactic| (try anorm_cons
+  `(tactic| (try mcons
              simp only [List.map_cons, List.map_nil, le_R_substF, const_R_subst,
                Formula.subst0, Formula.substVar0, Formula.substF, Formula.neg,
                Term.subst, Term.subst0_map_vz, Term.subst0_map_vs,
@@ -233,7 +251,7 @@ macro "mnorm" : tactic =>
                lt_Q_dec_weaken', sub_Q_weaken', add_Q_weaken', mul_Q_weaken',
                encode_nat_Q_weaken', exp2_weaken', add_weaken', zero_R_weaken, one_R_weaken',
                const_R_weaken, zero_Q_weaken', one_Q_weaken']
-             try anorm_cons))
+             try mcons))
 
 -- ── ℚ helpers ───────────────────────────────────────────────────────────────
 
@@ -627,15 +645,15 @@ transport (`le_R_app_congr_l`) where the ℕ proof could `prw`. -/
 def antitone_chain_R (a : Term F Γ (Ty.nat →ₜ realTy ι)) :
     Derivable F al Premises (Γ := Γ)
       (Formula.all Ty.nat (Formula.all Ty.nat
-        (Formula.all Ty.nat (le_R (a ⬝ (S x₂)) (a ⬝ x₂)) →ᶠ
-         le_R (a ⬝ (x₁ +ᵗ x₀)) (a ⬝ x₁)))) := by
+        (Formula.all Ty.nat (le_R (a ⬝ (Term.app .succ x₂)) (a ⬝ x₂)) →ᶠ
+         le_R (a ⬝ (Term.app2 Term.add x₁ x₀)) (a ⬝ x₁)))) := by
   pmode
   pinduction
   · -- i = 0 : a (m + 0) ≤ a m, by transport from a m ≤ a m
     mnorm
     pforall
     pintro hmono
-    papply (le_R_app_congr_l a x₀ (x₀ +ᵗ Term.zero) (a ⬝ x₀))
+    papply (le_R_app_congr_l a x₀ (Term.app2 Term.add x₀ Term.zero) (a ⬝ x₀))
     · psym
       pthm (add_zero_r x₀)
     · pthm (le_R_refl_core (a ⬝ x₀))
@@ -645,12 +663,14 @@ def antitone_chain_R (a : Term F Γ (Ty.nat →ₜ realTy ι)) :
     pforall
     pintro hmono
     -- a (m + S i) = a (S (m + i)) ≤ a (m + i) ≤ a m
-    papply (le_R_app_congr_l a (S (x₁ +ᵗ x₀)) (x₁ +ᵗ S x₀) (a ⬝ x₁))
+    papply (le_R_app_congr_l a (Term.app .succ (Term.app2 Term.add x₁ x₀))
+      (Term.app2 Term.add x₁ (Term.app .succ x₀)) (a ⬝ x₁))
     · psym
       pthm (add_succ x₁ x₀)
-    · papply (le_R_trans_core (a ⬝ (S (x₁ +ᵗ x₀))) (a ⬝ (x₁ +ᵗ x₀)) (a ⬝ x₁))
+    · papply (le_R_trans_core (a ⬝ (Term.app .succ (Term.app2 Term.add x₁ x₀)))
+        (a ⬝ (Term.app2 Term.add x₁ x₀)) (a ⬝ x₁))
       psplit
-      · pinst hmono (x₁ +ᵗ x₀) with hm
+      · pinst hmono (Term.app2 Term.add x₁ x₀) with hm
         mnorm
         pexact hm
       · pspecialize ih with ihm

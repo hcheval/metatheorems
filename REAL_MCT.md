@@ -251,6 +251,65 @@ the object-level statement produces. The P2ℝ descent of §3 has budget `2^{k+1
 above sharp — because its QF dichotomy certifies a good window at `< 7·2^{-(k+3)}` and a bad one
 at `> 5·2^{-(k+3)}`, and the budget unit `2^{-(k+1)}` is the dyadic that fits under `5/8`.
 
+## 8. The derivation exists (2026-09-05, branch `real-mct-proof`) — what the plan got right and wrong
+
+**Status.** `ProofMode/RealMCT.lean`: `real_mct_p2 : Derivable F al Premises (Γ := []) rmStatement`
+at every `al`, `[propext, Quot.sound]`; `real_mct_bound_p2 := rmBound … (real_mct_p2 (al :=
+Allowed.extended))`, `[propext, Classical.choice, Quot.sound]`. No `sorry`, no hypothesis binder.
+The lemmas are `RealNumbers/MCTLemmas.lean` (in the umbrella, all `[propext, Quot.sound]`).
+`rmStatement` is untouched, so `rmC_implies`/`rmB_all_iff`/`real_mct_of_bound` apply as written.
+
+**Right:**
+- The shape (§3): budget induction on `j` with `A(j) ≡ H → ∀m (a m ≤ℝ ⟨j·2^{-(k+1)}⟩ → ∃n C n)`,
+  dichotomy by `qf_lem` on `rmC.subst0 m`, budget `2^{k+1}`, closing at `m := 0` from `a 0 ≤ℝ 1ℝ`.
+  `Allowed.extended` suffices; nothing classical, exactly as predicted.
+- P3.4's warning: `|w| ≤ℝ w` is proved from `abs_R_le_of_le_le_core` and `−w ≤ℝ 0 ≤ℝ w`, never
+  via `|w| =ℝ w`.
+- P3.6: cancellation `f +ℝ h ≤ℝ g +ℝ h → f ≤ℝ g` is algebra (`le_add_neg_cancel_R`,
+  `add_neg_cancel_le_R_core`), not an estimate. Likewise M5.
+- The `closed_subst` set does stop the delta-expansion: `leIdx` is kept *folded* under
+  substitution by `leIdx_substF`/`leIdx_renameF`/`leIdx_weakenBy`, and `rmC` at two different
+  `m`s in one sequent (IH at `m + g m`, goal at `m`) caused no trouble at all — the "budget a
+  day" warning did not materialise.
+
+**Wrong or revised:**
+- M2 `const_R_add/sub/congr` as `=ℝ` facts were not needed; the `≤` forms `const_R_le_add`,
+  `const_R_le_sub` (slack-free, `lt_pow2neg_of_le` at each index) are what the descent uses.
+- M3 is the `≤` form `le_add_of_abs_sub_le`, since `approx_le_R_core` already gives
+  `|f −ℝ ⟨f̂(n)⟩| ≤ℝ ⟨2^{-n}⟩`; `approx_R`'s strict form is never touched. P3.2–P3.3 collapse into
+  one lemma `const_le_R_of_sample : q +ℚ 2^{-n} ≤ℚ f̂(n) →ᶠ ⟨q⟩ ≤ℝ f`.
+- M7 `zero_le_const_R` is not needed; the base case needs the *other* direction `q_0 ≤ℝ 0ℝ`
+  (`budget_zero_R`, via `zero_R_eq_const` and `const_R_mono`) plus `0ℝ <ℝ ⟨2^{-(k+1)}⟩`
+  (`zero_lt_pow2neg_R`), since `ε ≤ℝ 0ℝ` *is* `¬(0ℝ <ℝ ε)`.
+- P2 as planned (bounding `|w|ℝ` by `0ℝ` at `j = 0`) was not written: the base case reuses the
+  same window lemma as the step and derives `⊥` from `ε ≤ℝ 0ℝ`. One window lemma, two callers.
+- M8 "the premise quantifier swap, trivial": there is no swap lemma; each use instantiates
+  `∀u ∀n` at the needed `u` and `n` directly (`pinst` twice) and projects.
+- The plan lists `P1 antitone_chain_R` as a copy of `antitone_chain`; the ℝ version needs a
+  new ingredient the ℕ one does not: `a (m + S i)` cannot be rewritten to `a (S (m + i))` by
+  `prw` inside a `le_R` (not an equation), so `le_R_app_congr_l : s =₀ t →ᶠ a s ≤ℝ g →ᶠ a t ≤ℝ g`
+  was needed (unpack the `¬∃`, `prwby` the equation in the QF witness).
+- Every lemma with a ℚ side condition arising inside a sequent had to be an object
+  implication: there is no derivation-weakening combinator, so a Lean-level `(h : Derivable … (le_Q p q))`
+  in `Γ` is unusable under the `∀n` of `le_R_of_all`.
+- The two "mechanical risks" of §3 were the wrong ones. What actually cost time: (i) the
+  `closed_subst` attribute set does **not** contain the ℝ constants (`abs_R`, `sub_R`, `add_R`,
+  `neg_R`, `zero_R`, `one_R` are `@[simp]` in `RealNumbers/Defs.lean` but not `closed_subst`-tagged),
+  so `anorm`/`canorm`-style normalisation leaves `Term.abs_R.subst σ` stuck — and the subsequent
+  `pexact` unfolds it (a `whnf` timeout, trap 12); (ii) `simp only` does not see hypotheses under
+  `List.map (Formula.weakenBy ρ) Δ` unless `List.map_cons` is in the set; (iii) a hypothesis
+  weakened by `pforall` (`weakenBy`) and a freshly elaborated lemma instance (coercions) place the
+  renamings around opaque parameters differently — `rename (ext shift) (weaken a)` vs
+  `weaken (weaken a)` — which is *not* definitional, so `rmnorm` pushes `weakenBy` through every
+  binder and folds with `rename_ext_weaken`, and instantiation at a bound variable is `pinst h xₖ`,
+  never `pspecialize`. The window lemma is stated `H →ᶠ ∀m (…)` and applied to `H` *before* the
+  `pforall` that would weaken it.
+- **A module below the `RealNumbers` umbrella must not import `ProofMode.Arith`.** Its notations
+  `S`, `+ᵗ`, `∸ᵗ`, `*ᵗ`, `pdᵗ` are global `syntax`, and `MetricSpaces.lean:717` has
+  `set S : ℕ → ℕ := …`; the first full build after `MCTLemmas.lean` imported `Arith` broke there
+  with "unexpected token 'S'". `MCTLemmas.lean` spells the constructors out and carries a copy of
+  `anorm_cons` (`mcons`); `ProofMode/RealMCT.lean` imports `Arith` like `ProofMode/MCT.lean` does.
+
 ## 7. Size and extraction prospects — qualitative only
 
 Do not run `derivSize` on any of this (it OOMs on the 15-line `le_R_of_all`; CLAUDE.md,

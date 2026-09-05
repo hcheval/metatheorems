@@ -12,7 +12,8 @@ import Metatheorems.ProofMode.Arith
 
 `RealMCTStatement.lean` fixes the statement
 
-    ∀ x^{(ℕ→ℝ) ×ₜ ((ℕ→ℕ) ×ₜ ℕ)} ( ∀u B(u,x) → ∃v C(v,x) ),      a := fst x, g := fst (snd x), k := snd (snd x)
+    ∀ x^{(ℕ→ℝ) ×ₜ ((ℕ→ℕ) ×ₜ ℕ)} ( ∀u B(u,x) → ∃v C(v,x) )
+                                  a := fst x, g := fst (snd x), k := snd (snd x)
 
     B(u,x) := ∀n ( a(n+1) ≤ℝ a n ∧ 0ℝ ≤ℝ a n ∧ a n ≤ℝ 1ℝ )      each read at Cauchy index u
     C(v,x) := leIdx |a v −ℝ a(v + g v)|ℝ ⟨2^{-(k+1)}⟩ℝ (k+2)     i.e. D̂(k+3) <ℚ 3·2^{-(k+2)}
@@ -341,7 +342,8 @@ def pow2neg_zero_eq (Γ : Ctx ι) :
       (Formula.eq0 (.app Term.pow2neg_Q Term.zero) Term.one_Q) :=
   let hpd : Derivable F al Premises (Γ := Γ)
       (Formula.eq0 (.app Term.pd (.app Term.exp2 Term.zero)) Term.zero) :=
-    qtrans (qfer_no_premise_nat_nf exp2_zero (r := .app Term.pd (.var .vz)) (by qb_nf; try rfl) (by qb_nf; try rfl))
+    qtrans (qfer_no_premise_nat_nf exp2_zero (r := .app Term.pd (.var .vz))
+        (by qb_nf; try rfl) (by qb_nf; try rfl))
       (pd_succ Term.zero)
   qtrans (pow2neg_Q_unfold Term.zero)
     (qfer_no_premise_nat_nf hpd (r := Term.app2 Term.pair (Term.ofNat 2) (.var .vz))
@@ -393,7 +395,8 @@ def one_R_le_budget (k : Term F Γ Ty.nat) :
         (const_R (Term.app2 Term.mul_Q (.app Term.encode_nat_Q (.app Term.exp2 (.app .succ k)))
           (.app Term.pow2neg_Q (.app .succ k))))) :=
   Eq.mpr (congrArg (fun z => Derivable F al Premises
-      (le_R z (const_R (Term.app2 Term.mul_Q (.app Term.encode_nat_Q (.app Term.exp2 (.app .succ k)))
+      (le_R z (const_R (Term.app2 Term.mul_Q
+        (.app Term.encode_nat_Q (.app Term.exp2 (.app .succ k)))
         (.app Term.pow2neg_Q (.app .succ k)))))) one_R_eq_const)
     (Derivable.mp (budget_top_Q k) (const_R_mono Term.one_Q _))
 
