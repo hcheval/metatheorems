@@ -586,66 +586,208 @@ elab "pthm " eStx:term : tactic => withMainContext do
   let eS ← Lean.Elab.Term.exprToSyntax (← instantiateMVars e)
   evalTactic (← `(tactic| exact pm_have $eS))
 
-/-- `papply h` uses the implicational hypothesis `h`, leaving its antecedents as goals.
+/-! ### `papply` — one `apply` for hypotheses and kernel theorems
 
-It peels as many arrows as it takes to reach the goal, so a hypothesis with several premises
-produces several subgoals, in order — the same way Lean's own `apply` does. -/
-elab "papply " h:ident : tactic => do
-  let args ← seqDGoalArgs "papply"
-  let goalF := args[8]!
-  let hyp ← hypFormula "papply" h.getId.toString
-  -- How many antecedents lie between `h` and the goal? Probed without committing to any
-  -- unification the probe happens to make.
-  let k? ← withoutModifyingState do
-    let mut cur ← whnfD hyp
-    for i in [0:16] do
-      if (← isDefEq cur goalF) then return some i
-      let cargs := cur.getAppArgs
-      unless cur.isAppOf ``Formula.imp && cargs.size == 6 do return none
-      cur ← whnfD cargs[5]!
-    return none
-  let some k := k? |
-    throwError "papply: `{h.getId}` does not conclude the goal.\n\
-      It is{indentExpr hyp}\nand the goal is{indentExpr goalF}"
-  if k == 0 then
-    evalTactic (← `(tactic| pexact $h))
-  else
-    let mut e ← `(by pexact $h)
-    for _ in [0:k] do e ← `(pm_mp $e ?_)
-    evalTactic (← `(tactic| refine $e))
+Rung 8 of `LADDER.md`. The rule is elaborated **once**, open, and its *conclusion* is unified
+with the goal — in the real metavariable context, so whatever that unification determines
+(implicit formula arguments, `_` placeholders) stays determined. The `pm_mp` chain is then
+built as an expression from the elaborated rule, never by re-elaborating the user's syntax.
+Before this the rule was elaborated, probed inside `withoutModifyingState` to count the
+antecedents, and then handed back as *syntax* to a `refine` that elaborated and unified it a
+second time. -/
+
+/-- `pm.papply.trace`: log, at each `papply`, which elaboration it took (open, or pinned
+behind `j` antecedent placeholders), which transparency the conclusion matched at, and how
+many antecedents were peeled. Measurement only; off by default. -/
+register_option pm.papply.trace : Bool := {
+  defValue := false
+  descr := "papply: report elaboration route, matching transparency and antecedent count"
+}
+
+/-- The name of a bare identifier, if the syntax is one. -/
+private def identName? (s : Syntax) : Option String :=
+  if s.isIdent then some s.getId.toString else none
+
+/-- `SeqD` at the goal's parameters, with formula `B`. -/
+private def mkSeqDAt (args : Array Expr) (B : Expr) : Expr :=
+  mkAppN (.const ``SeqD []) #[args[0]!, args[1]!, args[2]!, args[3]!, args[4]!, args[5]!,
+    args[6]!, args[7]!, B]
+
+/-- The implicit prefix `ι κ F a Premises Γ ns Δ` shared by `pm_have` and `pm_mp`, read off
+the goal's arguments `ι, κ, names, F, a, Premises, Γ, Δ, B`. -/
+private def pmPrefix (args : Array Expr) : Array Expr :=
+  #[args[0]!, args[1]!, args[3]!, args[4]!, args[5]!, args[6]!, args[2]!, args[7]!]
+
+/-- Expose an implication: as written, then at reducible transparency, then at default.
+Returns the antecedent, the consequent, and whether default transparency was needed. -/
+private def peelImp (e : Expr) : MetaM (Option (Expr × Expr × Bool)) := do
+  let imp? (e : Expr) : Option (Expr × Expr) :=
+    let e := e.consumeMData
+    if e.isAppOf ``Formula.imp && e.getAppNumArgs == 6 then
+      some (e.getArg! 4, e.getArg! 5) else none
+  if let some (A, B) := imp? e then return some (A, B, false)
+  if let some (A, B) := imp? (← whnfR e) then return some (A, B, false)
+  if let some (A, B) := imp? (← whnfD e) then return some (A, B, true)
+  return none
+
+/-- Run a unification attempt, keeping its assignments on success and dropping them on
+failure. Exceptions — a heartbeat timeout in particular — propagate: hiding one here would
+turn trap 12 into silence. -/
+private def tryDefEq (x : TacticM Bool) : TacticM Bool := do
+  let s ← saveState
+  if ← x then return true
+  s.restore
+  return false
+
+/-- Unify a candidate conclusion with the goal's formula. Reducible transparency first, which
+never unfolds a `Term` constant; default only as the fallback. -/
+private def matchGoal (cur goalF : Expr) : TacticM (Option TransparencyMode) := do
+  if ← tryDefEq (withReducible (isDefEq cur goalF)) then return some .reducible
+  if ← tryDefEq (isDefEq cur goalF) then return some .default
+  return none
+
+/-- What `papply` found: `k` antecedents `ants`, the formula `rests[i]` left after peeling `i`
+of them (`rests[0]` is the rule itself, `rests[k]` unifies with the goal), the transparency
+the match needed, and whether exposing an arrow ever needed default transparency. -/
+private structure ApplyPlan where
+  k : Nat
+  ants : Array Expr
+  rests : Array Expr
+  tm : TransparencyMode
+  peelDefault : Bool
+
+/-- Peel arrows off `T` until what is left unifies with the goal. -/
+private def planApply (T goalF : Expr) : TacticM (Option ApplyPlan) := do
+  let mut cur := T
+  let mut ants := #[]
+  let mut rests := #[T]
+  let mut peelDefault := false
+  for i in [0:16] do
+    if let some tm ← matchGoal cur goalF then
+      return some { k := i, ants, rests, tm, peelDefault }
+    let some (A, B, d) ← peelImp cur | return none
+    peelDefault := peelDefault || d
+    ants := ants.push A
+    rests := rests.push B
+    cur := B
+  return none
+
+/-- Close `goal` with `pm_mp (… (pm_mp base ?g₁) …) ?gₖ`, built as an expression, and return
+the antecedent goals `?g₁ … ?gₖ` in order. `base : SeqD … Δ rests[0]`. -/
+private def applyPlan (args : Array Expr) (goal : MVarId) (base : Expr) (plan : ApplyPlan) :
+    TacticM (List MVarId) := do
+  let pre := pmPrefix args
+  let tag ← goal.getTag
+  let mut t := base
+  let mut goals := #[]
+  for i in [0:plan.k] do
+    let A ← instantiateMVars plan.ants[i]!
+    let B ← instantiateMVars plan.rests[i + 1]!
+    let g ← mkFreshExprSyntheticOpaqueMVar (mkSeqDAt args A) tag
+    t := mkAppN (.const ``pm_mp []) (pre ++ #[A, B, t, g])
+    goals := goals.push g.mvarId!
+  goal.assign t
+  return goals.toList
+
+/-- Elaborate a kernel theorem for `papply`. Open first — the formula a metavariable, as
+`pthm` does it; pinning the goal's formula before the open attempt is what diverged with a
+stack overflow on `mct_p1` (`LADDER.md`, "What A3 forced"). Only if the open attempt fails is
+the rule retried against the goal's formula behind 0, 1, 2 and 3 antecedent placeholders,
+which is what gives a side condition written as `rfl` something to check against. Returns the
+term and which attempt produced it. -/
+private def elabApplyRule (args : Array Expr) (eStx : TSyntax `term) :
+    TacticM (Expr × String) := do
+  let Γ := args[6]!
+  let fTy := mkAppN (.const ``Formula []) #[args[0]!, args[1]!, args[3]!, Γ]
+  let deriv (A : Expr) : Expr := mkAppN (.const ``Derivable [])
+    #[args[0]!, args[1]!, args[3]!, args[4]!, args[5]!, Γ, A]
+  try
+    let e ← Lean.Elab.Term.withoutErrToSorry
+      (elabRuleInCtx eStx Γ (← derivableInGoal args))
+    return (e, "open")
+  catch ex =>
+    let mut pinned := args[8]!
+    for j in [0:4] do
+      let s ← saveState
+      try
+        let e ← Lean.Elab.Term.withoutErrToSorry (elabRuleInCtx eStx Γ (deriv pinned))
+        return (e, s!"pinned behind {j}")
+      catch _ => s.restore
+      let A ← mkFreshExprMVar fTy
+      pinned := mkAppN (.const ``Formula.imp []) #[args[0]!, args[1]!, args[3]!, Γ, A, pinned]
+    throw ex
+
+private def tmName : TransparencyMode → String
+  | .reducible => "reducible"
+  | .default => "default"
+  | _ => "other"
+
+/-- `papply h` uses the implicational hypothesis `h`; `papply e` applies a kernel theorem
+`e`. Either way the antecedents are left as goals, in order, the way Lean's own `apply`
+does it. A bare identifier that names a hypothesis is the hypothesis; anything else is
+elaborated as a theorem, in the goal's context, so it may mention `x₀`.
+
+Implicit arguments of the theorem — formulas, terms, `_` placeholders — are determined by
+unifying its conclusion with the goal, so `papply succ_congr_imp` needs no `(s := …) (t := …)`,
+and `papply (lt_Q_add_both _ _ _ _)` reads all four terms off the goal. A placeholder the
+conclusion does not determine becomes a trailing goal, to be fixed by whatever proves the
+antecedent that mentions it.
+
+The conclusion is matched at reducible transparency first and at default only as a fallback,
+so a goal containing `Term.cauchyfy` is matched structurally rather than by unfolding it. -/
+syntax (name := papply) "papply " term : tactic
+
+elab_rules : tactic
+  | `(tactic| papply $eStx:term) => withMainContext do
+    let args ← seqDGoalArgs "papply"
+    let goal ← getMainGoal
+    let goalF := args[8]!
+    let names := ((listLit? args[2]!).getD []).filterMap strLit?
+    let report (what : String) (plan : ApplyPlan) : TacticM Unit := do
+      if pm.papply.trace.get (← getOptions) then
+        logInfo m!"papply {eStx}: {what}, {plan.k} antecedent(s), matched at {tmName plan.tm}, \
+          arrows exposed at {if plan.peelDefault then "default" else "reducible"}"
+    -- A hypothesis.
+    if let some n := identName? eStx.raw then
+      if let some i := names.findIdx? (· == n) then
+        let hyp ← hypFormula "papply" n
+        let some plan ← planApply hyp goalF |
+          throwError "papply: `{n}` does not conclude the goal.\n\
+            It is{indentExpr hyp}\nand the goal is{indentExpr goalF}"
+        let mut v ← `(HVar.hz)
+        for _ in [0:i] do v ← `(HVar.hs $v)
+        let base ← elabTermEnsuringType (← `(seq_id $v)) (some (mkSeqDAt args hyp))
+        let goals ← applyPlan args goal base plan
+        replaceMainGoal goals
+        report "hypothesis" plan
+        return
+    -- A kernel theorem.
+    let (e, how) ← elabApplyRule args eStx
+    let ety ← instantiateMVars (← inferType e)
+    unless ety.isAppOf ``Derivable && ety.getAppNumArgs == 7 do
+      throwError "papply: not a kernel derivation{indentExpr ety}"
+    let T := ety.appArg!
+    let some plan ← planApply T goalF |
+      throwError "papply: this theorem does not conclude the goal.\n\
+        It proves{indentExpr (← instantiateMVars T)}\nand the goal is{indentExpr goalF}"
+    let e ← instantiateMVars e
+    let T ← instantiateMVars T
+    let base := mkAppN (.const ``pm_have []) (pmPrefix args ++ #[T, e])
+    let goals ← applyPlan args goal base plan
+    -- Placeholders the conclusion did not determine become trailing goals, as in `apply`.
+    let others ← getMVarsNoDelayed e
+    replaceMainGoal (goals ++ others.toList)
+    report s!"theorem, elaborated {how}" plan
+
+/-- `papplym e` is `papply e` under its old name: the escape hatch's `apply`, next to `pthm`'s
+`exact`. Kept so no script changes. -/
+macro "papplym " e:term : tactic => `(tactic| papply $e)
 
 /-- `papply h in k with m` applies the implicational hypothesis `h` to the hypothesis `k`,
 adding the conclusion under the name `m`. Forward reasoning, the counterpart of `papply`. -/
 macro "papply " h:ident " in " k:ident " with " m:ident : tactic =>
   `(tactic| refine pm_cut $(Lean.quote m.getId.toString)
       (pm_mp (by pexact $h) (by pexact $k)) ?_)
-
-/-- `papplym e` applies a *kernel theorem* to the goal, leaving its antecedents as goals —
-the escape hatch's `apply`, next to `pthm`'s `exact`. -/
-elab "papplym " eStx:term : tactic => withMainContext do
-  let args ← seqDGoalArgs "papplym"
-  let goalF := args[8]!
-  let e ← elabRuleInCtx eStx args[6]! (← derivableInGoal args)
-  let ety ← instantiateMVars (← inferType e)
-  let etyArgs := ety.getAppArgs
-  unless ety.isAppOf ``Derivable && etyArgs.size == 7 do
-    throwError "papplym: not a kernel derivation{indentExpr ety}"
-  let k? ← withoutModifyingState do
-    let mut cur ← whnfD etyArgs[6]!
-    for i in [0:16] do
-      if (← isDefEq cur goalF) then return some i
-      let cargs := cur.getAppArgs
-      unless cur.isAppOf ``Formula.imp && cargs.size == 6 do return none
-      cur ← whnfD cargs[5]!
-    return none
-  let some k := k? | throwError "papplym: this theorem does not conclude the goal.\n\
-      It proves{indentExpr etyArgs[6]!}\nand the goal is{indentExpr goalF}"
-  if k == 0 then
-    evalTactic (← `(tactic| pthm $eStx))
-  else
-    let mut t ← `(pm_have $eStx)
-    for _ in [0:k] do t ← `(pm_mp $t ?_)
-    evalTactic (← `(tactic| refine $t))
 
 /-- `papplym e in h with k` applies a kernel theorem to a hypothesis. Like `pthm`, the
 theorem is elaborated in the goal's context, so it can mention `x₀`. -/

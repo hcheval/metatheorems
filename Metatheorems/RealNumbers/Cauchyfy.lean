@@ -499,16 +499,9 @@ def add_R_check (f g : Term F Γ (realTy ι)) :
   prw (cauchyfy_unfold g.weaken (.app .succ (.var .vz)))
   prw (cauchyfy_unfold f.weaken (.app .succ (.app .succ (.var .vz))))
   prw (cauchyfy_unfold g.weaken (.app .succ (.app .succ (.var .vz))))
-  papplym (le_lt_Q_trans
-    (.app Term.abs_Q (Term.app2 Term.sub_Q
-      (Term.app2 Term.add_Q
-        (.app Term.fst_pair (Term.cauchyState f.weaken (.app .succ (.var .vz))))
-        (.app Term.fst_pair (Term.cauchyState g.weaken (.app .succ (.var .vz)))))
-      (Term.app2 Term.add_Q
-        (.app Term.fst_pair
-          (Term.cauchyState f.weaken (.app .succ (.app .succ (.var .vz)))))
-        (.app Term.fst_pair
-          (Term.cauchyState g.weaken (.app .succ (.app .succ (.var .vz))))))))
+  -- Rung 8: the two ends of the transitivity are read off the goal; only the midpoint is
+  -- written.
+  papply (le_lt_Q_trans _
     (Term.app2 Term.add_Q
       (.app Term.abs_Q (Term.app2 Term.sub_Q
         (.app Term.fst_pair (Term.cauchyState f.weaken (.app .succ (.var .vz))))
@@ -518,7 +511,7 @@ def add_R_check (f g : Term F Γ (realTy ι)) :
         (.app Term.fst_pair (Term.cauchyState g.weaken (.app .succ (.var .vz))))
         (.app Term.fst_pair
           (Term.cauchyState g.weaken (.app .succ (.app .succ (.var .vz))))))))
-    (.app Term.pow2neg_Q (.app .succ (.var .vz))))
+    _)
   psplit
   · pthm (abs_Q_sub_add_split
       (.app Term.fst_pair
@@ -527,42 +520,11 @@ def add_R_check (f g : Term F Γ (realTy ι)) :
         (Term.cauchyState g.weaken (.app .succ (.app .succ (.var .vz)))))
       (.app Term.fst_pair (Term.cauchyState f.weaken (.app .succ (.var .vz))))
       (.app Term.fst_pair (Term.cauchyState g.weaken (.app .succ (.var .vz)))))
-  · papplym (lt_Q_congr
-      (Term.app2 Term.add_Q
-        (.app Term.abs_Q (Term.app2 Term.sub_Q
-          (.app Term.fst_pair (Term.cauchyState f.weaken (.app .succ (.var .vz))))
-          (.app Term.fst_pair
-            (Term.cauchyState f.weaken (.app .succ (.app .succ (.var .vz)))))))
-        (.app Term.abs_Q (Term.app2 Term.sub_Q
-          (.app Term.fst_pair (Term.cauchyState g.weaken (.app .succ (.var .vz))))
-          (.app Term.fst_pair
-            (Term.cauchyState g.weaken (.app .succ (.app .succ (.var .vz))))))))
-      (Term.app2 Term.add_Q
-        (.app Term.pow2neg_Q (.app .succ (.app .succ (.var .vz))))
-        (.app Term.pow2neg_Q (.app .succ (.app .succ (.var .vz)))))
-      (Term.app2 Term.add_Q
-        (.app Term.abs_Q (Term.app2 Term.sub_Q
-          (.app Term.fst_pair (Term.cauchyState f.weaken (.app .succ (.var .vz))))
-          (.app Term.fst_pair
-            (Term.cauchyState f.weaken (.app .succ (.app .succ (.var .vz)))))))
-        (.app Term.abs_Q (Term.app2 Term.sub_Q
-          (.app Term.fst_pair (Term.cauchyState g.weaken (.app .succ (.var .vz))))
-          (.app Term.fst_pair
-            (Term.cauchyState g.weaken (.app .succ (.app .succ (.var .vz))))))))
-      (.app Term.pow2neg_Q (.app .succ (.var .vz)))
-      (eq_Q_refl_inst _)
-      (pow2neg_Q_halve (.app .succ (.var .vz))))
-    papplym (lt_Q_add_both
-      (.app Term.abs_Q (Term.app2 Term.sub_Q
-        (.app Term.fst_pair (Term.cauchyState f.weaken (.app .succ (.var .vz))))
-        (.app Term.fst_pair
-          (Term.cauchyState f.weaken (.app .succ (.app .succ (.var .vz)))))))
-      (.app Term.abs_Q (Term.app2 Term.sub_Q
-        (.app Term.fst_pair (Term.cauchyState g.weaken (.app .succ (.var .vz))))
-        (.app Term.fst_pair
-          (Term.cauchyState g.weaken (.app .succ (.app .succ (.var .vz)))))))
-      (.app Term.pow2neg_Q (.app .succ (.app .succ (.var .vz))))
-      (.app Term.pow2neg_Q (.app .succ (.app .succ (.var .vz)))))
+  · -- Rung 8: `x` and `x'` come from the reflexivity proof and the goal, `y` and `y'` from
+    -- the halving equation; nothing is spelled out.
+    papply (lt_Q_congr _ _ _ _ (eq_Q_refl_inst _) (pow2neg_Q_halve (.app .succ (.var .vz))))
+    -- Rung 8: all four summands are read off the goal.
+    papply (lt_Q_add_both _ _ _ _)
     psplit
     · pthm (cauchyState_cauchy f.weaken (.app .succ (.var .vz)))
     · pthm (cauchyState_cauchy g.weaken (.app .succ (.var .vz)))

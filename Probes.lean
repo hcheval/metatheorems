@@ -6,6 +6,7 @@ import Metatheorems.Probes.ExtractTermDemo
 import Metatheorems.Probes.GeneralMatricesDemo
 import Metatheorems.Probes.HilbertDemo
 import Metatheorems.Probes.P1
+import Metatheorems.Probes.PapplyDemo
 import Metatheorems.Probes.QComm
 import Metatheorems.Probes.R1
 import Metatheorems.Probes.RwArrow
