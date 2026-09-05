@@ -10,6 +10,7 @@ import Metatheorems.NDTranslation
 import Metatheorems.Dialectica.Syntactic
 import Metatheorems.RationalNumbers
 import Metatheorems.SyntacticMetatheorem
+import Metatheorems.Dialectica.Monotone
 import Metatheorems.RealNumbers
 import Metatheorems.BaseEquality
 import Metatheorems.Soundness

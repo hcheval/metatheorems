@@ -392,7 +392,7 @@ Every obligation is now discharged:
 That the `ℕ →` indexing does no work is discussed in CLAUDE.md. -/
 noncomputable def MetricModel.abstractMajorizability (M : MetricModel) :
     AbstractMajorizability M.si :=
-  bezemAbstract M.si M.base 0
+  bezemAbstract M.si M.base M.base_mono 0
     (bezem_zero_maj M.base 0)
     (bezem_succ_maj M.base 0)
     (fun ρ => bezem_prec_maj M.base_mono 0 ρ)

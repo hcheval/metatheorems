@@ -98,6 +98,26 @@ structure AbstractMajorizability {ι κ : Type} {X : ι → Type} {F : κ → Ty
     maj (ρ ×ₜ τ) p_star p → maj τ p_star.2 p.2
   /-- The unit type is a singleton, so it is majorized outright. -/
   unit_maj : maj .unit () ()
+  /-- **`maxT` compatibility, left** — a pointwise maximum majorizes whatever its left
+      argument majorizes, provided the right argument majorizes itself.
+
+      Forced by `and_contract`'s monotone majorant (Kohlenbach Thm 9.1, p. 143 case 1:
+      `t*_Y := λx y' y''. max(y', y'')`): the monotone functional interpretation replaces the
+      matrix-branching counter of contraction by a `max`, and "a `max` of majorants majorizes"
+      is not derivable from the other fields — the abstract relation has no `max`. The book
+      has it free because its `maj` is Howard's concrete relation; our abstraction must
+      state it. True of every `bezem*` instance (`maxT_bezemMaj_left`). Added 2026-09-05,
+      promoted from `Probes/MonotoneSpike.lean`'s `MaxCompat`. -/
+  maxT_maj_left : ∀ {ρ : Ty ι} {a b : Ty.interpret X ρ.hat} {c : Ty.interpret X ρ},
+    maj ρ a c → selfMaj ρ b b → maj ρ (maxT ρ a b) c
+  /-- **`maxT` compatibility, right** — the mirror image of `maxT_maj_left`. -/
+  maxT_maj_right : ∀ {ρ : Ty ι} {a b : Ty.interpret X ρ.hat} {c : Ty.interpret X ρ},
+    maj ρ b c → selfMaj ρ a a → maj ρ (maxT ρ a b) c
+  /-- **`maxT` is a `selfMaj`-congruence.** The third `max` fact `and_contract` needs: the
+      `max`-majorant must itself be self-majorizing (hat-monotone), which is what
+      `arrow_intro`'s second clause asks of it. -/
+  maxT_selfMaj : ∀ {ρ : Ty ι} {a b c d : Ty.interpret X ρ.hat},
+    selfMaj ρ a b → selfMaj ρ c d → selfMaj ρ (maxT ρ a c) (maxT ρ b d)
   /-- The uniform threshold N for constant majorizability. -/
   N : ℕ
   /-- Majorant for zero (0 : nat). -/
@@ -604,9 +624,14 @@ variable {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
 concrete space supplies only the per-constant obligations.
 
 `N` is the uniform threshold; the five majorant arguments are the document's per-constant
-conditions, stated against `bezemMaj base`. -/
+conditions, stated against `bezemMaj base`.
+
+`hbase : BaseMono base` (added 2026-09-05) is what the three `maxT_*` fields cost at a base
+type: `maxT (.base i) a b = max a b`, and `base i (max a b) c` follows from `base i a c` only
+if the relation is upward closed in its numeric argument. Every instance in the tree already
+had it (`MetricModel.base_mono`), because `bezem_prec_maj` needed it for the same reason. -/
 def bezemAbstract (si : SpaceInterp X F) (base : (i : ι) → Nat → X i → Prop)
-    (N : ℕ)
+    (hbase : BaseMono base) (N : ℕ)
     (zero_maj : ∃ z_star : ℕ → Nat, ∀ n ≥ N, bezemMaj base .nat (z_star n) (0 : Nat))
     (succ_maj : ∃ s_star : ℕ → Ty.interpret X (Ty.nat →ₜ Ty.nat).hat,
       ∀ n ≥ N, bezemMaj base (.nat →ₜ .nat) (s_star n) (Nat.succ : Nat → Nat))
@@ -640,6 +665,11 @@ def bezemAbstract (si : SpaceInterp X F) (base : (i : ι) → Nat → X i → Pr
   prod_fst _ _ h := h.1
   prod_snd _ _ h := h.2
   unit_maj := trivial
+  maxT_maj_left h₁ h₂ := maxT_bezemMaj_left hbase _ _ _ _ h₁ h₂
+  maxT_maj_right h₁ h₂ := by
+    rw [maxT_comm]
+    exact maxT_bezemMaj_left hbase _ _ _ _ h₁ h₂
+  maxT_selfMaj h₁ h₂ := maxT_hatMaj _ _ _ _ _ h₁ h₂
   N := N
   zero_maj := zero_maj
   succ_maj := succ_maj
@@ -814,7 +844,7 @@ abstract metric space and no majorant can be computed even in principle. -/
 /-- The majorizability structure for pure `WE-HA^ω`. -/
 def bezemAbstractEmpty {X : Empty → Type} {F : Empty → Ty Empty} (si : SpaceInterp X F) :
     AbstractMajorizability si :=
-  bezemAbstract si (fun i => i.elim) 0
+  bezemAbstract si (fun i => i.elim) (fun i => i.elim) 0
     (bezem_zero_maj _ 0) (bezem_succ_maj _ 0)
     (fun ρ => bezem_prec_maj (fun i => i.elim) 0 ρ)
     (fun f => f.elim) (fun i => i.elim) (fun i => i.elim)
@@ -886,8 +916,8 @@ end ComputesDemo
 /-- `bezemAbstract` and `bezemRel` agree, so a space built the per-constant way still feeds
 anything stated against `MajorizabilityRel`. -/
 theorem bezemAbstract_toRel_maj (si : SpaceInterp X F) (base : (i : ι) → Nat → X i → Prop)
-    {N hz hs hp hf hx hd} :
-    (bezemAbstract si base N hz hs hp hf hx hd).toRel.maj = (bezemRel si base).maj := rfl
+    {hbase N hz hs hp hf hx hd} :
+    (bezemAbstract si base hbase N hz hs hp hf hx hd).toRel.maj = (bezemRel si base).maj := rfl
 
 end BezemAbstract
 

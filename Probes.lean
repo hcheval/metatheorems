@@ -16,7 +16,7 @@ import Metatheorems.Probes.MonotoneSpike
 import Metatheorems.Probes.SyntacticND
 import Metatheorems.Probes.SizeProbe
 import Metatheorems.Probes.ProductRulesDemo
-import Metatheorems.Probes.MonotoneSpike
+import Metatheorems.Probes.MonotoneLaneA
 import Metatheorems.Probes.TermPrintDemo
 import Metatheorems.Probes.TinyBoundDemo
 import Metatheorems.Probes.TriangleBoundDemo

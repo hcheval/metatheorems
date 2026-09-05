@@ -243,6 +243,18 @@ def maxT : (ρ : Ty ι) → Ty.interpret X ρ.hat → Ty.interpret X ρ.hat → 
   | .arr _ τ,  f, g => fun x => maxT τ (f x) (g x)
   | .prod ρ τ, p, q => (maxT ρ p.1 q.1, maxT τ p.2 q.2)
 
+/-- `maxT` is commutative at every hat type. Needed to get the right-handed
+`maxT_bezemMaj_left` from the left-handed one (`AbstractMajorizability.maxT_maj_right`).
+Promoted 2026-09-05 from `Probes/MonotoneSpike.lean`. -/
+theorem maxT_comm : ∀ (ρ : Ty ι) (a b : Ty.interpret X ρ.hat), maxT ρ a b = maxT ρ b a
+  -- `omega` treats `Ty.interpret X Ty.nat.hat`-typed atoms as opaque (CLAUDE.md), so the
+  -- two numeric cases go by the core lemma directly
+  | .nat, a, b => by simp only [maxT]; exact Nat.max_comm _ _
+  | .base _, a, b => by simp only [maxT]; exact Nat.max_comm _ _
+  | .unit, _, _ => rfl
+  | .arr _ τ, f, g => funext fun x => maxT_comm τ (f x) (g x)
+  | .prod ρ τ, p, q => Prod.ext (maxT_comm ρ p.1 q.1) (maxT_comm τ p.2 q.2)
+
 /-- `maxT` is a congruence for `hatMaj`. -/
 theorem maxT_hatMaj : ∀ (ρ : Ty ι) (a b c d : Ty.interpret X ρ.hat),
     hatMaj ρ a b → hatMaj ρ c d → hatMaj ρ (maxT ρ a c) (maxT ρ b d) := by

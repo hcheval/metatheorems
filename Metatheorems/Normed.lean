@@ -583,7 +583,7 @@ theorem NormedModel.zeroX_maj_zero (M : NormedModel) :
 /-- **A normed model is an abstract majorizability.** -/
 noncomputable def NormedModel.abstractMajorizability (M : NormedModel) :
     AbstractMajorizability M.si :=
-  bezemAbstract M.si M.toMetricModel.base 0
+  bezemAbstract M.si M.toMetricModel.base M.toMetricModel.base_mono 0
     (bezem_zero_maj M.toMetricModel.base 0)
     (bezem_succ_maj M.toMetricModel.base 0)
     (fun ρ => bezem_prec_maj M.toMetricModel.base_mono 0 ρ)

@@ -331,7 +331,7 @@ theorem WHyperbolicModel.W_maj (M : WHyperbolicModel) (N : ℕ) :
 `MetricTransfer.lean`; the one new obligation is `W_maj`. -/
 noncomputable def WHyperbolicModel.abstractMajorizability (M : WHyperbolicModel) :
     AbstractMajorizability M.si :=
-  bezemAbstract M.si M.base 0
+  bezemAbstract M.si M.base M.base_mono 0
     (bezem_zero_maj M.base 0)
     (bezem_succ_maj M.base 0)
     (fun ρ => bezem_prec_maj M.base_mono 0 ρ)
