@@ -89,6 +89,21 @@ What that costs, precisely:
 * `dist_W_right` is stated with `d(y,x)`, not `d(x,y)`. `dist_comm` gives
   `d(y,x) =ℝ d(x,y)`, but there is no way to rewrite under `·ℝ` — same missing congruence.
   The statement is *not* weakened: it is what (W1) at `z := y` literally gives.
+* `Probes/WHyperbolicLemmasDemo.lean` measures the gap exactly:
+  `dist_W_left_eq_in_model` derives Kohlenbach's equality `d(x, W(x,y,λ)) = λ·d(x,y)` in an
+  arbitrary `WHyperbolicModel` from `dist_W_left` and `dist_W_left_lower` — the whole
+  remaining step is one `nlinarith` over `M.d_comm` on Mathlib `ℝ`. So the mathematics of
+  the chain is complete; what is missing is one lemma of the ℝ *encoding*.
+* Neither is there anything above `W3_at`: transporting `W(x,y,λ̃) =_X W(y,x,1ℝ −ℝ λ̃)`
+  into another `d(·,·)` needs `Derivable.qfer` at `σ := realTy`, where `eqAtType` is
+  pointwise `=₀` on codes — strictly stronger than `=ℝ`, with no bridge in the ℝ layer.
+
+## Cost
+
+`Metatheorems.WHyperbolicLemmas` elaborates in **13–16 s**, `Probes.WHyperbolicLemmasDemo`
+in **14 s**. The four `W*_at` are the only proof-mode scripts in the file (four or five
+`pinst`/`znorm` rounds each); everything above them is Lean-level `Derivable.mp` composition
+with the ℝ order package, which is what keeps the cost flat as the chain grows.
 -/
 
 namespace Metatheorems

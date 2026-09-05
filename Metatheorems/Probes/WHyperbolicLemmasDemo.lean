@@ -289,7 +289,7 @@ theorem W2_in_model (a b : M.carrier) (r r' : ℕ → ℕ) :
   simp only [WHyperbolicModel.interp_W, codeReal_interp_mul_R, codeReal_interp_abs_R,
     codeReal_interp_sub_R, codeReal_interp_clamp01, isCauchyCode_interp_clamp01,
     WHyperbolicModel.codeReal_interp_dist, clampReal_of_mem, clampReal_nonneg,
-    clampReal_le_one, interp_qx, interp_qy] at h1 h2
+    clampReal_le_one, interp_qx] at h1 h2
   exact le_antisymm h1 h2
 
 end Model
