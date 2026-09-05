@@ -81,8 +81,8 @@ def clMRealizer (eqxi : EqXInterp X F si)
   let r1 : MRealizer cm (¬ᶠ¬ᶠ(Formula.all ρ (¬ᶠ¬ᶠ(clE B₀ C₀)))) :=
     MRealizer.transport
       (congrArg (fun G : Formula F [ρ] => ¬ᶠ¬ᶠ(Formula.all ρ (¬ᶠ¬ᶠ G))) hEki) r0
-  -- step 3: `nn_all_nn`, giving `∀ρ ¬¬E`
-  MRealizer.mp cm r1 (leafM eqxi spremise cm nn_all_nn)
+  -- step 3: `nn_all_nn` (hand-written: `nnAllNnF`), giving `∀ρ ¬¬E`
+  MRealizer.mp cm r1 (MRealizer.nnAllNnF cm (clE B₀ C₀))
 
 /-- The `U`-majorant, read off the monotone realizer's `tstar`: challenge the surviving `¬¬`
 with the default `¬E`-witness majorant, read the `∃u` index. Mirror of `interpret_extractUTermP`

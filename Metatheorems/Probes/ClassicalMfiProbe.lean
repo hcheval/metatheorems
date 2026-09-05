@@ -96,6 +96,42 @@ noncomputable def cV (xs : Ty.interpret lXE Ty.nat.hat) : ℕ :=
 -- ============================================================================
 
 /-!
+## STATUS (Lane C, second pass — hand-written leaves) and NEXT STEP, for whoever continues
+
+**What is built and green** (commit on `mfi-classical`): `Dialectica/MonotoneNDLeaves.lean` —
+hand-written monotone realizers of every `¬¬`-combinator `negTrans_sound` applies per node
+(`dnnIntroF`, `nnMpF`, `nnImpRevF`, `expF`, `impF`, `expansionF`, `dnnLemF`, all axiom-free or
+`[propext, Quot.sound]`), a syntactic majorization dispatcher `maj_auto`, and
+`Dialectica/MonotoneND.lean` rewritten to use them (`nnAllNnF` assembled; `leafM` survives only
+for the propositional/`forall_ax`/`exist_ax` axiom TERMS and the cases not on the classical
+route — `succ_*`, `rec_*`, `beta_eq`, `pair_*`, `dist_*`, `qfac`, `qfer`'s `negTrans_iff_pu`
+legs). `monotone_general_metatheorem_classical_at` type-checks, `[propext, Classical.choice,
+Quot.sound]`.
+
+**Gate G-C1 / G-C2 (`kernel_rfl` numeral): STILL NEGATIVE, and now localised to a different
+cause than the first pass claimed.** With every per-node leaf gone:
+- `lFinalNoLem` ALONE through `monotone_nd_soundness` (12 classical nodes, no `prenexify`):
+  the `∃v` projection of `(∀x(∀u B → ∃v C))ᴺᵀ` reduces to `5` by `kernel_rfl` in **37 ms**.
+- `prenexify` ALONE (347 nodes, 134 `syllogism`, 2 `lem`): `std::bad_alloc` at 12 GB, 74 s.
+- a synthetic chain of `k` classical `syllogism`s (`I_comb`s composed, no `lem`): kernel time
+  k=2 **140 ms**, k=4 **3.68 s**, k=8 **OOM** — ≈ ×5 per syllogism.
+So the wall is the **fan-out of the `¬¬`-combinators' counter sides under nesting**: one
+classical `syllogism` is three `MRealizer.syllogism`s (counter side uses `hAB` 3×) and two
+`neg_neg_mp`s (`nnMpFun` uses `Φ` 4×), and the kernel's `whnf` shares nothing across binder
+depths — ARCHITECTURE §14.2's "MFI does not remove composition's duplication; on paper it is
+free because terms are DAGs by notation" hitting at k ≈ 8, and `prenexify` has 134.
+
+**Next step** (not started): (1) `#eval` the same projections — hat-level ℕ values, NOT a
+composed `Term.interpret`, so hard rule 3 does not apply — to get the numbers with compiler
+trust (the evaluator shares by pointer); a first attempt (`proj 8/32/128` and the four gate
+values in one file) exceeded a 10-minute cap, so run ONE at a time with `timeout` and report
+which sizes finish; (2) if the numbers are wanted kernel-checked, the classical route needs a
+majorant representation with explicit sharing (`let`-bound sub-majorants evaluated once —
+Lane D1's memo direction), not more hand-writing: with the leaves gone, nothing per node is
+left to hand-write.
+-/
+
+/-!
 ## Lane C: the fused negative-translation + MFI recursion, and gates G-C1 / G-C2
 
 `monotone_general_metatheorem_classical_at` (`MonotoneMetatheoremClassical.lean`) interprets
