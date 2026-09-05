@@ -29,6 +29,12 @@ import Metatheorems.Probes.TinyBoundDemo
 import Metatheorems.Probes.TriangleBoundDemo
 import Metatheorems.Probes.UPremiseDemo
 import Metatheorems.Probes.WBoundDemo
+-- NOT imported here: `Demo/Walkthrough.lean`, the presenter's guided walkthrough. It must stay
+-- green, and it is reachable from nothing else, but `Demo` is not a `lean_lib` in
+-- `lakefile.toml`, so `import Demo.Walkthrough` fails with "unknown module prefix 'Demo'".
+-- Check it with `scripts/lean.sh <repo>/Demo/Walkthrough.lean` (≈1 min, no errors expected).
+-- To fold it into this sweep, add to `lakefile.toml`:  [[lean_lib]]  name = "Demo"
+-- and then the import line here.
 
 /-!
 # Probe sweep target
