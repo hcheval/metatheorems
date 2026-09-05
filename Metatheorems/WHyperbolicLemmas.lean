@@ -36,9 +36,12 @@ Kohlenbach (following Kirk, and Kohlenbach–Leuştean) states, for a W-hyperbol
 | name | statement | Kohlenbach |
 |---|---|---|
 | `W1_at` | (W1) at arbitrary terms, as `≤ℝ` | (W1) |
+| `W2_at` | `d(W(x,y,λ̃), W(x,y,μ̃)) =ℝ \|λ̃ −ℝ μ̃\|ℝ ·ℝ d(x,y)` | (W2) |
+| `W3_at` | `W(x,y,λ̃) =_X W(y,x, 1ℝ −ℝ λ̃)` | (W3) |
 | `W4_at` | (W4) at arbitrary terms, as `≤ℝ` | (W4) |
 | `dist_W_left` | `d(x, W(x,y,λ̃)) ≤ℝ λ̃ ·ℝ d(x,y)` | half of the geodesic property |
 | `dist_W_right` | `d(y, W(x,y,λ̃)) ≤ℝ (1ℝ −ℝ λ̃) ·ℝ d(y,x)` | the other half |
+| `dist_W_between` | the two added: `d(x,W) +ℝ d(W,y) ≤ℝ …` | geodesic, detour form |
 | `dist_W_left_lower` | `d(x,y) −ℝ (1ℝ −ℝ λ̃) ·ℝ d(y,x) ≤ℝ d(x, W(x,y,λ̃))` | reverse inequality |
 | `W_zero` | `W(x,y,0ℝ~) =_X x` | `W(x,y,0) = x` |
 | `W_one` | `W(x,y,1ℝ~) =_X y` | `W(x,y,1) = y` |
@@ -265,6 +268,72 @@ def W4_at (x y z w : Term WHyperbolic.F Γ xTy) (l : Term WHyperbolic.F Γ rTy) 
       sub_R_weaken, one_R_weaken'', add_R_weaken'', mul_R_weaken''])) in w6 with hle
   pexact hle
 
+/-- **(W2) at arbitrary terms**:
+
+    `d(W(x,y,λ̃), W(x,y,μ̃)) =ℝ |λ̃ −ℝ μ̃|ℝ ·ℝ d(x,y)`.
+
+This one needs no `le_R_pu` conversion — the axiom is already an `=ℝ` — so after the four
+`pinst`/`znorm` rounds the instance and the goal are brought to the *same* weakening normal
+form by `wfold` (both are `Formula.all Ty.nat` over a body mentioning `f.weaken`), and
+`pexact` closes. That is why `W1_at` needs `le_R_of_le_R_pu_nf` and this does not: there the
+goal is the folded `le_R`, here it is the axiom's own shape. -/
+def W2_at (x y : Term WHyperbolic.F Γ xTy) (l m : Term WHyperbolic.F Γ rTy) :
+    Derivable WHyperbolic.F a WHyperbolic.Premises
+      (eq_R
+        (Term.app2 (Term.dist ())
+          (Term.app3 (Term.func ()) x y (.app Term.clamp01 l))
+          (Term.app3 (Term.func ()) x y (.app Term.clamp01 m)))
+        (Term.app2 Term.mul_R
+          (.app Term.abs_R
+            (Term.app2 Term.sub_R (.app Term.clamp01 l) (.app Term.clamp01 m)))
+          (Term.app2 (Term.dist ()) x y))) := by
+  pmode
+  pfrom w1 := WHyperbolic.W2
+  simp only [WHyperbolic.ax_W2, eq_R, Term.app3]
+  pinst w1 x with w2
+  znorm
+  pclear w1
+  pinst w2 y with w3
+  znorm
+  pclear w2
+  pinst w3 l with w4
+  znorm
+  pclear w3
+  pinst w4 m with w5
+  znorm
+  pclear w4
+  wfold
+  pexact w5
+
+/-- **(W3) at arbitrary terms**: `W(x,y,λ̃) =_X W(y,x, 1ℝ −ℝ λ̃)`.
+
+Base-type equality is `d(·,·) =ℝ 0ℝ`, so this is again the axiom's own shape and `pexact`
+closes after `wfold`. The chain has no corollary of (W3) above it: `W(x,y,λ̃) =_X …` cannot
+be pushed inside another `d(·,·)` without extensionality of `d` in a base-type argument
+w.r.t. `=_X`, and `Derivable.qfer` is stated for `eqAtType` at the *substituted* type — at
+`realTy` that is pointwise `=₀`, strictly stronger than `=ℝ`, and no bridge from the one to
+the other exists in the ℝ layer. -/
+def W3_at (x y : Term WHyperbolic.F Γ xTy) (l : Term WHyperbolic.F Γ rTy) :
+    Derivable WHyperbolic.F a WHyperbolic.Premises
+      (eqAtType xTy
+        (Term.app3 (Term.func ()) x y (.app Term.clamp01 l))
+        (Term.app3 (Term.func ()) y x
+          (Term.app2 Term.sub_R Term.one_R (.app Term.clamp01 l)))) := by
+  pmode
+  pfrom w1 := WHyperbolic.W3
+  simp only [WHyperbolic.ax_W3, eqAtType, eq_R, Term.app3]
+  pinst w1 x with w2
+  znorm
+  pclear w1
+  pinst w2 y with w3
+  znorm
+  pclear w2
+  pinst w3 l with w4
+  znorm
+  pclear w3
+  wfold
+  pexact w4
+
 end AxiomsAt
 
 -- ============================================================================
@@ -361,6 +430,39 @@ def dist_W_left_lower (x y : Term WHyperbolic.F Γ xTy) (l : Term WHyperbolic.F 
   Derivable.mp
     (leRt htri (leR_mono_l dxw hwy))
     (le_sub_R_of_le_add_core dxy dxw bnd)
+
+/-- **`d(x, W(x,y,λ̃)) +ℝ d(W(x,y,λ̃), y) ≤ℝ λ̃ ·ℝ d(x,y) +ℝ (1ℝ −ℝ λ̃) ·ℝ d(y,x)`** — the
+two geodesic estimates added.
+
+Together with the triangle inequality `d(x,y) ≤ℝ d(x, W) +ℝ d(W, y)` (which is what
+`dist_W_left_lower` uses) this is Kohlenbach's observation that the point `W(x,y,λ̃)` sits on
+a geodesic: the detour through it costs nothing. The right-hand side is `d(x,y)` once the
+missing multiplicative facts are available; as it stands it is the sum of the two bounds,
+`le_R_add_mono_core` applied to `dist_W_left` and `dist_W_right` (the latter after
+`dist_comm` turns `d(W,y)` into `d(y,W)`). -/
+def dist_W_between (x y : Term WHyperbolic.F Γ xTy) (l : Term WHyperbolic.F Γ rTy) :
+    Derivable WHyperbolic.F a WHyperbolic.Premises
+      (le_R
+        (Term.app2 Term.add_R
+          (Term.app2 (Term.dist ()) x
+            (Term.app3 (Term.func ()) x y (.app Term.clamp01 l)))
+          (Term.app2 (Term.dist ())
+            (Term.app3 (Term.func ()) x y (.app Term.clamp01 l)) y))
+        (Term.app2 Term.add_R
+          (Term.app2 Term.mul_R (.app Term.clamp01 l)
+            (Term.app2 (Term.dist ()) x y))
+          (Term.app2 Term.mul_R (Term.app2 Term.sub_R Term.one_R (.app Term.clamp01 l))
+            (Term.app2 (Term.dist ()) y x)))) :=
+  let cl : Term WHyperbolic.F Γ (realTy MetricSpace.ι) := .app Term.clamp01 l
+  let wp : Term WHyperbolic.F Γ xTy := Term.app3 (Term.func ()) x y cl
+  let hwy : Derivable WHyperbolic.F a WHyperbolic.Premises
+      (le_R (Term.app2 (Term.dist ()) wp y)
+        (Term.app2 Term.mul_R (Term.app2 Term.sub_R Term.one_R cl)
+          (Term.app2 (Term.dist ()) y x))) :=
+    leRt (leR_of_eq (Derivable.dist_comm () wp y)) (dist_W_right x y l)
+  Derivable.mp
+    (Derivable.mp hwy (Derivable.mp (dist_W_left x y l) and_intro))
+    (le_R_add_mono_core _ _ _ _)
 
 end Geodesic
 
@@ -498,8 +600,11 @@ end WHyperbolic
 #print axioms mul_zero_l_R
 #print axioms eqX_of_dist_le_zero
 #print axioms WHyperbolic.W1_at
+#print axioms WHyperbolic.W2_at
+#print axioms WHyperbolic.W3_at
 #print axioms WHyperbolic.W4_at
 #print axioms WHyperbolic.dist_W_left
+#print axioms WHyperbolic.dist_W_between
 #print axioms WHyperbolic.dist_W_right
 #print axioms WHyperbolic.dist_W_left_lower
 #print axioms WHyperbolic.W_zero

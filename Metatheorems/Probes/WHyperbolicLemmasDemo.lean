@@ -60,13 +60,51 @@ def py : Term WHyperbolic.F Γw xTy := .var (.vs (.vs .vz))
 def pz : Term WHyperbolic.F Γw xTy := .var (.vs .vz)
 def pl : Term WHyperbolic.F Γw rTy := .var .vz
 
+/-- A second free code, for (W2), which speaks about two parameters. De Bruijn:
+`x = x₃`, `y = x₂`, `λ = x₁`, `μ = x₀`. -/
+abbrev Γ2 : Ctx MetricSpace.ι := [rTy, rTy, xTy, xTy]
+
+def qx : Term WHyperbolic.F Γ2 xTy := .var (.vs (.vs (.vs .vz)))
+def qy : Term WHyperbolic.F Γ2 xTy := .var (.vs (.vs .vz))
+def ql : Term WHyperbolic.F Γ2 rTy := .var (.vs .vz)
+def qm : Term WHyperbolic.F Γ2 rTy := .var .vz
+
 def dLeft := WHyperbolic.dist_W_left (a := Allowed.extended) px py pl
 def dRight := WHyperbolic.dist_W_right (a := Allowed.extended) px py pl
 def dLower := WHyperbolic.dist_W_left_lower (a := Allowed.extended) px py pl
 def dMonoR := WHyperbolic.dist_W_mono_right (a := Allowed.extended) px py pz pl
 def dMonoL := WHyperbolic.dist_W_mono_left (a := Allowed.extended) px py pz pl
+def dBetween := WHyperbolic.dist_W_between (a := Allowed.extended) px py pl
 def wZero := WHyperbolic.W_zero (a := Allowed.extended) px py
 def wOne := WHyperbolic.W_one (a := Allowed.extended) px py
+def w3 := WHyperbolic.W3_at (a := Allowed.extended) px py pl
+
+/-- (W2) at the two free codes, split into its two `≤ℝ` halves — the `=ℝ` read-out is
+assembled from them in the model by `le_antisymm`, so no new semantic bridge is needed
+beyond `RevTriangleDemo.codeReal_le_of_interpret_le_R_pu`. Both halves are object-level:
+`le_R_of_eq_R_core` and `eq_R_sym_core`. -/
+def w2le : Derivable WHyperbolic.F Allowed.extended WHyperbolic.Premises
+    (le_R
+      (Term.app2 (Term.dist ())
+        (Term.app3 (Term.func ()) qx qy (.app Term.clamp01 ql))
+        (Term.app3 (Term.func ()) qx qy (.app Term.clamp01 qm)))
+      (Term.app2 Term.mul_R
+        (.app Term.abs_R
+          (Term.app2 Term.sub_R (.app Term.clamp01 ql) (.app Term.clamp01 qm)))
+        (Term.app2 (Term.dist ()) qx qy))) :=
+  Derivable.mp (WHyperbolic.W2_at qx qy ql qm) (le_R_of_eq_R_core _ _)
+
+def w2ge : Derivable WHyperbolic.F Allowed.extended WHyperbolic.Premises
+    (le_R
+      (Term.app2 Term.mul_R
+        (.app Term.abs_R
+          (Term.app2 Term.sub_R (.app Term.clamp01 ql) (.app Term.clamp01 qm)))
+        (Term.app2 (Term.dist ()) qx qy))
+      (Term.app2 (Term.dist ())
+        (Term.app3 (Term.func ()) qx qy (.app Term.clamp01 ql))
+        (Term.app3 (Term.func ()) qx qy (.app Term.clamp01 qm)))) :=
+  Derivable.mp (Derivable.mp (WHyperbolic.W2_at qx qy ql qm) (eq_R_sym_core _ _))
+    (le_R_of_eq_R_core _ _)
 
 -- ============================================================================
 -- The model side
@@ -202,6 +240,58 @@ theorem dist_W_mono_left_in_model (a b c : M.carrier) (r : ℕ → ℕ) :
   wreadout hle
   exact hle
 
+/-- **The geodesic detour bound**, from `dist_W_between`:
+`d(x,W) + d(W,y) ≤ λ·d(x,y) + (1−λ)·d(y,x)` — which, with `M.d_comm`, is `d(x,y)`. -/
+theorem dist_W_between_in_model (a b : M.carrier) (r : ℕ → ℕ) :
+    M.d a (M.W a b (par r)) + M.d (M.W a b (par r)) b
+      ≤ par r * M.d a b + (1 - par r) * M.d b a := by
+  have hs := M.soundness (Derivable.mp dBetween (le_R_pu_of_le_R _ _)) (envW M a b a r)
+  have hle := RevTriangleDemo.codeReal_le_of_interpret_le_R_pu _ _ _ hs
+  wreadout hle
+  exact hle
+
+/-- **(W3) in the model**: `W(x,y,λ) = W(y,x,1−λ)`, from `W3_at` through separation. -/
+theorem W3_in_model (a b : M.carrier) (r : ℕ → ℕ) :
+    M.W a b (par r) = M.W b a (1 - par r) := by
+  have hs := M.soundness w3 (envW M a b a r)
+  have he := M.toMetricModel.eq_of_eqAtType_base_gen M.si (fun _ _ => rfl) _ _ _ hs
+  simp only [WHyperbolicModel.interp_W, codeReal_interp_sub_R, codeReal_interp_one_R,
+    codeReal_interp_clamp01, isCauchyCode_interp_clamp01] at he
+  -- the four variables read off the environment by `rfl`, so a type ascription suffices
+  have hm := par_mem r
+  have he' : M.W a b (clampReal (par r)) = M.W b a (clampReal (1 - par r)) := he
+  rw [clampReal_of_mem (par r) hm.1 hm.2,
+    clampReal_of_mem (1 - par r) (by linarith [hm.2]) (by linarith [hm.1])] at he'
+  exact he'
+
+/-- The environment for the two-parameter context `Γ2`. -/
+abbrev env2 (a b : M.carrier) (r r' : ℕ → ℕ) : Ctx.interpret (fun () => M.carrier) Γ2 :=
+  (r', r, b, a, ())
+
+theorem interp_qx (a b : M.carrier) (r r' : ℕ → ℕ) :
+    Term.interpret M.si qx (env2 M a b r r') = a := rfl
+theorem interp_qy (a b : M.carrier) (r r' : ℕ → ℕ) :
+    Term.interpret M.si qy (env2 M a b r r') = b := rfl
+theorem interp_ql (a b : M.carrier) (r r' : ℕ → ℕ) :
+    Term.interpret M.si ql (env2 M a b r r') = r := rfl
+theorem interp_qm (a b : M.carrier) (r r' : ℕ → ℕ) :
+    Term.interpret M.si qm (env2 M a b r r') = r' := rfl
+
+/-- **(W2) in the model**: `d(W(x,y,λ), W(x,y,μ)) = |λ−μ|·d(x,y)` — Kohlenbach's axiom (W2),
+read back out of the object theory as an equation on Mathlib `ℝ`. The two `≤` halves are
+object-level (`w2le`, `w2ge`); `le_antisymm` joins them here. -/
+theorem W2_in_model (a b : M.carrier) (r r' : ℕ → ℕ) :
+    M.d (M.W a b (par r)) (M.W a b (par r')) = |par r - par r'| * M.d a b := by
+  have hs1 := M.soundness (Derivable.mp w2le (le_R_pu_of_le_R _ _)) (env2 M a b r r')
+  have hs2 := M.soundness (Derivable.mp w2ge (le_R_pu_of_le_R _ _)) (env2 M a b r r')
+  have h1 := RevTriangleDemo.codeReal_le_of_interpret_le_R_pu _ _ _ hs1
+  have h2 := RevTriangleDemo.codeReal_le_of_interpret_le_R_pu _ _ _ hs2
+  simp only [WHyperbolicModel.interp_W, codeReal_interp_mul_R, codeReal_interp_abs_R,
+    codeReal_interp_sub_R, codeReal_interp_clamp01, isCauchyCode_interp_clamp01,
+    WHyperbolicModel.codeReal_interp_dist, clampReal_of_mem, clampReal_nonneg,
+    clampReal_le_one, interp_qx, interp_qy] at h1 h2
+  exact le_antisymm h1 h2
+
 end Model
 
 -- ============================================================================
@@ -246,6 +336,9 @@ end RealLine
 #print axioms W_one_in_model
 #print axioms dist_W_mono_right_in_model
 #print axioms dist_W_mono_left_in_model
+#print axioms dist_W_between_in_model
+#print axioms W2_in_model
+#print axioms W3_in_model
 
 end WHyperbolicLemmasDemo
 end Metatheorems
