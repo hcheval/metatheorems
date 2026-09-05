@@ -127,11 +127,25 @@ rebuilds the derivation as it goes. So the claim this file previously made, that
 route carries *no* classicality-specific cost, is **not supported**; that machinery is in the
 profile.
 
-**What remains unsettled, and should not be asserted again without evidence.** The top-three
+**The shared-blocker guess is REFUTED, by the obvious discriminating test.** The top-three
 signature does resemble the Stage-B stall of CLAUDE.md's Track A item 1
-(`Eq.rec ↦ 60474`, `Term.rec ↦ 10847`, `Term.rename ↦ 10504`). But `Eq.rec` is generic —
-essentially every dependent reduction routes through it — so a shared profile is weak evidence
-of a shared cause, and "one fix unblocks both" is an inference, not a measurement.
+(`Eq.rec ↦ 60474`, `Term.rec ↦ 10847`, `Term.rename ↦ 10504`), and this file briefly argued
+from that resemblance that one fix would unblock both. But `Eq.rec` is generic — essentially
+every dependent reduction routes through it — so a shared profile is weak evidence of a
+shared cause. The test that separates them is **sidedness**:
+
+- The intuitionistic stall is **one-sided**. `ConjBoundDemo.cVtTwice_at_5_9` evaluates the
+  *witness* functional `V` of the stalling two-instantiation derivation to a literal `1709`;
+  only the counter side sticks. `SeqMpBoundProbe`'s three commutation lemmas are likewise
+  witness-path only, and its header says so explicitly: the counter components "were not
+  touched, and that is exactly where the duplication lives".
+- The classical stall is **two-sided**. `(5 : Nat) = closedMajorizer lCmE lVtNoLem 5` — the
+  *witness* side, LEM-free — is also a `whnf` timeout.
+
+So the classical route costs something the counter-side debt does not explain, and paying that
+debt should not be expected to unblock it. `Derivable.castAllowed ↦ 18` in the profile is a
+concrete candidate for the difference, since it rebuilds the whole derivation; that is a
+hypothesis and has not been tested.
 
 The type level is **not** the explanation, and that part was checked: `tySize (wTy stmt) = 19`
 against `tySize (wTy pstmt') = 93`, `cTy` 7 against 39 — a factor of ≈5, nothing.
