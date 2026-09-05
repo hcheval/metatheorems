@@ -25,6 +25,7 @@ import Metatheorems.MetricSpaces
 import Metatheorems.MetricTransfer
 import Metatheorems.CodeReal
 import Metatheorems.WHyperbolic
+import Metatheorems.WHyperbolicLemmas
 import Metatheorems.CAT0
 import Metatheorems.Normed
 import Metatheorems.Instances
