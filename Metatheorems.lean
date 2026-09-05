@@ -11,6 +11,7 @@ import Metatheorems.Dialectica.Syntactic
 import Metatheorems.RationalNumbers
 import Metatheorems.SyntacticMetatheorem
 import Metatheorems.Dialectica.Monotone
+import Metatheorems.Dialectica.MonotoneMemo
 import Metatheorems.MonotoneMetatheorem
 import Metatheorems.RealNumbers
 import Metatheorems.BaseEquality

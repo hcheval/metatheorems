@@ -896,6 +896,30 @@ has the numbers. Note also that this file carries **two** `## 14` headings; the 
 "what the bound path should be") is a truncated partial duplicate of this one and ends
 mid-sentence — left as found, to be resolved by the owner.
 
+**Lane B' (2026-09-05): the `Eq.mpr` entry is written and proven** — `Dialectica/MonotoneMemo.lean`:
+`MRealizer.transport` (axiom-free) plus `monotone_soundness_eqmpr`/`_eqmp`/`_subst`, the MFI
+analogue of `syntactic_soundness_eqmpr`. The transport casts the majorant `tstar` by
+`congrArg wTy h` — whose two sides are `Ty.interpret X (wTy B).hat`/`(wTy B').hat`, definitionally
+equal for a `subst`/`rename` normalisation (`wTy` ignores a formula's terms), so it collapses
+structurally with no ℚ delta; the `Prop` half goes by `subst h`. **It reduces a real ℚ cast to a
+numeral where `monotone_soundness` meets `Eq.mpr`/`Eq.mp` directly** — `Probes/MonotoneLaneBp.lean`
+`castU`: `U = 901` (moving to `1273` at `x* = 7`) through **two** injected `mul_Q` `Eq.mp` casts on
+the premise-consuming counter path, via `simp only [monotone_soundness_eqmp (hB := …)]` + the
+kernel. Measured: bare `kernel_rfl` on **one** directly-injected cast *terminates* — `mul_Q` ≈8 s,
+`cauchyfy` ≈37 s: a single cast is a **linear** `Term.subst` delta, and the entry turns it O(1).
+**What the entry does NOT reach**: the casts of the real ℝ lemmas (`le_R_pu_of_le_R`, `leR_tail`,
+`mct_body`, …) are buried under the `pm_*`/`seq_*` layer, so `monotone_soundness` is applied to a
+`pm_*` def, not to the cast; `simp` cannot fire the memo lemma without unfolding that layer, which
+explodes (`le_R_of_le_R_pu` is 4167 constructors — `simp`+`kernel_rfl` OOMs at 12 GB, measured).
+Reaching them needs the MRealizer analogues of `CombinatorLemmas`' `wit_seq_*` (the counter-side
+commutation programme) — the entry here is that programme's missing *bridge*, not the programme.
+**Part C0** (`Probes/ClassicalMfiProbe.lean`): the composed classical route under MFI type-checks
+in ≈4 s (85,180 constructors, no realizer term built — unlike the term route which OOMs `#eval`
+building it), but *reducing* the `U`/`V` projection through it is `std::bad_alloc` at 12 GB (≈47 s):
+MFI clears the per-cast cost, not `negTrans_sound`'s ×230 per-node blowup. Lane B's "minutes, not
+OOM" prediction was optimistic; the wall is the translation layer (§14.5 "out of scope"), moved
+from elaboration to kernel reduction. No `main` change; headline axioms unchanged.
+
 ### 14.6 What this does to earlier decisions
 
 The design table's "Dialectica realizer: Subtype, not `∃`, so the witness is extractable"

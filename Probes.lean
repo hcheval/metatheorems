@@ -18,7 +18,9 @@ import Metatheorems.Probes.SizeProbe
 import Metatheorems.Probes.ProductRulesDemo
 import Metatheorems.Probes.MonotoneLaneA
 import Metatheorems.Probes.MonotoneLaneB
+import Metatheorems.Probes.MonotoneLaneBp
 import Metatheorems.Probes.MonotoneMCT
+import Metatheorems.Probes.ClassicalMfiProbe
 import Metatheorems.Probes.TermPrintDemo
 import Metatheorems.Probes.TinyBoundDemo
 import Metatheorems.Probes.TriangleBoundDemo
