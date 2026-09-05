@@ -210,5 +210,14 @@ namespace Metatheorems
 #print axioms le_R_add_mono_r_core
 #print axioms le_R_add_mono_l_core
 #print axioms le_R_add_mono_core
+-- Subtraction (2026-09-05): the ℝ content of the reverse triangle inequality
+-- (`BaseEquality.dist_rev_tri`). Tight as a direct estimate, but *no new estimate* — right
+-- monotonicity, then the cancellation `(g +ℝ h) +ℝ (−ℝ h) ≤ℝ g`, chained by `le_R_trans_core`;
+-- the two `=ℝ` facts hold on the nose at every index.
+#print axioms sub_R_eq_add_neg_R_core
+#print axioms neg_sub_R_core
+#print axioms add_neg_cancel_le_R_core
+#print axioms le_sub_R_of_le_add_core
+#print axioms abs_R_le_of_le_le_core
 
 end Metatheorems

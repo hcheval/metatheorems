@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Horatiu
 -/
 import Metatheorems.RealNumbers.Order
+import Metatheorems.RealNumbers.Approx
 
 namespace Metatheorems
 
@@ -645,6 +646,186 @@ def le_R_add_mono_core (f g h k : Term F Γ (realTy ι)) :
     pexact h1
   · papplym (le_R_add_mono_l_core g h k)
     pexact h2
+
+-- ── Subtraction: `f ≤ g +ℝ h → f −ℝ h ≤ g` ──────────────────────────────────
+--
+-- The ℝ content of the reverse triangle inequality (`BaseEquality.dist_rev_tri`).
+--
+-- The accounting, done directly: the goal at index `n` is about `(f −ℝ h)^(n+1) −ℚ ĝ(n+1)`,
+-- i.e. `f̂(n+2) −ℚ ĥ(n+2) −ℚ ĝ(n+1)` by `cauchyfy_sub_R`, while the hypothesis at index `m`
+-- is `f̂(m+1) −ℚ (ĝ(m+2) +ℚ ĥ(m+2)) <ℚ 2^{-m}`. Bringing `ĝ` from `m+2` to `n+1`, `ĥ` from
+-- `m+2` to `n+2` and `f̂` from `m+1` to `n+2` costs at least `2^{-(n+1)} + 2^{-(n+2)}` for
+-- every `m ≥ n+1`, so the total is `2^{-m} + 2^{-(n+1)} + 2^{-(n+2)} + …`, which reaches
+-- `2^{-n}` only as `m → ∞`: **tight**, every finite `m` overshoots (at `m = n+1` by exactly
+-- `2^{-(n+3)}`; at `m = n` by `2^{-(n+1)}`). So a direct proof must go through the
+-- `leR_strict` telescope.
+--
+-- But that telescope is already packaged in `le_R_trans_core`, and the statement is
+-- *algebraically* `f +ℝ (−ℝ h) ≤ (g +ℝ h) +ℝ (−ℝ h) =ℝ g` — right monotonicity (slack-free,
+-- above) followed by the cancellation `(g +ℝ h) +ℝ (−ℝ h) ≤ℝ g`, which is associativity,
+-- `add_neg_R_core` and `add_zero_R_core` chained by transitivity. No new estimate is written
+-- at all; the one new `cauchyfy` fact is `f −ℝ h =ℝ f +ℝ (−ℝ h)`, which holds *on the nose*
+-- at every index (`cauchyfy_sub_R` against `cauchyfy_add_R` + `cauchyfy_neg`), so it is
+-- `eq_R_of_cauchyfy_eqQ` with no estimate either.
+
+/-- `neg_R_app_weaken` is private to `Negation.lean`; re-derived here. -/
+private theorem neg_R_app_weaken' {Δ : Ctx ι} {ρ : Ty ι} (g : Term F Δ (realTy ι)) :
+    (Term.app Term.neg_R g).weaken (σ := ρ) = Term.app Term.neg_R g.weaken := by
+  show Term.app ((Term.neg_R : Term F Δ _).weaken) g.weaken = _
+  rw [Term.weaken, Term.rename_eq_subst, neg_R_closed_subst]
+
+/-- `neg_Q` congruence at `=₀` (`neg_Q_nat` is private to `Negation.lean`). -/
+private def negQ_nat' {s t : Term F Γ Ty.nat}
+    (h : Derivable F al Premises (Formula.eq0 s t)) :
+    Derivable F al Premises (Formula.eq0 (.app Term.neg_Q s) (.app Term.neg_Q t)) :=
+  qfer_no_premise_nat_nf h (r := .app Term.neg_Q (.var .vz)) (by qb_nf) (by qb_nf)
+
+/-- **`f −ℝ g =ℝ f +ℝ (−ℝ g)`.** The two cauchyfications agree on the nose at every index —
+`cauchyfy_sub_R` on the left, `cauchyfy_add_R` then `cauchyfy_neg` on the right — so this is
+`eq_R_of_cauchyfy_eqQ` with no estimate. -/
+def sub_R_eq_add_neg_R_core (f g : Term F Γ (realTy ι)) :
+    Derivable F al Premises
+      (eq_R (Term.app2 Term.sub_R f g) (Term.app2 Term.add_R f (.app Term.neg_R g))) :=
+  eq_R_of_cauchyfy_eqQ (Term.app2 Term.sub_R f g)
+    (Term.app2 Term.add_R f (.app Term.neg_R g)) (by
+    rw [sub_R_app_weaken, add_R_app_weaken, neg_R_app_weaken']
+    exact eqQ_of_nat_eq'
+      (qtrans (cauchyfy_sub_R f.weaken g.weaken (.app .succ (.var .vz)))
+        (Derivable.mp
+          (qtrans
+            (cauchyfy_add_R f.weaken (.app Term.neg_R g.weaken) (.app .succ (.var .vz)))
+            (addQ_r_nat (Term.app2 Term.cauchyfy f.weaken (.app .succ (.app .succ (.var .vz))))
+              (cauchyfy_neg g.weaken (.app .succ (.app .succ (.var .vz))))))
+          Derivable.sym0)))
+
+/-- **`−ℝ (f −ℝ g) =ℝ g −ℝ f`.** Again on the nose at every index: both sides cauchyfy to
+`ĝ(n+2) +ℚ (−ℚ f̂(n+2))` up to `neg_Q_add_Q`, `neg_Q_neg_Q` and commutativity. -/
+def neg_sub_R_core (f g : Term F Γ (realTy ι)) :
+    Derivable F al Premises
+      (eq_R (.app Term.neg_R (Term.app2 Term.sub_R f g)) (Term.app2 Term.sub_R g f)) :=
+  eq_R_of_cauchyfy_eqQ (.app Term.neg_R (Term.app2 Term.sub_R f g))
+    (Term.app2 Term.sub_R g f) (by
+    rw [neg_R_app_weaken', sub_R_app_weaken, sub_R_app_weaken]
+    let s1 : Term F (Ty.nat :: Γ) Ty.nat := .app .succ (.var .vz)
+    let s2 : Term F (Ty.nat :: Γ) Ty.nat := .app .succ s1
+    let A : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.cauchyfy f.weaken s2
+    let C : Term F (Ty.nat :: Γ) Ty.nat := Term.app2 Term.cauchyfy g.weaken s2
+    let nA : Term F (Ty.nat :: Γ) Ty.nat := .app Term.neg_Q A
+    let nC : Term F (Ty.nat :: Γ) Ty.nat := .app Term.neg_Q C
+    -- left: `−ℚ (A +ℚ −ℚ C)`
+    have hl : Derivable F al Premises (Γ := Ty.nat :: Γ)
+        (Formula.eq0 (Term.app2 Term.cauchyfy (.app Term.neg_R (Term.app2 Term.sub_R f.weaken g.weaken)) s1)
+          (.app Term.neg_Q (Term.app2 Term.add_Q A nC))) :=
+      qtrans (cauchyfy_neg (Term.app2 Term.sub_R f.weaken g.weaken) s1)
+        (negQ_nat' (cauchyfy_sub_R f.weaken g.weaken s1))
+    -- right: `C +ℚ −ℚ A`
+    have hr : Derivable F al Premises (Γ := Ty.nat :: Γ)
+        (Formula.eq0 (Term.app2 Term.cauchyfy (Term.app2 Term.sub_R g.weaken f.weaken) s1)
+          (Term.app2 Term.add_Q C nA)) :=
+      cauchyfy_sub_R g.weaken f.weaken s1
+    exact eqQtrans (eqQ_of_nat_eq' hl)
+      (eqQtrans (neg_Q_add_Q A nC)
+        (eqQtrans (addQr nA (neg_Q_neg_Q C))
+          (eqQtrans (add_Q_comm_inst nA C)
+            (eqQ_of_nat_eq' (Derivable.mp hr Derivable.sym0))))))
+
+/-- **Cancellation, one-sided**: `(g +ℝ h) +ℝ (−ℝ h) ≤ℝ g`. Associativity, `add_neg_R_core`
+under `g +ℝ ·` (monotonicity in place of an `=ℝ`-congruence for `+ℝ`, which does not exist),
+and `add_zero_R_core`, chained by `le_R_trans_core`. -/
+def add_neg_cancel_le_R_core (g h : Term F Γ (realTy ι)) :
+    Derivable F al Premises
+      (le_R (Term.app2 Term.add_R (Term.app2 Term.add_R g h) (.app Term.neg_R h)) g) := by
+  let nh : Term F Γ (realTy ι) := .app Term.neg_R h
+  let lhs : Term F Γ (realTy ι) := Term.app2 Term.add_R (Term.app2 Term.add_R g h) nh
+  let mid : Term F Γ (realTy ι) := Term.app2 Term.add_R g (Term.app2 Term.add_R h nh)
+  let mid0 : Term F Γ (realTy ι) := Term.app2 Term.add_R g Term.zero_R
+  pmode
+  papply (le_R_trans_core lhs mid g)
+  psplit
+  · papply (le_R_of_eq_R_core lhs mid)
+    pthm (add_assoc_R_core g h nh)
+  · papply (le_R_trans_core mid mid0 g)
+    psplit
+    · papply (le_R_add_mono_l_core g (Term.app2 Term.add_R h nh) Term.zero_R)
+      papply (le_R_of_eq_R_core (Term.app2 Term.add_R h nh) Term.zero_R)
+      pthm (add_neg_R_core h)
+    · papply (le_R_of_eq_R_core mid0 g)
+      pthm (add_zero_R_core g)
+
+/-- **`f ≤ℝ g +ℝ h → f −ℝ h ≤ℝ g`** — the ℝ content of the reverse triangle inequality.
+See the section comment for why no new estimate is needed although the statement is tight. -/
+def le_sub_R_of_le_add_core (f g h : Term F Γ (realTy ι)) :
+    Derivable F al Premises
+      (le_R f (Term.app2 Term.add_R g h) →ᶠ le_R (Term.app2 Term.sub_R f h) g) := by
+  let nh : Term F Γ (realTy ι) := .app Term.neg_R h
+  let fn : Term F Γ (realTy ι) := Term.app2 Term.add_R f nh
+  let gn : Term F Γ (realTy ι) := Term.app2 Term.add_R (Term.app2 Term.add_R g h) nh
+  pmode
+  pintro hyp
+  papply (le_R_trans_core (Term.app2 Term.sub_R f h) fn g)
+  psplit
+  · papply (le_R_of_eq_R_core (Term.app2 Term.sub_R f h) fn)
+    pthm (sub_R_eq_add_neg_R_core f h)
+  · papply (le_R_trans_core fn gn g)
+    psplit
+    · papply (le_R_add_mono_r_core f (Term.app2 Term.add_R g h) nh)
+      pexact hyp
+    · pthm (add_neg_cancel_le_R_core g h)
+
+/-- `a ≤ℚ A → a −ℚ b ≤ℚ A −ℚ b` — the first-argument half of `Interval.lean`'s `sub_Q_mono`,
+re-derived here so that `LeOrder` need not import the `[0,1]` module for one lemma. -/
+private def sub_Q_mono_l (a A b : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (le_Q a A →ᶠ le_Q (Term.app2 Term.sub_Q a b) (Term.app2 Term.sub_Q A b)) := by
+  pmode
+  pintro h1
+  papplym (le_Q_congr
+    (Term.app2 Term.add_Q a (.app Term.neg_Q b))
+    (Term.app2 Term.add_Q A (.app Term.neg_Q b))
+    (Term.app2 Term.sub_Q a b) (Term.app2 Term.sub_Q A b)
+    (eqQsym (sub_Q_eq_add_neg a b)) (eqQsym (sub_Q_eq_add_neg A b)))
+  papplym (le_Q_add_both a (.app Term.neg_Q b) A (.app Term.neg_Q b))
+  psplit
+  · pexact h1
+  · pthm (le_Q_refl (.app Term.neg_Q b))
+
+/-- **`w ≤ℝ v ∧ −ℝ w ≤ℝ v → |w|ℝ ≤ℝ v`.** Slack-free: `|ŵ|ℚ` is one of `ŵ`, `−ℚ ŵ` up to
+`≤ℚ` (`abs_Q_le_cases`), and `cauchyfy_abs_R`/`cauchyfy_neg` are identities, so each case is
+the corresponding hypothesis at the same index. -/
+def abs_R_le_of_le_le_core (w v : Term F Γ (realTy ι)) :
+    Derivable F al Premises
+      (le_R w v ∧ᶠ le_R (.app Term.neg_R w) v →ᶠ le_R (.app Term.abs_R w) v) := by
+  pmode
+  pintro hyp
+  pdestruct hyp with h1 h2
+  papplym (le_R_all w v) in h1 with hb1
+  papplym (le_R_all (.app Term.neg_R w) v) in h2 with hb2
+  papply (le_R_of_all (.app Term.abs_R w) v)
+  simp only [abs_R_app_weaken, neg_R_app_weaken']
+  pforall
+  pspecialize hb1 with hc1
+  pspecialize hb2 with hc2
+  lnorm
+  prw (cauchyfy_abs_R w.weaken (.app .succ (.var .vz)))
+  prw (cauchyfy_neg w.weaken (.app .succ (.var .vz))) in hc2 with hc2'
+  pfrom hc := abs_Q_le_cases (Term.app2 Term.cauchyfy w.weaken (.app .succ (.var .vz)))
+  pcases hc with hA | hB
+  · papply (le_lt_Q_trans _
+      (Term.app2 Term.sub_Q
+        (Term.app2 Term.cauchyfy w.weaken (.app .succ (.var .vz)))
+        (Term.app2 Term.cauchyfy v.weaken (.app .succ (.var .vz)))) _)
+    psplit
+    · papply (sub_Q_mono_l _ _ _)
+      pexact hA
+    · pexact hc1
+  · papply (le_lt_Q_trans _
+      (Term.app2 Term.sub_Q
+        (.app Term.neg_Q (Term.app2 Term.cauchyfy w.weaken (.app .succ (.var .vz))))
+        (Term.app2 Term.cauchyfy v.weaken (.app .succ (.var .vz)))) _)
+    psplit
+    · papply (sub_Q_mono_l _ _ _)
+      pexact hB
+    · pexact hc2'
 
 end OrderedFieldAxioms
 
