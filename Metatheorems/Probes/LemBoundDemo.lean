@@ -99,29 +99,50 @@ where both sides stick at a common point proves nothing).
 
 ## Where the stall actually is — measured, not guessed
 
-`set_option diagnostics true` on the stalling `rfl`, at threshold 500:
+`set_option diagnostics true` on the stalling `rfl`. **Read this at threshold 5, not 500** —
+the first pass of this analysis used 500, concluded from the resulting top-three that "nothing
+from the negative translation appears at all, `whnf` never gets that far", and wrote that into
+this file and into CLAUDE.md. It was false: the machinery was there, under the threshold. A
+filtered view is not a small view of the truth, it is a different claim.
 
-    Eq.rec ↦ 6312,  Term.rec ↦ 1985,  Term.rename ↦ 1930
-    (reducible: Eq.ndrec ↦ 6312, Term.casesOn ↦ 1985, Ty.casesOn ↦ 577)
+The full profile (threshold 5):
 
-**Nothing from the negative translation appears at all** — no `negTrans`, no
-`syntactic_soundness`, no `SRealizer.imp`, no `sSyllogism`. `whnf` never gets that far. What
-it is doing is **dependent-cast (`Eq.rec`) and renaming traffic**, which is *the same
-signature* as the Stage-B stall recorded in CLAUDE.md's Track A item 1
-(`Eq.rec ↦ 60474`, `Term.rec ↦ 10847`, `Term.rename ↦ 10504`) — and an order of magnitude
-smaller here.
+    Eq.rec ↦ 6312        Term.rec ↦ 1985       Term.rename ↦ 1930
+    Formula.rec ↦ 138    Term.weaken ↦ 132     Formula.neg ↦ 74
+    wTy ↦ 59             termMajorizer ↦ 55    cTy ↦ 43
+    Formula.renameF ↦ 36 Derivable.rec ↦ 27    Derivable.castAllowed ↦ 18
+    Formula.weakenBy ↦ 18  SRealizer ↦ 9       syntactic_soundness ↦ 9
+    SRealizer.imp ↦ 7
 
-**So the classical route is not blocked by a classicality-specific cost.** It is blocked by
-the cast/rename commutation debt the counter side already owes, reached by a different path:
-`classical_to_prenex_extended` moves the matrix under a `weakenBy`/`renameF` pair, and every
-such move leaves `Eq.rec` casts that `whnf` must push through before it can see a constructor.
-The restructuring target is therefore the same one item 1 names — cast/rename commutation, not
-arithmetic and not the translation — and a fix there unblocks both.
+**What this actually says.** `whnf` *is* inside `syntactic_soundness`'s recursion — and it has
+managed **9 unfoldings of it, 27 of `Derivable.rec`**, before exhausting the entire
+200,000-heartbeat budget. So the stall is not "before the translation" and not "at the
+translation"; it is an enormous **per-derivation-node** cost: roughly 700 `Eq.rec` and 215
+`Term.rename` for each single step of the soundness recursion. The derivation is walked at
+about nine nodes per full heartbeat budget.
 
-Two corollaries worth keeping. The type level is **not** the explanation, and this was checked
-rather than assumed: `tySize (wTy stmt) = 19` against `tySize (wTy pstmt') = 93`, and `cTy` 7
-against 39 — a factor of ≈5, nothing. And the counts are small in absolute terms (6312, not
-60474), so this reads as a constant factor over budget rather than a divergence.
+**`Derivable.castAllowed ↦ 18` is classicality-specific** — it is step 4 of
+`classical_to_prenex_extended`, the `Allowed.classical → Allowed.extended` cast, and it
+rebuilds the derivation as it goes. So the claim this file previously made, that the classical
+route carries *no* classicality-specific cost, is **not supported**; that machinery is in the
+profile.
+
+**What remains unsettled, and should not be asserted again without evidence.** The top-three
+signature does resemble the Stage-B stall of CLAUDE.md's Track A item 1
+(`Eq.rec ↦ 60474`, `Term.rec ↦ 10847`, `Term.rename ↦ 10504`). But `Eq.rec` is generic —
+essentially every dependent reduction routes through it — so a shared profile is weak evidence
+of a shared cause, and "one fix unblocks both" is an inference, not a measurement.
+
+The type level is **not** the explanation, and that part was checked: `tySize (wTy stmt) = 19`
+against `tySize (wTy pstmt') = 93`, `cTy` 7 against 39 — a factor of ≈5, nothing.
+
+**And note what has NOT been tried here: the technique that actually works.** A bare `rfl` is
+not how this project has ever extracted a numeral from a large term. `seq_mp_11_numeral`
+(`Probes/SeqMpBoundProbe.lean`) produces a kernel-checked literal from a term measured at
+≈7×10¹² nodes at context depth 11 — via a **simp set of commutation lemmas**, so the term is
+never materialized at all. Everything above is evidence about `rfl`, and `rfl` is known to be
+the wrong instrument at this scale. Before drawing any conclusion about feasibility here, run
+the simp route.
 
 ## Reproduction
 
