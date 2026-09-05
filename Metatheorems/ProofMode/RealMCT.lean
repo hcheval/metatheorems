@@ -18,7 +18,7 @@ import Metatheorems.ProofMode.Arith
     B(u,x) := ∀n ( a(n+1) ≤ℝ a n ∧ 0ℝ ≤ℝ a n ∧ a n ≤ℝ 1ℝ )      each read at Cauchy index u
     C(v,x) := leIdx |a v −ℝ a(v + g v)|ℝ ⟨2^{-(k+1)}⟩ℝ (k+2)     i.e. D̂(k+3) <ℚ 3·2^{-(k+2)}
 
-and `REAL_MCT.md` §3 plans its derivation as `mct_p2`'s budget descent over the reals. This
+and `docs/REAL_MCT.md` §3 plans its derivation as `mct_p2`'s budget descent over the reals. This
 file is that derivation, at `Allowed.extended` (no `lem`, no `markov`: the only case split is
 `qf_lem` on the quantifier-free conclusion matrix), and `real_mct_bound_p2` feeds it to the
 metatheorem.
@@ -64,7 +64,7 @@ The book's budget is `2^k` windows of drop `2^{-k}`. Ours is `2^{k+1}` windows o
 `2^{-(k+1)}`, because the dichotomy is taken on the *quantifier-free* `C(m)` — a rational
 comparison at the single index `k+3` — rather than on the real statement `D ≤ℝ 2^{-k}`. A
 window that fails `C(m)` is only known to have `D̂(k+3) ≥ 3·2^{-(k+2)}`, hence real drop
-`> 5·2^{-(k+3)}`, and the dyadic budget unit under `5/8` is `2^{-(k+1)}` (`REAL_MCT.md` §1,
+`> 5·2^{-(k+3)}`, and the dyadic budget unit under `5/8` is `2^{-(k+1)}` (`docs/REAL_MCT.md` §1,
 §6). The price of a constructive, `Allowed.extended` derivation is therefore one extra
 iteration of `m ↦ m + g m` in the exponent — `Φ ≈ g̃^{(2^{k+1})}(0)` against the book's
 `g̃^{(2^k)}(0)` — and the `2^k + 1` of `Reference/MCT.lean` is a third bookkeeping (its

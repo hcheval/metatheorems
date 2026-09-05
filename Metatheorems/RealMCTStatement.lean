@@ -12,7 +12,7 @@ import Metatheorems.CodeRealOps
 
 The *statement only* — design, side conditions, the semantic reading, and the plumbing that
 shows it fits `syntactic_general_metatheorem_at_gen` / `_classical_gen`. No derivation is
-built here; the derivation plan is `REAL_MCT.md` at the repo root (2026-09-05).
+built here; the derivation plan is `docs/REAL_MCT.md` (2026-09-05).
 
 `MCTStatement.lean` is **ℕ**-MCT: values are naturals, order is `x ∸ y =₀ 0`, the conclusion
 is *exact* equality `a v =₀ a (v + g v)`, and the budget is a natural `K`. `Reference/MCT.lean`
@@ -51,7 +51,7 @@ sequences of ℚ-codes with the fixed modulus `2^{-n}`).
   need only hold up to `2^{-U}`), and the same reading `TriangleBoundDemo` gave its `U`.
   The alternative packing — `u` the sequence index, the Cauchy index inside — would make `U`
   bound how far into the sequence the hypotheses are consulted; both are legitimate, the
-  brief asked for this one, and `REAL_MCT.md` §1 records the trade.
+  brief asked for this one, and `docs/REAL_MCT.md` §1 records the trade.
 
 * **The conclusion `∃v C` is the metastability statement with explicit slack at a fixed
   index** (CLAUDE.md Track D4, "the one genuine design step"). The real-number statement
@@ -80,7 +80,7 @@ sequences of ℚ-codes with the fixed modulus `2^{-n}`).
     bound with positive slack — so a non-strict target `D̂(j) ≤ℚ t` is unreachable and the
     target has to be the strict `D̂(k+3) <ℚ c + 2^{-(k+2)}`; that is the tightness
     discipline of CLAUDE.md's ℝ section applied to the statement rather than to a proof.
-    The two free parameters are then pinned by the descent proof (`REAL_MCT.md` §3): a
+    The two free parameters are then pinned by the descent proof (`docs/REAL_MCT.md` §3): a
     window that *fails* `C` has `D̂(k+3) ≥ 3·2^{-(k+2)}`, hence a real drop
     `> 3·2^{-(k+2)} − 2^{-(k+3)} = 5·2^{-(k+3)} > 2^{-(k+1)}`, so the budget unit is
     `2^{-(k+1)}` and `a 0 ≤ 1` allows `2^{k+1}` bad windows. With `c = 2^{-(k+2)}` instead the

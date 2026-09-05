@@ -971,19 +971,22 @@ which is why `general_metatheorem`'s original shape comes back into use.
 
 ### 14.7 Status (2026-09-05, evening) — where the MFI work lives and what it has shown
 
-The refactor is on the integration branch `mfi` (worktree `.worktrees/mfi`), deliberately
-**unmerged into `main`** until a bound with mathematical content reduces; the per-lane record
-is in that branch's copy of `CLAUDE.md`. Landed there: Lane A (full `monotone_soundness`, all
+The refactor was built on an integration branch `mfi` and **merged into `main` on 2026-09-06**
+(as work in progress; the original gate — a bound with mathematical content reducing — was
+not reached); the per-lane record is in `CLAUDE.md` ("MFI Lane A/B/B'/C/D1"). Landed: Lane A (full `monotone_soundness`, all
 39 constructors, `MaxCompat` as fields, gate G1 — the `and_contract` crossover `max(1709, 901)`
 by `rfl`), Lane B (`monotone_general_metatheorem_at`/`_gen`; a cast-free proof-mode derivation
 at a space gives `U = V = Φ = 901` in the kernel; `pinduction` reduces through the book's
 `t^M`), Lane B' (`MRealizer.transport`, the `Eq.mpr` entry; a directly reachable ℚ cast
 reduces to a numeral), Lane C (the fused NT+MFI recursion `monotone_nd_soundness` on classical
 derivations and `monotone_general_metatheorem_classical_at`; NT-stability is no longer needed
-because the premise case takes an `MRealizer` at `Bᴺᵀ`). Two obstacles remain, both named by
-measurement: (1) casts left by `anorm`/`canorm`/`qfer_*_nf` sit *under* the `pm_*`/`seq_*`
-layer, where the entry cannot reach them without commutation lemmas for that layer (Lane D1,
-in progress); (2) **the composition combinators re-evaluate their sub-majorants** —
+because the premise case takes an `MRealizer` at `Bᴺᵀ`), and Lane D1 (`mfi_memo`: the
+`seq_*`-layer commutation entries — `seq_of_thm`/`seq_mp`/`seq_id`/`seq_allI`/`seq_induction`,
+all Δ-generic — which push `monotone_soundness` through a whole proof-mode derivation to its
+casts: `le_R_of_le_R_pu`, 4167 constructors and 180 casts, gives its counter read-out `3` in
+13.5 s of kernel time). So the cast obstacle is cleared, and **one obstacle remains**, named by
+measurement from both sides (Lane C on the classical route, Lane D1 on the intuitionistic):
+**the composition combinators re-evaluate their sub-majorants** —
 `MRealizer.syllogism` uses `hAB.val n e` three times and `hBC.val n e` twice, and neither the
 kernel nor the compiled evaluator shares them, so nested syllogisms cost ×5 per level (kernel
 dies at ≈8, evaluator at 3; `prenexify` has 134). That is the Dialectica exponential in its

@@ -15,14 +15,14 @@ an identifier (found 2026-09-05: the full build broke at `MetricSpaces.lean:717`
 `Term.app2 Term.add s t`, and carries its own copy of `anorm_cons`'s rule list (`mcons`). -/
 
 /-!
-# The ℝ lemmas the ℝ-MCT derivation needs (`REAL_MCT.md` §5, revised)
+# The ℝ lemmas the ℝ-MCT derivation needs (`docs/REAL_MCT.md` §5, revised)
 
 `ProofMode/RealMCT.lean` derives the real-number monotone convergence theorem in metastable
 form. Its descent runs entirely at the level of `≤_ℝ` — every estimate it needs is already
 paid inside `LeOrder.lean`'s package — and what was missing was *assembly*: constants,
 cancellation, absolute value, the antitone chain over the reals. This file is that assembly.
 
-## Design rules, and where the plan (`REAL_MCT.md` §5) was revised
+## Design rules, and where the plan (`docs/REAL_MCT.md` §5) was revised
 
 * **Everything with a rational side condition is an object implication.** There is no
   derivation-weakening combinator (`Derivable … A` in `Γ` does not give one in `ρ :: Γ`), so a
