@@ -920,6 +920,35 @@ MFI clears the per-cast cost, not `negTrans_sound`'s ×230 per-node blowup. Lane
 OOM" prediction was optimistic; the wall is the translation layer (§14.5 "out of scope"), moved
 from elaboration to kernel reduction. No `main` change; headline axioms unchanged.
 
+**Lane C (2026-09-05): the fused NT+MFI recursion — the classical route is now IN scope, and
+the NT-stability condition disappears.** §14.5 listed "the classical route's ×230 from
+`negTrans_sound`" as *explicitly out of scope* because it is "a fix to the translation, not to
+the interpretation." Lane C makes that fix: `Dialectica/MonotoneND.lean`'s `monotone_nd_soundness`
+interprets a **classical** derivation directly into `MRealizer cm Aᴺᵀ`, so the 85,180-node
+`negTrans_sound` output is never built. The recursion mirrors `negTrans_sound` arm for arm: the
+fixed `¬¬`-combinators it inlines per node are **leaves** (`leafM = ofSRealizer ∘
+syntactic_soundness`), recursive results compose with Lane A's `MRealizer.mp`/`.syllogism`/… ,
+and the eigenvariable/QF-ER/induction cases go through `MRealizer.forallRule`/`existRule`/
+`univGen`/`qfer`/`induction` (`ndForallRule`/…/`ndInduction`). The consequence worth keeping:
+**NT-stability vanishes.** `negTrans_sound` needs `nts : NTStableD Premises` because its premise
+case is `.mp (.premise hp) (nts _ _ hp)`; here the premise case takes an `MRealizer cm Bᴺᵀ`
+*directly* (`spremise_nd`), so no condition on the premise set is needed at all — and this was
+the last consumer of the `isPurelyUniversal`-on-`Derivable.premise` idea (note 1). For purely
+universal premise sets (every space axiom) `spremise_nd_of_pu` supplies `spremise_nd` from the
+existing `spremise` through `negTrans_iff_pu`, so the space models add nothing.
+`MonotoneMetatheoremClassical.lean`'s `monotone_general_metatheorem_classical_at` routes
+`prenexify` → `monotone_nd_soundness` → `nn_all_nn` → the `¬¬∃u∃v` projection
+(`mfi_extract_classical`, peeling the surviving `¬¬` as `extraction_of_prenex_realizer` does) →
+`metatheorem_core_of_majorants_at`, SAME statement as the term-route classical metatheorem, all
+`[propext, Classical.choice, Quot.sound]`, no `sorryAx`. So the classical bound no longer OOMs
+at ELABORATION. **But the numeral REDUCTION still OOMs** (gate G-C1/G-C2, `Probes/ClassicalMfiProbe.lean`):
+`std::bad_alloc` at 12 GB, now dominated by `prenexify` (347 constructors, LEM) + the
+`¬¬`-combinator leaves, not by `negTrans_sound`. Localised exactly: the same 12-node derivation
+at `Allowed.extended` under MFI, *without* prenexify/NT, reduces to `U=0`, `V=5` in ≈17 s
+(`extU5`/`extV5`, PASS). MFI thus moved the classical OOM from elaboration to a *different*
+kernel reduction; making the classical numeral reduce needs a `monotone_nd_soundness`-commutation
+simp set (the `MonotoneMemo`/`wit_seq_*` idea one layer down), the new "out of scope".
+
 ### 14.6 What this does to earlier decisions
 
 The design table's "Dialectica realizer: Subtype, not `∃`, so the witness is extractable"

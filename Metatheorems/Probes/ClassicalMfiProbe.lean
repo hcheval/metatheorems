@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Horatiu
 -/
 import Metatheorems.Dialectica.MonotoneMemo
+import Metatheorems.MonotoneMetatheoremClassical
 import Metatheorems.Probes.LemBoundDemo
 import Metatheorems.Probes.MonotoneLaneB
 
@@ -89,6 +90,76 @@ noncomputable def cV (xs : Ty.interpret lXE Ty.nat.hat) : ℕ :=
 
 #print axioms cDerivNoLem
 #print axioms crNoLem
+
+-- ============================================================================
+-- The FUSED classical route (Lane C): `monotone_nd_soundness`, no `negTrans_sound`
+-- ============================================================================
+
+/-!
+## Lane C: the fused negative-translation + MFI recursion, and gates G-C1 / G-C2
+
+`monotone_general_metatheorem_classical_at` (`MonotoneMetatheoremClassical.lean`) interprets
+the CLASSICAL derivation directly — `prenexify` under `∀x`, then `monotone_nd_soundness`
+(`Dialectica/MonotoneND.lean`), then `nn_all_nn` at the `MRealizer` level. It never builds
+`classical_to_prenex_extended`'s 85,180-node `negTrans_sound` output (part C0 above), so the
+×230 does not bite at ELABORATION: the whole classical metatheorem **type-checks and is
+`[propext, Classical.choice, Quot.sound]`, no `sorryAx`** — verified in the umbrella build.
+And **NT-stability is gone**: `monotone_nd_soundness`'s premise case takes an `MRealizer` of
+the translated premise directly, so no `NTStableD` argument appears anywhere on this route
+(`lNts` is unused by it).
+
+**Gate G-C1 / G-C2 (reduce to a numeral): NEGATIVE — kernel `std::bad_alloc` at 12 GB.**
+The fused recursion removes negTrans_sound's blow-up, but the classical bound's kernel
+REDUCTION still exhausts 12 GB — now dominated by `prenexify` (347 constructors, with LEM) plus
+the `¬¬`-combinator leaves `monotone_nd_soundness` inserts (`neg_neg_mp`, `neg_neg_imp_rev`,
+`nn_all_nn`, …), each realized by `syntactic_soundness` of a fixed combinator. So MFI moved the
+OOM from elaboration (term route, `#eval`/reduction of the 85k term) to a *different* kernel
+reduction, and did not make the classical numeral reducible by bare `kernel_rfl`.
+
+**Localised.** The difference is exactly `prenexify` + the NT layer, NOT MFI itself:
+`CGate.extR = monotone_soundness … lFinalExt` — the SAME derivation at `Allowed.extended`, MFI,
+**no prenexify, no NT** — reduces to `U = 0`, `V = 5` by `kernel_rfl` in ≈17 s (`extU5`,
+`extV5` below, both PASS). The classical route's OOM is the prenexify+NT reduction, not the
+monotone interpretation, which is the same conclusion part C0 reached for the term route.
+
+**Reproduction of the OOM (kept out of the file — a file of errors is not a green build):**
+
+    -- `std::bad_alloc` at 12 GB after ≈50 s:
+    noncomputable def cmfiRNoLem :=
+      clMRealizer lEqxiE lSpremiseE lCmE (fun _ _ h => h.elim)
+        lB0_qf lB0_vf lC0_qf lC0_vf lFinalNoLem
+    theorem gC1_U : (0 : ℕ) = mfiU_cl lCmE cmfiRNoLem (5 : ℕ) := by kernel_rfl
+    theorem gC1_V : (5 : ℕ) = mfiV_cl lCmE cmfiRNoLem (5 : ℕ) := by kernel_rfl
+    -- `cmfiRNoLem` itself type-checks (it is what `monotone_general_metatheorem_classical_at`
+    -- builds); only the `kernel_rfl` reductions OOM. G-C2 (`lFinalLem`, genuine `Derivable.lem`)
+    -- is the same: type-checks, reduction OOMs. Excluded-middle is invisible under the prenexify
+    -- cost, exactly as `LemBoundDemo` found for the term route.
+
+The next step, out of scope here (brief: do not start the fused NT+MFI simp programme), is a
+`monotone_nd_soundness`-commutation simp set (the `MonotoneMemo`/`wit_seq_*` idea one layer
+down) so the leaves are rewritten rather than reduced — the only route that has produced a
+numeral from a large term in this project (`seq_mp_11_numeral`).
+-/
+
+open LemBoundDemo (lFinalExt)
+
+/-- The EXTENDED MFI realizer of the SAME 12-node derivation — MFI, but no `prenexify`, no NT.
+The localisation control for the classical OOM above. -/
+noncomputable def CGate.extR :=
+  monotone_soundness lEqxiE lSpremiseE lCmE lFinalExt
+
+/-- **G-C1 control (PASS): the MFI machinery reduces and gives the expected `U = 0`.** Agrees
+with `LemBoundDemo.lUtExt_at_5` (the term-route intuitionistic control). ≈17 s, `kernel_rfl`. -/
+theorem extU5 : (0 : ℕ) = mfiU lCmE CGate.extR (5 : ℕ) := by kernel_rfl
+
+/-- **G-C1 control (PASS): `V = 5`.** Agrees with `LemBoundDemo.lVtExt_at_5`. -/
+theorem extV5 : (5 : ℕ) = mfiV lCmE CGate.extR (5 : ℕ) := by kernel_rfl
+
+/-- Non-degeneracy: `4` is refuted, so the `rfl` genuinely reduces (trap 12). -/
+theorem extV5_ne_4 : (4 : ℕ) ≠ mfiV lCmE CGate.extR (5 : ℕ) := by rw [← extV5]; decide
+
+#print axioms extU5
+#print axioms extV5
 
 end ClassicalMfi
 end Metatheorems
