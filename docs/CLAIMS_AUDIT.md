@@ -293,3 +293,75 @@ audit cheap. Items needing attention:
    over- and an under-estimate of achievable sharing, for two independent reasons. Both
    arguments look right; the net is genuinely unknown, and the deck says so. Nothing to fix,
    but do not let a question turn it into a number.
+
+---
+
+## Appendix — the staleness pass on `CLAUDE.md` and `ARCHITECTURE.md`
+
+A separate task, done after this audit and committed separately: **delete chronology, never
+delete content.** No Lean source was touched. `CLAUDE.md` 2605 → 2516 lines,
+`ARCHITECTURE.md` 1068 → 1057.
+
+**Removed** (counts are of edit sites, not lines):
+
+| category | CLAUDE | ARCH |
+|---|---|---|
+| `YYYY-MM-DD` stamps in prose, headings and table cells | 183 occurrences, all gone | 28, all gone |
+| commit SHAs cited as provenance (`af9de4e`, `67228bd`, `3089af9`, `511f5a2`, `5003bb4`, `c332fd7`, `32ea2eb`, `27366a2`, `fb25083`, `6abbfc4`) | 10 | 2 |
+| branch-lifecycle narration: merge dates, deleted branch names, `trial/*` snapshots, per-lane merge table, "live branches as of …" | ~1 page | ~2 paragraphs |
+| build-job counts quoted as of a date (8061 / 8063 / 8065 / 8088 / 8102 / 8111) | 6 | 1 |
+| "this entry used to say / an earlier draft said / corrected on …", where the correction itself was kept | 14 | 4 |
+| "Remaining sorries — HISTORICAL" section (a list of sorries that no longer exist) | 1 section | — |
+
+**Kept, rewritten into the present tense at the point where someone would retry the thing:**
+every failed approach and every corrected belief. Specifically, and these were checked
+one by one after the edit:
+
+* `let`-binding the sub-majorants does not help — the kernel zeta-reduces `let` (ARCH §14.8.2,
+  verbatim);
+* the composition cost is exponential in **depth** (9 for `prenexify`), not in the syllogism
+  **count** (134) — both in ARCH §14.7/§14.8 and in the CLAUDE Lane C block, now phrased as a
+  standing instruction ("do not write 134") rather than as a correction;
+* the delta-expansion pathology is a `prw`/`subst` phenomenon, **not** a term-size one;
+* `Majorizability` with a total majorizer is uninhabitable, with the `f* = id` argument;
+* a `conv` block with no closing tactic can be vacuous (trap 12, and the `BoundLemmasP2`
+  retraction that produced it);
+* `AdmissibleEqX.eqx_refl` was *unsatisfiable*, not merely unproved, with the refuting
+  interpretation;
+* the `#eval lTermSize` OOM is not evidence about a bound (`sizeWithoutSharing` ban);
+* a filtered `diagnostics.threshold` profile is a different claim, not a smaller one;
+* `Term.monus`/`Term.pd` are **not** what the Stage-B stall is;
+* `sInduction`'s difficulty is not `cm.precM`;
+* the classical stall is two-sided where the intuitionistic one is one-sided;
+* extraction with content does **not** require the proof mode — the proof mode is a liability
+  (×295);
+* `mul_Q`'s node count predicted nothing about its elaboration cost;
+* `cauchyfy_congr` does not need `seq_induction`;
+* two lanes can prove different lemmas under the same name;
+* `git merge-tree` has reported zero conflicts for a merge that had one.
+
+**Judgement calls, listed so they can be spot-checked rather than trusted:**
+
+1. **Deleted one whole section**, "Remaining sorries — HISTORICAL": a per-file count of sorries
+   that are all closed. Its three non-chronological sentences were moved up into "THE BUILD HAS
+   NO SORRIES" — the `le_zero_eq_zero_R`-was-false lesson, the `eqxi`-as-a-hidden-sorry lesson,
+   and the four-metatheorem axiom lists. Nothing else in it was content.
+2. **Rewrote a stale claim rather than only de-dating it**, in ARCH §3: it said
+   `MetricModel.eqXInterp` has "five `sorry`" fields and that both metric metatheorems depend
+   on `sorryAx`. That is false now. The paragraph's content — that all of them stall on one
+   missing evaluation bridge — is kept and pointed at `QValBridge.lean`.
+3. **Deleted a note about the file itself** in ARCH §14.5 saying the file "carries **two**
+   `## 14` headings, the second a truncated duplicate". There is now exactly one; the duplicate
+   was already resolved.
+4. **Replaced the "live branches" paragraph** with an undated statement of the branch layout
+   plus `demo`'s two concrete merge obstacles. A live-state list is not chronology, but it
+   cannot be kept accurate without a date, so it is now the smallest true statement.
+5. **Corrected two counts while de-dating them**, because leaving the old number would have
+   been worse than either alternative: `soundness` "all 36 constructors" → 39 (three sites),
+   and the `Probes/` file count, which is now stated as no count at all.
+6. **Left the three `[HISTORICAL]` `AdmissibleEqX` sections in place**, only de-dated. They
+   duplicate `ARCHITECTURE.md` §1–§3, which is where the same reasoning lives in better shape;
+   deleting them is a defensible next step but is more than a staleness pass.
+7. **Left every claim this audit flags as INFERRED or PROSE exactly as it stands** — including
+   "`U(k) = k−1` sharp" — because fixing them is the *other* task, and mixing the two would
+   make both unreviewable.
