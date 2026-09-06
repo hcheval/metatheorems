@@ -2,7 +2,7 @@
 
 Reasoning behind the project's parametrisation choices, the bugs found in them, and the
 directions considered but not taken. `CLAUDE.md` records *what is true now*; this file records
-*why*, and what was rejected. Written 2026-09-02.
+*why*, and what was rejected.
 
 Everything below is either verified (a build, a `#print axioms`, a probe that compiled) or
 explicitly marked as inferred. Where a claim was checked, the check is named so it can be
@@ -59,7 +59,7 @@ variable-inclusion puts `adm` in its signature. Repeat ~2,000 times.
 Verified: `adm.eqx_refl/sym/trans` are used in **exactly three places in the project** —
 `Arithmetic.lean:164`, `:188`, `:206`. Everything else merely forwards `adm`.
 
-### Why it stayed hidden until 2026-09-02
+### Why it stays hidden
 
 A *primitive* `=_X` with equivalence axioms gets admissibility free from `.premise`. The
 circularity only appears when `=_X` is **defined** — as `d(x,y) =ℝ 0ℝ` is — and its properties
@@ -70,25 +70,23 @@ thing to do, silently.
 
 ## 2. `AdmissibleEqX` was polymorphic in `Premises` — an unsatisfiable field
 
-Fixed 2026-09-02, commit `af9de4e`. Recorded here because the reasoning generalises.
+Recorded here because the reasoning generalises.
 
-`eqx_refl` used to quantify over *every* `Premises`, including the empty one — demanding
+`eqx_refl` quantified over *every* `Premises`, including the empty one — demanding
 `⊢ d(t,t) =ℝ 0ℝ` from no assumptions. `d_X` is `Term.func ()`, uninterpreted, so the
 interpretation `metric x y = fun _ => 1` refutes it. The field was **not satisfiable**, and its
 `sorry` stood for a false claim rather than for unfinished work. The in-file comment blaming
 the ℝ ordered-field axioms was wrong: no amount of `RealNumbers.lean` progress touched it.
 
-`AdmissibleEqX EqX Premises` now carries its theory. `Premises` is a plain parameter with no
-monotonicity hypothesis, because every file already has `Premises` as an ambient section
+The fix was to make `AdmissibleEqX EqX Premises` carry its theory. `Premises` is a plain
+parameter with no monotonicity hypothesis, because every file already has `Premises` as an ambient section
 variable — so all ~35 signature sites moved and **zero call sites changed**.
 
 ---
 
 ## 3. `adm` was discharged into a binder at the metric site
 
-Also fixed in `af9de4e`, after the user pointed it out.
-
-`MetricModel.metric_metatheorem_classical` used to take `adm` as a *parameter* rather than
+`MetricModel.metric_metatheorem_classical` took `adm` as a *parameter* rather than
 using `MetricSpace.admissibleEqX`, because the latter was sorried. That is a `sorry` moved
 into a binder: the theorem looks finished and the obligation is invisible.
 
@@ -103,8 +101,8 @@ construct is a `sorry` moved into a binder.*
 
 ### This pattern has now appeared three times
 
-Verified 2026-09-02 (morning): **nothing in the project constructed an `EqXInterp`.** It
-occurred only as the hypothesis `eqxi`. `spremise` likewise.
+At one point **nothing in the project constructed an `EqXInterp`**: it occurred only as the
+hypothesis `eqxi`, and `spremise` likewise.
 
 Worse, `EqXInterp.extract` requires a realizer of `EqX i s t` to yield
 `Term.interpret si s env = Term.interpret si t env` — **Lean equality of the interpretations**.
@@ -112,22 +110,21 @@ For the metric model that is `d(x,y) = 0 → x = y`, i.e. **separation**, which 
 does not satisfy. `MetricSpaces.lean` called itself a pseudometric in four places and
 `MetricModel` had no separation field.
 
-**Resolved 2026-09-02 (afternoon), as predicted.** The docs were wrong, not the code: the
-*theory* is a pseudometric one and the *models* are genuine metric spaces. `MetricModel` now
-carries `d_eq_zero : ∀ x y, d x y = 0 → x = y`, its docstring says why the two differ (weaker
-axioms ⇒ derivations apply to more structures; `extract` needs separation), and the header
-comment no longer calls the model a pseudometric. **Do not add separation to `Derivable`.**
+The docs were wrong here, not the code: the *theory* is a pseudometric one and the *models* are
+genuine metric spaces. `MetricModel` carries `d_eq_zero : ∀ x y, d x y = 0 → x = y`, and its
+docstring says why the two differ (weaker axioms ⇒ derivations apply to more structures;
+`extract` needs separation). **Do not add separation to `Derivable`.**
 
-`MetricModel.eqXInterp` now exists and both metric metatheorems discharge `eqxi` internally,
-so all three of `metric_metatheorem`'s unconstructed hypotheses are gone. The price is
-explicit: four of `EqXInterp`'s nine fields are proved (the structural ones — the witness type
-is `ℕ → Unit`), and **five are `sorry`**, so both metric metatheorems now depend on `sorryAx`.
-All five stall on the *same* missing piece, and it is not a metric fact: an **evaluation
-bridge** from object-level ℚ terms to `Rounding.qval`, i.e. the value of
+`MetricModel.eqXInterp` exists and both metric metatheorems discharge `eqxi` internally, so
+all three of `metric_metatheorem`'s unconstructed hypotheses are gone. The structural fields
+are free (the witness type is `ℕ → Unit`); the model facts all stalled on the *same* missing
+piece, and it is not a metric fact: an **evaluation bridge** from object-level ℚ terms to
+`Rounding.qval`, i.e. the value of
 `lt_Q_dec (abs_Q (sub_Q (cauchyfy f (n+1)) (cauchyfy g (n+1)))) (pow2neg_Q n)` in the standard
-model. `QVal.lean`'s own header declines exactly this ("a separate bridge … not attempted
-here"). The obvious alternative — a soundness theorem for `Derivable` — is **circular**: its
-`dist_comm`/`dist_tri` cases *are* two of the five fields.
+model. That is `QValBridge.lean`, and building it is what closed them; `QVal.lean`'s own header
+declines exactly this task ("a separate bridge … not attempted here"). The obvious alternative
+— a soundness theorem for `Derivable` — is **circular**: its `dist_comm`/`dist_tri` cases *are*
+two of those fields.
 
 ---
 
@@ -142,16 +139,15 @@ inductive Term {ι : Type} (F : ι → Ty ι) : Ctx ι → Ty ι → Type where
 `ι` indexes base types (`Ty.base`), function constants (`func`), and distinguished points
 (`zeroX`) — **one of each, in lockstep**, so `|constants| = |base types|`, forced.
 
-**Count corrected 2026-09-04 — the diagnosis below stands, the example that motivated it no
-longer does.** This paragraph used to read "Metric spaces fit exactly (one `X`, one `d`). But
-W-hyperbolic needs one base type and **two** constants, `d` and `W`, and no `ι` gives that."
-Since the `Term.dist` refactor (2026-09-02) `d` is **not** a constant — it is the structural
+**Beware the count that motivated this section.** The natural first statement of the problem —
+"W-hyperbolic needs one base type and **two** constants, `d` and `W`, and no `ι` gives that" —
+is wrong, and the diagnosis stands without it. `d` is **not** a constant: it is the structural
 constructor `Term.dist`, carried by every base type at every `ι`, because `eqAtType` must name
 it without going through a signature. So:
 
 - **Metric spaces use ZERO function constants**: `MetricSpace.F () = Ty.unit`, and `d_X` is
   `Term.dist ()`. The one available constant slot sits unused.
-- **W-hyperbolic now needs 1 base type + 1 constant** (`W` alone), which `ι = Unit` supplies.
+- **W-hyperbolic needs 1 base type + 1 constant** (`W` alone), which `ι = Unit` supplies.
   **It fits — but by the numbers happening to line up, not because the indices were
   decoupled.** W-hyperbolic can therefore be built *before* this refactor, which is a
   sequencing convenience, not a reprieve.
@@ -311,7 +307,7 @@ elaborator second.
 **The proposal.** Delete `EqX`; give every base type a distance `d_i`, define
 `x =_X y :≡ eq_R (d_i x y) 0ℝ` once and for all.
 
-**Probe result (2026-09-02): feasible, no blocker.** Verified two independent ways — a
+**Probe result: feasible, no blocker.** Verified two independent ways — a
 constant-level dependency oracle over the elaborated environment, and a 630-line verbatim copy
 of all required declarations compiling against only `Metatheorems.Language` and
 `Metatheorems.SimpSets` **in 4.5 s**. The probe also elaborated a working `eqAtType'` with `EqX`
@@ -362,7 +358,7 @@ Move exactly the theorems and what remains is **always constructible by computat
 proof**. The §1 circularity dissolves — not by removing `adm` from arithmetic, but by making it
 cheap enough that arithmetic can have it.
 
-**Cost (both figures verified 2026-09-02).** 3 constructors, 3 field removals, 3 call sites
+**Cost (both figures verified).** 3 constructors, 3 field removals, 3 call sites
 (`Arithmetic.lean:164/188/206`), 2 `sorry`s deleted; and 3 new cases in each of **4** in-build
 recursions over `Derivable` (`Dialectica/Lemmas.lean`, `NegTrans.lean`,
 `Syntactic.lean:1032`, `castAllowed`) plus the out-of-build `Hilbert.lean` printer. `adm` stays
@@ -393,7 +389,7 @@ as a debt or it becomes something we assumed and forgot we assumed.
 
 ## 9. Neri–Pischke, *Proof mining and probability theory* (arXiv:2403.00659)
 
-Read 2026-09-02 as a test of whether our design over-commits. A **non-metric** metatheorem:
+Read as a test of whether our design over-commits. A **non-metric** metatheorem:
 abstract elements are majorized by the probability content rather than by a metric.
 Deliberately deferred as future work; recorded because it constrains interfaces we are about to
 touch.
@@ -420,8 +416,8 @@ touch.
    their key axioms are **type Δ** — `∀a ∃b ≤_σ ra ∀c A_qf` — neither PU nor NT-stable, and
    eliminated by Skolemising into a *new constant* plus a purely universal axiom. If we want a
    reusable metatheorem, premise-admissibility should be a **parameter with at least two
-   inhabitants**, not a fixed `isPurelyUniversal` check. *We may implement the Δ version later
-   (user, 2026-09-02) — retrofitting touches `Derivable`, `NegTrans` and the metatheorem
+   inhabitants**, not a fixed `isPurelyUniversal` check. *The Δ version may be implemented
+   later (user decision) — retrofitting touches `Derivable`, `NegTrans` and the metatheorem
    statement.*
 2. **`eqAtType` is not the only type-recursive relation needed.** `≤_ρ` is a second one, with a
    per-base-type clause, interacting with `≽` via a field we lack:
@@ -442,7 +438,7 @@ touch.
 
 ---
 
-## 9b. Known debts from the `Term.dist` refactor (2026-09-02)
+## 9b. Known debts from the `Term.dist` refactor
 
 Recorded so they read as *debts*, not as design.
 
@@ -532,7 +528,7 @@ without quotienting first.
 ## 10. Scope decisions
 
 - **`general_metatheorem` may narrow to theories whose base types are pointed pseudometric
-  spaces** if §7 is ever taken — user decision, 2026-09-02, made deliberately. Not an oversight;
+  spaces** if §7 is ever taken — a deliberate user decision. Not an oversight;
   do not "restore" the generality. It costs nothing at `ι = Empty`, which is where the whole
   ℚ/ℝ layer and both MCT derivations live.
 - **Primitive λ is kept.** See `CLAUDE.md`, "Lambda vs. combinators". §9 confirms the reasoning.
@@ -571,7 +567,7 @@ inherits to every extension verbatim — where hand-built `Term F_metric` realiz
 the `morphism(t)` problem of §6 at the worst possible place. **Unchecked**: whether `le_R_pu` is
 `isVFree`, which `dialecticaMatrix_iff_interpFormula` requires alongside QF.
 
-## 12. Decisions D-1, D-2, D-4 — salvaged from the deleted `HANDOFF.md` (2026-09-04)
+## 12. Decisions D-1, D-2, D-4 — salvaged from the deleted `HANDOFF.md`
 
 `HANDOFF.md` was a one-month *talk* plan (thesis, schedule, budgets, Q&A prep, abort states).
 That plan is moot and the file was deleted — but its §4 decisions are **enforced in code right
@@ -610,13 +606,13 @@ check. Not a restriction suffered but the precise statement of what D-1's hand-t
 produces: the lazy MCT proof's contradiction bottoms out in a Σ₁ statement over decidable
 primes, so after Kuroda its classical content is exactly `¬¬∃n(qf) → ∃n(qf)`.
 
-**Deliberately NOT salvaged, because it is now false or dead:** D-3 (superseded by D-4 in the
-original); the "out of scope for the month" note protecting the `general_metatheorem_classical`
-sorry — *that sorry was closed 2026-09-02*; D-4.1's "ℚ and ℝ are both off the critical path
-this cycle" — the ℚ/ℝ tower is complete with zero sorries; and the entire schedule, budget,
-claims-calibration and abort-state apparatus. Full text remains in git history.
+**Deliberately NOT salvaged, because it is false or dead:** D-3 (D-4 replaces it in the
+original); the "out of scope" note protecting the `general_metatheorem_classical` sorry — that
+sorry is closed; D-4.1's "ℚ and ℝ are both off the critical path" — the ℚ/ℝ tower is complete
+with zero sorries; and the entire schedule, budget, claims-calibration and abort-state
+apparatus. Full text remains in git history.
 
-## 13. How our metatheorem differs from Kohlenbach 17.52 (2026-09-04)
+## 13. How our metatheorem differs from Kohlenbach 17.52
 
 **Read this before claiming the project "formalizes Kohlenbach's metatheorem".** It does not,
 quite. The gap is narrow and probably costs nothing mathematically, but it was unrecorded until
@@ -636,13 +632,13 @@ proof mining: the abstract metric and hyperbolic case", Gerhardy–Kohlenbach):
 
 | | Kohlenbach 17.52 | reference document | **ours** |
 |---|---|---|---|
-| premise matrix | `B∀`, a ∀-formula | `∀b̲ B₀` | `B₀` **quantifier-free** (QF entry points); **`isPurelyUniversal`** in the `_gen` entry points since 2026-09-04 |
+| premise matrix | `B∀`, a ∀-formula | `∀b̲ B₀` | `B₀` **quantifier-free** (QF entry points); **`isPurelyUniversal`** in the `_gen` entry points |
 | conclusion matrix | `C∃`, an ∃-formula | `∃c̲ C₀` | `C₀` **quantifier-free** (QF entry points); **`isPurelyExistential`** in the `_gen` entry points |
 | connectives | unrestricted | unrestricted | **∨-free** |
 | type `ρ` | degree `(1,X)` or `≤ 2` | any | any |
 | `0_X` in the matrices | **excluded** | — | allowed, majorized |
 
-### The one real gap: QF matrices — CLOSED 2026-09-04 (branch `general-matrices`)
+### The one real gap: QF matrices — CLOSED
 
 **Status.** `syntactic_general_metatheorem_gen`, `_at_gen`, `_classical_gen` and the
 spelled-out `syntactic_general_metatheorem_block` (`SyntacticMetatheorem.lean`, section
@@ -737,20 +733,19 @@ The λ-vs-combinators trade (our `arrow_intro` = Lemma 17.80) is in `CLAUDE.md`,
 a difference in *term language*, not in the metatheorem's statement. The `AbstractMajorizability`
 vs Def. 6.0.1 field count is discussed there too.
 
-## 14. The monotone functional interpretation: bounds without realizer terms (2026-09-05)
+## 14. The monotone functional interpretation: bounds without realizer terms
 
-**Status: design settled by a passed gate (`Probes/MonotoneSpike.lean`); refactor not started.**
-This section records why the extraction pipeline is being re-based, what the new object is, what
-the spike established, and what the plan is. `CLAUDE.md` has the measurements; this has the
-reasoning.
+This section records why the extraction pipeline was re-based, what the new object is, what the
+spike established, and what the plan was. **§14.7 is the standing status**; `CLAUDE.md` has the
+measurements, this has the reasoning.
 
 ### 14.1 The problem, stated with the numbers that separated it into two
 
 The pipeline since `syntactic-witnesses` is: `syntactic_soundness` builds a Dialectica realizer
 as a closed object-language `Term`; `closedMajorizer` majorizes that term; the metatheorem's
 `Φ` is built from the majorants. It produces kernel-checked numerals on derivations of ~12
-raw constructors and nothing beyond. Two measurements on 2026-09-05 (`SizeProbe`,
-`LemBoundDemo`) showed that "nothing beyond" is **two problems, not one**:
+raw constructors and nothing beyond. Two measurements (`SizeProbe`, `LemBoundDemo`) showed that
+"nothing beyond" is **two problems, not one**:
 
 | stall | term size | what the kernel is doing |
 |---|---|---|
@@ -872,7 +867,7 @@ Additive throughout; nothing existing is deleted until G3.
 - **Explicitly out of scope**: the classical route's ×230 from `negTrans_sound` — a fix to the
   translation, not to the interpretation (§14.1, second row).
 
-**Status of the plan (2026-09-05, after Lanes A and B).** Lane A: `Monotone.lean`, every
+**Lanes A and B.** Lane A: `Monotone.lean`, every
 constructor, G1 passed (`Probes/MonotoneLaneA.lean`). Lane B: `MonotoneMetatheorem.lean`
 (`monotone_general_metatheorem_at`, `_at_gen`; `mfi_extract_core` is the extraction half over
 an abstract `MRealizer`, and `general_metatheorem_extract` turned out not to be the right
@@ -892,11 +887,9 @@ that avoided the computation produces the cast that forces it. **So the next ite
 `syntactic_soundness_eqmpr` shape) applied by `simp` with the equation given, so casts are
 rewritten and never reduced — the `wit_seq_*` programme one level up, or `canorm`-free
 proof-mode lemmas. Until then the term-route `_at` entry points stay. The CLAUDE.md entry
-has the numbers. Note also that this file carries **two** `## 14` headings; the second (from
-"what the bound path should be") is a truncated partial duplicate of this one and ends
-mid-sentence — left as found, to be resolved by the owner.
+has the numbers.
 
-**Lane B' (2026-09-05): the `Eq.mpr` entry is written and proven** — `Dialectica/MonotoneMemo.lean`:
+**Lane B' — the `Eq.mpr` entry, written and proven**: `Dialectica/MonotoneMemo.lean`,
 `MRealizer.transport` (axiom-free) plus `monotone_soundness_eqmpr`/`_eqmp`/`_subst`, the MFI
 analogue of `syntactic_soundness_eqmpr`. The transport casts the majorant `tstar` by
 `congrArg wTy h` — whose two sides are `Ty.interpret X (wTy B).hat`/`(wTy B').hat`, definitionally
@@ -920,8 +913,8 @@ MFI clears the per-cast cost, not `negTrans_sound`'s ×230 per-node blowup. Lane
 OOM" prediction was optimistic; the wall is the translation layer (§14.5 "out of scope"), moved
 from elaboration to kernel reduction. No `main` change; headline axioms unchanged.
 
-**Lane C (2026-09-05): the fused NT+MFI recursion — the classical route is now IN scope, and
-the NT-stability condition disappears.** §14.5 listed "the classical route's ×230 from
+**Lane C — the fused NT+MFI recursion: the classical route comes into scope, and the
+NT-stability condition disappears.** §14.5 listed "the classical route's ×230 from
 `negTrans_sound`" as *explicitly out of scope* because it is "a fix to the translation, not to
 the interpretation." Lane C makes that fix: `Dialectica/MonotoneND.lean`'s `monotone_nd_soundness`
 interprets a **classical** derivation directly into `MRealizer cm Aᴺᵀ`, so the 85,180-node
@@ -969,11 +962,11 @@ was the right move for what it bought — majorants without a total majorizer �
 same idea one level up: majorants from the *derivation's* syntax rather than the *term's*,
 which is why `general_metatheorem`'s original shape comes back into use.
 
-### 14.7 Status (2026-09-05, evening) — where the MFI work lives and what it has shown
+### 14.7 Status — where the MFI work lives and what it has shown
 
-The refactor was built on an integration branch `mfi` and **merged into `main` on 2026-09-06**
-(as work in progress; the original gate — a bound with mathematical content reducing — was
-not reached); the per-lane record is in `CLAUDE.md` ("MFI Lane A/B/B'/C/D1"). Landed: Lane A (full `monotone_soundness`, all
+The refactor was built on an integration branch and merged into `main` as work in progress; the
+original gate — a bound with mathematical content reducing — was not reached. The per-lane
+record is in `CLAUDE.md` ("MFI Lane A/B/B'/C/D1"). Landed: Lane A (full `monotone_soundness`, all
 39 constructors, `MaxCompat` as fields, gate G1 — the `and_contract` crossover `max(1709, 901)`
 by `rfl`), Lane B (`monotone_general_metatheorem_at`/`_gen`; a cast-free proof-mode derivation
 at a space gives `U = V = Φ = 901` in the kernel; `pinduction` reduces through the book's
@@ -993,25 +986,21 @@ dies at ≈8, evaluator at 3). That is the Dialectica exponential in its
 last hiding place, and it applies to every route equally; §14.1's "×230 from `negTrans_sound`"
 is a linear factor that fusion removed and that was invisible behind it.
 
-**The cost is exponential in composition DEPTH, and this paragraph used to quote a COUNT.** It
-said "`prenexify` has 134", against a wall at ≈8, which made the gap look hopeless. 134 is
-`prenexify`'s *number* of `syllogism`s; the ×5 compounds along the longest **path** through
-composition nodes, and that depth is **9** — measured 2026-09-06 by `Probes/NestingDepth.lean`
-(branch `sharing`), an `Expr` DAG walk memoised on `ExprStructEq` with no `whnf`. See §14.8 for
-the table and for what the measurement cost the `let`-sharing plan.
+**The cost is exponential in composition DEPTH, not in the COUNT — do not quote the count.**
+"`prenexify` has 134" against a wall at ≈8 makes the gap look hopeless, and 134 is merely
+`prenexify`'s *number* of `syllogism`s. The ×5 compounds along the longest **path** through
+composition nodes, and that depth is **9** — measured by `Probes/NestingDepth.lean`, an `Expr`
+DAG walk memoised on `ExprStructEq` with no `whnf`. See §14.8 for the table and for what the
+measurement cost the `let`-sharing plan.
 
-### 14.8 What the 2026-09-06 lanes measured — depth, sharing, and a second wall
+### 14.8 Depth, sharing, and a second wall
 
-Four lanes ran overnight on branches off `6abbfc4`. All four were verified in their own
-worktrees by a no-op rebuild of both targets plus `#print axioms` by name, per the "verify
-before relaying" rule. **`whyp`, `examples` and `sharing` were merged into `main` on
-2026-09-07** (both targets green at 8111 / 8147 jobs, zero sorries), so items 1–6 below now
-cite probes that are on `main`; `sharing`'s `Monotone.lean` edit was **dropped** at the merge,
-being the refuted experiment of item 2. **`demo` is still unmerged** — it carries
-`Demo/Walkthrough.lean`, `docs/RESULTS.md` and `docs/QA.md`, and its merge is blocked on
-untracked debris at `Demo/hilbert/` in the working tree.
+Six findings from four parallel lanes, each verified in its own worktree by a no-op rebuild of
+both targets plus `#print axioms` by name, per the "verify before relaying" rule. Items 1–6
+cite probes that are on `main`; the `let`-sharing edit to `Monotone.lean` was **dropped** at the
+merge, being the refuted experiment of item 2.
 
-**1. Composition depth, not count (`sharing`, `Probes/NestingDepth.lean`).** The longest path
+**1. Composition depth, not count (`Probes/NestingDepth.lean`).** The longest path
 through composition nodes, memoised on `ExprStructEq`, no `whnf`:
 
 | derivation | DAG | tree | **depth** |
@@ -1028,7 +1017,7 @@ Against a wall at ≈8 that makes ℕ-MCT ≈5³ away and ℝ-MCT ≈5¹⁴ — 
 where 5¹³⁴ was not. This is the single most useful number the MFI programme has produced, and
 it cost one probe; **measure depth before estimating any composition cost.**
 
-**2. The `let`-sharing hypothesis is REFUTED (`sharing`, `Probes/SharingProbe.lean`).** Binding
+**2. The `let`-sharing hypothesis is REFUTED (`Probes/SharingProbe.lean`).** Binding
 each sub-majorant with `let` in `MRealizer.syllogism` changes nothing: ×3.7 per level before
 and after, `std::bad_alloc` at k=6 both ways. **The kernel zeta-reduces `let` by substitution**,
 so sharing at a binding site never survives to the reduction that matters; the compiled
@@ -1037,20 +1026,20 @@ arguments, so a fix must change **what is applied**: staged evaluation with per-
 reification (~12 stages for ℕ-MCT, ~23 for ℝ-MCT), or an `MRealizer` redesign whose counter
 component does not call the witness component. Do not re-propose `let`-binding; it is measured.
 
-**3. A SECOND wall, independent of depth: the VALUE (`examples`,
-`Probes/ContentExampleNat.lean`).** On one fixed 145-constructor derivation, `V = 128` is
+**3. A SECOND wall, independent of depth: the VALUE
+(`Probes/ContentExampleNat.lean`).** On one fixed 145-constructor derivation, `V = 128` is
 kernel-checked in ≈9 s and `V = 256` OOMs at 12 GB. `Term.add`'s majorant is a `prec`, so
 `recMaj` iterates **value-many** times without sharing. So extraction is bounded from two
-directions at once — composition depth and the magnitude of the number being computed — and the
-second was not on any list before this. Any bound whose value is large is out of reach even
-from a shallow derivation.
+directions at once — composition depth and the magnitude of the number being computed. Any
+bound whose value is large is out of reach even from a shallow derivation.
 
-**4. The proof mode can itself be the wall (`examples`).** The *same theorem by the same
+**4. The proof mode can itself be the wall.** The *same theorem by the same
 argument*, written in the proof mode, is **42,729** constructors against the raw derivation's
 145 — a factor of 295 — and reduces only at `k = 0`. §14.7's cast story (Lane D1) clears the
 `Eq.mpr` obstacle but not this one.
 
-**5. The first bound with mathematical content (`examples`).** `∀x(∀u (f(Su) =₀ f u +ᵗ f u) →
+**5. The first bound with mathematical content (`Probes/ContentExampleNat.lean`).**
+`∀x(∀u (f(Su) =₀ f u +ᵗ f u) →
 ∃v (f k =₀ v))` at `x = (k,f)`, by raw `Derivable.induction`, the witness at each step built
 from the induction hypothesis's witness: `V = 2^k·f(0)`, kernel-checked at four points, moving
 with **both** components, `U(k) = k−1` sharp, six refutation controls, and the term route
@@ -1059,7 +1048,7 @@ trivial, and the **bound** is the mathematics — `f k ≤ 2^k f(0)`. That is th
 "bounds are properties of proofs, not theorems" thesis with a number attached rather than the
 `mct_p1`/`mct_p2` contrast.
 
-**6. W-hyperbolic derived lemmas (`whyp`, `Metatheorems/WHyperbolicLemmas.lean`).** The four
+**6. W-hyperbolic derived lemmas (`Metatheorems/WHyperbolicLemmas.lean`).** The four
 axioms usable at arbitrary terms, then `d(x, W(x,y,λ)) ≤ λ·d(x,y)` and its mirror, the reverse
 inequality, `W(x,y,0) = x`, `W(x,y,1) = y`, nonexpansiveness in each argument, (W2) as an
 equality — all `[propext, Quot.sound]`, each read back in an arbitrary `WHyperbolicModel`. It
