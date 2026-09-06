@@ -11,6 +11,10 @@
 # PDFs (papers and build output)
 *.pdf
 
+# Writing about the project, as opposed to the project. Untracked 2026-09-06 before the
+# first push; both stay on disk.
+/Cheval.tex
+
 # The reference document's LaTeX sources. Not our development, and its PDF was already
 # excluded by the *.pdf rule above, which left the repo tracking sources for a build it
 # could not run. Untracked 2026-09-06 before the first push; the directory stays on disk.
