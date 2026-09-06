@@ -57,7 +57,13 @@ both components of `x*`: `8 → 32` when `k*` goes `3 → 5`, and `4 → 12` whe
    of the recursion. So on this example the wall is *derivation size*, i.e. the
    ×5-per-composition of `MRealizer.syllogism` (ARCHITECTURE §14.7), not the induction, not the
    premise, not the matrix.
-3. **`Φ` is a genuine recursion, not a projection.** `MonotoneMCT.indFinal` (the earlier
+3. **The ceiling is the VALUE, not the derivation.** On this same 145-constructor derivation
+   the bound is kernel-checked at `k* = 7` (`V = 128`, ≈9 s of kernel time, `V_at_7` below) and
+   is `INTERNAL PANIC: out of memory` at the 12 GB cap at `k* = 8` (`V = 256`) — measured
+   2026-09-06, both by `kernel_rfl` with nothing else changed. The majorant of the object-level
+   `Term.add` is a `prec` term, so `recMaj` iterates *value*-many times with nothing shared;
+   that, not derivation size, is what stops the doubling at 128 here.
+4. **`Φ` is a genuine recursion, not a projection.** `MonotoneMCT.indFinal` (the earlier
    `pinduction` control) has `V(k*) = k*` — the witness is the induction variable itself. Here
    the witness at `k+1` is a function *of the previous witness*, so `recMaj` iterates and the
    bound is exponential; the refutation controls below (`≠ 7`, `≠ 9`, `≠ 4`, `≠ 16`) pin it.
@@ -250,6 +256,10 @@ theorem V_at_3 : (8 : ℕ) = mfiV cmE rE (xs 3) := by kernel_rfl
 theorem V_at_5 : (32 : ℕ) = mfiV cmE rE (xs 5) := by kernel_rfl
 theorem V_at_0 : (1 : ℕ) = mfiV cmE rE (xs 0) := by kernel_rfl
 
+/-- The largest value that still reduces on this derivation: `2^7 = 128` (≈9 s of kernel
+time). At `k* = 8` the same `kernel_rfl` is out of memory at the 12 GB cap. -/
+theorem V_at_7 : (128 : ℕ) = mfiV cmE rE (xs 7) := by kernel_rfl
+
 /-- …and it tracks the *function* majorant too: `f*(0) = 3` triples every value. -/
 theorem V_ys_at_0 : (3 : ℕ) = mfiV cmE rE (ys 0) := by kernel_rfl
 theorem V_ys_at_2 : (12 : ℕ) = mfiV cmE rE (ys 2) := by kernel_rfl
@@ -339,6 +349,7 @@ def Lpm : D G0 (Formula.all Ty.nat A1) := by
 #print axioms V_at_3
 #print axioms V_at_5
 #print axioms V_at_0
+#print axioms V_at_7
 #print axioms V_ys_at_0
 #print axioms V_ys_at_2
 #print axioms U_at_0

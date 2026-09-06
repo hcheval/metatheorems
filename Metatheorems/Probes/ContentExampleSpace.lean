@@ -61,7 +61,9 @@ the ℕ conjunct).
   first version of `eRec` used the witness `⌈d(x,z)⌉₀ +ᵗ w`, to have one number depending on
   both. Kernel: `std::bad_alloc` at 12 GB, in either summand order. The object-level `Term.add`
   is a `prec` term, so its majorant runs `recMaj` — and at an argument of size ≈900 that is
-  what dies (`ContentExampleNat`'s pure-ℕ `V` is fine at `2^5 = 32` and OOMs at `2^6 = 64`).
+  what dies. The ceiling is the **value**, not the derivation: `ContentExampleNat`'s pure-ℕ `V`
+  is kernel-checked at `2^7 = 128` (≈9 s) and is out of memory at `2^8 = 256`, on the same
+  145-constructor derivation (measured 2026-09-06).
   The version kept here therefore reports the two dependencies as two proofs rather than as one
   sum, which is the more informative comparison anyway.
 
