@@ -36,6 +36,11 @@ Categories, as the brief defines them:
 
 Each of these is CHECKED and, where a number is involved, appears verbatim in the build log.
 
+*(Two caveats that belong with this list rather than buried in the table: six headline
+declarations have no axiom line anywhere in the build because `Headline.lean` is not built —
+C8; and `TinyBoundDemo`/`LemBoundDemo` have no `#print axioms` of their own — C11. Both are
+closed by running one more target and adding two lines.)*
+
 1. **The library has no `sorry` and no custom axiom.** The 8147-job build carries no
    `declaration uses 'sorry'` warning anywhere. The only `sorry`s in the tree are in
    `Metatheorems/Probes/CounterSideProbe.lean`, which is deliberately outside the sweep.
@@ -158,6 +163,7 @@ rest are numbers whose provenance is weaker than the sentence around them.
 | C7 | "`soundness` … all 36 constructors" | `CLAUDE.md`, "Soundness (2026-09-03)" and "Fully proved" | **39**; the status block already corrects this and says several places still say 36 | count in source |
 | C8 | `#print axioms` for "every headline declaration" is checked | `docs/QA.md:111–118` | **`Metatheorems/Headline.lean` is not imported by the umbrella and was not built.** Six of its names have no axiom line anywhere in the 8147-job log: `syntactic_general_metatheorem`, `_classical`, `_at`, `_classical_at`, `add_Q_assoc`, `distrib_Q`. Their claimed lists are currently PROSE | log. Cheap to close: `lake build Metatheorems.Headline`, ideally wired into CI |
 | C9 | RESULTS/QA "what it does not show: no numeral yet from any derivation with real mathematical content" | `docs/RESULTS.md:181` | superseded by `ContentExampleNat`/`ContentExampleSpace` (2026-09-06) | see the staleness note below |
+| C11 | RESULTS gives an axiom list for every row | throughout | **`Probes/TinyBoundDemo.lean` and `Probes/LemBoundDemo.lean` contain no `#print axioms` at all** (7 and 9 theorems between them), so rows **1–2** — "the project's first evaluated bound, full stop" — and rows **22** carry no axiom check anywhere in the 8147-job build. Their claimed `[propext, Classical.choice, Quot.sound]` is PROSE. Every other bound probe has a hygiene block, though several are partial (`ConjBoundDemo` prints 19 of 30 theorems, `TriangleBoundDemo` 14 of 20, `MonotoneLaneB` 19 of 25, `WBoundDemo` 6 of 10 — the unprinted ones are mostly `_qf`/`_vf` side conditions closed by `rfl`) | grep + log. Two `#print axioms` lines close this |
 | C10 | realizer tree/DAG ratio "**2.77**–3.21" | `docs/RESULTS.md:135`, `docs/QA.md:174`, deck | the five measured ratios are 2.77, 3.21, 2.79, **2.76**, 3.09 — the range is **2.76–3.21** | log, `TermPrintDemo.lean:187–191`. The written ratios 1.00 / 1.14 / 1.20 / 1.20 / 1.35 and the sizes 186–563 are exactly as documented |
 
 ---
@@ -188,13 +194,13 @@ appears in the 8147-job build log.
 
 | claim | class | evidence |
 |---|---|---|
-| Rows 1–2, `U = 0` / `V = 5` from a 12-constructor derivation | CHECKED (`rfl`) | `TinyBoundDemo.lean:183,188`; `[propext, Classical.choice, Quot.sound]`. **No refutation control** |
+| Rows 1–2, `U = 0` / `V = 5` from a 12-constructor derivation | CHECKED (`rfl`), but the axiom list is PROSE | `TinyBoundDemo.lean:183,188`. **No refutation control and no `#print axioms` in the file** — see C11. The weakest-evidenced pair of rows in the table, and they are row 1 |
 | Rows 3–6, W-hyperbolic `U = 0`, `V = Φ = 901`, `Φ = 1273` | CHECKED | `WBoundDemo.lean:241,254,264,284`; one control in the file |
 | Rows 7–11, premise consumed: `U = V = Φ = 901`, `1273`, `1709`; `WBoundDemo`'s `U = 0` under this file's majorants | CHECKED | `UPremiseDemo.lean:202,213,223,244,280,286`; 3 controls |
 | Rows 12–16, triangle inequality in the premise slot | CHECKED | `TriangleBoundDemo.lean:347,356,365,380,389,498`; 4 controls |
 | Rows 17–20, contraction: `1709`/`349`, and `V` of the stalling derivation | CHECKED | `ConjBoundDemo.lean:421,431,447,463,637`; 7 controls |
 | Row 21, the `and_contract` `whnf` timeout | MEASURED (negative) | probe header snippet; not a declaration, correctly |
-| Row 22, `U = 0` / `V = 5` at `Allowed.extended` | CHECKED | `LemBoundDemo.lean:364,367`, control `lVtExt_at_5_ne_4` at `:371` |
+| Row 22, `U = 0` / `V = 5` at `Allowed.extended` | CHECKED, axiom list PROSE | `LemBoundDemo.lean:364,367`, control `lVtExt_at_5_ne_4` at `:371`; no `#print axioms` in the file (C11) |
 | Row 23, both classical extractors time out | MEASURED (negative) | `LemBoundDemo.lean:63–99` |
 | Row 24, `0` through a depth-11 `seq_mp`, term ≈7×10¹² nodes | CHECKED for the numeral; the node count is MEASURED | `SeqMpBoundProbe.lean:384` |
 | Row 25, `901 = closedMajorizer …` in any `MetricModel` | CHECKED | `MetricSpaces.lean:474` |
