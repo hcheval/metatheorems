@@ -24,6 +24,7 @@ import Metatheorems.Probes.MonotoneLaneBp
 import Metatheorems.Probes.MonotoneMCT
 import Metatheorems.Probes.MonotoneMemoGates
 import Metatheorems.Probes.ClassicalMfiProbe
+import Metatheorems.Probes.ContentExampleNat
 import Metatheorems.Probes.TermPrintDemo
 import Metatheorems.Probes.TinyBoundDemo
 import Metatheorems.Probes.TriangleBoundDemo
