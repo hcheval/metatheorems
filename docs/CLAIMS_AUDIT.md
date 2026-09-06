@@ -51,7 +51,10 @@ closed by running one more target and adding two lines.)*
    `termMajorizer_maj` and `mfi_extract_core` each "does not depend on any axioms".
 4. **Every numeral quoted on the "Extracted bounds" slide is a machine-checked equation.**
    901, 1273, 1709, 349, 0, 5, 9, 8, 32, 12, 128 — each is a named theorem closed by
-   `kernel_rfl`, `rfl` or `decide`, all at `[propext, Classical.choice, Quot.sound]` in the log.
+   `kernel_rfl`, `rfl` or `decide`. All of them print
+   `[propext, Classical.choice, Quot.sound]` in the log **except** `TinyBoundDemo`'s `0` and `5`
+   (rows 1–2 of RESULTS), whose file prints no axioms at all — see C11. The slide's own eight
+   rows are unaffected: none of them is the `TinyBoundDemo` pair.
 5. **The bounds are uniform in the space.** This is visible in the *statement*, not inferred:
    e.g. `TriangleBoundDemo.triUt_is_901` (`:347`) binds `(M : WHyperbolicModel)` and
    `(h : M.d M.ref M.zeroX ≤ 5)` as hypotheses, so the numeral is a fact about every model with
