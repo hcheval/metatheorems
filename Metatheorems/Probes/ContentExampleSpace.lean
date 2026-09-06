@@ -47,7 +47,8 @@ the ℕ conjunct).
 ## Method notes — what was needed to make these reduce (all measured, 2026-09-06)
 
 * **`mfi_push` then `kernel_rfl`** (`Probes/MonotoneMemoGates.lean`, Lane D1). Bare
-  `kernel_rfl` is a 12 GB `std::bad_alloc` on **every** number here: the casts inside
+  `kernel_rfl` is a 12 GB `std::bad_alloc` on the recursive proof's `V` (measured on `eRec`'s
+  shape before `mfi_push` was applied; the direct proof was never run bare): the casts inside
   `ex_and_left` and `forall_map` (`forall_ax_vz`, `substF_renameF_id`) are K-checked through
   `cauchyfy`/`le_Q_dec`, which is the documented delta-expansion trap. `mfi_push` rewrites them
   to `MRealizer.transportTo` at the kernel-normalised hat type and they cost nothing.
