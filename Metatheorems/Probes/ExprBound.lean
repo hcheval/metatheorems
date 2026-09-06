@@ -73,9 +73,41 @@ present in the first and absent in the second — the known-true structural diff
   and nothing is recognisable. Reduction was never the problem; stopping was.
 - **Scale is untested.** This target is 13 constructors, composition depth 4. Nothing here
   bounds behaviour at `mct_p2` (depth 12) or `real_mct_p2` (depth ≥23), where the ×5
-  sub-majorant re-evaluation bites. One encouraging structural point: the memo is keyed on
-  `(fuel, ExprStructEq)`, so it *does* share across repeated sub-majorants — the direction that
-  blowup would need.
+  sub-majorant re-evaluation bites.
+
+## Second target, 2026-09-06: `MonotoneMCT.rI` — a proof-mode `pinduction`. NEGATIVE.
+
+`mfiV cmE MonotoneMCT.rI n`, symbolic in the point `n`. Two real bugs in the reducer were
+found and fixed on the way (both recorded at their fix sites): a stuck **`Expr.proj`** was
+returned untouched, and in the `.app` case the **head was copied rather than reduced**. Each
+produced the same symptom — *identical output at every fuel*, i.e. a fixed point that is not
+the normal form. **If output does not change with fuel, suspect a missing `Expr` case, not
+convergence.**
+
+With both fixed the reduction descends and the iteration becomes visible — at fuel 6 as the
+object-level recursor `R[…] ⬝ mtIndBase ⬝ mtIndStep`, at fuel 12 as `recMaj` applied to its
+base and step. But it **does not converge**:
+
+| fuel | `numObjs` |
+|---|---|
+| 6 | 1033 |
+| 12 | 1295 |
+| 20 | 8125 (1.1 s) |
+| 30, 45 | `(deterministic) timeout at whnf` |
+
+Size *grows* where `acSpike`'s peaked and collapsed, and no limit was raised. The reason is
+structural: `recMaj` is stuck on the **symbolic** point `n`, so nothing downstream collapses to
+arithmetic, while the base and step subterms — each an unreduced
+`monotone_soundness … (pm_intro …)` — keep re-expanding along every path. That is the same
+per-path re-expansion that defeats evaluation, appearing in the display tool for the same
+reason, and the memo does not stop it because it is keyed on **`(fuel, ExprStructEq)`**: the
+identical subterm reached at two different fuels is two different keys.
+
+**The obvious next experiment** (untried): drop `fuel` from the design entirely and reduce to a
+normal form with respect to the blocklist alone, memoising on `ExprStructEq` only. The blocklist
+already stops reduction, so fuel may be doing nothing but breaking sharing. The risk is
+non-termination on a recursive definition that always delta-expands, which would need the
+recursors added to the blocklist.
 - **Proof-mode derivations need `mfi_push` first**, since `Derivable.rec` cannot fire until the
   `pm_*`/`seq_*` layer and its `Eq.mpr` casts are rewritten away. Raw-constructor derivations
   like this one need nothing.
@@ -120,6 +152,19 @@ def blocked : Std.HashSet Name := Std.HashSet.ofList
 
 abbrev M' := StateRefT (Std.HashMap (Nat × ExprStructEq) Expr) MetaM
 
+/-- Delta-expand the head constant, **bypassing smart unfolding**.
+
+`Meta.unfoldDefinition?` refuses on a function defined by structural recursion until its
+recursive argument is already a constructor application — which is exactly the situation here:
+`monotone_soundness … indFinal` cannot unfold until `indFinal` does, and `indFinal` is itself a
+`def`. Using it alone the reduction freezes with no fuel consumed, producing the *same* output
+at every fuel — a fixed point that is not the normal form. Forcing the delta hands us the
+`brecOn`/`rec` body, after which `whnfCore`'s iota can proceed once the argument is exposed. -/
+def forceDelta (e : Expr) : MetaM (Option Expr) := do
+  let .const c us := e.getAppFn | return none
+  let some (.defnInfo di) := (← getEnv).find? c | return none
+  return some (mkAppN (di.value.instantiateLevelParams di.levelParams us) e.getAppArgs)
+
 /-- Fueled, memoised partial delta-reduction. A `Nat.rec` on a literal fires; on a variable it
 stays **stuck**, and a stuck recursor is exactly the iteration we want to see in the bound. -/
 partial def pr (fuel : Nat) (e : Expr) : M' Expr := do
@@ -136,13 +181,33 @@ where
         if !blocked.contains c then
           if let some e' ← unfoldDefinition? e then
             return ← pr (fuel - 1) e'
+          else if let some e' ← forceDelta e then
+            return ← pr (fuel - 1) e'
     match e with
+    -- The head must be reduced too, not merely copied. Found 2026-09-06: with
+    -- `let f := e.getAppFn` the head of `(↑r A B n).1` is a `.proj`, not a `.const`, so the
+    -- unfolding branch above never fires and the whole reduction freezes there — again with
+    -- identical output at every fuel. Reduce the head, rebuild, and re-run `whnfCore` so the
+    -- beta/proj redexes the head reduction just exposed actually fire.
     | .app .. =>
-      let f := e.getAppFn
+      let f ← pr fuel e.getAppFn
       let args ← e.getAppArgs.mapM (pr fuel)
-      return mkAppN f args
+      let e' := mkAppN f args
+      let e'' ← whnfCore e'
+      if e'' == e' then return e' else pr fuel e''
     | .lam n t b bi => withLocalDecl n bi t fun x => do
         mkLambdaFVars #[x] (← pr fuel (b.instantiate1 x))
+    | .mdata _ b => pr fuel b
+    -- A stuck projection MUST be descended into, or the whole reduction stops dead at it.
+    -- Found 2026-09-06: without this case `mfiV cm r n` — which is `(r.val …).1` — froze at
+    -- `↑r` and produced the SAME output at fuel 6, 12 and 25, i.e. a fixed point that was not
+    -- the normal form. `whnfCore` cannot reduce `.proj` until the structure is a constructor
+    -- application, which needs delta on the argument, which only happens if we recurse.
+    | .proj s i b => do
+      let b' ← pr fuel b
+      let e' := Expr.proj s i b'
+      let e'' ← whnfCore e'
+      if e'' == e' then return e' else pr fuel e''
     | _ => return e
 
 /-- Reduce a constant at the given fuel and log the time, the `Expr.numObjs` (NEVER a tree
