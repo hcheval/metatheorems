@@ -479,8 +479,13 @@ def MRealizer.mp (cm : ConstMajorants am) {Γ : Ctx ι} {A B : Formula F Γ}
 def MRealizer.syllogism (cm : ConstMajorants am) {Γ : Ctx ι} {A B C : Formula F Γ}
     (hAB : MRealizer cm (A →ᶠ B)) (hBC : MRealizer cm (B →ᶠ C)) : MRealizer cm (A →ᶠ C) :=
   ⟨fun n e =>
-    (fun xA => (hBC.val n e).1 ((hAB.val n e).1 xA),
-     fun xA yC => (hAB.val n e).2 xA ((hBC.val n e).2 ((hAB.val n e).1 xA) yC)),
+    -- SHARING EXPERIMENT (branch `sharing`, 2026-09-06): `hAB.val n e` occurred 3× and
+    -- `hBC.val n e` 2× here; `let` binds each once. Definitionally transparent, so the
+    -- `Prop` half below is unchanged.
+    let a := hAB.val n e
+    let b := hBC.val n e
+    (fun xA => b.1 (a.1 xA),
+     fun xA yC => a.2 xA (b.2 (a.1 xA) yC)),
    fun n hn => by
     obtain ⟨⟨xAB, hxAB, hmAB⟩, hsAB⟩ := hAB.property n hn
     obtain ⟨⟨xBC, hxBC, hmBC⟩, hsBC⟩ := hBC.property n hn
@@ -550,9 +555,11 @@ def MRealizer.syllogism (cm : ConstMajorants am) {Γ : Ctx ι} {A B C : Formula 
 def MRealizer.exportation (cm : ConstMajorants am) {Γ : Ctx ι} {A B C : Formula F Γ}
     (h : MRealizer cm (A ∧ᶠ B →ᶠ C)) : MRealizer cm (A →ᶠ B →ᶠ C) :=
   ⟨fun n e =>
-    (fun xA => (fun xB => (h.val n e).1 (xA, xB),
-                fun xB yC => ((h.val n e).2 (xA, xB) yC).2),
-     fun xA p => ((h.val n e).2 (xA, p.1) p.2).1),
+    -- SHARING EXPERIMENT: `h.val n e` occurred 3×.
+    let c := h.val n e
+    (fun xA => (fun xB => c.1 (xA, xB),
+                fun xB yC => (c.2 (xA, xB) yC).2),
+     fun xA p => (c.2 (xA, p.1) p.2).1),
    fun n hn => by
     obtain ⟨⟨xh, hxh, hmh⟩, hsh⟩ := h.property n hn
     refine ⟨⟨fun env =>
@@ -679,14 +686,15 @@ def MRealizer.forallRule (cm : ConstMajorants am) {Γ : Ctx ι} {ρ : Ty ι} {B 
     {A : Formula F (ρ :: Γ)} (h : MRealizer cm (Formula.weakenBy ρ B →ᶠ A)) :
     MRealizer cm (B →ᶠ Formula.all ρ A) :=
   ⟨fun n e =>
-    (fun xB z => (h.val n (z, e)).1
-        (cast (congrArg (fun σ : Ty ι => Ty.interpret X σ.hat)
-          (wTy_cTy_renameF B Term.Renaming.shift).1).symm xB),
-     fun xB p => cast (congrArg (fun σ : Ty ι => Ty.interpret X σ.hat)
-          (wTy_cTy_renameF B Term.Renaming.shift).2)
-        ((h.val n (p.1, e)).2
-          (cast (congrArg (fun σ : Ty ι => Ty.interpret X σ.hat)
-            (wTy_cTy_renameF B Term.Renaming.shift).1).symm xB) p.2)),
+    -- SHARING EXPERIMENT: the two occurrences of `h.val n (·, e)` are at *different*
+    -- arguments, so only the closure and the two type equations can be shared.
+    let hv := fun z => h.val n (z, e)
+    let cw := (congrArg (fun σ : Ty ι => Ty.interpret X σ.hat)
+      (wTy_cTy_renameF B Term.Renaming.shift).1).symm
+    let cc := congrArg (fun σ : Ty ι => Ty.interpret X σ.hat)
+      (wTy_cTy_renameF B Term.Renaming.shift).2
+    (fun xB z => (hv z).1 (cast cw xB),
+     fun xB p => cast cc ((hv p.1).2 (cast cw xB) p.2)),
    fun n hn => by
     obtain ⟨⟨xh, hxh, hmh⟩, hsh⟩ := h.property n hn
     have hw : wTy (Formula.weakenBy ρ B) = wTy B := (wTy_cTy_renameF B Term.Renaming.shift).1
