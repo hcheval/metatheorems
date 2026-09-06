@@ -1,9 +1,12 @@
 name: Create Release
 
 on:
-  push:
-    branches:
-      - 'main'
+  # Disabled 2026-09-06, before the first push to a private backup remote: this would have
+  # cut a GitHub release automatically on that push. Re-enable when the repo faces outward.
+  # push:
+  #   branches:
+  #     - 'main'
+  workflow_dispatch:
       - 'master'
     paths:
       - 'lean-toolchain'

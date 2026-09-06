@@ -25,8 +25,10 @@ Here we mirror those definitions at the object level:
 * `wTy A`, `cTy A` — the witness and counter types **as `Ty ι`**;
 * `interpret_wTy`, `interpret_cTy` — their interpretations are *definitionally* the
   original Lean types, so nothing downstream needs a cast;
-* `syntacticRealizerCtx` — a realizer is a `Term` whose interpretation satisfies the
-  (unchanged, semantic) Dialectica matrix.
+* `SRealizer A` — a realizer is a `Term` whose interpretation satisfies the (unchanged,
+  semantic) Dialectica matrix **at every environment**. The uniformity is the point: a
+  per-environment version does not survive the `forall_rule` case, which needs one term that
+  works at every extension of the environment.
 
 This is the "syntactic witness, semantic soundness" split: the witness carries syntax, so
 it can be majorized; the correctness statement stays where it already is.
@@ -70,17 +72,12 @@ def defaultWTerm (A : Formula F Γ) : Term F Γ (wTy A) := Term.defaultOf _
 /-- Syntactic counterpart of `dialecticaDefaultCounter`. -/
 def defaultCTerm (A : Formula F Γ) : Term F Γ (cTy A) := Term.defaultOf _
 
--- ============================================================================
--- Realizers as terms
--- ============================================================================
-
-/-- A realizer whose witness is a **term**. The matrix is the unchanged semantic one,
-applied to the term's interpretation: syntactic witness, semantic soundness. -/
-def syntacticRealizerCtx {X : ι → Type} (si : SpaceInterp X F)
-    (A : Formula F Γ) (env : Ctx.interpret X Γ) : Type :=
-  { t : Term F Γ (wTy A) //
-      ∀ y : ℂ X A,
-        dialecticaMatrix si A env (Term.interpret si t env) y }
+-- Realizers as terms: see `SRealizer` below. A per-environment variant
+-- (`syntacticRealizerCtx`, taking `env` as a parameter and quantifying only over counters)
+-- existed here until 2026-09-07 and was deleted unused — nothing ever constructed or consumed
+-- it. `SRealizer` quantifies over environments *inside* the subtype, which is what the
+-- `forall_rule` case needs; the weaker form has no use site. The same asymmetry appears at
+-- `realizer_of_pu` vs `realizer_of_pu_at`, where both forms are genuinely used.
 
 -- ============================================================================
 -- The point: the extracted functionals are closed terms

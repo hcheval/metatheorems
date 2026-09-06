@@ -989,8 +989,80 @@ measurement from both sides (Lane C on the classical route, Lane D1 on the intui
 **the composition combinators re-evaluate their sub-majorants** —
 `MRealizer.syllogism` uses `hAB.val n e` three times and `hBC.val n e` twice, and neither the
 kernel nor the compiled evaluator shares them, so nested syllogisms cost ×5 per level (kernel
-dies at ≈8, evaluator at 3; `prenexify` has 134). That is the Dialectica exponential in its
+dies at ≈8, evaluator at 3). That is the Dialectica exponential in its
 last hiding place, and it applies to every route equally; §14.1's "×230 from `negTrans_sound`"
-is a linear factor that fusion removed and that was invisible behind it. Next: `let`-sharing
-in the combinators and `prenexify` as one hand-written leaf, measured on a synthetic
-syllogism chain before anything else.
+is a linear factor that fusion removed and that was invisible behind it.
+
+**The cost is exponential in composition DEPTH, and this paragraph used to quote a COUNT.** It
+said "`prenexify` has 134", against a wall at ≈8, which made the gap look hopeless. 134 is
+`prenexify`'s *number* of `syllogism`s; the ×5 compounds along the longest **path** through
+composition nodes, and that depth is **9** — measured 2026-09-06 by `Probes/NestingDepth.lean`
+(branch `sharing`), an `Expr` DAG walk memoised on `ExprStructEq` with no `whnf`. See §14.8 for
+the table and for what the measurement cost the `let`-sharing plan.
+
+### 14.8 What the 2026-09-06 lanes measured — depth, sharing, and a second wall
+
+Four lanes ran overnight on branches off `6abbfc4`. All four were verified in their own
+worktrees by a no-op rebuild of both targets plus `#print axioms` by name, per the "verify
+before relaying" rule. **`whyp`, `examples` and `sharing` were merged into `main` on
+2026-09-07** (both targets green at 8111 / 8147 jobs, zero sorries), so items 1–6 below now
+cite probes that are on `main`; `sharing`'s `Monotone.lean` edit was **dropped** at the merge,
+being the refuted experiment of item 2. **`demo` is still unmerged** — it carries
+`Demo/Walkthrough.lean`, `docs/RESULTS.md` and `docs/QA.md`, and its merge is blocked on
+untracked debris at `Demo/hilbert/` in the working tree.
+
+**1. Composition depth, not count (`sharing`, `Probes/NestingDepth.lean`).** The longest path
+through composition nodes, memoised on `ExprStructEq`, no `whnf`:
+
+| derivation | DAG | tree | **depth** |
+|---|---|---|---|
+| `prenexify` | 252 | 253 | **9** |
+| `classical_to_prenex_extended` | 3434 | 3435 | 11 |
+| `ConjBoundDemo.acFinal` | 13 | 13 | 4 |
+| `MonotoneLaneB.pmFinal` | 202 | 527 | 4 |
+| `le_R_of_le_R_pu` | 403 | 893 | 7 |
+| `ProofMode.mct_p2` | 7244 | 84335 | **12** |
+| `le_R_trans_core`, `dist_tri_chain`, `real_mct_p2` | ≥47938 | ≥58559 | **≥23** (budget hit) |
+
+Against a wall at ≈8 that makes ℕ-MCT ≈5³ away and ℝ-MCT ≈5¹⁴ — a finite engineering target,
+where 5¹³⁴ was not. This is the single most useful number the MFI programme has produced, and
+it cost one probe; **measure depth before estimating any composition cost.**
+
+**2. The `let`-sharing hypothesis is REFUTED (`sharing`, `Probes/SharingProbe.lean`).** Binding
+each sub-majorant with `let` in `MRealizer.syllogism` changes nothing: ×3.7 per level before
+and after, `std::bad_alloc` at k=6 both ways. **The kernel zeta-reduces `let` by substitution**,
+so sharing at a binding site never survives to the reduction that matters; the compiled
+evaluator already shared closure results by pointer. The cost is per *application* at differing
+arguments, so a fix must change **what is applied**: staged evaluation with per-stage literal
+reification (~12 stages for ℕ-MCT, ~23 for ℝ-MCT), or an `MRealizer` redesign whose counter
+component does not call the witness component. Do not re-propose `let`-binding; it is measured.
+
+**3. A SECOND wall, independent of depth: the VALUE (`examples`,
+`Probes/ContentExampleNat.lean`).** On one fixed 145-constructor derivation, `V = 128` is
+kernel-checked in ≈9 s and `V = 256` OOMs at 12 GB. `Term.add`'s majorant is a `prec`, so
+`recMaj` iterates **value-many** times without sharing. So extraction is bounded from two
+directions at once — composition depth and the magnitude of the number being computed — and the
+second was not on any list before this. Any bound whose value is large is out of reach even
+from a shallow derivation.
+
+**4. The proof mode can itself be the wall (`examples`).** The *same theorem by the same
+argument*, written in the proof mode, is **42,729** constructors against the raw derivation's
+145 — a factor of 295 — and reduces only at `k = 0`. §14.7's cast story (Lane D1) clears the
+`Eq.mpr` obstacle but not this one.
+
+**5. The first bound with mathematical content (`examples`).** `∀x(∀u (f(Su) =₀ f u +ᵗ f u) →
+∃v (f k =₀ v))` at `x = (k,f)`, by raw `Derivable.induction`, the witness at each step built
+from the induction hypothesis's witness: `V = 2^k·f(0)`, kernel-checked at four points, moving
+with **both** components, `U(k) = k−1` sharp, six refutation controls, and the term route
+independently agreeing on `V`. Note what carries the content: the *theorem* `∃v (f k =₀ v)` is
+trivial, and the **bound** is the mathematics — `f k ≤ 2^k f(0)`. That is the project's
+"bounds are properties of proofs, not theorems" thesis with a number attached rather than the
+`mct_p1`/`mct_p2` contrast.
+
+**6. W-hyperbolic derived lemmas (`whyp`, `Metatheorems/WHyperbolicLemmas.lean`).** The four
+axioms usable at arbitrary terms, then `d(x, W(x,y,λ)) ≤ λ·d(x,y)` and its mirror, the reverse
+inequality, `W(x,y,0) = x`, `W(x,y,1) = y`, nonexpansiveness in each argument, (W2) as an
+equality — all `[propext, Quot.sound]`, each read back in an arbitrary `WHyperbolicModel`. It
+stops at a **named gap**: multiplicative monotonicity of `≤ℝ` does not exist and is not
+derivable from what does, because the obvious route needs a `·ℝ`-congruence that *is* that
+monotonicity. The equality forms stop one step short for that reason and say so.

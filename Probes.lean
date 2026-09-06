@@ -10,6 +10,7 @@ import Metatheorems.Probes.PapplyDemo
 import Metatheorems.Probes.QComm
 import Metatheorems.Probes.R1
 import Metatheorems.Probes.RevTriangleDemo
+import Metatheorems.Probes.WHyperbolicLemmasDemo
 import Metatheorems.Probes.RwArrow
 import Metatheorems.Probes.RwBase
 import Metatheorems.Probes.SeqMpBoundProbe
@@ -24,6 +25,11 @@ import Metatheorems.Probes.MonotoneLaneBp
 import Metatheorems.Probes.MonotoneMCT
 import Metatheorems.Probes.MonotoneMemoGates
 import Metatheorems.Probes.ClassicalMfiProbe
+import Metatheorems.Probes.ContentExampleNat
+import Metatheorems.Probes.ContentExampleSpace
+import Metatheorems.Probes.NestingDepth
+import Metatheorems.Probes.SharingProbe
+import Metatheorems.Probes.ExprBound
 import Metatheorems.Probes.TermPrintDemo
 import Metatheorems.Probes.TinyBoundDemo
 import Metatheorems.Probes.TriangleBoundDemo
