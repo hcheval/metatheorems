@@ -264,6 +264,34 @@ theorem W3_in_model (a b : M.carrier) (r : ℕ → ℕ) :
     clampReal_of_mem (1 - par r) (by linarith [hm.2]) (by linarith [hm.1])] at he'
   exact he'
 
+/-- **Extensionality of `W` in its first argument**, read back: from the object-level
+`W_ext_left`, whose premise is the object formula `x =_X x'` and whose conclusion is
+`W(x,y,λ) =_X W(x',y,λ)`. `eqAtType_base_holds_gen` turns the model-side `a = c` into the
+object premise, `eq_of_eqAtType_base_gen` (separation) turns the object conclusion back into
+a carrier equation. Nothing here consults `M.W1`–`M.W4`. -/
+theorem W_ext_left_in_model (a b c : M.carrier) (r : ℕ → ℕ) (hac : a = c) :
+    M.W a b (par r) = M.W c b (par r) := by
+  have hs := M.soundness (WHyperbolic.W_ext_left px pz py pl) (envW M a b c r)
+  have hp := M.toMetricModel.eqAtType_base_holds_gen M.si (fun _ _ => rfl) px pz
+    (envW M a b c r) hac
+  have he := M.toMetricModel.eq_of_eqAtType_base_gen M.si (fun _ _ => rfl) _ _ _ (hs hp)
+  simp only [WHyperbolicModel.interp_W, codeReal_interp_clamp01,
+    isCauchyCode_interp_clamp01, clampReal_of_mem, clampReal_nonneg, clampReal_le_one,
+    interp_px, interp_py, interp_pz, interp_pl] at he
+  exact he
+
+/-- **Extensionality of `W` in its second argument**, from `W_ext_right`. -/
+theorem W_ext_right_in_model (a b c : M.carrier) (r : ℕ → ℕ) (hbc : b = c) :
+    M.W a b (par r) = M.W a c (par r) := by
+  have hs := M.soundness (WHyperbolic.W_ext_right px py pz pl) (envW M a b c r)
+  have hp := M.toMetricModel.eqAtType_base_holds_gen M.si (fun _ _ => rfl) py pz
+    (envW M a b c r) hbc
+  have he := M.toMetricModel.eq_of_eqAtType_base_gen M.si (fun _ _ => rfl) _ _ _ (hs hp)
+  simp only [WHyperbolicModel.interp_W, codeReal_interp_clamp01,
+    isCauchyCode_interp_clamp01, clampReal_of_mem, clampReal_nonneg, clampReal_le_one,
+    interp_px, interp_py, interp_pz, interp_pl] at he
+  exact he
+
 /-- The environment for the two-parameter context `Γ2`. -/
 abbrev env2 (a b : M.carrier) (r r' : ℕ → ℕ) : Ctx.interpret (fun () => M.carrier) Γ2 :=
   (r', r, b, a, ())
@@ -339,6 +367,8 @@ end RealLine
 #print axioms dist_W_between_in_model
 #print axioms W2_in_model
 #print axioms W3_in_model
+#print axioms W_ext_left_in_model
+#print axioms W_ext_right_in_model
 
 end WHyperbolicLemmasDemo
 end Metatheorems

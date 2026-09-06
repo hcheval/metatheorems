@@ -47,6 +47,38 @@ Kohlenbach (following Kirk, and Kohlenbach–Leuştean) states, for a W-hyperbol
 | `W_one` | `W(x,y,1ℝ~) =_X y` | `W(x,y,1) = y` |
 | `dist_W_mono_right` | `d(W(x,y,λ̃), W(x,y',λ̃)) ≤ℝ λ̃ ·ℝ d(y,y')` | (W4), nonexpansive in `y` |
 | `dist_W_mono_left` | `d(W(x,y,λ̃), W(x',y,λ̃)) ≤ℝ (1ℝ −ℝ λ̃) ·ℝ d(x,x')` | (W4), in `x` |
+| `W_ext_left` | `x =_X x' →ᶠ W(x,y,λ̃) =_X W(x',y,λ̃)` | extensionality, 1st argument |
+| `W_ext_right` | `y =_X y' →ᶠ W(x,y,λ̃) =_X W(x,y',λ̃)` | extensionality, 2nd argument |
+| `W_ext_param` | `λ =ℝ μ →ᶠ W(x,y,λ̃) =_X W(x,y,μ̃)` | extensionality, parameter |
+| `W_ext` | all three at once | Kohlenbach §17.2 |
+
+## Extensionality of `W`, and why it has to be *derived*
+
+The ambient system is **weakly** extensional: `WE-HA^{ω,X}` has only quantifier-free
+extensionality (`Derivable.qfer`), and full extensionality is deliberately unavailable — it is
+what would break the metatheorems. So adding a constant `W` to the signature is only
+legitimate if `W`'s extensionality follows from the *space's own axioms*. For W-hyperbolic
+spaces it does, and `W_ext` is that derivation: the two carrier arguments come from (W4)
+through `dist_W_mono_left`/`_right`, and the parameter from (W2) through `W2_at`. The three
+one-argument cases are chained by `eqAtType_trans_base`; nothing outside
+`WHyperbolic.W2`/`W4` is consulted.
+
+The mechanism in each case is the same and is worth stating once: `s =_X t` **is**
+`d(s,t) =ℝ 0ℝ`, so a nonexpansiveness bound `d(W…, W…) ≤ℝ c ·ℝ d(s,t)` collapses as soon as
+the product does, and a product with a **known-zero factor** is `mul_eq_zero_R_core` /
+`mul_zero_l_R` — no order-theoretic input about `·ℝ` at all. `dist_nonneg` supplies the other
+side and `le_R_antisymm_core` closes.
+
+**This is why the parameter case is *not* blocked by the missing lemma below**, which the
+first version of this header predicted it would be. (W2) puts the parameter difference in the
+**left** factor, `d(W(x,y,λ̃), W(x,y,μ̃)) =ℝ |λ̃ −ℝ μ̃|ℝ ·ℝ d(x,y)`, and rewriting a factor
+*to `0ℝ`* is a special case of the congruence that is already available. What is missing is
+rewriting a factor by an **arbitrary** `=ℝ`.
+
+Three generic `=ℝ` facts were needed and are proved here (`abs_eq_zero_R`, `sub_eq_zero_R`,
+`clamp01_congr_R`, and the composite `abs_sub_eq_zero_R`). All are slack-free or better:
+`cauchyfy` evaluates on `|·|ℝ`, `−ℝ` and `clamp01`, so each goal is a ℚ identity at a single
+index. Their proper home is `RealNumbers/`; they are kept here for the reason stated below.
 
 `λ̃` is `clamp01 λ` throughout — the object-level `[0,1]`-retraction, exactly as the axioms
 of `WHyperbolic.lean` are stated. `0ℝ~` and `1ℝ~` above mean `clamp01 0ℝ` and `clamp01 1ℝ`;
@@ -66,18 +98,51 @@ keeps `mul_eq_zero_R_core`):
 
 **NOT DONE, and this is the honest boundary of the chain: the equality versions.**
 Kohlenbach's `d(x, W(x,y,λ)) = λ·d(x,y)` and the (W2) corollary
-`d(W(x,y,λ), W(x,y,μ)) ≤ d(x,y)` both need **multiplicative monotonicity of `≤ℝ`**,
+`d(W(x,y,λ), W(x,y,μ)) ≤ d(x,y)` need an `=ℝ`-**congruence** for `·ℝ`,
 
-    `0ℝ ≤ℝ f → g ≤ℝ g' → f ·ℝ g ≤ℝ f ·ℝ g'`,
+    `mul_congr_r_R :  g =ℝ g' →ᶠ f ·ℝ g =ℝ f ·ℝ g'`,
 
-and the ℝ layer does not have it — `RealNumbers/Order.lean` has only the *strict* product
-fact `lt_mul_pos_R` (`0 <ℝ f → 0 <ℝ g → 0 <ℝ f ·ℝ g`), and `RealNumbers/Mul.lean` has the ring
-identities but no order. Nor is it derivable from what is there: the natural route
-`f ·ℝ g' =ℝ f ·ℝ (g +ℝ (g' −ℝ g)) =ℝ f ·ℝ g +ℝ f ·ℝ (g' −ℝ g)` needs an `=ℝ`-congruence for
-`·ℝ` in its second argument, and *that* is again multiplicative monotonicity (the additive
-congruence, by contrast, **is** derivable from `le_R_add_mono_*` plus `le_R_antisymm_core`,
-which is why nothing additive is blocked). So it is a genuine new estimate in the
-`cauchyfy` layer — of the shape of `mul_R_check` — and was not attempted here.
+which the ℝ layer does not have — `RealNumbers/Order.lean` has only the *strict* product fact
+`lt_mul_pos_R` (`0 <ℝ f → 0 <ℝ g → 0 <ℝ f ·ℝ g`), and `RealNumbers/Mul.lean` has the ring
+identities (`mul_comm_R`, `mul_assoc_R`, `distrib_R`, `mul_one_R`) but nothing that rewrites a
+factor. The additive congruence, by contrast, **is** derivable from `le_R_add_mono_*` plus
+`le_R_antisymm_core`, which is why nothing additive is blocked.
+
+**Two corrections to what this paragraph used to say** (2026-09-07):
+
+1. **The missing statement is the congruence, not multiplicative monotonicity
+   (`0ℝ ≤ℝ f → g ≤ℝ g' → f ·ℝ g ≤ℝ f ·ℝ g'`).** The header used to name monotonicity and then
+   argue that the congruence "is again multiplicative monotonicity". That is backwards: the
+   congruence is strictly weaker (it is monotonicity's two-sided instance, with no sign
+   hypothesis and no sign case split), it is what both stalled statements actually consume,
+   and it is what should be attempted first. Monotonicity additionally needs a four-way case
+   split on the signs of `f̂(N)` and `ĝ(N) −ℚ ĝ'(N)`; the congruence needs none, because there
+   `|ĝ(N) −ℚ ĝ'(N)|` is itself small and `|f̂(N)|` only has to be *bounded*.
+
+2. **It is not "of the shape of `mul_R_check`" and it does not need a new telescope.** The
+   accounting, done: with `b₁ = f(0)+g(0)+2`, `cauchyfy_mul_R` reads the goal at index
+   `p = x₀+1+b₁`, and relocating both factors to a common far index `N` costs at most
+   `(⟨f(0)⟩+⟨g(0)⟩+2) ·ℚ 2^{-p}` per side — the two existing move lemmas `mul_move_le` /
+   `mul_move_le_l` with `cauchyfy_shift_le` and `cauchyfy_mag_le`, exactly as in
+   `mul_assoc_est`. The residual `|f̂(N)| ·ℚ |ĝ(N) −ℚ ĝ'(N)|` is bounded by
+   `(⟨f(0)⟩+1) ·ℚ 2^{-(N-1)}` from the hypothesis, and `N` is **free**, so it can be made
+   smaller than any fixed budget.
+
+   Whether that closes depends on one dyadic constant. `mag_dyadic_le` spends `c+1` exponent
+   units on a magnitude `⟨c⟩+1` (via `⟨c⟩+1 ≤ ⟨2^{c+1}⟩`), and four independent applications
+   of it consume the whole budget `2^{-x₀} = 4 ·ℚ 2^{-(x₀+2)}` with nothing left for the
+   residual. Bounding the two moves of one side **together** — `⟨f(0)⟩+⟨g(0)⟩+2 ≤ ⟨2^{f(0)+g(0)+1}⟩`,
+   i.e. the sharper `c+1 ≤ 2^c` in place of `c+1 ≤ 2^{c+1}` (true at every `c`, including
+   `c = 0`) — gives `2^{-(x₀+2)}` per side instead of `2^{-(x₀+1)}`, hence `2^{-(x₀+1)}` for
+   the two sides and `2^{-(x₀+1)}` left over for the residual. So there **is** a factor of 2 of
+   slack, and no Archimedean squeeze (`eqR_tail`/`eqR_le`/`eqR_strict`) is needed — unlike
+   `eq_R_trans` and `le_R_trans_core`, which are genuinely tight.
+
+   The recipe, for whoever picks it up: one new dyadic lemma (`mag_dyadic_le` with `c` in
+   place of `c+1`, resting on `c+1 ≤ 2^c` at the encoded level), one combined two-move bound
+   per side, and a five-term `abs_Q_triangle` chain. Everything else is already in
+   `RealNumbers/Mul.lean` and `RealNumbers/Bounds.lean`. Estimated at a day, not a night; not
+   attempted here.
 
 What that costs, precisely:
 
@@ -158,6 +223,151 @@ def eqX_of_dist_le_zero {i : ι} (s t : Term F Γ (Ty.base i))
     (h : Derivable F al Premises (le_R (Term.app2 (Term.dist i) s t) Term.zero_R)) :
     Derivable F al Premises (eqAtType (Ty.base i) s t) :=
   eqR_of_le_le h (dist_nonneg i s t)
+
+/-- `eqX_of_dist_le_zero` as an **object-level implication**, which is what a derivation built
+by `.syllogism` chaining needs. `eqAtType (.base i) s t` *is* `d(s,t) =ℝ 0ℝ`, so the type
+ascription below is a definitional unfolding and no cast appears. -/
+def eqX_of_dist_le_zero_imp {i : ι} (s t : Term F Γ (Ty.base i)) :
+    Derivable F al Premises
+      (le_R (Term.app2 (Term.dist i) s t) Term.zero_R →ᶠ eqAtType (Ty.base i) s t) :=
+  .syllogism (pair_h I_comb (weaken_intro_h (dist_nonneg i s t)))
+    (le_R_antisymm_core (Term.app2 (Term.dist i) s t) Term.zero_R)
+
+-- ── Three `=ℝ` facts the extensionality of `W` needs ────────────────────────
+--
+-- All three are slack-free or better, and none is an estimate in the `leR_strict` sense:
+-- every `cauchyfy` involved evaluates (`cauchyfy_abs_R`, `cauchyfy_sub_R`,
+-- `cauchyfy_clamp01`), so each goal is a ℚ identity at a single index. Contrast the
+-- multiplicative facts of the file header, where `mul_R`'s index shift depends on the
+-- arguments and the two sides are read at *different* indices.
+
+/-- **`w =ℝ 0ℝ →ᶠ |w|ℝ =ℝ 0ℝ`.** `cauchyfy` is the identity on `|w|ℝ`, so the goal at index
+`n` is `‖|ŵ(n+1)|ℚ −ℚ 0ℚ‖ℚ <ℚ 2^{-n}` and the hypothesis at the *same* index is
+`|ŵ(n+1) −ℚ 0ℚ|ℚ <ℚ 2^{-n}`; `abs_Q_abs_Q` and `sub_Q_zero_Q` identify the two left-hand
+sides. Nothing moves index, so there is no budget to account for. -/
+def abs_eq_zero_R (w : Term F Γ (realTy ι)) :
+    Derivable F al Premises
+      (eq_R w Term.zero_R →ᶠ eq_R (.app Term.abs_R w) Term.zero_R) := by
+  pmode
+  pintro h
+  pforall
+  simp only [abs_R_app_weaken, zero_R_weaken]
+  pspecialize h with h1
+  canorm
+  prw (cauchyfy_zero_R (.app .succ (.var .vz)))
+  prw (cauchyfy_zero_R (.app .succ (.var .vz))) in h1 with h2
+  prw (cauchyfy_abs_R w.weaken (.app .succ (.var .vz)))
+  papplym (lt_Q_congr
+    (.app Term.abs_Q (Term.app2 Term.sub_Q
+      (Term.app2 Term.cauchyfy w.weaken (.app .succ (.var .vz))) Term.zero_Q))
+    (.app Term.pow2neg_Q (.var .vz))
+    (.app Term.abs_Q (Term.app2 Term.sub_Q
+      (.app Term.abs_Q (Term.app2 Term.cauchyfy w.weaken (.app .succ (.var .vz))))
+      Term.zero_Q))
+    (.app Term.pow2neg_Q (.var .vz))
+    (eqQtrans
+      (abs_Q_congr (sub_Q_zero_Q
+        (Term.app2 Term.cauchyfy w.weaken (.app .succ (.var .vz)))))
+      (eqQtrans
+        (eqQsym (abs_Q_abs_Q
+          (Term.app2 Term.cauchyfy w.weaken (.app .succ (.var .vz)))))
+        (eqQsym (abs_Q_congr (sub_Q_zero_Q
+          (.app Term.abs_Q
+            (Term.app2 Term.cauchyfy w.weaken (.app .succ (.var .vz)))))))))
+    (eq_Q_refl_inst (.app Term.pow2neg_Q (.var .vz))))
+  pexact h2
+
+/-- The one ℚ identity `sub_eq_zero_R` needs: `|a −ℚ b|ℚ =ℚ |(a +ℚ (−ℚ b)) −ℚ 0ℚ|ℚ`. -/
+private def subZeroEq (a b : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (eq_Q (.app Term.abs_Q (Term.app2 Term.sub_Q a b))
+        (.app Term.abs_Q (Term.app2 Term.sub_Q
+          (Term.app2 Term.add_Q a (.app Term.neg_Q b)) Term.zero_Q))) :=
+  abs_Q_congr
+    (eqQtrans (sub_Q_eq_add_neg a b)
+      (eqQsym (sub_Q_zero_Q (Term.app2 Term.add_Q a (.app Term.neg_Q b)))))
+
+/-- **`f =ℝ g →ᶠ f −ℝ g =ℝ 0ℝ`.** `sub_R` shifts by one (`cauchyfy_sub_R`), so the goal at
+index `n` speaks about index `n+2` while the hypothesis read at `n+1` bounds the same
+difference by `2^{-(n+1)}` — half the budget. Factor 2 of slack; no telescope. -/
+def sub_eq_zero_R (f g : Term F Γ (realTy ι)) :
+    Derivable F al Premises
+      (eq_R f g →ᶠ eq_R (Term.app2 Term.sub_R f g) Term.zero_R) := by
+  pmode
+  pintro h
+  pforall
+  simp only [sub_R_app_weaken, zero_R_weaken]
+  pinst h (.app .succ (.var .vz)) with h1
+  canorm
+  prw (cauchyfy_zero_R (.app .succ (.var .vz)))
+  prw (cauchyfy_sub_R f.weaken g.weaken (.app .succ (.var .vz)))
+  papplym (lt_le_Q_trans
+    (.app Term.abs_Q (Term.app2 Term.sub_Q
+      (Term.app2 Term.add_Q
+        (Term.app2 Term.cauchyfy f.weaken (.app .succ (.app .succ (.var .vz))))
+        (.app Term.neg_Q
+          (Term.app2 Term.cauchyfy g.weaken (.app .succ (.app .succ (.var .vz))))))
+      Term.zero_Q))
+    (.app Term.pow2neg_Q (.app .succ (.var .vz)))
+    (.app Term.pow2neg_Q (.var .vz)))
+  psplit
+  · papplym (lt_Q_congr
+      (.app Term.abs_Q (Term.app2 Term.sub_Q
+        (Term.app2 Term.cauchyfy f.weaken (.app .succ (.app .succ (.var .vz))))
+        (Term.app2 Term.cauchyfy g.weaken (.app .succ (.app .succ (.var .vz))))))
+      (.app Term.pow2neg_Q (.app .succ (.var .vz)))
+      (.app Term.abs_Q (Term.app2 Term.sub_Q
+        (Term.app2 Term.add_Q
+          (Term.app2 Term.cauchyfy f.weaken (.app .succ (.app .succ (.var .vz))))
+          (.app Term.neg_Q
+            (Term.app2 Term.cauchyfy g.weaken (.app .succ (.app .succ (.var .vz))))))
+        Term.zero_Q))
+      (.app Term.pow2neg_Q (.app .succ (.var .vz)))
+      (subZeroEq
+        (Term.app2 Term.cauchyfy f.weaken (.app .succ (.app .succ (.var .vz))))
+        (Term.app2 Term.cauchyfy g.weaken (.app .succ (.app .succ (.var .vz)))))
+      (eq_Q_refl_inst (.app Term.pow2neg_Q (.app .succ (.var .vz)))))
+    pexact h1
+  · pthm (pow2neg_Q_le_succ (.var .vz))
+
+/-- **`clamp01` respects `=ℝ`**: `f =ℝ g →ᶠ clamp01 f =ℝ clamp01 g`.
+
+`clamp01_Q_lip` — `clamp01_Q` is 1-Lipschitz — transfers the bound verbatim at the same
+index, exactly as it transfers the Cauchy rate in `clamp01_check`. No budget is spent. -/
+def clamp01_congr_R (f g : Term F Γ (realTy ι)) :
+    Derivable F al Premises
+      (eq_R f g →ᶠ eq_R (.app Term.clamp01 f) (.app Term.clamp01 g)) := by
+  pmode
+  pintro h
+  pforall
+  simp only [clamp01_app_weaken]
+  pspecialize h with h1
+  canorm
+  prw (cauchyfy_clamp01 f.weaken (.app .succ (.var .vz)))
+  prw (cauchyfy_clamp01 g.weaken (.app .succ (.var .vz)))
+  papplym (le_lt_Q_trans
+    (.app Term.abs_Q (Term.app2 Term.sub_Q
+      (.app Term.clamp01_Q
+        (Term.app2 Term.cauchyfy f.weaken (.app .succ (.var .vz))))
+      (.app Term.clamp01_Q
+        (Term.app2 Term.cauchyfy g.weaken (.app .succ (.var .vz))))))
+    (.app Term.abs_Q (Term.app2 Term.sub_Q
+      (Term.app2 Term.cauchyfy f.weaken (.app .succ (.var .vz)))
+      (Term.app2 Term.cauchyfy g.weaken (.app .succ (.var .vz)))))
+    (.app Term.pow2neg_Q (.var .vz)))
+  psplit
+  · pthm (clamp01_Q_lip
+      (Term.app2 Term.cauchyfy f.weaken (.app .succ (.var .vz)))
+      (Term.app2 Term.cauchyfy g.weaken (.app .succ (.var .vz))))
+  · pexact h1
+
+/-- **`f =ℝ g →ᶠ |f −ℝ g|ℝ =ℝ 0ℝ`** — `sub_eq_zero_R` then `abs_eq_zero_R`. This is the
+form the `λ` case of `W`'s extensionality consumes: (W2) puts `|λ̃ −ℝ μ̃|ℝ` in the *left*
+factor of a product, where `mul_zero_l_R` applies. -/
+def abs_sub_eq_zero_R (f g : Term F Γ (realTy ι)) :
+    Derivable F al Premises
+      (eq_R f g →ᶠ eq_R (.app Term.abs_R (Term.app2 Term.sub_R f g)) Term.zero_R) :=
+  .syllogism (sub_eq_zero_R f g) (abs_eq_zero_R (Term.app2 Term.sub_R f g))
 
 end RHelpers
 
@@ -606,6 +816,136 @@ def dist_W_mono_left (x x' y : Term WHyperbolic.F Γ xTy) (l : Term WHyperbolic.
 
 end Nonexpansive
 
+-- ============================================================================
+-- Extensionality of `W`
+-- ============================================================================
+
+section Extensionality
+
+variable {Γ : Ctx MetricSpace.ι} {a : Allowed}
+
+/-- **`x =_X x' →ᶠ W(x,y,λ̃) =_X W(x',y,λ̃)`** — extensionality of `W` in its first argument.
+
+Nonexpansiveness (`dist_W_mono_left`, i.e. (W4)) bounds `d(W(x,y,λ̃), W(x',y,λ̃))` by
+`(1ℝ −ℝ λ̃) ·ℝ d(x,x')`, and `d(x,x') =ℝ 0ℝ` — which is exactly what `x =_X x'` *is* —
+collapses that product through `mul_eq_zero_R_core`. A distance bounded above by `0ℝ` and
+below by `dist_nonneg` is `0ℝ`, i.e. the two points are equal at the base type. -/
+def W_ext_left (x x' y : Term WHyperbolic.F Γ xTy) (l : Term WHyperbolic.F Γ rTy) :
+    Derivable WHyperbolic.F a WHyperbolic.Premises
+      (eqAtType xTy x x' →ᶠ
+        eqAtType xTy
+          (Term.app3 (Term.func ()) x y (.app Term.clamp01 l))
+          (Term.app3 (Term.func ()) x' y (.app Term.clamp01 l))) :=
+  let cl : Term WHyperbolic.F Γ (realTy MetricSpace.ι) := .app Term.clamp01 l
+  let mu : Term WHyperbolic.F Γ (realTy MetricSpace.ι) :=
+    Term.app2 Term.sub_R Term.one_R cl
+  let dxx : Term WHyperbolic.F Γ (realTy MetricSpace.ι) := Term.app2 (Term.dist ()) x x'
+  let mid : Term WHyperbolic.F Γ (realTy MetricSpace.ι) := Term.app2 Term.mul_R mu dxx
+  let wl : Term WHyperbolic.F Γ xTy := Term.app3 (Term.func ()) x y cl
+  let wr : Term WHyperbolic.F Γ xTy := Term.app3 (Term.func ()) x' y cl
+  let dW : Term WHyperbolic.F Γ (realTy MetricSpace.ι) := Term.app2 (Term.dist ()) wl wr
+  .syllogism (mul_eq_zero_R_core mu dxx)
+    (.syllogism (le_R_of_eq_R_core mid Term.zero_R)
+      (.syllogism (pair_h (weaken_intro_h (dist_W_mono_left x x' y l)) I_comb)
+        (.syllogism (le_R_trans_core dW mid Term.zero_R)
+          (eqX_of_dist_le_zero_imp wl wr))))
+
+/-- **`y =_X y' →ᶠ W(x,y,λ̃) =_X W(x,y',λ̃)`** — the same argument on the other side, through
+`dist_W_mono_right`; the surviving factor is `λ̃` instead of `1ℝ −ℝ λ̃`. -/
+def W_ext_right (x y y' : Term WHyperbolic.F Γ xTy) (l : Term WHyperbolic.F Γ rTy) :
+    Derivable WHyperbolic.F a WHyperbolic.Premises
+      (eqAtType xTy y y' →ᶠ
+        eqAtType xTy
+          (Term.app3 (Term.func ()) x y (.app Term.clamp01 l))
+          (Term.app3 (Term.func ()) x y' (.app Term.clamp01 l))) :=
+  let cl : Term WHyperbolic.F Γ (realTy MetricSpace.ι) := .app Term.clamp01 l
+  let dyy : Term WHyperbolic.F Γ (realTy MetricSpace.ι) := Term.app2 (Term.dist ()) y y'
+  let mid : Term WHyperbolic.F Γ (realTy MetricSpace.ι) := Term.app2 Term.mul_R cl dyy
+  let wl : Term WHyperbolic.F Γ xTy := Term.app3 (Term.func ()) x y cl
+  let wr : Term WHyperbolic.F Γ xTy := Term.app3 (Term.func ()) x y' cl
+  let dW : Term WHyperbolic.F Γ (realTy MetricSpace.ι) := Term.app2 (Term.dist ()) wl wr
+  .syllogism (mul_eq_zero_R_core cl dyy)
+    (.syllogism (le_R_of_eq_R_core mid Term.zero_R)
+      (.syllogism (pair_h (weaken_intro_h (dist_W_mono_right x y y' l)) I_comb)
+        (.syllogism (le_R_trans_core dW mid Term.zero_R)
+          (eqX_of_dist_le_zero_imp wl wr))))
+
+/-- **`λ =ℝ μ →ᶠ W(x,y,λ̃) =_X W(x,y,μ̃)`** — extensionality of `W` in the **parameter**.
+
+This is the case the file header predicted would need multiplicative monotonicity, and it
+does not, for a reason worth stating: (W2) puts the parameter difference in the **left**
+factor, `d(W(x,y,λ̃), W(x,y,μ̃)) =ℝ |λ̃ −ℝ μ̃|ℝ ·ℝ d(x,y)`, and killing a product whose *known*
+factor is `0ℝ` is `mul_zero_l_R` — a special case of the congruence, not the congruence
+itself. What is missing is the ability to rewrite a factor by an arbitrary `=ℝ`; here the
+factor is rewritten to `0ℝ`, and `0ℝ ·ℝ c =ℝ 0ℝ` needs no monotonicity at all.
+
+The chain is `clamp01_congr_R` (the retraction respects `=ℝ`), `abs_sub_eq_zero_R`,
+`mul_zero_l_R`, and `eq_R_trans_core` against (W2). -/
+def W_ext_param (x y : Term WHyperbolic.F Γ xTy) (l m : Term WHyperbolic.F Γ rTy) :
+    Derivable WHyperbolic.F a WHyperbolic.Premises
+      (eq_R l m →ᶠ
+        eqAtType xTy
+          (Term.app3 (Term.func ()) x y (.app Term.clamp01 l))
+          (Term.app3 (Term.func ()) x y (.app Term.clamp01 m))) :=
+  let cl : Term WHyperbolic.F Γ (realTy MetricSpace.ι) := .app Term.clamp01 l
+  let cm : Term WHyperbolic.F Γ (realTy MetricSpace.ι) := .app Term.clamp01 m
+  let df : Term WHyperbolic.F Γ (realTy MetricSpace.ι) :=
+    .app Term.abs_R (Term.app2 Term.sub_R cl cm)
+  let dxy : Term WHyperbolic.F Γ (realTy MetricSpace.ι) := Term.app2 (Term.dist ()) x y
+  let prod : Term WHyperbolic.F Γ (realTy MetricSpace.ι) := Term.app2 Term.mul_R df dxy
+  let wl : Term WHyperbolic.F Γ xTy := Term.app3 (Term.func ()) x y cl
+  let wr : Term WHyperbolic.F Γ xTy := Term.app3 (Term.func ()) x y cm
+  let dW : Term WHyperbolic.F Γ (realTy MetricSpace.ι) := Term.app2 (Term.dist ()) wl wr
+  .syllogism (clamp01_congr_R l m)
+    (.syllogism (abs_sub_eq_zero_R cl cm)
+      (.syllogism (mul_zero_l_R df dxy)
+        (.syllogism (pair_h (weaken_intro_h (W2_at x y l m)) I_comb)
+          (eq_R_trans_core dW prod Term.zero_R))))
+
+/-- **Full extensionality of `W`**:
+
+    x =_X x' → y =_X y' → λ =ℝ μ → W(x,y,λ̃) =_X W(x',y',μ̃).
+
+The three one-argument cases chained by `eqAtType_trans_base`. Stated as an object-level
+implication from the conjunction, so it is a *theorem of the theory*, not a derived rule.
+
+**Why this is worth having.** The ambient system is *weakly* extensional: `WE-HA^{ω,X}` has
+only quantifier-free extensionality (`Derivable.qfer`), and full extensionality is
+deliberately absent — it is what would break the metatheorems. So a new space constant is
+only legitimate if its extensionality follows from the space's own axioms rather than being
+assumed. For `W` it does, and this is that derivation: (W4) supplies the two carrier
+arguments and (W2) the parameter. Nothing here is a `.premise` beyond `WHyperbolic.W2` and
+`WHyperbolic.W4` themselves. -/
+def W_ext (x x' y y' : Term WHyperbolic.F Γ xTy) (l m : Term WHyperbolic.F Γ rTy) :
+    Derivable WHyperbolic.F a WHyperbolic.Premises
+      (eqAtType xTy x x' ∧ᶠ eqAtType xTy y y' ∧ᶠ eq_R l m →ᶠ
+        eqAtType xTy
+          (Term.app3 (Term.func ()) x y (.app Term.clamp01 l))
+          (Term.app3 (Term.func ()) x' y' (.app Term.clamp01 m))) := by
+  pmode
+  pintro hyp
+  -- `∧ᶠ` is left-associative, so the conjunction is `(x =_X x' ∧ y =_X y') ∧ λ =ℝ μ`
+  pdestruct hyp with hxy hl
+  pdestruct hxy with hx hy
+  papplym (eqAtType_trans_base ()
+    (Term.app3 (Term.func ()) x y (.app Term.clamp01 l))
+    (Term.app3 (Term.func ()) x' y' (.app Term.clamp01 l))
+    (Term.app3 (Term.func ()) x' y' (.app Term.clamp01 m)))
+  psplit
+  · papplym (eqAtType_trans_base ()
+      (Term.app3 (Term.func ()) x y (.app Term.clamp01 l))
+      (Term.app3 (Term.func ()) x' y (.app Term.clamp01 l))
+      (Term.app3 (Term.func ()) x' y' (.app Term.clamp01 l)))
+    psplit
+    · papplym (W_ext_left x x' y l)
+      pexact hx
+    · papplym (W_ext_right x' y y' l)
+      pexact hy
+  · papplym (W_ext_param x' y' l m)
+    pexact hl
+
+end Extensionality
+
 end WHyperbolic
 
 -- ============================================================================
@@ -626,5 +966,13 @@ end WHyperbolic
 #print axioms WHyperbolic.W_one
 #print axioms WHyperbolic.dist_W_mono_right
 #print axioms WHyperbolic.dist_W_mono_left
+#print axioms abs_eq_zero_R
+#print axioms sub_eq_zero_R
+#print axioms clamp01_congr_R
+#print axioms abs_sub_eq_zero_R
+#print axioms WHyperbolic.W_ext_left
+#print axioms WHyperbolic.W_ext_right
+#print axioms WHyperbolic.W_ext_param
+#print axioms WHyperbolic.W_ext
 
 end Metatheorems
