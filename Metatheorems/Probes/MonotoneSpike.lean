@@ -9,6 +9,14 @@ import Metatheorems.Probes.ConjBoundDemo
 /-!
 # Spike G0: the monotone functional interpretation on `acFinal`'s nine constructors
 
+**"Spike"** is used here in the software sense: a deliberately throwaway prototype built to
+answer one feasibility question fast — here, *does the monotone functional interpretation
+clear the `and_contract` stall that blocked the term route?* Nine of the (then) 36
+`Derivable` constructors were implemented, just enough to run `ConjBoundDemo.acFinal`, and the
+rest fell back to the term route. It did clear it (`1709` in ≈207 ms where the term route was
+a `whnf` timeout), and that result is why MFI was adopted. Elsewhere in the docs "the spike"
+always means this file.
+
 **STATUS (2026-09-05, Lane A): the recursion has moved into the library.** What this file
 used to define — `MRealizer`, `MaxCompat`, the nine combinators, `monotone_spike`, `mfiU`/
 `mfiV`, `maxT_comm`, `bezemMaxCompat` — now lives in `Metatheorems/Dialectica/Monotone.lean`

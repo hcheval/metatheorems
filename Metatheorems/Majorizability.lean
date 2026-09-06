@@ -44,10 +44,20 @@ structure AbstractMajorizability {ι κ : Type} {X : ι → Type} {F : κ → Ty
   /-- **Self-majorization** (`≽ᵃ_ρ̂`), the second conjunct of Bezem's definition. Both
       arguments are at the hat type; `bezemMaj`'s instance of this is `hatMaj`.
 
-      Added 2026-09-02 with the two-clause widening of `bezemMaj`. Before that, `arrow_intro`
-      was the converse of `app_compat` outright; with two clauses a majorization at an arrow
-      type carries strictly more information than the pointwise statement, and there is no way
-      to recover it, so the structure has to carry the notion. -/
+      Introduced with the two-clause widening of `bezemMaj`: with two clauses a majorization at
+      an arrow type carries strictly more information than the pointwise statement, so
+      `arrow_intro` is no longer simply the converse of `app_compat`.
+
+      **Why this is a field and not a definition.** It is *not* that the notion cannot be
+      recovered — `Ty.hat` is idempotent and sends every base type to `.nat`, so
+      `maj ρ.hat` has exactly this type, and for `bezemMaj` it *is* this relation (the
+      `base i` clause is unreachable at a hat type, leaving `hatMaj`). What blocks defining
+      `selfMaj ρ := maj ρ.hat` is that `ρ.hat.hat = ρ.hat` holds only *propositionally* for a
+      variable `ρ`, so the definition would carry a transport and every use site would carry an
+      `Eq.rec`. Dependent-cast traffic is this project's measured pathology — `Eq.rec ↦ 60474`
+      in a stalling profile — so the notion is carried rather than derived. An earlier version
+      of this docstring said "there is no way to recover it", which is true of `maj` at `ρ` and
+      false at `ρ.hat`. -/
   selfMaj : (ρ : Ty ι) → Ty.interpret X ρ.hat → Ty.interpret X ρ.hat → Prop
   /-- A majorant majorizes itself. -/
   maj_selfMaj : ∀ {ρ : Ty ι} {x_star : Ty.interpret X ρ.hat} {x : Ty.interpret X ρ},
@@ -228,7 +238,41 @@ def IsMajorizable {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     - Variables: use `MajEnv.lookup`
     - Application: combine majorants via `app_compat`
     - Lambda: use IH on body + `arrow_intro`
-    - Constants: use the corresponding field of `AbstractMajorizability` -/
+    - Constants: use the corresponding field of `AbstractMajorizability`
+
+    ## Why this does not contradict `Majorizability` being uninhabitable
+
+    This is the question the whole architecture turns on, so it is recorded here rather than
+    left to be rediscovered.
+
+    `Majorizability.majorizer` asks for a majorant of **every semantic value** `x : ⟦ρ⟧`, and
+    provably cannot exist: fix `f* = id` at `(ℕ→ℕ)→ℕ`; the functions it majorizes are
+    `S = {f | ∀n, f n ≤ n}`, and a single number `Φ* id` would have to bound `Φ` on all of `S`.
+    Take `Φ f :=` the least `n ≥ 1` with `f n = 0`, else `0`, and `f_k :=` the identity with a
+    zero planted at `k`: every `f_k ∈ S`, and `Φ (f_k) = k` is unbounded. So no majorant.
+
+    This lemma looks stronger — it even handles open terms — but it quantifies over a
+    **different domain**. `⟦ρ⟧` is the full set-theoretic type structure, uncountable, and
+    contains functionals like `Φ` above, which is discontinuous (hence not computable, hence
+    certainly not System T definable) and lives in Lean only via `Classical.dec`. `Term F Γ ρ`
+    is countable syntax, every member of which is a System T term. **Majorizability holds on
+    the definable part and fails on the whole**, and the environment generalisation does not
+    bridge that: "given majorants for the free variables, produce one for the term" is the
+    fundamental lemma of a logical relation over *syntax*, extending the induction through
+    binders, not the domain from syntax to semantics. Closed terms are the empty-environment
+    case, which is `all_closed_terms_majorizable`.
+
+    Stated pen-and-paper, with no de Bruijn indices: *for all valuations `σ*`, `σ` with
+    `σ*(x) ≽ σ(x)` at every free variable `x` of `t`, we have `⟦t⟧σ* ≽ ⟦t⟧σ`.* Kohlenbach
+    needs only the closed case because a combinatory language has no free variables; binders
+    force the generalisation, exactly as they do in any Tait/Girard-style argument.
+
+    **The consequence for the design**: a Dialectica realizer built by recursion on a
+    derivation *is* definable — but once its type is a Lean `Type`, that fact is erased, and
+    majorization needs it. Making the witness type an object-level `Ty ι`, so that realizers
+    are `Term`s, is exactly the act of keeping it. Note the converse fails — there are
+    majorizable functionals no term denotes — so the syntactic route preserves something
+    strictly stronger than needed; it is simply the property that survives by construction. -/
 theorem all_terms_majorizable {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     {si : SpaceInterp X F} (am : AbstractMajorizability si)
     {Γ : Ctx ι} {ρ : Ty ι} (t : Term F Γ ρ) :

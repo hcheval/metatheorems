@@ -42,8 +42,13 @@ definitionally `Derivable`, so a proof-mode proof *will* traverse — into thous
 because every `pintro`/`prw` is itself a derivation.
 
 `#hilbert foo unfolding bar baz` makes the named constants transparent (delta-unfolded and
-walked). `#hilbert foo unfolding *` makes everything transparent, which is what you want on a
-combinator and never what you want on `mct_p2`.
+walked). `#hilbert foo all` makes everything transparent **except the proof-mode layer**,
+which is what you want on a combinator and never what you want on `mct_p2`.
+
+There is **no** `unfolding *`: the parser takes `ident+` and resolves each through
+`realizeGlobalConstNoOverloadWithInfo`, so `*` does not even parse. This paragraph claimed
+otherwise until 2026-09-07. To expand a proof-mode constant, name it under `unfolding`, one
+at a time — and see `shouldUnfold` for why `all` stops where it does.
 
 ## Output
 
