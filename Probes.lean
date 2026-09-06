@@ -27,6 +27,9 @@ import Metatheorems.Probes.MonotoneMemoGates
 import Metatheorems.Probes.ClassicalMfiProbe
 import Metatheorems.Probes.ContentExampleNat
 import Metatheorems.Probes.ContentExampleSpace
+import Metatheorems.Probes.NestingDepth
+import Metatheorems.Probes.SharingProbe
+import Metatheorems.Probes.ExprBound
 import Metatheorems.Probes.TermPrintDemo
 import Metatheorems.Probes.TinyBoundDemo
 import Metatheorems.Probes.TriangleBoundDemo

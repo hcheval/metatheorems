@@ -1002,10 +1002,14 @@ the table and for what the measurement cost the `let`-sharing plan.
 
 ### 14.8 What the 2026-09-06 lanes measured — depth, sharing, and a second wall
 
-Four lanes ran overnight on branches off `6abbfc4`. **As written, none is merged**; each result
-below names the branch that carries its probe, and this section should be re-read when they
-land. All four were verified in their own worktrees by a no-op rebuild of both targets plus
-`#print axioms` by name, per the "verify before relaying" rule.
+Four lanes ran overnight on branches off `6abbfc4`. All four were verified in their own
+worktrees by a no-op rebuild of both targets plus `#print axioms` by name, per the "verify
+before relaying" rule. **`whyp`, `examples` and `sharing` were merged into `main` on
+2026-09-07** (both targets green at 8111 / 8147 jobs, zero sorries), so items 1–6 below now
+cite probes that are on `main`; `sharing`'s `Monotone.lean` edit was **dropped** at the merge,
+being the refuted experiment of item 2. **`demo` is still unmerged** — it carries
+`Demo/Walkthrough.lean`, `docs/RESULTS.md` and `docs/QA.md`, and its merge is blocked on
+untracked debris at `Demo/hilbert/` in the working tree.
 
 **1. Composition depth, not count (`sharing`, `Probes/NestingDepth.lean`).** The longest path
 through composition nodes, memoised on `ExprStructEq`, no `whnf`:
