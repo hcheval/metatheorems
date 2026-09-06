@@ -48,7 +48,29 @@ which is what you want on a combinator and never what you want on `mct_p2`.
 There is **no** `unfolding *`: the parser takes `ident+` and resolves each through
 `realizeGlobalConstNoOverloadWithInfo`, so `*` does not even parse. This paragraph claimed
 otherwise until 2026-09-07. To expand a proof-mode constant, name it under `unfolding`, one
-at a time — and see `shouldUnfold` for why `all` stops where it does.
+at a time — and see `shouldUnfoldAt` for why `all` stops where it does.
+
+## `depth n` — the fueled unfolding (2026-09-07)
+
+`#hilbert foo depth 2` makes the proof-mode layer transparent, but only **two `ProofMode`
+unfoldings deep along any path**; below that a proof-mode constant is cited by name exactly as
+the default does. So the listing degrades gracefully instead of not terminating, and the fuel
+is a *display knob*: at depth 1 you see which proof-mode tactic each step was, at depth 2 you
+see the `seq_*` combinators it is built from, and so on down to raw `Derivable` constructors.
+
+The design is `Probes/ExprBound.lean`'s, one level up: fuel plus a name-based stop set
+(`keeping g h`), with the memo keyed on the fuel as well as the expression. Keying the memo on
+the fuel is forced — the same subderivation reached with two different budgets renders
+differently — and it is what costs the sharing that makes depth expensive. `all` and
+`unfolding` are unchanged and consume no fuel; only `ProofMode` names do.
+
+`keeping` matters as much as the fuel, and for a reason specific to this project: a *named
+sub-derivation* written in the proof mode (`ProofMode.mct_descent`) lives in the same
+namespace as the tactic lemmas (`ProofMode.pm_mp`), so no name test separates "the plumbing"
+from "the mathematics". `depth 1 keeping mct_descent` says expand the plumbing and cite the
+mathematics, which is what a paper proof does.
+
+Measurements (`Probes/HilbertDepth.lean`) are in that file's header.
 
 ## Output
 
@@ -151,15 +173,33 @@ structure Line where
 structure Config where
   /-- Constants to delta-unfold and walk instead of citing. -/
   unfold : NameSet := {}
+  /-- Constants **never** unfolded, whatever `all` or `depth` say.
+
+  This is the stop set, and per `Probes/ExprBound.lean`'s finding it is at least as much of
+  the design as the fuel is: what you refuse to unfold is the vocabulary the listing gets
+  written in. On a proof-mode derivation the thing you want to keep is usually a *named
+  sub-derivation* — `mct_descent` inside `mct_body` — which lives in the same `ProofMode`
+  namespace as the tactic lemmas and is therefore indistinguishable from them by name alone.
+  `keeping mct_descent` is how you say "expand the tactics, cite the mathematics". -/
+  keep : NameSet := {}
   /-- Unfold *every* constant. Useful on combinators, disastrous on proof-mode proofs. -/
   unfoldAll : Bool := false
+  /-- How many `ProofMode` unfoldings deep to go along any one path. `0` — the default — is
+  the historical behaviour: the proof-mode layer is opaque and every tactic gets one cited
+  line. Only `ProofMode` names draw on this budget. -/
+  pmDepth : Nat := 0
   /-- Hard cap; a runaway traversal stops rather than hanging. -/
   maxLines : Nat := 20000
 
 structure State where
   lines : Array Line := #[]
-  cache : Std.HashMap ExprStructEq Nat := {}
-  fvars : Std.HashMap FVarId Nat := {}
+  /-- Keyed on the remaining proof-mode budget as well as the expression: the same
+  subderivation reached with different budgets left renders differently (expanded here, cited
+  there), so a fuel-blind key would report the first rendering for both. At `pmDepth = 0` —
+  every pre-2026-09-07 invocation — the key is constantly `(0, e)` and this is the old cache
+  exactly. -/
+  cache : Std.HashMap (Nat × ExprStructEq) Nat := {}
+  fvars : Std.HashMap (Nat × FVarId) Nat := {}
 
 abbrev M := ReaderT Config (StateRefT State MetaM)
 
@@ -343,24 +383,34 @@ def shortName (n : Name) : String :=
 /-- Does this constant belong to the proof-mode layer? -/
 def isProofModeName (n : Name) : Bool := (`Metatheorems.ProofMode).isPrefixOf n
 
-/-- Should this constant be walked into rather than cited?
+/-- Should this constant be walked into rather than cited, with `d` of the proof-mode budget
+left?
 
-`all` deliberately stops at the proof-mode layer. Expanding it is not merely verbose: on
-`mct_body` it does not finish at all — every `pintro`/`prw` is a derivation over a packed
-hypothesis context, and unfolding them exhausts the heartbeat budget inside `whnf` before
-producing a line. Naming such a constant explicitly under `unfolding` still expands it, so
-the escape hatch is there for one step at a time. -/
-def shouldUnfold (cfg : Config) (n : Name) : Bool :=
-  cfg.unfold.contains n || (cfg.unfoldAll && !isProofModeName n)
+`all` deliberately stops at the proof-mode layer. Expanding it without a bound is not merely
+verbose: on `mct_body` it does not finish at all — every `pintro`/`prw` is a derivation over a
+packed hypothesis context, and unfolding them exhausts the heartbeat budget inside `whnf`
+before producing a line. Two escape hatches, and they are independent:
+
+* naming a constant under `unfolding` expands it wherever it occurs, at no cost to the budget
+  (this is how one proof-mode tactic at a time was expanded before `depth` existed);
+* `depth n` spends one unit of budget per `ProofMode` unfolding along a path, so the expansion
+  is bounded by construction rather than by luck.
+
+Note the asymmetry, which is deliberate: a non-proof-mode constant costs nothing. The
+budget is a statement about the *proof-mode layer's* depth, which is what is unbounded in
+practice; ordinary library lemmas bottom out in `Derivable` constructors quickly. -/
+def shouldUnfoldAt (cfg : Config) (d : Nat) (n : Name) : Bool :=
+  !cfg.keep.contains n
+    && (cfg.unfold.contains n || (if isProofModeName n then d > 0 else cfg.unfoldAll))
 
 mutual
 
 /-- Number the `Derivable`-typed explicit arguments of an application, in order. -/
-partial def subProofs (args : Array Expr) : M (List Nat) := do
+partial def subProofs (d : Nat) (args : Array Expr) : M (List Nat) := do
   let mut out := #[]
   for a in args do
     if ← isDerivProof a then
-      out := out.push (← go a)
+      out := out.push (← go d a)
   return out.toList
 
 /-- The instantiating term, for the two rules where it is the whole content of the step and
@@ -376,29 +426,29 @@ partial def termAnnotation (c : Name) (args : Array Expr) : MetaM String := do
       parts := parts.push (s.pretty rowWidth)
   if parts.isEmpty then return "" else return s!" [{String.intercalate ", " parts.toList}]"
 
-partial def go (e₀ : Expr) : M Nat := do
+partial def go (d : Nat) (e₀ : Expr) : M Nat := do
   let cfg ← read
   if (← get).lines.size > cfg.maxLines then
     throwError "#hilbert: exceeded {cfg.maxLines} lines; the proof is too large to list \
-      (or an `unfolding` made it so)"
+      (or an `unfolding`/`depth` made it so)"
   let e ← instantiateMVars e₀
-  if let some n := (← get).cache[ExprStructEq.mk e]? then return n
-  let n ← step e
-  modify fun st => { st with cache := st.cache.insert (ExprStructEq.mk e) n }
+  if let some n := (← get).cache[(d, ExprStructEq.mk e)]? then return n
+  let n ← step d e
+  modify fun st => { st with cache := st.cache.insert (d, ExprStructEq.mk e) n }
   return n
 
-/-- One node of the DAG. -/
-partial def step (e : Expr) : M Nat := do
+/-- One node of the DAG, with `d` of the proof-mode budget left. -/
+partial def step (d : Nat) (e : Expr) : M Nat := do
   let cfg ← read
   match e with
-  | .mdata _ b => go b
+  | .mdata _ b => go d b
   | .fvar id =>
-    if let some n := (← get).fvars[id]? then return n
+    if let some n := (← get).fvars[(d, id)]? then return n
     let decl ← id.getDecl
     match decl.value? with
     | some v =>
-      let n ← go v
-      modify fun st => { st with fvars := st.fvars.insert id n }
+      let n ← go d v
+      modify fun st => { st with fvars := st.fvars.insert (d, id) n }
       return n
     | none => push e s!"hypothesis {decl.userName}" []
   | .letE nm t v b _ =>
@@ -406,9 +456,9 @@ partial def step (e : Expr) : M Nat := do
     -- normalisation equation proved by `simp` — carries no step. Bind it and move on.
     withLetDecl nm t v fun x => do
       if ← isDerivProof v then
-        let k ← go v
-        modify fun st => { st with fvars := st.fvars.insert x.fvarId! k }
-      go (b.instantiate1 x)
+        let k ← go d v
+        modify fun st => { st with fvars := st.fvars.insert (d, x.fvarId!) k }
+      go d (b.instantiate1 x)
   | _ =>
     -- `have`/`let_fun` survives elaboration as `letFun v (fun x => body)`.
     if e.isAppOfArity ``letFun 4 then
@@ -419,33 +469,34 @@ partial def step (e : Expr) : M Nat := do
       | .lam nm t body _ =>
         return ← withLocalDeclD nm t fun x => do
           if isProof then
-            let k ← go args[2]!
-            modify fun st => { st with fvars := st.fvars.insert x.fvarId! k }
-          go (body.instantiate1 x)
-      | _ => return ← go (mkApp args[3]! args[2]!)
+            let k ← go d args[2]!
+            modify fun st => { st with fvars := st.fvars.insert (d, x.fvarId!) k }
+          go d (body.instantiate1 x)
+      | _ => return ← go d (mkApp args[3]! args[2]!)
     let fn := e.getAppFn
     match fn with
     | .const c _ =>
       if isTransparentWrapper c then
         -- No content: walk straight through to the single derivation argument.
-        let subs ← subProofs e.getAppArgs
+        let subs ← subProofs d e.getAppArgs
         match subs with
         | [k] => return k
         | _   => return ← push e (shortName c) subs
       if let some r := ctorRuleName c then
         let args := e.getAppArgs
-        let subs ← subProofs args
+        let subs ← subProofs d args
         let ann ← termAnnotation c args
         return ← push e (r ++ ann) subs
-      if shouldUnfold cfg c then
+      if shouldUnfoldAt cfg d c then
         if let some u ← unfoldDefinition? e then
-          return ← go u
-      let subs ← subProofs e.getAppArgs
+          -- Only the proof-mode layer draws on the budget; see `shouldUnfoldAt`.
+          return ← go (if isProofModeName c then d - 1 else d) u
+      let subs ← subProofs d e.getAppArgs
       let r := (libRuleName c).getD (shortName c)
       return ← push e r subs
     | _ =>
       -- A lambda- or projection-headed proof: no name to cite, so show it as a leaf.
-      let subs ← subProofs e.getAppArgs
+      let subs ← subProofs d e.getAppArgs
       return ← push e "(term)" subs
 
 end
@@ -457,9 +508,9 @@ end
 def escapeMd (s : String) : String :=
   (s.replace "|" "\\|").replace "\n" " "
 
-def renderMd (name : Name) (lines : Array Line) : String := Id.run do
+def renderMd (name : Name) (lines : Array Line) (note : String := "") : String := Id.run do
   let mut out := s!"# `{name}`\n\n"
-  out := out ++ s!"{lines.size} steps.\n\n"
+  out := out ++ s!"{lines.size} steps{note}.\n\n"
   out := out ++ "| # | Formula | Justification |\n|---:|---|---|\n"
   for l in lines do
     let just :=
@@ -468,11 +519,11 @@ def renderMd (name : Name) (lines : Array Line) : String := Id.run do
     out := out ++ s!"| {l.num} | `{escapeMd l.uni}` | {escapeMd just} |\n"
   return out
 
-def renderTex (name : Name) (lines : Array Line) : String := Id.run do
+def renderTex (name : Name) (lines : Array Line) (note : String := "") : String := Id.run do
   let nm := (toString name).replace "_" "\\_"
   let mut out := "% Generated by #hilbert. Requires \\usepackage{longtable,amssymb,amsmath}.\n"
   out := out ++ "\\section*{\\texttt{" ++ nm ++ "}}\n"
-  out := out ++ s!"{lines.size} steps.\n\n"
+  out := out ++ s!"{lines.size} steps{note}.\n\n"
   out := out ++ "\\begin{longtable}{r l l}\n"
   out := out ++ "\\hline\n\\# & Formula & Justification \\\\\n\\hline\n\\endhead\n"
   for l in lines do
@@ -492,7 +543,7 @@ def hilbertLines (name : Name) (cfg : Config) : MetaM (Array Line) := do
   lambdaTelescope val fun _ body => do
     let some _ ← derivConcl? (← inferType body)
       | throwError "#hilbert: `{name}` does not conclude in `Derivable`"
-    let (_, st) ← ((go body).run cfg).run {}
+    let (_, st) ← ((go cfg.pmDepth body).run cfg).run {}
     return st.lines
 
 end Hilbert
@@ -504,32 +555,52 @@ end Hilbert
 namespace Hilbert
 open Lean Lean.Elab Lean.Elab.Command
 
-/-- `#hilbert f` cites every non-constructor by name; `#hilbert f all` expands everything;
-`#hilbert f unfolding g h` expands just `g` and `h`; `to "path"` sets the output base name
-(no extension — `.md` and `.tex` are both written). -/
+/-- `#hilbert f` cites every non-constructor by name; `#hilbert f all` expands everything
+outside the proof-mode layer; `#hilbert f unfolding g h` expands just `g` and `h`;
+`#hilbert f depth n` expands the proof-mode layer `n` levels deep and cites it below that;
+`#hilbert f keeping g` never expands `g`, whatever the rest says;
+`to "path"` sets the output base name (no extension — `.md` and `.tex` are both written).
+
+They are independent and compose: `#hilbert f all unfolding g keeping h depth 2 to "…"` is
+legal and means all five things at once. `keeping` wins over `unfolding` and over both
+`all` and `depth`. -/
 syntax (name := hilbertCmd)
-  "#hilbert " ident (" all")? (" unfolding " ident+)? (" to " str)? : command
+  "#hilbert " ident (" all")? (" unfolding " ident+)? (" keeping " ident+)?
+    (" depth " num)? (" to " str)? : command
 
 @[command_elab hilbertCmd]
 def elabHilbert : CommandElab := fun stx => do
   match stx with
-  | `(command| #hilbert $id:ident $[all%$a?]? $[unfolding $us*]? $[to $out?:str]?) => do
+  | `(command| #hilbert $id:ident $[all%$a?]? $[unfolding $us*]? $[keeping $ks*]?
+        $[depth $dp?:num]? $[to $out?:str]?) => do
     liftTermElabM do
       let name ← Lean.Elab.realizeGlobalConstNoOverloadWithInfo id
-      let mut cfg : Config := { unfoldAll := a?.isSome }
+      let mut cfg : Config :=
+        { unfoldAll := a?.isSome, pmDepth := (dp?.map (·.getNat)).getD 0 }
       if let some us := us then
         for u in us do
           let n ← Lean.Elab.realizeGlobalConstNoOverloadWithInfo u
           cfg := { cfg with unfold := cfg.unfold.insert n }
+      if let some ks := ks then
+        for k in ks do
+          let n ← Lean.Elab.realizeGlobalConstNoOverloadWithInfo k
+          cfg := { cfg with keep := cfg.keep.insert n }
+      let t0 ← IO.monoMsNow
       let lines ← hilbertLines name cfg
+      let t1 ← IO.monoMsNow
       let base := match out? with
         | some s => s.getString
-        | none => "hilbert-out/" ++ (toString name).replace "." "_"
+        | none =>
+          let stem := "hilbert-out/" ++ (toString name).replace "." "_"
+          if cfg.pmDepth = 0 then stem else stem ++ s!"_d{cfg.pmDepth}"
       if let some dir := (System.FilePath.mk base).parent then
         IO.FS.createDirAll dir
-      IO.FS.writeFile (base ++ ".md") (renderMd name lines)
-      IO.FS.writeFile (base ++ ".tex") (renderTex name lines)
-      logInfo m!"#hilbert {name}: {lines.size} steps → {base}.md, {base}.tex"
+      let note :=
+        (if cfg.unfoldAll then ", `all`" else "")
+          ++ (if cfg.pmDepth = 0 then "" else s!", proof-mode depth {cfg.pmDepth}")
+      IO.FS.writeFile (base ++ ".md") (renderMd name lines note)
+      IO.FS.writeFile (base ++ ".tex") (renderTex name lines note)
+      logInfo m!"#hilbert {name}: {lines.size} steps in {t1 - t0}ms → {base}.md, {base}.tex"
   | _ => throwUnsupportedSyntax
 
 end Hilbert
