@@ -105,6 +105,12 @@ rest are numbers whose provenance is weaker than the sentence around them.
    evaluating it by hand reproduces two independently kernel-checked numerals (1709 at (5,9),
    349 at (5,1)). Present it as "the reduction prints", with the numeral agreement as the
    corroboration; do not write it with an `=` on a slide that also carries proved equations.
+   **A second, independent display corroborates it and is not mentioned in any document**:
+   `Probes/MonotoneLaneA.lean:179,190` prints the *contraction* bound's normal form at concrete
+   points as `max (pairN (2 * ((5 + 5) * 2 ^ (0 + 1))) (2 ^ (0 + 1) - 1)) (max (pairN (2 * ((5 +
+   9) * 2 ^ (0 + 1))) (2 ^ (0 + 1) - 1)) 0)` — the same `pairN (2·((a+b)·2)) 1` shape,
+   arrived at by a different route, showing the `max` that the crossover story needs. Worth
+   putting on the slide instead of, or beside, the single `ExprBound` display.
 5. **"×5 per nested syllogism" and "evaluation fails at depth ≈8"** (`ARCHITECTURE.md` §14.7,
    `docs/QA.md` Q3, `docs/RESULTS.md` rows 55–56, deck "Costs"). These come from a scratch run
    that was **never committed** — `Probes/SharingProbe.lean:13–21` says so in as many words.
@@ -152,6 +158,7 @@ rest are numbers whose provenance is weaker than the sentence around them.
 | C7 | "`soundness` … all 36 constructors" | `CLAUDE.md`, "Soundness (2026-09-03)" and "Fully proved" | **39**; the status block already corrects this and says several places still say 36 | count in source |
 | C8 | `#print axioms` for "every headline declaration" is checked | `docs/QA.md:111–118` | **`Metatheorems/Headline.lean` is not imported by the umbrella and was not built.** Six of its names have no axiom line anywhere in the 8147-job log: `syntactic_general_metatheorem`, `_classical`, `_at`, `_classical_at`, `add_Q_assoc`, `distrib_Q`. Their claimed lists are currently PROSE | log. Cheap to close: `lake build Metatheorems.Headline`, ideally wired into CI |
 | C9 | RESULTS/QA "what it does not show: no numeral yet from any derivation with real mathematical content" | `docs/RESULTS.md:181` | superseded by `ContentExampleNat`/`ContentExampleSpace` (2026-09-06) | see the staleness note below |
+| C10 | realizer tree/DAG ratio "**2.77**–3.21" | `docs/RESULTS.md:135`, `docs/QA.md:174`, deck | the five measured ratios are 2.77, 3.21, 2.79, **2.76**, 3.09 — the range is **2.76–3.21** | log, `TermPrintDemo.lean:187–191`. The written ratios 1.00 / 1.14 / 1.20 / 1.20 / 1.35 and the sizes 186–563 are exactly as documented |
 
 ---
 
