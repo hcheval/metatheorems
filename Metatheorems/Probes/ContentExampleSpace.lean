@@ -36,6 +36,9 @@ doubling per induction step and *provably indifferent* to the space majorants (`
 `Vrec3b` are both `8`). Bounds are properties of proofs, not of theorems — here at a space,
 with the space axiom in the premise slot and both numbers kernel-checked.
 
+Both numbers come out of `monotone_general_metatheorem_at` itself as well as off `mfiU`/`mfiV`
+(`PhiDir = 901`, `PhiRec = 8`; `Φ = max U V`).
+
 `U` is the index at which the **triangle inequality must be known**: `Udir = 901 = Vdir`
 because the direct proof consults it at `⌈d(x,z)⌉₀`; `Urec = 2^{k*}·f*(0)` because the
 recursive proof consults it at the index the recursion computed (which dominates the `k*−1` of
@@ -373,6 +376,28 @@ theorem Udirb : (1273 : ℕ) = mfiU (triCm M h) (rDir M h) (qs M 7 5 0) := by
   pushDirU
   kernel_rfl
 
+/-! ### `Φ` through `monotone_general_metatheorem_at` itself -/
+
+macro "pushPhiDir" : tactic =>
+  `(tactic| (rw [monotone_general_metatheorem_at_val]
+             unfold mfiU mfiV
+             mfi_push [eDir, wrap, wrapW, innerDir, projS, forall_map]))
+macro "pushPhiRec" : tactic =>
+  `(tactic| (rw [monotone_general_metatheorem_at_val]
+             unfold mfiU mfiV
+             mfi_push [eRec, wrap, wrapW, innerRec, exStep, innerSp, lnk, Lraw, baseD, stepD,
+               stepW, stepBody, key, keyEA, inner3, hi, projN, projS, forall_map]))
+
+theorem PhiDir : (901 : ℕ) = (monotone_general_metatheorem_at M.eqXInterp M.spremise
+    (triCm M h) bigB_qf bigB_vf spB_qf spB_vf eDir).val (qs M 5 5 0) := by
+  pushPhiDir
+  kernel_rfl
+
+theorem PhiRec : (8 : ℕ) = (monotone_general_metatheorem_at M.eqXInterp M.spremise
+    (triCm M h) bigB_qf bigB_vf spB_qf spB_vf eRec).val (qs M 5 5 3) := by
+  pushPhiRec
+  kernel_rfl
+
 /-! ### Refutation controls -/
 
 theorem Vrec3_ne_7 : (7 : ℕ) ≠ mfiV (triCm M h) (rRec M h) (qs M 5 5 3) := by
@@ -413,6 +438,8 @@ end Model
 #print axioms Vdirb
 #print axioms Udir
 #print axioms Udirb
+#print axioms PhiDir
+#print axioms PhiRec
 #print axioms Vrec3_ne_7
 #print axioms Vrec3_ne_9
 #print axioms Vrec5_ne_8
