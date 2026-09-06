@@ -140,11 +140,13 @@ structure TypeDecl where
   id : Ident
   /-- `none` for a base type (generated-`ι` mode only); `some e` for an abbreviation. -/
   defn? : Option TSTerm
+  deriving Inhabited
 
 /-- A `constants` item. -/
 structure ConstDecl where
   id : Ident
   ty : TSTerm
+  deriving Inhabited
 
 /-- An `axioms` item, with its binder groups flattened. -/
 structure AxiomDecl where
@@ -152,6 +154,7 @@ structure AxiomDecl where
   /-- Binders, outermost first. -/
   binders : Array (Ident × TSTerm)
   body : TSTerm
+  deriving Inhabited
 
 /-- Substitute identifiers, by simple name, throughout a piece of syntax.  Used to turn the
 user's named variables into de Bruijn `Term.var`s and their short type/constant names into
@@ -194,7 +197,8 @@ def mkOrElim (leaves : Array TSTerm) : CommandElabM TSTerm := do
 
 /-- The `j`-th injection into an `n`-fold right-nested `Or`, applied to `rfl`. -/
 def mkOrIntro (j n : Nat) : CommandElabM TSTerm := do
-  let mut acc ← if j + 1 == n then `(rfl) else `(Or.inl rfl)
+  let base ← if j + 1 == n then `(rfl) else `(Or.inl rfl)
+  let mut acc := base
   for _ in [0:j] do
     acc ← `(Or.inr $acc)
   return acc
@@ -222,17 +226,19 @@ def elabTheory : CommandElab := fun stx => do
   let thyName := thy.getId
 
   -- ---------------------------------------------------------------- collect
-  let mut index? : Option TSTerm := none
-  let mut types : Array TypeDecl := #[]
+  let mut idxClause : Option TSTerm := none
+  -- NOTE: `types`, `constants`, `axioms` and `index` are now parser tokens (declared above),
+  -- so they cannot be used as local names anywhere below this point in this file.
+  let mut tyDecls : Array TypeDecl := #[]
   let mut consts : Array ConstDecl := #[]
   let mut axs : Array AxiomDecl := #[]
   for it in items do
     match it with
     | `(thyItem| index $e:term) =>
-        if index?.isSome then throwErrorAt it "theory: duplicate `index` clause"
-        index? := some e
+        if idxClause.isSome then throwErrorAt it "theory: duplicate `index` clause"
+        idxClause := some e
     | `(thyItem| types $n:ident $[:= $e?:term]?) =>
-        types := types.push { id := n, defn? := e? }
+        tyDecls := tyDecls.push { id := n, defn? := e? }
     | `(thyItem| constants $n:ident : $t:term) =>
         consts := consts.push { id := n, ty := t }
     | `(thyItem| axioms $n:ident $gs:thyBinderGroup* : $b:term) =>
@@ -252,16 +258,16 @@ def elabTheory : CommandElab := fun stx => do
   let fId := qid `F
 
   -- ------------------------------------------------------- the index type ι
-  match index? with
+  match idxClause with
   | some e =>
-      for t in types do
+      for t in tyDecls do
         if t.defn?.isNone then
           throwErrorAt t.id
             "theory: with an `index` clause every `types` item needs `:= <Ty expression>` \
              (there is no generated inductive to add a constructor to)"
       elabCommand (← `(command| abbrev $iotaId : Type := $e))
   | none =>
-      let baseNames := (types.filter (·.defn?.isNone)).map (·.id)
+      let baseNames := (tyDecls.filter (·.defn?.isNone)).map (·.id)
       if baseNames.isEmpty then
         throwErrorAt thy
           "theory: no base types.  Declare at least one `types X` (without `:=`), or give an \
@@ -270,7 +276,7 @@ def elabTheory : CommandElab := fun stx => do
 
   -- ------------------------------------ the type abbreviations, in declaration order
   let mut typeSubst : Std.HashMap Name Syntax := {}
-  for t in types do
+  for t in tyDecls do
     let tid := qid t.id.getId
     let rhs ← match t.defn? with
       | some e => pure (substT typeSubst e)
@@ -406,7 +412,7 @@ def elabTheory : CommandElab := fun stx => do
 
   let axHoldLeaves : Array TSTerm ← axs.mapM fun a => do
     let fld := mkIdent a.id.getId
-    `(fun e => by subst e; exact $oId.$fld $envId)
+    `(fun e => by subst e; exact $(oId).$(fld) $envId)
   let axHoldElim ← mkOrElim axHoldLeaves
   elabCommand (← `(command|
     theorem $(qid `axiomsHold) {$xId : $iotaId → Type} {$siId : SpaceInterp $xId $fId}
@@ -440,8 +446,9 @@ def elabTheory : CommandElab := fun stx => do
       theorem $(qid `Majorants.funcM_maj) {$xId : $iotaId → Type}
           {$siId : SpaceInterp $xId $fId} {$amId : AbstractMajorizability $siId}
           ($mId : $(qid `Majorants) $amId) :
-          ∀ (f : $kappaId), ∀ $nId ≥ $amId.N,
-            $amId.maj ($fId f) ($(qid `Majorants.funcM) $mId f $nId) ($siId.funcInterp f) :=
+          ∀ (f : $kappaId), ∀ ($nId : Nat), $nId ≥ $(amId).N →
+            $(amId).maj ($fId f) ($(qid `Majorants.funcM) $mId f $nId)
+              ($(siId).funcInterp f) :=
         fun c => c.elim))
   else
     let mut fieldNames : Array Ident := #[]
@@ -453,14 +460,14 @@ def elabTheory : CommandElab := fun stx => do
       fieldNames := fieldNames.push c.id
       fieldTys := fieldTys.push (← `(Nat → Ty.interpret $xId (Ty.hat $ty)))
       fieldNames := fieldNames.push (mkIdent (Name.mkSimple s!"{c.id.getId}_maj"))
-      fieldTys := fieldTys.push (← `(∀ $nId ≥ $amId.N,
-        $amId.maj ($fId $ctor) ($(mkIdent c.id.getId) $nId) ($siId.funcInterp $ctor)))
+      fieldTys := fieldTys.push (← `(∀ ($nId : Nat), $nId ≥ $(amId).N →
+        $(amId).maj ($fId $ctor) ($(mkIdent c.id.getId) $nId) ($(siId).funcInterp $ctor)))
     elabCommand (← `(command|
       structure $(qid `Majorants) {$xId : $iotaId → Type} {$siId : SpaceInterp $xId $fId}
           ($amId : AbstractMajorizability $siId) : Type where
         $[$fieldNames:ident : $fieldTys:term]*))
     let vals : Array TSTerm ← consts.mapM fun c => do
-      let f := mkIdent c.id.getId; `($mId.$f)
+      let f := mkIdent c.id.getId; `($(mId).$(f))
     elabCommand (← `(command|
       def $(qid `Majorants.funcM) {$xId : $iotaId → Type}
           {$siId : SpaceInterp $xId $fId} {$amId : AbstractMajorizability $siId}
@@ -468,13 +475,14 @@ def elabTheory : CommandElab := fun stx => do
           (f : $kappaId) → Nat → Ty.interpret $xId ($fId f).hat := fun c => match c with
         $[| $ctorPats:term => $vals:term]*))
     let majVals : Array TSTerm ← consts.mapM fun c => do
-      let f := mkIdent (Name.mkSimple s!"{c.id.getId}_maj"); `($mId.$f)
+      let f := mkIdent (Name.mkSimple s!"{c.id.getId}_maj"); `($(mId).$(f))
     elabCommand (← `(command|
       theorem $(qid `Majorants.funcM_maj) {$xId : $iotaId → Type}
           {$siId : SpaceInterp $xId $fId} {$amId : AbstractMajorizability $siId}
           ($mId : $(qid `Majorants) $amId) :
-          ∀ (f : $kappaId), ∀ $nId ≥ $amId.N,
-            $amId.maj ($fId f) ($(qid `Majorants.funcM) $mId f $nId) ($siId.funcInterp f) :=
+          ∀ (f : $kappaId), ∀ ($nId : Nat), $nId ≥ $(amId).N →
+            $(amId).maj ($fId f) ($(qid `Majorants.funcM) $mId f $nId)
+              ($(siId).funcInterp f) :=
         fun c => match c with
         $[| $ctorPats:term => $majVals:term]*))
 
