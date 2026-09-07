@@ -78,8 +78,8 @@ example : ℂ X₀ mctC₀ = Unit := rfl
     𝕎(P → Q) = (𝕎P → 𝕎Q) × (𝕎P → ℂQ → ℂP)
     𝕎(S)     = R → ((ℕ→1) → ℕ×1) × ((ℕ→1) → 1 → ℕ×1)
 
-The two components of the pair are exactly the `V` and `U` that `general_metatheorem`
-projects out. -/
+The two components of the pair are exactly the `V` and `U` that
+`general_metatheorem_extract` projects out. -/
 
 example :
     𝕎 X₀ mctStatement
@@ -159,7 +159,7 @@ example :
 example :
     ℂ X₀ ntS = ((((Wnt → Unit) × (Wnt → Unit → Cnt))) × Unit) := rfl
 
-/-! ## 4. What the extraction in `general_metatheorem_classical` actually does
+/-! ## 4. What the extraction on the classical route actually does
 
 It builds `ki_w := (w.2 (default 𝕎(¬nt(S))) ()).1 : Wnt` — i.e. it supplies the *default*
 challenge.  The soundness property of `w` then only says the resulting `Wnt` answers that

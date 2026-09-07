@@ -119,8 +119,10 @@ majorant of `x` — with *no* majorizability hypotheses beyond `AbstractMajoriza
 itself. The `U_star` / `V_star` that `metatheorem_core_of_majorants` asks for are produced
 by `all_closed_terms_majorizable`, because the extracted functionals are closed terms.
 
-Compare `general_metatheorem`, which had to assume a total majorizer on every semantic
-value. -/
+This is what replaced the document's Def. 6.0.1 route, which assumed a *total* majorizer on
+every semantic value — an assumption that is not satisfiable (`MajorizabilityRel.lean`'s
+closing section). Getting the majorants from the syntax instead is the whole content of the
+`syntactic-witnesses` design. -/
 theorem syntactic_general_metatheorem
     (eqxi : EqXInterp X F si)
     (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B)
@@ -147,15 +149,15 @@ theorem syntactic_general_metatheorem
 
 Same conclusion as `syntactic_general_metatheorem`, but the input derivation may use LEM and
 QF-AC (`Allowed.classical`), and — as there — the only majorizability hypothesis is
-`AbstractMajorizability`. Compare `general_metatheorem_classical`, which needs a
-`Majorizability`, i.e. a *total* majorizer on every semantic value; that field is not
-satisfiable over the full set-theoretic type structure, which is why the metric model could
-not use it.
+`AbstractMajorizability`. The total-majorizer version of this statement was not merely
+harder to apply but impossible: that field is unsatisfiable over the full set-theoretic type
+structure, which is why the metric model could never have used it
+(`MajorizabilityRel.lean`'s closing section).
 
 The route:
 
 1. `classical_to_prenex_extended` — prenexify, negatively translate, push the outer `¬¬`
-   inside the `∀`, cast to `Allowed.extended`. Shared with `general_metatheorem_classical`.
+   inside the `∀`, cast to `Allowed.extended`. Shared with the MFI classical entry point.
 2. `syntactic_soundness` — a closed **`Term`** realizing `∀x ¬¬∃u∃v(B₀' → C₀')`.
 3. `extractUTermP` / `extractVTermP` — go *through* the surviving `¬¬` at the term level
    (the semantic version strips it with `Classical.not_not` instead), challenging it with the

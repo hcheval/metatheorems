@@ -697,7 +697,7 @@ sharper, since `cFinalOnce` differs from `cFinalTwice` only by the detour.
 **Note on `Ty` products.** They do not help here. `∃v^(nat ×ₜ nat)` would give one binder for
 two witnesses, but the two conjuncts would then read `fst v` / `snd v`, and the derivation would
 need `Term.fst (Term.mkPair a b) = a` as a *derivable* equation — which the proof system does
-not have (`beta_eq` covers `lam` only; CLAUDE.md, `general_metatheorem_classical` section).
+not have (`beta_eq` covers `lam` only; `classical_to_prenex_extended`'s docstring).
 
 ### Controls actually run
 

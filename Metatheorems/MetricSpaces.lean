@@ -957,9 +957,10 @@ def MetricSpace.d_self_derivable {Γ : Ctx MetricSpace.ι} {a : Allowed}
 genuinely classical one (LEM + QF-AC), which is what an actual proof-mining application
 produces. It is `syntactic_general_metatheorem_classical` at this model.
 
-This is the combination that `general_metatheorem_classical` cannot deliver: that theorem
-asks for a `Majorizability`, i.e. a total majorizer on every semantic value, and a metric
-model supplies only an `AbstractMajorizability` (`MetricModel.abstractMajorizability`).
+This is the combination the document's Def. 6.0.1 route cannot deliver: it asks for a total
+majorizer on every semantic value, and a metric model supplies only an
+`AbstractMajorizability` (`MetricModel.abstractMajorizability`) — nor could it supply more,
+since that assumption is unsatisfiable (`MajorizabilityRel.lean`'s closing section).
 
 **`adm` is gone, not discharged.** This theorem used to take an `AdmissibleEqX` parameter,
 and then (correctly) to discharge it with `MetricSpace.admissibleEqX` — which was `sorry`-ed,

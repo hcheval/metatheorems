@@ -27,19 +27,12 @@ terms of; it imports `Semantics` and nothing else.
 * `maxT` — pointwise maximum at hat types, with its `hatMaj`/`bezemMaj` compatibility
   lemmas; this is what `MaxCompat` and the MFI normal forms are built from
 
-## Quarantined at the bottom of this file
+## History, at the bottom of this file
 
-* `Majorizability` — the total-majorizer structure. **Uninhabitable**; kept as a recorded
-  finding about the reference document's Def. 6.0.1, not as usable API. See the section
-  header there before building on it.
-
-## Renamed 2026-09-07
-
-This file was `StrongMajorizability.lean`. The old name advertised `Majorizability` — the
-one dead declaration in it — while the live content is the relation and its lemmas, which
-the metric, W-hyperbolic, CAT(0) and normed models all depend on. The old header also
-claimed the total majorizer was "the natural assumption for the general metatheorem",
-which is the 2025 design and is exactly what the uninhabitability argument refutes.
+The file was `StrongMajorizability.lean` and held a `Majorizability` structure — the
+total majorizer of the document's Def. 6.0.1, which is **uninhabitable**. Both the name and
+the structure went on 2026-09-07; the closing section records why, since the argument is a
+finding about that presentation and is worth more than the dead code was.
 -/
 
 -- ============================================================================
@@ -316,59 +309,46 @@ theorem maxT_bezemMaj_left {base : (i : ι) → Nat → X i → Prop} (hbase : B
 
 end MaxT
 
--- ============================================================================
--- ⚠ QUARANTINE — the total majorizer. Uninhabitable. Do not build on it.
--- ============================================================================
-
 /-!
-## The 2025 design, kept as a recorded finding
+## Removed 2026-09-07: `Majorizability`, the total majorizer
 
-`Majorizability` below is the faithful transcription of the reference document's
-Def. 6.0.1 with a *total* majorizer, and matches the Lean 3 formalization. **It has no
-instances and cannot have any.** It is kept, rather than deleted, because its
-uninhabitability is a finding *about that presentation* — and because the docstrings of
-`SyntacticMetatheorem.lean` and `MetricSpaces.lean` explain the live design by contrast
-with it.
+A `Majorizability` structure used to sit here — `MajorizabilityRel` extended with
 
-**Nothing may be built on it.** The three declarations that take one —
-`metatheorem_core`, `general_metatheorem`, `general_metatheorem_classical`
-(`Metatheorem.lean`), plus the `example` at `MCTStatement.lean:96` — are inapplicable for
-the same reason and are labelled there.
+    majorizer     : {ρ : Ty ι} → Ty.interpret X ρ → Ty.interpret X ρ.hat
+    majorizer_maj : ∀ {ρ} (x : Ty.interpret X ρ), maj ρ (majorizer x) x
 
-**Why it is uninhabitable, in one line.** `majorizer` quantifies over `Ty.interpret X ρ`,
-the *full set-theoretic* type structure, which is uncountable and contains non-definable
-functionals. At `(nat →ₜ nat) →ₜ nat`, take `f* = id`; the `f` it majorizes range over all
-`f` with `f n ≤ n`, and on that set `Φ f := the least n ≥ 1 with f n = 0, else 0` is
-unbounded — witnessed by `fₖ n := if n = k then 0 else n`. So no `Φ*` exists. Degenerate
-choices (e.g. `maj := Eq` where `ρ.hat = ρ`) do satisfy the field, but then the bound
-depends on `x` itself and carries no uniformity, which is the entire point.
+the faithful transcription of the reference document's Def. 6.0.1, matching the Lean 3
+formalization. It was deleted along with its only consumers — `metatheorem_core`,
+`general_metatheorem`, `general_metatheorem_classical` (`Metatheorem.lean`) and the shape
+probe in `MCTStatement.lean`. **The reason is recorded here rather than in code, because it
+is a finding about that presentation and the code could never do anything.**
 
-**This is not a defect of the semantic route as such.** `all_terms_majorizable` quantifies
-over `Term F Γ ρ` — countable syntax, every element definable — and goes through. That
-contrast (semantic values vs. terms) is the resolution, and it is written out in
-`all_terms_majorizable`'s docstring. The monotone functional interpretation reaches the
-same place differently: it carries no witness at all, only a majorant with its condition.
+**It has no instances and cannot have any.** `majorizer` quantifies over
+`Ty.interpret X ρ`, the *full set-theoretic* type structure — uncountable, containing
+non-definable functionals. At `(nat →ₜ nat) →ₜ nat` take `f* = id`; the `f` that `f*`
+majorizes then range over all `f` with `f n ≤ n`, and on that set
 
-**The live route.** Since the `syntactic-witnesses` merge (2026-09-01) the Dialectica
+    Φ f := the least n ≥ 1 with f n = 0, else 0
+
+is unbounded, witnessed by `fₖ n := if n = k then 0 else n`. So no single `Φ*` majorizes
+`Φ`. Degenerate choices (`maj := Eq` where `ρ.hat = ρ`) do satisfy the field, but then the
+bound depends on `x` itself and carries no uniformity — which is the entire point of a
+metatheorem. Turning this argument into a `no_total_majorizer` theorem is about 30 lines and
+has not been done.
+
+**This is not a defect of the semantic route as such, and that contrast is the resolution.**
+`all_terms_majorizable` quantifies over `Term F Γ ρ` — countable syntax, every element
+definable — and goes through. Its docstring writes this out. The monotone functional
+interpretation reaches the same place a third way: it carries no witness at all, only a
+majorant with its condition.
+
+**What replaced it.** Since the `syntactic-witnesses` merge (2026-09-01) the Dialectica
 witness/counter *types* are object-level `Ty ι`, so realizers are closed `Term`s and
 `all_closed_terms_majorizable` produces their majorants outright. That needs only
-`AbstractMajorizability` (inhabited by `bezemAbstract`) and no total majorizer at all. Use
-`syntactic_general_metatheorem` / `syntactic_general_metatheorem_classical`, or the MFI
-entry points; both metric metatheorems already do.
+`AbstractMajorizability` (inhabited by `bezemAbstract`) and no total majorizer at all. The
+live entry points are `syntactic_general_metatheorem{,_classical,_at,_gen}` and the MFI
+`monotone_general_metatheorem{_at,_classical_at}`; every bound in the project comes through
+`MajorizabilityRel` plus explicit majorants, via `metatheorem_core_of_majorants_at`.
 -/
-
-/-- Majorizability with a total majorizer on all semantic values.
-
-**VESTIGIAL — this structure has no instances and cannot have any.** Read the quarantine
-note above this declaration before using it; the short version is that `majorizer` ranges
-over the full set-theoretic type structure, where an arbitrary functional is unbounded on
-the set a single majorant must cover. Prefer `MajorizabilityRel` plus explicit majorants
-(`metatheorem_core_of_majorants`), or the syntactic / MFI entry points. -/
-structure Majorizability {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
-    (si : SpaceInterp X F) extends MajorizabilityRel si where
-  /-- Total majorizer: every semantic value has a majorant. -/
-  majorizer : {ρ : Ty ι} → Ty.interpret X ρ → Ty.interpret X ρ.hat
-  /-- The majorizer actually majorizes. -/
-  majorizer_maj : ∀ {ρ : Ty ι} (x : Ty.interpret X ρ), maj ρ (majorizer x) x
 
 end Metatheorems

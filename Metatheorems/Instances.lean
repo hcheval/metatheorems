@@ -14,9 +14,10 @@ namespace Metatheorems
 Everything above this file is quantified over `MetricModel`, `WHyperbolicModel`, `CAT0Model`
 or `NormedModel` **as variables**. Until this file, the project constructed **no inhabitant of
 any of them** — so every space metatheorem was a statement about a class not known to be
-non-empty. That is not a hypothetical worry here: `Majorizability` is documented as provably
-having no instances, and `AdmissibleEqX.eqx_refl` was outright *refutable* while looking like
-ordinary unfinished work. Both were found by trying to build the thing.
+non-empty. That is not a hypothetical worry here: the total-majorizer `Majorizability` had
+provably no instances and was deleted for it (`MajorizabilityRel.lean`), and
+`AdmissibleEqX.eqx_refl` was outright *refutable* while looking like ordinary unfinished
+work. Both were found by trying to build the thing.
 
 This file does that, from **arbitrary** Mathlib structures — no concrete carrier, no extra
 hypotheses:

@@ -2,9 +2,10 @@ import Metatheorems.Arithmetic
 import Metatheorems.Metatheorem
 
 /-!
-# Probe P2: is the ℕ-level MCT statement expressible in the shape `general_metatheorem` wants?
+# Probe P2: is the ℕ-level MCT statement expressible in the shape the metatheorem wants?
 
-`general_metatheorem` consumes a derivation of
+Every entry point — `syntactic_general_metatheorem`, its classical and `_at`/`_gen`
+variants, and the MFI ones — consumes a derivation of
 
     all ρ (imp (all .nat B₀) (ex .nat C₀))     with  B₀ C₀ : Formula F [Ty.nat, ρ]
 
@@ -66,7 +67,7 @@ def mctB₀ : Formula F (mctCtx ι) :=
 def mctC₀ : Formula F (mctCtx ι) :=
   .eq0 (mctA mctVar) (mctA (Term.app2 Term.add mctVar (mctG mctVar)))
 
-/-- **The full statement**, in exactly the shape `general_metatheorem` consumes. -/
+/-- **The full statement**, in exactly the shape the metatheorem consumes. -/
 def mctStatement : Formula F [] :=
   .all (mctTy ι) (.all Ty.nat mctB₀ →ᶠ .ex Ty.nat mctC₀)
 
@@ -89,32 +90,20 @@ example : (mctB₀ (F := F) (ι := ι)).isVFree = true := rfl
 example : (mctC₀ (F := F) (ι := ι)).isQF = true := rfl
 example : (mctC₀ (F := F) (ι := ι)).isVFree = true := rfl
 
-/-! ## Does it actually fit `general_metatheorem`?
+/-! ## Does it actually fit a metatheorem entry point?
 
-If this elaborates, the shape is right: the only remaining input is the derivation.
+An `example` used to sit here applying `general_metatheorem` to `mctStatement`, as the
+shape check: if it elaborates, the only remaining input is the derivation. It was **deleted
+on 2026-09-07** with `general_metatheorem` itself, whose `Majorizability` argument is
+uninhabitable (`MajorizabilityRel.lean`), so no instantiation of it could ever have been
+run.
 
-**Note what this does and does not establish, because `general_metatheorem` is VESTIGIAL**
-— its `Majorizability` argument is uninhabitable (quarantine section of
-`MajorizabilityRel.lean`), so no instantiation of this `example` can ever be run. It is a
-*shape* check and remains a valid one: the statement's fit is a property of the statement,
-and the hypotheses being unsatisfiable does not make the elaboration vacuous. The live
-route for this statement is `mct_bound_p2` / `mct_bound_p2_at`. -/
-
-example
-    {X : ι → Type} (si : SpaceInterp X F)
-    (eqxi : EqXInterp X F si)
-    (mj : Majorizability si)
-    {Premises : PremiseSet F}
-    (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
-      ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
-    (prf : @Derivable ι κ F Allowed.extended Premises [] mctStatement) :
-    { Φ : Ty.interpret X (mctTy ι).hat → Nat //
-      ∀ (x : Ty.interpret X (mctTy ι)) (x_star : Ty.interpret X (mctTy ι).hat),
-        mj.maj (mctTy ι) x_star x →
-        (∀ u : Nat, u ≤ Φ x_star → Formula.interpret si mctB₀ (u, (x, ()))) →
-        ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret si mctC₀ (v, (x, ())) } :=
-  general_metatheorem si eqxi mj premise_realizer rfl rfl rfl rfl prf
-
+Nothing is lost, because the check is made twice over further down and both times against a
+live entry point: **Probe P2d** (`mctExtract` / `mct_bound`, below) composes
+`general_metatheorem_extract` with `metatheorem_core_of_majorants` over a `MajorizabilityRel`,
+and `mct_bound_p1` / `mct_bound_p2` (`ProofMode/MCT.lean`, `ProofMode/MCTLazy.lean`) apply
+`syntactic_general_metatheorem` to the real derivations. `mct_bound_p2_at` and `mctPhi` are
+the MFI versions. -/
 
 /-!
 ## Probe P2b: does the derivation plumbing compute?
@@ -274,8 +263,9 @@ end Plumbing
 
 /-! ## Probe P2d: does the extraction/bounding split compose for this statement?
 
-`general_metatheorem` needs a `Majorizability` — a *total* majorizer — and no instance of
-that exists (nor can one, non-degenerately, at the type level this statement needs).
+The document's Def. 6.0.1 route needs a *total* majorizer, and no instance of that exists
+(nor can one, non-degenerately, at the type level this statement needs — see
+`MajorizabilityRel.lean`'s closing section).
 `general_metatheorem_extract` plus `metatheorem_core_of_majorants` needs only a
 `MajorizabilityRel`, which `bezemRel` provides, together with majorants for the two
 extracted functionals. This checks the two halves actually fit together here. -/
@@ -300,7 +290,8 @@ def mctExtract
 `all_closed_terms_majorizable` — so the `mj`, `U_star`, `V_star`, `hU`, `hV` arguments below
 are all unnecessary. Kept as the record of Probe P2d, which was written before the
 `syntactic-witnesses` merge and correctly established that the extraction/bounding split
-composes at a time when `Majorizability` was the only alternative. -/
+composes at a time when the only alternative was the total-majorizer route, which turned out
+to be uninhabitable and was deleted on 2026-09-07. -/
 theorem mct_bound
     {X : ι → Type} (si : SpaceInterp X F) (eqxi : EqXInterp X F si)
     (mj : MajorizabilityRel si)

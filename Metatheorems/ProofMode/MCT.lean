@@ -29,9 +29,9 @@ hypothesis applies at `m + g m`. The statement follows by instantiating `A` at `
 
 Nothing here is classical beyond `qf_lem`, which is derivable in the base system: the
 dichotomy is a decidable comparison of two natural numbers, not an appeal to LEM. That is the
-whole point of p₂ — it goes through `general_metatheorem` at `Allowed.extended` with no
-translation step, and its derivation tree contains no node where `g`-iteration could be
-manufactured.
+whole point of p₂ — it goes through `syntactic_general_metatheorem` at `Allowed.extended`
+with no translation step, and its derivation tree contains no node where `g`-iteration could
+be manufactured.
 
 ## What it is built from
 
@@ -175,9 +175,9 @@ def mct_p2 :
 
 /-! ## It goes through the metatheorem
 
-`MCTStatement.lean` checked that the *statement* fits `general_metatheorem` and that the
-extraction/bounding split composes for it, both with the derivation left as a hypothesis.
-That hypothesis is now discharged. -/
+`MCTStatement.lean`'s Probe P2d checked that the extraction/bounding split composes for this
+statement — `general_metatheorem_extract` into `metatheorem_core_of_majorants` — with the
+derivation left as a hypothesis. That hypothesis is now discharged. -/
 
 section Extraction
 
@@ -196,7 +196,8 @@ def mct_extract_p2 (si : SpaceInterp X F) (eqxi : EqXInterp X F si)
 Migrated 2026-09-03. It used to route through `mct_bound` (Probe P2d), which predates the
 `syntactic-witnesses` merge and therefore had to hypothesise a `MajorizabilityRel` *and*
 majorants `U_star`/`V_star` for the two extracted functionals — because the only alternative
-then was `Majorizability`, which has no instances. That is no longer the situation: the
+then was the total-majorizer structure, which has no instances (and was deleted for it on
+2026-09-07; see `MajorizabilityRel.lean`). That is no longer the situation: the
 extracted functionals are closed `Term`s, so `all_closed_terms_majorizable` supplies their
 majorants and the four extra hypotheses disappear. The only majorizability input is
 `AbstractMajorizability`, which `bezemAbstract` inhabits. -/

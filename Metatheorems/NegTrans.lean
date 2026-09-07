@@ -251,9 +251,9 @@ Proof: apply `forall_rule` with the derivation (in context ρ :: Γ):
 obtained via `forall_ax (.var .vz)` (using `substF_renameF_id` to simplify the
 substituted formula to `¬¬Q`) composed with `neg_neg_imp_rev + neg_neg_mp`.
 
-Public (it was `private` until 2026-09-02): `general_metatheorem_classical` uses it as the
-step that pushes the outer `¬¬` of `NT(∀x A)` inside the `∀`, which is FEASIBILITY decision
-D-1 and the only place the prenexified route needs it. -/
+Public (it was `private` until 2026-09-02): `classical_to_prenex_extended` uses it as step 3,
+pushing the outer `¬¬` of `NT(∀x A)` inside the `∀`. That is FEASIBILITY decision D-1 and the
+only place the prenexified route needs it. -/
 def nn_all_nn {Γ : Ctx ι} {ρ : Ty ι} {Q : Formula F (ρ :: Γ)} :
     Derivable F a Premises (¬ᶠ¬ᶠ(Formula.all ρ (¬ᶠ¬ᶠQ)) →ᶠ Formula.all ρ (¬ᶠ¬ᶠQ)) :=
   -- Use forall_rule: suffices to derive (¬¬(∀x.¬¬Q)).weaken →ᶠ ¬¬Q in context ρ :: Γ.

@@ -166,8 +166,9 @@ inductive Derivable {ι κ : Type} (F : κ → Ty ι)
   -- Product β/η-equality (for the primitive `mkPair`/`fst`/`snd`; added 2026-09-05).
   -- Same family as `beta_eq`: the two sides have definitionally equal interpretations,
   -- so every pass over `Derivable` handles them with the line `beta_eq` uses. Without them
-  -- `fst (mkPair a b) =_ρ a` was underivable — the wall `general_metatheorem_classical`'s
-  -- `∃u∃v` collapse and `Probes/ConjBoundDemo.lean`'s nested existentials both hit.
+  -- `fst (mkPair a b) =_ρ a` was underivable — the wall the classical route's `∃u∃v`
+  -- collapse and `Probes/ConjBoundDemo.lean`'s nested existentials both hit. Written out
+  -- in `classical_to_prenex_extended`'s docstring (`Metatheorem.lean`).
   | pair_fst     : (a : Term F Γ ρ) → (b : Term F Γ τ) →
                    Derivable F allowed Premises
       (eqAtType ρ (Term.fst (Term.mkPair a b)) a)

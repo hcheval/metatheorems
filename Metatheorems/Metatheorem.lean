@@ -17,10 +17,24 @@ The general metatheorem: from a classical proof of
 `∀u ≤ Φ(x*) B(x,u) → ∃v ≤ Φ(x*) C(x,v)` for all x* ≥*_ρ x.
 
 The proof factors into:
-1. **Core bound construction** (`metatheorem_core`): given semantic witnesses
-   U, V with `∀x, B(x, U(x)) → C(x, V(x))`, construct Φ using majorizability.
-2. **Witness extraction**: connect `nd_soundness` to the core via Dialectica
-   witness extraction for the specific formula shape.
+1. **Core bound construction** (`coreBound` / `metatheorem_core_of_majorants{,_at}`): given
+   semantic witnesses U, V with `∀x, B(x, U(x)) → C(x, V(x))` and majorants for them,
+   construct Φ as their pointwise max.
+2. **Witness extraction** (`general_metatheorem_extract`): connect Dialectica soundness to
+   the core by projecting U, V out of the realizer for the specific formula shape.
+3. **The classical reduction** (`prenexify`, `classical_to_prenex_extended{,_gen}`): the
+   proof-theoretic half, shared by every classical entry point.
+
+**This file holds no entry point of its own.** The live ones are
+`syntactic_general_metatheorem{,_classical,_at,_gen}` (`SyntacticMetatheorem.lean`) and
+`monotone_general_metatheorem{_at,_classical_at}` (`MonotoneMetatheorem.lean`,
+`MonotoneMetatheoremClassical.lean`); both are built from the three parts above.
+
+*Until 2026-09-07 this file also held `general_metatheorem`, `general_metatheorem_classical`
+and `metatheorem_core`, the transcription of the reference document's Def. 6.0.1 with a
+total majorizer. All three were deleted with the `Majorizability` structure they took, which
+is uninhabitable — see `MajorizabilityRel.lean`. Everything else here is live and is what
+both routes above rest on.*
 -/
 
 open Formula
@@ -58,89 +72,6 @@ theorem dialecticaMatrix_iff_interpFormula
     · intro h hM
       have := (dialecticaMatrix_iff_interpFormula si A hqf.1 hvf.1 env wA (g wA cB)).mp hM
       exact (dialecticaMatrix_iff_interpFormula si B hqf.2 hvf.2 env (f wA) cB).mpr (h this)
-
--- ============================================================================
--- General Metatheorem (Theorem 6.1)
--- ============================================================================
-
-/-- **General Metatheorem** (Theorem 6.1), Dialectica step.
-
-**VESTIGIAL — cannot be applied.** It takes a `Majorizability`, i.e. a *total* majorizer, and
-that structure has no instances and cannot have any (the refutation is in the quarantine
-section at the bottom of `MajorizabilityRel.lean`).
-Kept as the faithful transcription of the document's Def. 6.0.1. **Use
-`syntactic_general_metatheorem`**, which needs only `AbstractMajorizability` and gets the
-majorants free from `all_closed_terms_majorizable`.
-
-Takes a derivation in the extended system (post-NT) and applies Dialectica
-directly. The matrix has no ¬¬ layers, making extraction clean.
-The full metatheorem composes `negTrans_sound` (external) with this. -/
-def general_metatheorem
-    {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
-    (si : SpaceInterp X F)
-    (eqxi : EqXInterp X F si)
-    (mj : Majorizability si)
-    {Premises : PremiseSet F}
-    (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
-      ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
-    {ρ : Ty ι}
-    {B₀ C₀ : Formula F [Ty.nat, ρ]}
-    (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
-    (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
-    (prf : @Derivable ι κ F Allowed.extended Premises []
-      (all ρ (imp (all .nat B₀) (ex .nat C₀)))) :
-    { Φ : Ty.interpret X ρ.hat → Nat //
-      ∀ (x : Ty.interpret X ρ) (x_star : Ty.interpret X ρ.hat),
-        mj.maj ρ x_star x →
-        (∀ u : Nat, u ≤ Φ x_star → Formula.interpret si B₀ (u, (x, ()))) →
-        ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret si C₀ (v, (x, ())) } := by
-  -- Step 1: Apply Dialectica directly (no NT)
-  let r := @dialectica_soundness_ctx' ι κ X F si eqxi Premises premise_realizer _ _ prf
-  -- r : ∀ env, dialecticaRealizerCtx si (all ρ (imp (all .nat B₀) (ex .nat C₀))) env
-  -- Specialize to empty env
-  let r₀ := r ()
-  let w := r₀.val
-  let h := r₀.property
-  -- Step 2: Extract U, V from the Dialectica witness
-  -- w : Ty.interpret X ρ → W(imp (all .nat B₀) (ex .nat C₀))
-  -- W(imp P Q) = (W(P) → W(Q)) × (W(P) → C(Q) → C(P))
-  -- W(all .nat B₀) = ℕ → W(B₀)
-  -- W(ex .nat C₀) = ℕ × W(C₀)
-  -- C(ex .nat C₀) = C(C₀)
-  -- C(all .nat B₀) = ℕ × C(B₀)
-  -- Extract V: feed default W(∀u B₀) into first component, project .1
-  let V : Ty.interpret X ρ → Nat := fun x => ((w x).1 (dialecticaDefaultWitness si _)).1
-  -- Extract U: feed defaults into second component, project .1
-  let U : Ty.interpret X ρ → Nat := fun x =>
-    ((w x).2 (dialecticaDefaultWitness si _) (dialecticaDefaultCounter si _)).1
-  -- Step 3: Prove B(x, U(x)) → C(x, V(x)) from the Dialectica matrix
-  have hUV : ∀ x : Ty.interpret X ρ,
-      Formula.interpret si B₀ (U x, (x, ())) → Formula.interpret si C₀ (V x, (x, ())) := by
-    intro x hBx
-    -- Specialize h to counter (x, (defaultW(all .nat B₀), defaultC(ex .nat C₀)))
-    let wP := dialecticaDefaultWitness si (all Ty.nat B₀)
-    let cQ := dialecticaDefaultCounter si (ex Ty.nat C₀)
-    have h_spec := h (x, (wP, cQ))
-    -- h_spec : matrix(imp (all .nat B₀) (ex .nat C₀), (x, ()), w x, (wP, cQ))
-    -- which is: matrix(all .nat B₀, ..., wP, (w x).2 wP cQ) → matrix(ex .nat C₀, ..., (w x).1 wP, cQ)
-    -- Unfold: matrix(all .nat B₀, (x,()), wP, (U x, ...)) = matrix(B₀, (U x, x, ()), wP(U x), ...)
-    -- and:    matrix(ex .nat C₀, (x,()), (V x, ...), cQ) = matrix(C₀, (V x, x, ()), ..., cQ)
-    simp only [dialecticaMatrix] at h_spec
-    -- Use the QF∨-free reduction for B₀ and C₀
-    rw [dialecticaMatrix_iff_interpFormula si B₀ hB_qf hB_vf] at h_spec
-    rw [dialecticaMatrix_iff_interpFormula si C₀ hC_qf hC_vf] at h_spec
-    exact h_spec hBx
-  -- Step 4: Construct Φ using majorizability
-  exact ⟨fun x_star =>
-    Nat.max (mj.majorizer (ρ := ρ →ₜ .nat) U x_star)
-            (mj.majorizer (ρ := ρ →ₜ .nat) V x_star),
-    fun x x_star hx hB => by
-      have hV_le : V x ≤ mj.majorizer (ρ := ρ →ₜ .nat) V x_star :=
-        mj.maj_le (mj.maj_app (mj.majorizer_maj (ρ := ρ →ₜ .nat) V) hx)
-      have hU_le : U x ≤ mj.majorizer (ρ := ρ →ₜ .nat) U x_star :=
-        mj.maj_le (mj.maj_app (mj.majorizer_maj (ρ := ρ →ₜ .nat) U) hx)
-      exact ⟨V x, Nat.le_trans hV_le (Nat.le_max_right ..),
-             hUV x (hB (U x) (Nat.le_trans hU_le (Nat.le_max_left ..)))⟩⟩
 
 -- ============================================================================
 -- Renaming lemmas used by the classical (prenexified) route
@@ -425,21 +356,43 @@ def prenexify
 
 /-- **The proof-theoretic half of the classical metatheorem**, on its own.
 
-Steps 1–4 of `general_metatheorem_classical`: no semantics, no majorizability, no
-Dialectica — just
+No semantics, no majorizability, no Dialectica — just
 
 1. `prenexify` under `∀x` (`forall_map`), the LEM-using step;
 2. `negTrans_sound` (`kurodaInner` is the identity on the QF body);
 3. `nn_all_nn`, pushing the outer `¬¬` inside the `∀`;
 4. `castAllowed` into `Allowed.extended`.
 
-**The surviving inner `¬¬` is real** and every consumer must go through it — semantically
-(`Classical.not_not`, as `general_metatheorem_classical` does) or otherwise. It is not
-strippable here: `Derivable.markov` wants a quantifier-free body and `∃v(B₀' → C₀')` is not
-one.
+This is the classical route CLAUDE.md note 2 prescribes and the one the paper takes.
+`syntactic_general_metatheorem_classical` and, through it,
+`monotone_general_metatheorem_classical_at` are its consumers.
 
-Factored out so that both the semantic (`general_metatheorem_classical`) and the syntactic
-(`syntactic_general_metatheorem_classical`) entry points share it. -/
+**The surviving inner `¬¬` is real** and every consumer must go through it, semantically or
+otherwise. The semantic discharge is `Classical.not_not` on the matrix, and it is sound and
+cheap here **precisely because of the prenexification**: the body `∃u∃v(B₀' → C₀')` has a
+quantifier-free ∨-free matrix, so `dialecticaMatrix_iff_interpFormula` reduces it **for
+every counter**, and the counter the `¬¬` layer hands us is therefore irrelevant. That is
+exactly what fails on the *unprenexified* route, where the witness depends on a challenge
+that genuinely matters (FEASIBILITY R1).
+
+**An object-level Markov step is not available at this shape without new machinery**, and
+the reason is worth keeping because it recurs. `Derivable.markov` needs a quantifier-free
+body, and `∃v(B₀' → C₀')` is not one. Collapsing `∃u∃v` into a single `∃w` over
+`nat ×ₜ nat` would need `Term.fst (Term.mkPair a b) = a` as a *derivable* equation, and the
+proof system has **no product β-rules** (`beta_eq` covers `lam` only) — the same wall
+`Probes/ConjBoundDemo.lean`'s nested-existential variant hits, and the one
+`Derivable.lean`'s `pair_fst` comment refers to. The Cantor-pairing alternative has the
+equations but drags in `RationalNumbers` (the 43 s module) and needs QF-ER rewriting under
+two binders. Both are avoidable: Markov's principle is true in the model, and
+`Classical.not_not` is precisely its semantic content. Nothing is given up by taking it,
+since `dialectica_soundness_ctx'` already brings in `Classical.choice` via its own Markov
+case.
+
+*Provenance.* The three paragraphs above were the docstring of
+`general_metatheorem_classical`, deleted 2026-09-07 along with `general_metatheorem` and
+`metatheorem_core` because all three took the uninhabitable `Majorizability`. Proving the
+classical one is what produced this factoring in the first place, so its reasoning is
+inherited here rather than lost with it. -/
 def classical_to_prenex_extended
     {ι κ : Type} {F : κ → Ty ι}
     {Premises : PremiseSet F}
@@ -571,183 +524,28 @@ def classical_to_prenex_extended_gen
 
 end GeneralMatricesPrenex
 
-/-- **General Metatheorem from classical proof** (Theorem 6.1).
-
-**VESTIGIAL as an entry point — cannot be applied**, for the same reason as
-`general_metatheorem`: the `Majorizability` argument has no instances. **Use
-`syntactic_general_metatheorem_classical`.**
-
-It is *not* wasted work, and this is worth knowing: proving it is what produced
-`classical_to_prenex_extended` (steps 1–4 below), and the syntactic classical metatheorem
-calls exactly that. So this theorem is the origin of the shared proof-theoretic factor, even
-though the theorem itself is now superseded.
-
-Takes a classical derivation (with LEM + QF-AC) and produces a bound, via the
-**prenexified** route — the one the paper takes, and the one CLAUDE.md note 2 prescribes:
-
-1. `prenexify` under `∀x` (`forall_map`), turning `∀x(∀u B₀ → ∃v C₀)` into
-   `∀x ∃u ∃v (B₀' → C₀')`. This is the LEM-using step.
-2. `negTrans_sound`, giving `⊢ ¬¬(∀x ¬¬ ∃u∃v(B₀' → C₀'))` in `Allowed.nt_target`
-   (`kurodaInner` is the identity on the QF body).
-3. `nn_all_nn` pushes the outer `¬¬` inside the `∀` (FEASIBILITY decision D-1).
-4. `castAllowed` into `Allowed.extended` and apply Dialectica soundness.
-
-The remaining single `¬¬` is discharged **semantically**, by `Classical.not_not` on the
-matrix, rather than by an object-level Markov step. That is sound and cheap here precisely
-*because* of the prenexification: the body `∃u∃v(B₀' → C₀')` has a quantifier-free ∨-free
-matrix, so `dialecticaMatrix_iff_interpFormula` reduces its matrix to the formula's
-interpretation **for every counter**, and the counter the `¬¬` layer hands us is therefore
-irrelevant. This is exactly what fails on the unprenexified route, where the witness depends
-on a challenge that genuinely matters (FEASIBILITY R1).
-
-An object-level Markov step is *not* available at this shape without new machinery: Markov
-needs a quantifier-free body, and `∃v(B₀' → C₀')` is not one. Collapsing `∃u∃v` to a single
-`∃w` over `nat ×ₜ nat` would need `Term.fst (Term.mkPair a b) = a` as a *derivable* equation,
-and the proof system has no product β-rules (only `beta_eq` for `lam`); the Cantor-pairing
-route has the equations but drags in `RationalNumbers` (the 43 s module). Both are avoidable:
-Markov's principle is *true in the model*, and `Classical.not_not` is precisely its semantic
-content. Note that `dialectica_soundness_ctx'` already uses `Classical.choice` (via the
-Markov case), so nothing is lost. -/
-def general_metatheorem_classical
-    {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
-    (si : SpaceInterp X F)
-    (eqxi : EqXInterp X F si)
-    {Premises : PremiseSet F}
-    (mj : Majorizability si)
-    (nts : NTStableD Premises)
-    (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
-      ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
-    {ρ : Ty ι}
-    {B₀ C₀ : Formula F [Ty.nat, ρ]}
-    (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
-    (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
-    (prf : @Derivable ι κ F Allowed.classical Premises []
-      (all ρ (imp (all .nat B₀) (ex .nat C₀)))) :
-    { Φ : Ty.interpret X ρ.hat → Nat //
-      ∀ (x : Ty.interpret X ρ) (x_star : Ty.interpret X ρ.hat),
-        mj.maj ρ x_star x →
-        (∀ u : Nat, u ≤ Φ x_star → Formula.interpret si B₀ (u, (x, ()))) →
-        ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret si C₀ (v, (x, ())) } := by
-  classical
-  -- The prenexified matrix, in context [nat, nat, ρ]: variable 0 is `v`, 1 is `u`, 2 is `x`.
-  let B₀' : Formula F [Ty.nat, Ty.nat, ρ] := B₀.weakenBy Ty.nat
-  let C₀' : Formula F [Ty.nat, Ty.nat, ρ] :=
-    C₀.renameF (Term.Renaming.ext Term.Renaming.shift)
-  have hB'_qf : B₀'.isQF = true := by rw [show B₀'.isQF = B₀.isQF from isQF_weakenBy B₀, hB_qf]
-  have hB'_vf : B₀'.isVFree = true := by
-    rw [show B₀'.isVFree = B₀.isVFree from isVFree_weakenBy B₀, hB_vf]
-  have hC'_qf : C₀'.isQF = true := by
-    rw [show C₀'.isQF = C₀.isQF from isQF_renameF _ C₀, hC_qf]
-  have hC'_vf : C₀'.isVFree = true := by
-    rw [show C₀'.isVFree = C₀.isVFree from isVFree_renameF _ C₀, hC_vf]
-  have hP_qf : (B₀' →ᶠ C₀').isQF = true := by
-    simp only [Formula.isQF, hB'_qf, hC'_qf, Bool.and_self]
-  have hP_vf : (B₀' →ᶠ C₀').isVFree = true := by
-    simp only [Formula.isVFree, hB'_vf, hC'_vf, Bool.and_self]
-  -- ── Steps 1–4: the proof-theoretic reduction, factored out ─────────────────
-  let extd : Derivable F Allowed.extended Premises
-      (Formula.all ρ (¬ᶠ¬ᶠ(Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀'))))) :=
-    classical_to_prenex_extended nts hB_qf hB_vf hC_qf hC_vf prf
-  -- ── Step 5: Dialectica, then read off U and V ──────────────────────────────
-  -- Destructed with `obtain`, not `let`: the realizer is a huge term, and leaving it as a
-  -- let-value makes every later defeq check try to `whnf` it (a heartbeat timeout).
-  obtain ⟨w, hw⟩ :=
-    (@dialectica_soundness_ctx' ι κ X F si eqxi Premises premise_realizer _ _ extd) ()
-  -- The counter for the inner `¬¬` is a witness for `¬E`; any one will do, because the
-  -- E-counter it produces is only ever fed to a QF ∨-free matrix.
-  let aW : 𝕎 X (¬ᶠ(Formula.ex Ty.nat (Formula.ex Ty.nat (B₀' →ᶠ C₀')))) :=
-    dialecticaDefaultWitness si _
-  let U : Ty.interpret X ρ → Nat := fun x => ((w x).2 aW ()).1.1
-  let V : Ty.interpret X ρ → Nat := fun x => ((w x).2 aW ()).1.2.1
-  have hUV : ∀ x : Ty.interpret X ρ,
-      Formula.interpret si B₀ (U x, (x, ())) → Formula.interpret si C₀ (V x, (x, ())) := by
-    intro x hBx
-    have hb : Formula.interpret si B₀' (V x, (U x, (x, ()))) =
-        Formula.interpret si B₀ (U x, (x, ())) :=
-      Formula.interpret_renameF_gen si (Term.Renaming.shift (σ := Ty.nat)) B₀
-        (V x, (U x, (x, ()))) (U x, (x, ())) (fun {_} _ => rfl)
-    have hc : Formula.interpret si C₀' (V x, (U x, (x, ()))) =
-        Formula.interpret si C₀ (V x, (x, ())) :=
-      Formula.interpret_renameF_gen si
-        (Term.Renaming.ext (σ := Ty.nat) (Term.Renaming.shift (σ := Ty.nat))) C₀
-        (V x, (U x, (x, ()))) (V x, (x, ()))
-        (fun {_} v => match v with | .vz => rfl | .vs _ => rfl)
-    have key := hw (x, (aW, ()))
-    simp only [Formula.neg, dialecticaMatrix] at key
-    rw [dialecticaMatrix_iff_interpFormula si B₀' hB'_qf hB'_vf,
-        dialecticaMatrix_iff_interpFormula si C₀' hC'_qf hC'_vf] at key
-    -- key : ¬¬(‖B₀'‖ → ‖C₀'‖) at the environment (V x, (U x, (x, ())))
-    by_contra hCn
-    exact key (fun himp => hCn (Eq.mp hc (himp (Eq.mpr hb hBx))))
-  exact ⟨fun x_star =>
-    Nat.max (mj.majorizer (ρ := ρ →ₜ .nat) U x_star)
-            (mj.majorizer (ρ := ρ →ₜ .nat) V x_star),
-    fun x x_star hx hB => by
-      have hV_le : V x ≤ mj.majorizer (ρ := ρ →ₜ .nat) V x_star :=
-        mj.maj_le (mj.maj_app (mj.majorizer_maj (ρ := ρ →ₜ .nat) V) hx)
-      have hU_le : U x ≤ mj.majorizer (ρ := ρ →ₜ .nat) U x_star :=
-        mj.maj_le (mj.maj_app (mj.majorizer_maj (ρ := ρ →ₜ .nat) U) hx)
-      exact ⟨V x, Nat.le_trans hV_le (Nat.le_max_right ..),
-             hUV x (hB (U x) (Nat.le_trans hU_le (Nat.le_max_left ..)))⟩⟩
-
-#print axioms general_metatheorem
-#print axioms general_metatheorem_classical
-
 -- ============================================================================
 -- Core bound construction (Theorem 6.1, step 3–5)
 -- ============================================================================
 
-/-- **Core of the General Metatheorem** (Theorem 6.1).
+/-! **The core bound construction**: given semantic witness functions
+`U V : Ty.interpret X ρ → ℕ` with `∀x, B(x, U(x)) → C(x, V(x))` — the "extracted content" of
+the ND-interpretation — build a Φ such that
+`(∀u ≤ Φ(x*), B(x,u)) → (∃v ≤ Φ(x*), C(x,v))` for every `x* ≥*_ρ x`.
 
-**VESTIGIAL — cannot be applied**, and easy to mistake for the live one. It takes a
-`Majorizability` (the uninhabitable total majorizer; see the quarantine section of
-`MajorizabilityRel.lean`). **The live core is `metatheorem_core_of_majorants` below**, which
-takes only a `MajorizabilityRel` plus explicit majorants and is what every current entry
-point calls. The two names differ by a suffix and nothing else, so check which one you have.
+**The majorants are supplied explicitly**, rather than obtained from a total `majorizer`.
+That is what makes this form usable: it needs only `MajorizabilityRel`, which is inhabited
+(`bezemRel`), together with majorants for the two extracted functionals — which
+`all_closed_terms_majorizable` or a `ConstMajorants` provides.
 
-Given semantic witness functions `U V : Ty.interpret X ρ → ℕ` satisfying
-`∀x, B(x, U(x)) → C(x, V(x))` (the "extracted content" from the
-ND-interpretation), construct a computable bound Φ such that for all
-`x* ≥*_ρ x`: `(∀u ≤ Φ(x*), B(x,u)) → (∃v ≤ Φ(x*), C(x,v))`. -/
-theorem metatheorem_core
-    {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
-    {si : SpaceInterp X F}
-    (mj : Majorizability si)
-    {ρ : Ty ι}
-    (B C : Ty.interpret X ρ → Nat → Prop)
-    (U V : Ty.interpret X ρ → Nat)
-    (hUV : ∀ x : Ty.interpret X ρ, B x (U x) → C x (V x)) :
-    ∃ Φ : Ty.interpret X ρ.hat → Nat,
-    ∀ (x : Ty.interpret X ρ) (x_star : Ty.interpret X ρ.hat),
-      mj.maj ρ x_star x →
-      (∀ u : Nat, u ≤ Φ x_star → B x u) →
-      ∃ v : Nat, v ≤ Φ x_star ∧ C x v := by
-  -- Define Φ(x*) = max(U*(x*), V*(x*)) where U* = majorizer(U), V* = majorizer(V)
-  refine ⟨fun x_star =>
-    Nat.max (mj.majorizer (ρ := ρ →ₜ .nat) U x_star)
-            (mj.majorizer (ρ := ρ →ₜ .nat) V x_star), ?_⟩
-  intro x x_star hx hB
-  -- V(x) ≤ V*(x*) ≤ Φ(x*)
-  have hV_le : V x ≤ mj.majorizer (ρ := ρ →ₜ .nat) V x_star :=
-    mj.maj_le (mj.maj_app (mj.majorizer_maj (ρ := ρ →ₜ .nat) V) hx)
-  -- U(x) ≤ U*(x*) ≤ Φ(x*)
-  have hU_le : U x ≤ mj.majorizer (ρ := ρ →ₜ .nat) U x_star :=
-    mj.maj_le (mj.maj_app (mj.majorizer_maj (ρ := ρ →ₜ .nat) U) hx)
-  -- B(x, U(x)) holds since U(x) ≤ Φ(x*)
-  have hBU : B x (U x) := hB (U x) (Nat.le_trans hU_le (Nat.le_max_left ..))
-  -- C(x, V(x)) holds by the semantic content
-  exact ⟨V x, Nat.le_trans hV_le (Nat.le_max_right ..), hUV x hBU⟩
+*Until 2026-09-07 there was also a `metatheorem_core` taking a whole `Majorizability`, with
+`U_star := majorizer U`, `V_star := majorizer V` as the special case. It was deleted with
+that structure: the total majorizer is uninhabitable (`MajorizabilityRel.lean`), so it could
+never be applied, and its name differed from the live one by a suffix.*
 
-/-! `metatheorem_core` with the majorants supplied explicitly instead of obtained from a
-total `majorizer`.
-
-This is the form that is actually usable: it needs only `MajorizabilityRel` (which is
-inhabited — `bezemRel`) together with majorants for the two extracted functionals. The
-total-majorizer version is the special case `U_star := majorizer U`, `V_star := majorizer V`.
-
-Since 2026-09-04 it comes in the project's usual two flavours: `coreBound` names the witness,
-`metatheorem_core_of_majorants_at` is the statement about it, and `metatheorem_core_of_majorants`
-is the `∃`-valued original, now a one-liner over those two. -/
+Three flavours, the project's usual split: `coreBound` names the witness,
+`metatheorem_core_of_majorants_at` is the statement about it, and
+`metatheorem_core_of_majorants` is the `∃`-valued form, a one-liner over those two. -/
 
 /-- **The bound, named.** `Φ` is the pointwise max of the two majorants — that is the whole
 content of `metatheorem_core_of_majorants`'s witness, and naming it is what lets a bound be
@@ -801,10 +599,14 @@ theorem metatheorem_core_of_majorants
 
 /-- **The extraction half of the metatheorem**, on its own.
 
-Steps 1–3 of `general_metatheorem` — apply Dialectica soundness, project the two
-functionals `U`, `V` out of the witness, and reduce the matrix back to the interpreted
-formula. No majorizability is involved, and the result is data: `.val.1` and `.val.2` are
-Lean functions that compute.
+Apply Dialectica soundness, project the two functionals `U`, `V` out of the witness, and
+reduce the matrix back to the interpreted formula. No majorizability is involved, and the
+result is data: `.val.1` and `.val.2` are Lean functions that compute.
+
+Note the MFI route does **not** reuse this: it fixes the realizer to
+`dialectica_soundness_ctx'`'s, whereas an `MRealizer`'s majorization fact is about the
+*existential* realizer. `mfi_extract_core` is this lemma's analogue, stated over an abstract
+realizer. See `MonotoneMetatheorem.lean`.
 
 Compose with `metatheorem_core_of_majorants` to obtain a uniform bound. -/
 def general_metatheorem_extract
