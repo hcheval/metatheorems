@@ -27,12 +27,12 @@ space (no `whnf` cache with free model variables — `MonotoneLaneB`'s finding).
 
 `q = ((x, x'), (y, λ))`, so `q* = ((nx, nx'), (ny, r*))`. `λ̃` is `clamp01 λ`.
 
-| rung | premise `∀u B₀` | conclusion `∃v C₀` | the proof | result |
-|---|---|---|---|---|
-| 1 `wDir` | `W(x,y,λ̃) =_X W(x',y,λ̃)` | the same, at some `v` | `forall_ax D₀` ⟶ `exist_ax D₀` | see below |
-| 2 `wAx` | unused | `∃v` (W2)'s body at `v` | `W2_at` (the axiom at abstract terms, via the proof mode) | see below |
-| 3 `wExt` | `x =_X x'` | `W(x,y,λ̃) =_X W(x',y,λ̃)` at some `v` | **`W_ext_left`** | see below |
-| 4 `wExtP` | `λ =ℝ μ` | `W(x,y,λ̃) =_X W(x,y,μ̃)` at some `v` | **`W_ext_param`** | see below |
+| rung | premise `∀u B₀` | conclusion `∃v C₀` | the proof | depth | `V` | `U` |
+|---|---|---|---|---|---|---|
+| 1 `wDir` | `W(x,y,λ̃) =_X W(x',y,λ̃)` | the same, at some `v` | `forall_ax D₀` ⟶ `exist_ax D₀` | **3** | **901** / **1273** | **901** |
+| 2 `wAx` | unused | `∃v` (W2)'s body at `v` | `W2_at` (the axiom at abstract terms, via the proof mode) | **8** | **901** / **1273** | **0** |
+| 3 `wExt` / `wExtD` | `x =_X x'` | `W(x,y,λ̃) =_X W(x',y,λ̃)` at some `v` | **`W_ext_left`** | **≥66** | **901** (36 s) | **OOM** |
+| 4 `wExtP` | `λ =ℝ μ` | `W(x,y,λ̃) =_X W(x,y,μ̃)` at some `v` | **`W_ext_param`** | **≥62** | not run | not run |
 
 Rung 3 is the one with content: premise and conclusion are *different formulas*, the premise
 is genuinely consumed (it is `W_ext_left`'s only hypothesis), and `U` is the precision at
@@ -45,12 +45,66 @@ holds by `rfl` (`extB_all`, `extC_all`, `parB_all` below). That is `TriangleBoun
 (there for `le_R_pu`) transposed to `=_X`, and it is what lets an *equality between points* sit
 in the premise slot of a metatheorem whose premise variable ranges over `ℕ`.
 
-## MEASURED (2026-09-07) — see the `#eval NestingDepth.report` rows at the bottom
+## MEASURED (2026-09-07) — five findings
 
-The composition **depth** is the predictor (`Probes/NestingDepth.lean`: the kernel cost is
-≈ ×5 per level of `syllogism`/`mp` nesting, and 12 GB runs out around depth 9–10). The numbers
-this file records are in its `RESULTS` section below, which is filled in from the build log;
-if a rung has no numeral theorem, the reason is stated there and the depth row is the evidence.
+The `#eval NestingDepth.report` rows at the bottom of the file print the depths; the numerals
+are the `kernel_rfl` theorems in the `Model` section. Everything below was run in this
+worktree with `LEAN_NUM_THREADS=2` and the 12 GB `ulimit -v`, with two other lanes building.
+
+1. **Rungs 1 and 2 reduce completely, both sides**, and the numbers move with the space
+   majorant: `901` at `nx = 5`, `1273` at `nx = 7`, `900` refuted by `decide` in both cases.
+2. **Rung 2 is the project's first bound mined through a space-theory `.premise`.** Every
+   earlier space extraction (`TriangleBoundDemo`, `ContentExampleSpace`) consumes
+   `Derivable.dist_tri`, a **free constructor**; `wAx` runs `monotone_soundness` through
+   `WHyperbolic.W2_at`, whose derivation ends in `Derivable.premise WHyperbolic.W2` (see its
+   histogram: `premise~1`) and whose body is a proof-mode script of four `pinst`/`znorm`
+   rounds. Composition depth **8** — right at the wall the classical route hits — and it
+   reduces in seconds. So neither `.premise` nor the `pm_*` layer is what stops extraction.
+3. **Rung 3 splits by side, and the split is sharp.** `VextD = 901` (the witness side, through
+   a derivation of depth **≥66** and 3.7 M tree nodes) is kernel-checked in **≈36 s**;
+   `mfiU` on the *same* realizer is `std::bad_alloc` at 12 GB after **≈100 s**. That is the
+   witness/counter sidedness the project measured for the term route (`ConjBoundDemo`'s `V`
+   reduces while its `U` stalls) reproduced under MFI, on a real space theorem.
+4. **Depth is not by itself the predictor it was taken to be.** `Probes/NestingDepth.lean`
+   calibrates the MFI wall at composition depth ≈ 9 from the classical `syllogism` chain, and
+   `wExt` at depth ≥66 nonetheless reduces on the witness side in 36 s. The ×5-per-level cost
+   is charged on the **counter** side (`MRealizer.syllogism` uses `hAB` three times there and
+   `hBC` twice); the witness side composes without duplication. So a depth figure bounds the
+   counter side and says little about the witness side.
+5. **What blocks rung 3's `U` is the ℝ order package, and the extensionality argument adds
+   nothing to it.** This was checked rather than assumed, and the check corrected the guess.
+   `dist_W_mono_left` — which `W_ext_left` merely composes with `mul_eq_zero_R_core`,
+   `le_R_of_eq_R_core` and `eqX_of_dist_le_zero_imp` — is **itself** `dag 48141 / tree 105226 /
+   DEPTH 38`, the same figures as `W_ext_left` (both budget-capped at 250 000 `Expr` nodes).
+   So the depth is already there one rung below, inside `leRt = le_R_trans_core`, which
+   `Probes/NestingDepth.lean` measures at depth ≥23 standing alone. By contrast `W2_at` — the
+   (W2) axiom instantiated at four abstract terms, with no `≤ℝ` anywhere — is `dag 252 /
+   tree 1478 / DEPTH 3`, and rung 2 built on it reduces. **The `≤ℝ` package is the cost, not
+   `W`**: every W-hyperbolic statement phrased with `≤ℝ` inherits `le_R_trans_core`'s
+   telescope, and every one phrased with `=ℝ` (i.e. (W2), (W3)) does not.
+
+Reproduction of the negative measurement (it cannot live in the file — a file of errors is not
+a green build). Paste into a scratch module importing this one:
+
+```lean
+theorem UextD : (0 : ℕ) = mfiU (triCm M h) (rExtD M h) (qs M 5 5 5) := by
+  unfold mfiU rExtD
+  mfi_push [wExtD, wrap, wrapW, extInnerD]
+  kernel_rfl
+```
+
+`0` is only the first candidate; the value is unknown, because a `kernel_rfl` that OOMs
+reports nothing about it. Nine candidates (`0`–`6`, `901`) were tried in one module and the
+module died at 12 GB, so the failure is not a mis-guessed constant.
+
+## What this suggests for the next lane
+
+Finding 5 is actionable: a W-hyperbolic statement whose *only* ℝ content is `=ℝ` extracts, and
+one that touches `≤ℝ` does not. `W_ext_param` (rung 4) is the interesting case — it is proved
+from (W2) plus `mul_zero_l_R`, `clamp01_congr_R`, `abs_sub_eq_zero_R` and `eq_R_trans_core`,
+with **no `le_R_trans_core`** — yet it measures at depth ≥62. The candidate culprit is
+`eq_R_trans_core`, which carries the `eqR_tail`/`eqR_le`/`eqR_strict` telescope; if so, an
+`=ℝ`-transitivity that avoided the squeeze would move rung 4 into range. Not measured here.
 
 ## Honest limits
 
@@ -194,6 +248,14 @@ def extInner : DS K0 (Formula.all Ty.nat (eqBody dXX Term.zero_R) →ᶠ
     (Derivable.syllogism (Derivable.forall_ax (A := eqBody dWW Term.zero_R) Term.zero)
       (Derivable.exist_ax Term.zero (eqBody dWW Term.zero_R)))
 
+/-- The same at the **non-trivial** witness `⌈d(x,x')⌉₀`, so that `V` is `901` rather than `0`
+and cannot be produced without evaluating a majorant. -/
+def extInnerD : DS K0 (Formula.all Ty.nat (eqBody dXX Term.zero_R) →ᶠ
+    Formula.ex Ty.nat (eqBody dWW Term.zero_R)) :=
+  Derivable.syllogism (WHyperbolic.W_ext_left x0 x1 y0 l0)
+    (Derivable.syllogism (Derivable.forall_ax (A := eqBody dWW Term.zero_R) D0)
+      (Derivable.exist_ax D0 (eqBody dWW Term.zero_R)))
+
 -- ============================================================================
 -- Rung 4: `W_ext_param` — the premise is `λ =ℝ μ`
 -- ============================================================================
@@ -231,6 +293,7 @@ def wrap {B C : Formula WHyperbolic.F K1}
 def wDir := wrap dirInner
 def wAx := wrap axInner
 def wExt := wrap extInner
+def wExtD := wrap extInnerD
 def wExtP := wrap parInner
 
 -- ============================================================================
@@ -315,6 +378,42 @@ theorem Uax : (0 : ℕ) = mfiU (triCm M h) (rAx M h) (qs M 5 5 5) := by
 theorem Vax_ne_900 : (900 : ℕ) ≠ mfiV (triCm M h) (rAx M h) (qs M 5 5 5) := by
   rw [← Vax M h]; decide
 
+/-! ### Rung 3: `W_ext_left` — witness side only
+
+`W_ext_left` is a composition-**depth 66** derivation of 3.7 M tree nodes (the histogram at
+the bottom of this file). The witness side goes through it in seconds; the counter side does
+not go through it at all. See this file's header for the numbers and the reproduction
+snippet. -/
+
+noncomputable def rExt : MRealizer (triCm M h)
+    (Formula.all qTy (Formula.all Ty.nat (eqBody dXX Term.zero_R) →ᶠ
+      Formula.ex Ty.nat (eqBody dWW Term.zero_R))) :=
+  monotone_soundness M.eqXInterp M.spremise (triCm M h) wExt
+
+noncomputable def rExtD : MRealizer (triCm M h)
+    (Formula.all qTy (Formula.all Ty.nat (eqBody dXX Term.zero_R) →ᶠ
+      Formula.ex Ty.nat (eqBody dWW Term.zero_R))) :=
+  monotone_soundness M.eqXInterp M.spremise (triCm M h) wExtD
+
+/-- The witness `0`: `V = 0`. **On its own this proves nothing** — a `V` of `0` at a witness
+whose majorant is `0` is exactly the laziness `Probes/MonotoneLaneB.lean` records for
+`dist_tri_chain`. It is kept as the control for the next theorem. -/
+theorem Vext : (0 : ℕ) = mfiV (triCm M h) (rExt M h) (qs M 5 5 5) := by
+  unfold mfiV rExt
+  mfi_push [wExt, wrap, wrapW, extInner]
+  kernel_rfl
+
+/-- **The non-vacuous one**: at the witness `⌈d(x,x')⌉₀` the same derivation gives `901`, the
+majorant `distMajorant 5 5 0`. So the kernel really evaluates a majorant through
+`W_ext_left`; `Vext` above is not what is being reported here. ≈36 s of kernel time. -/
+theorem VextD : (901 : ℕ) = mfiV (triCm M h) (rExtD M h) (qs M 5 5 5) := by
+  unfold mfiV rExtD
+  mfi_push [wExtD, wrap, wrapW, extInnerD]
+  kernel_rfl
+
+theorem VextD_ne_900 : (900 : ℕ) ≠ mfiV (triCm M h) (rExtD M h) (qs M 5 5 5) := by
+  rw [← VextD M h]; decide
+
 end Model
 
 -- ============================================================================
@@ -330,6 +429,7 @@ end Model
 #eval show Lean.MetaM Unit from NestingDepth.report ``Metatheorems.WExtBoundDemo.wAx
 #eval show Lean.MetaM Unit from NestingDepth.report ``Metatheorems.WExtBoundDemo.wExt
 #eval show Lean.MetaM Unit from NestingDepth.report ``Metatheorems.WExtBoundDemo.wExtP
+#eval show Lean.MetaM Unit from NestingDepth.report ``Metatheorems.WHyperbolic.dist_W_mono_left
 
 -- ============================================================================
 -- Axiom hygiene
@@ -340,6 +440,7 @@ end Model
 #print axioms wDir
 #print axioms wAx
 #print axioms wExt
+#print axioms wExtD
 #print axioms wExtP
 
 end WExtBoundDemo
