@@ -387,5 +387,18 @@ def lTermSize {Γ : Ctx Empty} {τ : Ty Empty} : Term lFE Γ τ → Nat
   | .fst p      => 1 + lTermSize p
   | .snd p      => 1 + lTermSize p
 
+/-! ## Hygiene
+
+Added 2026-09-07 (`docs/CLAIMS_AUDIT.md` C11). This file had no `#print axioms`, so the axiom
+lists quoted for its numerals were prose rather than build output. It already carries its own
+refutation control (`lVtExt_at_5_ne_4`).
+
+Only the *extended* pair is checkable: the classical extractors do not reduce at all, which is
+this probe's finding, so there is nothing to print for them. -/
+
+#print axioms lUtExt_at_5
+#print axioms lVtExt_at_5
+#print axioms lVtExt_at_5_ne_4
+
 end LemBoundDemo
 end Metatheorems

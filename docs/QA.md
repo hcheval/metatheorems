@@ -106,9 +106,10 @@ rewrite of `Term`.
 ### 6. What is the trust base?
 
 Lean 4's kernel plus Mathlib, and nothing else: **the library has no `sorry` and no custom
-axiom**. A source grep over `Metatheorems/` finds exactly one `sorry`, in
-`Metatheorems/Probes/CounterSideProbe.lean:288,293` — a record of a measurement that exhausts
-memory, deliberately excluded from the sweep target `Probes.lean` and reachable from nothing. `Metatheorems/Headline.lean` (`lake build
+axiom**. A source grep over `Metatheorems/` finds `sorry` in exactly one file — three of them,
+at `Metatheorems/Probes/CounterSideProbe.lean:288,293,385` — a record of a measurement that
+exhausts memory, deliberately excluded from the sweep target `Probes.lean` and reachable from
+nothing. `Metatheorems/Headline.lean` (`lake build
 Metatheorems.Headline`) prints `#print axioms` for every headline declaration in one place —
 `soundness`, `all_closed_terms_majorizable`, the seven term-route metatheorems, the five
 monotone ones, the four space instantiations, `mct_p1`/`mct_p2`/`real_mct_p2`,
@@ -148,7 +149,7 @@ def pmFinal : D [] (Formula.all pTy (Formula.all Ty.nat tB →ᶠ Formula.ex Ty.
   pexact h1
 ```
 
-Forty-odd tactics exist (43 `elab`/`macro` declarations in `ProofMode/Tactics.lean`): `pintro`, `papply`, `pexact`,
+Forty-odd tactics exist (41 `elab`/`macro` declarations in `ProofMode/Tactics.lean`, plus 4 bare `syntax`): `pintro`, `papply`, `pexact`,
 `pexists`, `pobtain`, `pinduction`, `prw`/`prwby` (rewriting by quantifier-free extensionality,
 in the goal or in a hypothesis), `pcases`, `pleft`/`pright`, `psym`, `pthm`. The goal displays
 as a named-hypothesis box with object-level notation. The scale it carries:
@@ -171,7 +172,7 @@ needs neither LEM nor Markov. `Reference/MCT.lean:120` (`metastable`) is the han
 textbook comparison with `Φ k g = (shift g)^[2^k + 1] 0`, itself one iterate above the sharp
 `2^k` because its `descent` is non-strict; `Reference/MCTBridge.lean` locates that off-by-one.
 On **readability**, `Probes/TermPrintDemo.lean` measures five extracted realizers: tree/DAG is
-2.77–3.21, but tree/**written** — nodes actually spelled out, after hoisting only the closed
+2.76–3.21, but tree/**written** — nodes actually spelled out, after hoisting only the closed
 repeated subterms a `let` can legally bind — is only **1.00–1.35**
 (`term-print-out/realizers.md`). De Bruijn indices are the pessimal representation for this,
 since the same content at two binder depths is textually distinct.

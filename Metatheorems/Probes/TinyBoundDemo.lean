@@ -235,5 +235,32 @@ reusing a `let`-bound sub-derivation via `obtain`, per CLAUDE.md rule 4) would l
 very differently — this measures one specific failure mode, not a universal bound on
 constructor count. -/
 
+/-! ## Hygiene
+
+Added 2026-09-07 (`docs/CLAIMS_AUDIT.md` C11). This file is cited as "the project's first
+evaluated bound, full stop" and had **no `#print axioms` at all**, so the axiom list quoted for
+it in `docs/RESULTS.md` rows 1–2 was prose rather than build output.
+
+The two numerals are also the only ones in the project with **no refutation control**, which
+matters here more than elsewhere: both are closed by bare `rfl`, and a `rfl` whose two sides
+stall at the same unreduced point succeeds exactly like one that computes (CLAUDE.md note 12).
+The controls below are what distinguish the two cases. -/
+
+theorem tUt_bound_at_5_ne_1 : (1 : ℕ) ≠ closedMajorizer tCmE tUt (5 : ℕ) := by
+  rw [← tUt_bound_at_5]; decide
+
+theorem tVt_bound_at_5_ne_4 : (4 : ℕ) ≠ closedMajorizer tCmE tVt (5 : ℕ) := by
+  rw [← tVt_bound_at_5]; decide
+
+theorem tVt_bound_at_5_ne_6 : (6 : ℕ) ≠ closedMajorizer tCmE tVt (5 : ℕ) := by
+  rw [← tVt_bound_at_5]; decide
+
+#print axioms tinyBound
+#print axioms tUt_bound_at_5
+#print axioms tVt_bound_at_5
+#print axioms tUt_bound_at_5_ne_1
+#print axioms tVt_bound_at_5_ne_4
+#print axioms tVt_bound_at_5_ne_6
+
 end TinyBoundDemo
 end Metatheorems

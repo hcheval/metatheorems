@@ -31,6 +31,13 @@ import Metatheorems.Probes.NestingDepth
 import Metatheorems.Probes.SharingProbe
 import Metatheorems.Probes.ExprBound
 import Metatheorems.Probes.WExtBoundDemo
+-- Not a probe: `Metatheorems.Headline` is the project's `#print axioms` block for every
+-- headline declaration. It is not reachable from the umbrella either, so until 2026-09-07 it
+-- was built by nobody and six of its names — `syntactic_general_metatheorem` and its four
+-- variants, `add_Q_assoc`, `distrib_Q` — had no axiom line in any build; the lists quoted for
+-- them in the docs were prose. Imported here so the sweep covers them (`docs/CLAIMS_AUDIT.md`
+-- C8).
+import Metatheorems.Headline
 import Metatheorems.Probes.TermPrintDemo
 import Metatheorems.Probes.TinyBoundDemo
 import Metatheorems.Probes.TriangleBoundDemo

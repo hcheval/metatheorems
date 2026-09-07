@@ -981,17 +981,20 @@ casts: `le_R_of_le_R_pu`, 4167 constructors and 180 casts, gives its counter rea
 measurement from both sides (Lane C on the classical route, Lane D1 on the intuitionistic):
 **the composition combinators re-evaluate their sub-majorants** —
 `MRealizer.syllogism` uses `hAB.val n e` three times and `hBC.val n e` twice, and neither the
-kernel nor the compiled evaluator shares them, so nested syllogisms cost ×5 per level (kernel
-dies at ≈8, evaluator at 3). That is the Dialectica exponential in its
-last hiding place, and it applies to every route equally; §14.1's "×230 from `negTrans_sound`"
-is a linear factor that fusion removed and that was invisible behind it.
+kernel nor the compiled evaluator shares them, so nested syllogisms cost a constant factor per
+level — **×3.7, dying at k = 6**, on the one committed measurement
+(`Probes/SharingProbe.lean`). A "×5, dying at k = 8" pair circulated in these documents for
+two days; it comes from a scratch run that was never committed, as that probe's own header
+records. Quote the committed figures. That is the Dialectica exponential in its last hiding
+place, and it applies to every route equally; §14.1's "×230 from `negTrans_sound`" is a linear
+factor that fusion removed and that was invisible behind it.
 
 **The cost is exponential in composition DEPTH, not in the COUNT — do not quote the count.**
-"`prenexify` has 134" against a wall at ≈8 makes the gap look hopeless, and 134 is merely
-`prenexify`'s *number* of `syllogism`s. The ×5 compounds along the longest **path** through
-composition nodes, and that depth is **9** — measured by `Probes/NestingDepth.lean`, an `Expr`
-DAG walk memoised on `ExprStructEq` with no `whnf`. See §14.8 for the table and for what the
-measurement cost the `let`-sharing plan.
+"`prenexify` has 134" made the gap look hopeless, and 134 is merely `prenexify`'s *number* of
+`syllogism`s. The factor compounds along the longest **path** through composition nodes, and
+that depth is **9** — measured by `Probes/NestingDepth.lean`, an `Expr` DAG walk memoised on
+`ExprStructEq` with no `whnf`. See §14.8 for the table, for the two limits on what that walk
+can measure, and for what it cost the `let`-sharing plan.
 
 ### 14.8 Depth, sharing, and a second wall
 
@@ -1013,9 +1016,25 @@ through composition nodes, memoised on `ExprStructEq`, no `whnf`:
 | `ProofMode.mct_p2` | 7244 | 84335 | **12** |
 | `le_R_trans_core`, `dist_tri_chain`, `real_mct_p2` | ≥47938 | ≥58559 | **≥23** (budget hit) |
 
-Against a wall at ≈8 that makes ℕ-MCT ≈5³ away and ℝ-MCT ≈5¹⁴ — a finite engineering target,
-where 5¹³⁴ was not. This is the single most useful number the MFI programme has produced, and
-it cost one probe; **measure depth before estimating any composition cost.**
+The qualitative conclusion — a finite engineering target, where 5¹³⁴ was not — is what matters
+here, and **the arithmetic that used to follow this table was wrong twice over; it is not
+repeated.** It read "against a wall at ≈8 that makes ℕ-MCT ≈5³ away and ℝ-MCT ≈5¹⁴". Both the
+base and the wall were taken from a run that **was never committed** (`SharingProbe.lean`'s own
+header says so): the committed reconstruction measures **×3.7 per level, dying at k = 6**, not
+×5 dying at k = 8. And even on its own figures the exponents were off by one (12 − 8 = 4,
+23 − 8 = 15). Quote the depths, and the ×3.7/k=6 pair from the committed probe; do not multiply
+them out into a headline. `docs/CLAIMS_AUDIT.md` item 5.
+
+The depth measurement itself stands and cost one probe: **measure depth before estimating any
+composition cost.** Two limits on it, both established 2026-09-07:
+
+* the walk is **budget-capped at 250 000 `Expr` nodes**, so every "≥" above is the cap and not
+  a depth. In particular it **cannot discriminate inside the ℝ layer**: `clamp01_congr_R`, a
+  slack-free single-index lemma, reports ≥35. Do not choose an ℝ-layer target by its depth.
+* depth does not predict the **witness** side at all. `Probes/WExtBoundDemo.lean` reduces `V`
+  through derivations of depth ≥66 in ~35 s; only `mfiU` fails. The ×5-per-level cost is
+  charged where `MRealizer.syllogism` duplicates — `hAB` three times, `hBC` twice — which is
+  the counter side alone.
 
 **2. The `let`-sharing hypothesis is REFUTED (`Probes/SharingProbe.lean`).** Binding
 each sub-majorant with `let` in `MRealizer.syllogism` changes nothing: ×3.7 per level before

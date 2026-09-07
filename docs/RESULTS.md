@@ -132,7 +132,7 @@ hand-written in `Dialectica/MonotoneNDLeaves.lean` and the OOM was unchanged), *
 | 60 | `Probes/SizeProbe.lean` | `derivSize` of the classical route's output on a 12-node derivation | **85,180** = `prenexify` 347 + `nn_all_nn` 274 + `negTrans_sound` 363→84,905 (≈230/node) | `SizeProbe.lean` header, item 2 |
 | 61 | `Probes/MonotoneLaneB.lean` | `derivSize`/DAG of proof-mode and ℝ-layer derivations | `pmFinal` 449/429; `le_R_pu_of_le_R` 650/622; `le_R_of_le_R_pu` 4167/3979 | `MonotoneLaneB.lean:78–98`, `#eval`s at `:362–371` |
 | 62 | `Probes/MonotoneLaneB.lean` | `derivSize` of `le_R_trans_core`, `dist_tri_chain`, `mct_p2` | **OOM at 12 GB while the value is being built** — a sharing-free tree count is not a ruler here | `MonotoneLaneB.lean:86–87` |
-| 63 | `Probes/TermPrintDemo.lean` | five extracted realizers, rendered and measured: tree / DAG / **written** | 186–563 nodes; tree/DAG 2.77–3.21 but tree/**written** only **1.00–1.35** | `TermPrintDemo.lean:119–125`, table in `term-print-out/realizers.md` |
+| 63 | `Probes/TermPrintDemo.lean` | five extracted realizers, rendered and measured: tree / DAG / **written** | 186–563 nodes; tree/DAG 2.76–3.21 but tree/**written** only **1.00–1.35** | `TermPrintDemo.lean:119–125`, table in `term-print-out/realizers.md` |
 | 64 | `Probes/ExtractTermDemo.lean` | `extractTerm` — the realizer **with the model deleted**, hence computable at a space | `UPremiseDemo.uFinal` ↦ **533** nodes, kernel-checked; a Markov-using derivation ↦ **27** | `ExtractTermDemo.lean:90`, `:100`, `:132` |
 
 Row 63 corrects the natural conjecture: "DAG size" is an **upper** bound on achievable
@@ -178,14 +178,27 @@ It is checked with `scripts/lean.sh Demo/Walkthrough.lean`, not by `lake build P
 
 ## What it does not show
 
-* **No numeral yet from any derivation with real mathematical content.** `mct_p2` (row 50),
-  `real_mct_p2`, `le_R_trans_core`, `dist_tri_chain` (row 41 closes only *by laziness*, and
-  the probe says so) have named, type-checked `Φ`s and no values.
-* **The classical route reduces nothing** (rows 23, 52).
-* **Every numeral above comes from a derivation whose content is an instantiation term.** `U`
-  and `V` are read off that term; the matrix — even the full triangle inequality with
-  `cauchyfy`/`le_Q_dec` inside it — is never entered. That is why row 12 is cheap and row 49
-  is not.
+**⚠ The 64 rows above predate 2026-09-06 and three of the claims in this section have since
+been falsified. They are kept, struck through, because what replaced them is the more useful
+statement. Regenerate the table before showing it; `docs/CLAIMS_AUDIT.md` has the full list.**
+
+* ~~**No numeral yet from any derivation with real mathematical content.**~~ **False since
+  2026-09-06.** `Probes/ContentExampleNat.lean` mines `V = 2^k·f(0)` from
+  `∀x(∀u (f(Su) =₀ f u +ᵗ f u) → ∃v (f k =₀ v))` by a raw `Derivable.induction`, kernel-checked
+  at six points with refutation controls, the term route agreeing on `V`. The *theorem* there is
+  trivial and the **bound** is the mathematics — which is this project's own thesis with a
+  number attached. What remains true is the narrower claim: `mct_p2` (row 50), `real_mct_p2`,
+  `le_R_trans_core` and `dist_tri_chain` still have named, type-checked `Φ`s and no values.
+* ~~**Every numeral above comes from a derivation whose content is an instantiation term.**~~
+  **False since 2026-09-07.** `Probes/WExtBoundDemo.lean` rung 2 mines a bound through
+  `Derivable.premise WHyperbolic.W2` — a genuine space-theory premise with a proof-mode script
+  inside it, at composition depth 8 — where every earlier space extraction consumed
+  `Derivable.dist_tri`, a *free constructor*. So neither `.premise` nor the `pm_*` layer is
+  what stops extraction.
+* **The classical route reduces nothing** (rows 23, 52). Still true.
+* **The failure is on the counter side specifically.** Rungs 3–4 of `WExtBoundDemo` reduce `V`
+  to `901` through derivations of depth ≥66 in ~35 s; only `mfiU` exhausts memory. Depth alone
+  does not predict failure — the duplication in `MRealizer.syllogism` does.
 
 ## The single named blocker
 
