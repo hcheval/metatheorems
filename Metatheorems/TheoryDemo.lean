@@ -26,7 +26,8 @@ namespace Metatheorems
 
 open Formula
 
-/-- A metric space with a nonexpansive self-map fixing `0_X`. -/
+-- A metric space with a nonexpansive self-map fixing `0_X`.
+-- (A `theory` block takes no doc comment: it is not a single declaration.)
 theory Nonexp
   index MetricSpace.ι
   types X := xTy
@@ -130,8 +131,8 @@ end Obligations
 -- Generated `ι`: the other mode
 -- ============================================================================
 
-/-- With no `index` clause the index type is generated too.  Two base types, one constant
-between them, one axiom. -/
+-- With no `index` clause the index type is generated too.  Two base types, one constant
+-- between them, one axiom.
 theory TwoSorted
   types A
   types B
