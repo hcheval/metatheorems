@@ -294,4 +294,32 @@ theory BadMode
   types X
 endtheory
 
+-- ============================================================================
+-- Axiom hygiene of the generated declarations
+-- ============================================================================
+
+/-!
+The command emits no `sorry` and no axiom of its own: `premises_pu` / `premises_vf` are
+`Or.elim` folds over `subst`+`rfl`, the accessors are `Derivable.premise` applied to an
+`Or.inr` chain, and `metatheorem` is a direct application of
+`syntactic_general_metatheorem`, so it inherits exactly that theorem's axioms.
+-/
+
+#print axioms Nonexp.ax_nonexp_pu
+#print axioms Nonexp.ax_fixpt_vf
+#print axioms Nonexp.premises_pu
+#print axioms Nonexp.premises_vf
+#print axioms Nonexp.nonexp
+#print axioms Nonexp.fixpt
+#print axioms Nonexp.axiomsHold
+#print axioms Nonexp.spremise
+#print axioms Nonexp.metatheorem
+#print axioms Nonexp.metatheorem_classical
+#print axioms Nonexp.Majorants.funcM_maj
+#print axioms TwoSorted.ax_g_isom_pu
+#print axioms TwoSorted.premises_pu
+#print axioms NoConstants.Majorants.funcM_maj
+#print axioms NoAxioms.axiomsHold
+#print axioms NoAxioms.spremise
+
 end Metatheorems

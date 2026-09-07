@@ -165,7 +165,14 @@ open WHypDSL.Expected
 variable {Γ : Ctx MetricSpace.ι}
 
 /-- **The check.**  The command's output and `WHyperbolic.lean`'s hand-written de Bruijn
-spelling are the same formula, at every context. -/
+spelling are the same formula, at every context.
+
+**Non-degeneracy, checked and not assumed** (2026-09-07): swapping the two `X` arguments of
+the second `W` in `expW3` — i.e. writing `(.var (.vs (.vs .vz))) (.var (.vs .vz))` where
+(W3) has `(.var (.vs .vz)) (.var (.vs (.vs .vz)))`, which is *exactly* the mistake a person
+counting `.vs`es makes — turns the third line below into a `Type mismatch` at
+`WHyperbolicDSL.lean:171:46` and nothing else in the file changes.  So these four `rfl`s do
+discriminate the index assignment; they are not four instances of `rfl : x = x`. -/
 example : (WHypDSL.ax_W1 (Γ := Γ)) = expW1 := rfl
 example : (WHypDSL.ax_W2 (Γ := Γ)) = expW2 := rfl
 example : (WHypDSL.ax_W3 (Γ := Γ)) = expW3 := rfl
