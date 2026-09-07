@@ -31,6 +31,7 @@ per constant, so the user discharges named goals in ordinary Lean and gets `spre
 /-- A doc comment here is allowed, and ignored. -/
 theory Foo
   index MetricSpace.ι                        -- optional; see "Two modes" below
+  signature WHyperbolic.κ := WHyperbolic.F   -- optional; reuse a signature
   types X := xTy
   types R := realTy MetricSpace.ι
   abbrev d := Term.dist ()                   -- a syntactic alias for axiom bodies
@@ -41,11 +42,11 @@ endtheory
 ```
 
 One keyword per item; items may appear in any order, except that `index`, `types` and
-`abbrev` must precede anything that mentions them.  The three keywords `index`, `types` and
-`constants` become parser tokens in every file that imports this module, so they cannot be
-used as identifiers there; `abbrev` and `axioms` reuse tokens Lean already has.  **This is
-why `Theory.lean` is deliberately not imported by `Metatheorems.lean`** — putting it in the
-umbrella would make those three words keywords for the whole project.
+`abbrev` must precede anything that mentions them.  The four keywords `index`, `types`,
+`constants` and `signature` become parser tokens in every file that imports this module, so
+they cannot be used as identifiers there; `abbrev` and `axioms` reuse tokens Lean already
+has.  **This is why `Theory.lean` is deliberately not imported by `Metatheorems.lean`** —
+putting it in the umbrella would make those four words keywords for the whole project.
 
 ### `abbrev` items
 
@@ -67,6 +68,20 @@ get no generated `abbrev`.
 
 A `types n := e` item is a plain abbreviation in either mode; it is how non-base types
 (`R`, function types) get short names.
+
+### Two modes for the signature `κ` / `F`
+
+* **No `signature` clause** — `Foo.κ` is an inductive with one constructor per `constants`
+  item (`Empty` if there are none) and `Foo.F` is generated from the declared types.  Each
+  item must then carry `: <Ty expression>` and must not carry `:=`.
+* **`signature κexpr := Fexpr`** — `Foo.κ` and `Foo.F` are `abbrev`-ed to the given
+  expressions, and each `constants` item must say which element of `κexpr` it names, as
+  `constants W : <type> := <κ value>` (the type may be omitted, and is then `Foo.F <κ value>`).
+  The emitted formulas are then `Formula Fexpr Γ` **on the nose**, so a theory declared this
+  way can *replace* a hand-written one rather than parallel it: see
+  `WHyperbolicDSL.lean`'s `WHypSig`, where `WHypSig.ax_W1 = WHyperbolic.ax_W1` and
+  `WHypSig.Premises = WHyperbolic.Premises` hold by `rfl`, and `WHyperbolicModel.axiomsHold`
+  inhabits the generated `Obligations` with no re-proof.
 
 ### Axiom bodies
 
@@ -148,8 +163,14 @@ syntax thyBinderGroup := "(" ident+ " : " term ")"
 syntax "index " term : thyItem
 /-- Declare a base type (no `:=`) or a type abbreviation (with `:=`). -/
 syntax "types " ident (" := " term)? : thyItem
-/-- Declare a function constant of the signature. -/
-syntax "constants " ident " : " term : thyItem
+/-- Reuse an existing signature: `signature <κ> := <F>`.  Then every `constants` item must
+say which element of `<κ>` it names (`constants W : … := ()`), and no `κ` / `F` is generated.
+-/
+syntax "signature " term " := " term : thyItem
+/-- Declare a function constant of the signature.  Without a `signature` clause the type is
+required and the `κ` constructor is generated; with one, `:= <κ value>` is required and the
+type may be omitted (it is then read off the given `F`). -/
+syntax "constants " ident (" : " term)? (" := " term)? : thyItem
 /-- A *syntactic* alias usable in axiom bodies: `abbrev d := Term.dist ()`.  The right-hand
 side is substituted (parenthesised) wherever the name occurs in a later axiom body.  It
 generates no declaration, so it can name anything an axiom body wants short — the structural
@@ -176,7 +197,10 @@ structure TypeDecl where
 /-- A `constants` item. -/
 structure ConstDecl where
   id : Ident
-  ty : TSTerm
+  /-- The declared type; required without a `signature` clause. -/
+  ty? : Option TSTerm
+  /-- The `κ` value this constant names; required with a `signature` clause. -/
+  val? : Option TSTerm
   deriving Inhabited
 
 /-- An `axioms` item, with its binder groups flattened. -/
@@ -258,6 +282,7 @@ def elabTheory : CommandElab := fun stx => do
 
   -- ---------------------------------------------------------------- collect
   let mut idxClause : Option TSTerm := none
+  let mut sigClause : Option (TSTerm × TSTerm) := none
   -- NOTE: `types`, `constants`, `axioms` and `index` are now parser tokens (declared above),
   -- so they cannot be used as local names anywhere below this point in this file.
   let mut tyDecls : Array TypeDecl := #[]
@@ -271,8 +296,11 @@ def elabTheory : CommandElab := fun stx => do
         idxClause := some e
     | `(thyItem| types $n:ident $[:= $e?:term]?) =>
         tyDecls := tyDecls.push { id := n, defn? := e? }
-    | `(thyItem| constants $n:ident : $t:term) =>
-        consts := consts.push { id := n, ty := t }
+    | `(thyItem| signature $k:term := $f:term) =>
+        if sigClause.isSome then throwErrorAt it "theory: duplicate `signature` clause"
+        sigClause := some (k, f)
+    | `(thyItem| constants $n:ident $[: $t?:term]? $[:= $v?:term]?) =>
+        consts := consts.push { id := n, ty? := t?, val? := v? }
     | `(thyItem| abbrev $n:ident := $e:term) =>
         aliases := aliases.push (n, e)
     | `(thyItem| axioms $n:ident $gs:thyBinderGroup* : $b:term) =>
@@ -322,17 +350,45 @@ def elabTheory : CommandElab := fun stx => do
 
   -- ------------------------------------------------------------ κ and F
   let constNames := consts.map (·.id)
-  let constTys : Array TSTerm := consts.map fun c => substT typeSubst c.ty
-  let ctorIds : Array Ident := consts.map fun c => mkIdent (thyName ++ `κ ++ c.id.getId)
-  let ctorPats : Array TSTerm ← ctorIds.mapM fun c => `($c)
-  if consts.isEmpty then
-    elabCommand (← `(command| abbrev $kappaId : Type := Empty))
-    elabCommand (← `(command| def $fId : $kappaId → Ty $iotaId := fun c => c.elim))
-  else
-    elabCommand (← `(command| inductive $kappaId where $[| $constNames:ident]*))
-    elabCommand (← `(command|
-      def $fId : $kappaId → Ty $iotaId := fun c => match c with
-        $[| $ctorPats:term => $constTys:term]*))
+  -- `ctorPats.[i]` is what a `match` on `κ` matches for constant `i`: a generated constructor
+  -- without a `signature` clause, the user's `:= <κ value>` with one.
+  let mut ctorPats : Array TSTerm := #[]
+  let mut constTys : Array TSTerm := #[]
+  match sigClause with
+  | some (kexpr, fexpr) =>
+      elabCommand (← `(command| abbrev $kappaId : Type := $kexpr))
+      elabCommand (← `(command| abbrev $fId : $kappaId → Ty $iotaId := $fexpr))
+      for c in consts do
+        let some v := c.val? |
+          throwErrorAt c.id
+            "theory: with a `signature` clause every `constants` item must say which element \
+             of the given `κ` it names, as `constants {c.id.getId} : <type> := <κ value>`."
+        ctorPats := ctorPats.push v
+        constTys := constTys.push
+          (← match c.ty? with
+              | some t => pure (substT typeSubst t)
+              | none   => `($fId $v))
+  | none =>
+      for c in consts do
+        if c.val?.isSome then
+          throwErrorAt c.id
+            "theory: `constants {c.id.getId} := …` names an element of an existing `κ`, but \
+             this theory has no `signature` clause, so its `κ` is generated.  Drop the `:=`, \
+             or add `signature <κ> := <F>`."
+        let some t := c.ty? |
+          throwErrorAt c.id "theory: `constants {c.id.getId}` needs a type, as \
+            `constants {c.id.getId} : <Ty expression>`."
+        constTys := constTys.push (substT typeSubst t)
+      ctorPats := ← (consts.map fun c => mkIdent (thyName ++ `κ ++ c.id.getId)).mapM
+        fun c => `($c)
+      if consts.isEmpty then
+        elabCommand (← `(command| abbrev $kappaId : Type := Empty))
+        elabCommand (← `(command| def $fId : $kappaId → Ty $iotaId := fun c => c.elim))
+      else
+        elabCommand (← `(command| inductive $kappaId where $[| $constNames:ident]*))
+        elabCommand (← `(command|
+          def $fId : $kappaId → Ty $iotaId := fun c => match c with
+            $[| $ctorPats:term => $constTys:term]*))
 
   -- --------------------------------------------------- one abbrev per constant
   let gammaId := mkIdent `Γ
@@ -340,7 +396,7 @@ def elabTheory : CommandElab := fun stx => do
   for i in [0 : consts.size] do
     let c := consts[i]!
     let cid := qid c.id.getId
-    let ctor := ctorIds[i]!
+    let ctor := ctorPats[i]!
     let ty := constTys[i]!
     elabCommand (← `(command|
       abbrev $cid {$gammaId : Ctx $iotaId} : Term $fId $gammaId $ty := Term.func $ctor))
@@ -535,7 +591,7 @@ def elabTheory : CommandElab := fun stx => do
     let mut fieldTys : Array TSTerm := #[]
     for i in [0 : consts.size] do
       let c := consts[i]!
-      let ctor := ctorIds[i]!
+      let ctor := ctorPats[i]!
       let ty := constTys[i]!
       fieldNames := fieldNames.push c.id
       fieldTys := fieldTys.push (← `(Nat → Ty.interpret $xId (Ty.hat $ty)))
