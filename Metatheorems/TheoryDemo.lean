@@ -147,4 +147,56 @@ example {Γ : Ctx TwoSorted.ι} {al : Allowed} :
     Derivable TwoSorted.F al TwoSorted.Premises (TwoSorted.ax_g_const (Γ := Γ)) :=
   TwoSorted.g_const
 
+-- ============================================================================
+-- Rejection: the admissibility check, and what it says
+-- ============================================================================
+
+/-!
+The command evaluates `Formula.isPurelyUniversal` and `Formula.isVFree` on each axiom before
+emitting the `_pu` / `_vf` theorems, and fails naming the axiom.  Both failures are captured
+by `#guard_msgs` below, so the *rejection* is part of a green build rather than a comment
+claiming one.  Note that the declarations generated before the failing axiom (`BadEx.ι`,
+`BadEx.κ`, `BadEx.F`, `BadEx.f`, `BadEx.ax_surj`) do survive: the command aborts at the
+offending axiom, it does not roll back.
+-/
+
+-- An existential premise.
+/--
+error: theory: axiom `surj` is NOT purely universal, so the metatheorems cannot take it as a premise.
+A premise must be a block of `∀` (and `∧`) over a quantifier-free matrix: no `∃`, and no `→` or `∨` above a quantifier.  Checked by evaluating `Formula.isPurelyUniversal BadEx.ax_surj`, which is `false`.
+-/
+#guard_msgs in
+theory BadEx
+  index MetricSpace.ι
+  types X := xTy
+  constants f : X →ₜ X
+  axioms surj (y : X) :
+    Formula.ex Ty.nat (Formula.eq0 (.var .vz) (.var .vz))
+endtheory
+
+-- A disjunctive premise: purely universal, but not ∨-free.
+/--
+error: theory: axiom `split` is NOT ∨-free, so the metatheorems cannot take it as a premise.
+The Dialectica interpretation of a disjunction carries a decision, so premises must be ∨-free.  Replace the `∨ᶠ` by a quantifier-free decision term, or split the two cases into separate axioms.  Checked by evaluating `Formula.isVFree BadOr.ax_split`, which is `false`.
+-/
+#guard_msgs in
+theory BadOr
+  index MetricSpace.ι
+  types X := xTy
+  constants f : X →ₜ X
+  axioms split (y : X) :
+    Formula.or (Formula.eq0 Term.zero Term.zero) (Formula.eq0 Term.zero Term.zero)
+endtheory
+
+-- And the mode check: a `types` item with no `:=` under an `index` clause has no constructor
+-- to be, and is rejected before anything is generated.
+/--
+error: theory: with an `index` clause every `types` item needs `:= <Ty expression>` (there is no generated inductive to add a constructor to)
+-/
+#guard_msgs in
+theory BadMode
+  index MetricSpace.ι
+  types X
+endtheory
+
 end Metatheorems
