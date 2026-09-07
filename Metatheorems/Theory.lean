@@ -82,6 +82,9 @@ A `types n := e` item is a plain abbreviation in either mode; it is how non-base
   `WHyperbolicDSL.lean`'s `WHypSig`, where `WHypSig.ax_W1 = WHyperbolic.ax_W1` and
   `WHypSig.Premises = WHyperbolic.Premises` hold by `rfl`, and `WHyperbolicModel.axiomsHold`
   inhabits the generated `Obligations` with no re-proof.
+  One constraint in this mode: `Foo.Majorants.funcM` matches on the given `κ`, so the
+  `constants` items must between them cover *every* element of it, or that definition is
+  non-exhaustive and the command fails there.
 
 ### Axiom bodies
 
