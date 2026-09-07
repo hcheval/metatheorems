@@ -21,9 +21,20 @@ derivation at `ι = Empty`. On the monotone route the same numbers come out of a
 written **in the proof mode** (`Probes/MonotoneLaneB.lean:420`, `U = 901`, counter side
 included, 2.2 s of kernel time), through a real **induction** (`Probes/MonotoneMCT.lean:154`,
 `V(5) = 5`, `V(9) = 9`), and through the `Eq.mpr` casts of two genuine ℝ-layer lemmas
-(`Probes/MonotoneMemoGates.lean:263`, `:305`). What every one of these has in common, and it is
-the honest caveat: the mathematical content is an **instantiation term**, and `U`/`V` are read
-off that term rather than off the matrix.
+(`Probes/MonotoneMemoGates.lean:263`, `:305`).
+
+In the rows listed above the mathematical content is an **instantiation term**, and `U`/`V` are
+read off that term rather than off the matrix. That was once true of *every* extraction in the
+project, and it is no longer. Two rows break it, and both are kernel-checked:
+
+* `Probes/ContentExampleNat.lean:255–265` mines the bound from a **doubling induction** —
+  `V = 8 / 32 / 128` at `k* = 3 / 5 / 7` with `f* = λn.n+1`, and `3 / 12` at `k* = 0 / 2` with
+  `f* = λn.n+3`, so the value moves with both components. The value *is* the mathematics; the
+  theorem it comes from is trivial. (Six sampled points, all `kernel_rfl`; there is no
+  `∀k` closed form and none is provable by `rfl` — do not write one.)
+* `Probes/WExtBoundDemo.lean:404` mines `V = 901` through a `Derivable.premise` on
+  `WHyperbolic.Premises` whose body is a proof-mode script, where every earlier space
+  extraction consumed `Derivable.dist_tri`, a free constructor.
 
 ### 2. Are the bounds properties of the proof or of the theorem?
 
