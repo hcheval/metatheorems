@@ -1,8 +1,13 @@
 # RESULTS — every bound this project has extracted, and every one it has not
 
-*Compiled 2026-09-06 on branch `demo` (off `main` at `6abbfc4`). Every row was re-checked
-against the probe file named in it — the theorem was opened and read, not copied from
-`CLAUDE.md`. Line numbers are of the declaration's first line.*
+*Rows 1–64 compiled 2026-09-06; **section 6 (rows 65–80) added 2026-09-07** after the four
+presentation lanes landed on `main`. Every row was re-checked against the probe file named in
+it — the theorem was opened and read, not copied from `CLAUDE.md`. Line numbers are of the
+declaration's first line.*
+
+*Two claims in "What it does not show" were falsified by rows 65 and 72 and are struck through
+there rather than deleted. `docs/CLAIMS_AUDIT.md` classifies every claim in this file by what
+backs it, and lists the nine that must not be stated as theorems.*
 
 **How to read a row.** A **numeral** row is a Lean theorem stating `<literal> = <extraction>`
 that the build accepts; the extraction is a `Nat`-valued projection of a metatheorem's `Φ`,
@@ -158,6 +163,38 @@ It is checked with `scripts/lean.sh Demo/Walkthrough.lean`, not by `lake build P
 
 ---
 
+## 6. 2026-09-06/07 — content bounds, space-theory premises, symbolic display
+
+*Added 2026-09-07. Rows 1–64 above are numbered as of 2026-09-06 and the prose cross-references
+them ("row 19", "row 23"), so these continue the numbering rather than being interleaved.*
+
+| # | source | what | value | where |
+|---:|---|---|---|---|
+| 65 | `Probes/ContentExampleNat.lean` | **the first bound whose value is a function of the mathematics.** `∀x(∀u (f(Su) =₀ f u +ᵗ f u) → ∃v (f k =₀ v))` at `x = (k,f)`, by raw `Derivable.induction`; the witness at each step is built from the induction hypothesis's | `V` = **8 / 32 / 128** at `k* = 3 / 5 / 7` with `f* = λn.n+1`; **12** at `(2, λn.n+3)`, so it moves with *both* components | `:255`, `:256`, `:261`, `:265`; controls `:298–306` |
+| 66 | `Probes/ContentExampleNat.lean` | the premise side of the same derivation | `U` = **0 / 0 / 1 / 2 / 4** at `k* = 0…5` | `:269–273` |
+| 67 | `Probes/ContentExampleNat.lean` | `Φ` through `monotone_general_metatheorem_at` itself | **8** at `k* = 3`, **32** at `k* = 5` | `:276`, `:279` |
+| 68 | `Probes/ContentExampleNat.lean` | the **term route** on the same derivation, as an independent check | `closedMajorizer … = 8`, agreeing with row 65. Its `U` is `INTERNAL PANIC: out of memory` at 12 GB | `:292` |
+| 69 | `Probes/ContentExampleNat.lean` | **NEGATIVE — the value ceiling, and it is independent of proof size.** Same fixed 145-constructor derivation | `V = 128` reduces in ≈9 s; **`V = 256` exhausts 12 GB.** `Term.add`'s majorant is a `prec`, so `recMaj` iterates *value*-many times unshared | header `:61–65` |
+| 70 | `Probes/ContentExampleNat.lean` | **NEGATIVE — the proof mode is a liability for extraction.** The *same theorem by the same argument*, written in the proof mode | **42,729** constructors against **145** raw — ×295 — and it reduces only at `k* = 0` | header `:318`, `#eval` at `:341` |
+| 71 | `Probes/ContentExampleSpace.lean` | one statement at a W-hyperbolic model, **two proofs, two bounds** — `M` and `h` free, so it holds of every model with `d(a,0_X) ≤ 5` | `eDir` (index from the space): `U = V = Φ` = **901** at `(5,5)`, **1273** at `(7,5)`. `eRec` (index from the doubling induction): **1 / 8 / 32** at `k* = 0/3/5`, and **unchanged** at `(7,5)` — provably indifferent to the space majorants | `:329–397`; controls `:404–419` |
+| 72 | `Probes/WExtBoundDemo.lean` | **the first bound mined through a space-theory `.premise`.** Rung 2 runs `monotone_soundness` through `W2_at`, which ends in `Derivable.premise WHyperbolic.W2` and whose body is a proof-mode script — where every earlier space extraction consumed `Derivable.dist_tri`, a *free constructor* | `V` = **901** at `(5,5)`, **1273** at `(7,5)`; composition depth **8**, seconds | `:404`, `:408` |
+| 73 | `Probes/WExtBoundDemo.lean` | rungs 3–4: a bound whose premise is a **derived** theorem — `W_ext_left`, then `W_ext_param` | `V` = **901**, in ≈36 s, through derivations of composition depth **≥66** and **≥62** | `:447`, `:466` |
+| 74 | `Probes/WExtBoundDemo.lean` | **NEGATIVE, and it localises the failure.** The counter side of rows 73 | `mfiU` is `std::bad_alloc` at 12 GB (≈100 s) on the *same* derivations whose `V` reduces. **The failure is the counter side specifically, not depth** | header `:64–70`, `:128`; snippet in header |
+| 75 | `Probes/ExprBound.lean` | **`Φ` displayed as arithmetic**, by fueled `ExprStructEq`-memoised partial reduction at the `Expr` level — not a numeral but the *function* | `Φ(a,b) = maxT nat (pairN (2·((a+b)·2^(0+1))) (2^(0+1)−1)) 0`, `numObjs` **166**, ≈0.1 s. `M` and `h` are bound and **absent from the body** — uniformity as syntax. Reproduces 1709 at `(5,9)` and 349 at `(5,1)` | `:227`, `:231`; header for the fuel/size table |
+| 76 | `Probes/ExprBound.lean` | **NEGATIVE.** The same tool on a proof-mode `pinduction` bound | the iteration becomes visible as `recMaj`, but output *grows* with fuel — 1033 / 1295 / 8125 objects — and times out at fuel 30. `recMaj` stuck on a symbolic point never collapses | header, "Second target" |
+| 77 | `Probes/NestingDepth.lean` | composition **depth** — the longest path through composition nodes, memoised on `ExprStructEq`, no `whnf` | `prenexify` **9** (its syllogism *count* is 134 — do not quote the count); `mct_p2` **12**; `le_R_trans_core`/`dist_tri_chain`/`real_mct_p2` **≥23** | header table |
+| 78 | `Probes/NestingDepth.lean` | **two limits on that instrument**, found 2026-09-07 | the walk is **capped at 250 000 `Expr` nodes**, so every "≥" is the cap: `clamp01_congr_R`, a slack-free single-index lemma, reports ≥35. It **cannot discriminate inside the ℝ layer**. And depth does not predict the *witness* side at all (row 73) | `WExtBoundDemo.lean` header `:96–102` |
+| 79 | `Probes/SharingProbe.lean` | **NEGATIVE — the `let`-sharing hypothesis is refuted.** Binding each sub-majorant with `let` in `MRealizer.syllogism` | identical before and after: **×3.7 per level, `std::bad_alloc` at k = 6**. The kernel zeta-reduces `let` by substitution, so binding-site sharing never survives. *(A "×5, k = 8" pair circulated in the docs; that run was never committed — this file's header says so.)* | header `:8–26` |
+| 80 | `Metatheorems/WHyperbolicLemmas.lean` | not a bound — **extensionality of `W`, derived** from (W2)/(W4). The ambient system is only *weakly* extensional, so a space constant is legitimate only if its extensionality follows from the space's own axioms | `W_ext_left`, `W_ext_right`, `W_ext_param`, `W_ext`, all `[propext, Quot.sound]`, at **every** `Allowed`; read back in an arbitrary model | `:973–976`; model demo in `Probes/WHyperbolicLemmasDemo.lean` |
+
+Row 72 and row 65 are the two that change what this document could previously claim, and both
+are struck through in "What it does not show" below.
+
+Row 74 is the sharpest statement of the blocker the project has: on one derivation, at one
+`x*`, with one set of majorants, the witness functional reduces and the premise functional does
+not. Everything else — casts, the proof-mode layer, induction, `.premise`, classicality — has
+been eliminated by measurement.
+
 ## What this shows
 
 * **The extraction pipeline runs end to end and produces kernel-checked literals** — from
@@ -208,10 +245,26 @@ statement. Regenerate the table before showing it; `docs/CLAIMS_AUDIT.md` has th
    (`Dialectica/MonotoneSeq.lean`, the `mfi_memo` set + `mfi_push`), which is what makes rows
    47–48 pass.
 2. **The composition combinators re-evaluate their sub-majorants.** `MRealizer.syllogism`
-   uses its first argument three times on the counter side and neither the kernel nor the
-   compiled evaluator shares them: **≈×5 per nested syllogism** (row 55), dying at depth ≈8,
-   where `prenexify` alone has 134 (row 54) and row 49 is association-sensitive at the cap.
-   This is the Dialectica exponential in its last hiding place and it is route-independent.
+   uses `hAB` three times and `hBC` twice, and neither the kernel nor the compiled evaluator
+   shares them: **×3.7 per nested syllogism, dying at k = 6** (row 79 — the committed
+   measurement; a "×5, k = 8" pair circulated in these documents and came from a run that was
+   never committed). This is the Dialectica exponential in its last hiding place and it is
+   route-independent.
 
-The fix named in both probes is a majorant representation with **explicit sharing**
-(`let`-bound sub-majorants evaluated once). It has not been attempted.
+**Sharpened 2026-09-07 by rows 73–74**, and this is the most precise statement available: on
+one derivation, at one `x*`, with one set of majorants, `mfiV` reduces to `901` in ≈36 s while
+`mfiU` exhausts 12 GB. **The failure is the counter side specifically** — the side where that
+duplication is charged — and *not* depth as such, since the same derivation's witness side goes
+through 66 levels without trouble. Everything else once suspected — casts, the `pm_*` layer,
+induction, `.premise`, classicality — has been eliminated by measurement.
+
+**The `let` fix has been attempted and is refuted** (row 79): the kernel zeta-reduces `let` by
+substitution, so binding-site sharing never survives to the reduction that matters, and the
+compiled evaluator already shares closure results by pointer. A fix must change what is
+*applied* — staged evaluation with per-stage literal reification, or an `MRealizer` whose
+counter component does not call its witness component.
+
+A second, **independent** wall was found the same week and is not this one: the extracted
+*value* (row 69). On a fixed 145-constructor derivation `128` reduces and `256` does not,
+because `recMaj` iterates value-many times unshared. For MCT, whose bound is of order `2^k`,
+that is the nearer of the two.
