@@ -30,6 +30,7 @@ import Metatheorems.Probes.ContentExampleSpace
 import Metatheorems.Probes.NestingDepth
 import Metatheorems.Probes.SharingProbe
 import Metatheorems.Probes.ExprBound
+import Metatheorems.Probes.WExtBoundDemo
 import Metatheorems.Probes.TermPrintDemo
 import Metatheorems.Probes.TinyBoundDemo
 import Metatheorems.Probes.TriangleBoundDemo
