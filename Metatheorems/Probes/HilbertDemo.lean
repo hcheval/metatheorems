@@ -8,8 +8,14 @@ import Metatheorems.Hilbert
 /-!
 # Demo driver for `#hilbert`
 
-Not imported by `Metatheorems.lean`. Building this module regenerates every listing under
-`hilbert-out/`.
+Not imported by `Metatheorems.lean`. Building this module regenerates every listing at the top
+level of `hilbert-out/`.
+
+Every invocation here is at the **default** opacity, and that is the point: this file is the
+regression control for `depth`, which was added on 2026-09-07. Its eight listings are
+byte-identical before and after that change. The `depth`/`keeping` ladder, and what it costs,
+is `Probes/HilbertDepth.lean` — including the finding that `seq_id` alone is what makes the
+proof-mode layer unexpandable.
 -/
 
 namespace Metatheorems
