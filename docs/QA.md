@@ -48,9 +48,11 @@ equations are `closed_subst`-style normalisations the kernel's K-rule has to *re
 layer and turns each cast into an `MRealizer.transportTo` at the kernel-normalised hat type,
 which is what makes `MonotoneMemoGates.d2c_is_3` and `d1c_is_3` pass. The second is not:
 `MRealizer.syllogism` uses its first argument three times on the counter side, and neither the
-kernel nor the compiled evaluator shares the re-evaluations — measured as **≈×5 per nested
-syllogism** (`Probes/ClassicalMfiProbe.lean:100–140`, k=2 140 ms, k=4 3.68 s, k=8 OOM), and
-visible as association-sensitivity in `MonotoneMemoGates.lean:344–378`. The plan is a majorant
+kernel nor the compiled evaluator shares the re-evaluations. The committed measurement is
+**×3.7 per nested syllogism, with `std::bad_alloc` at k = 6** (`Probes/SharingProbe.lean:42–54`
+— an earlier "≈×5, k = 8" pair came from a run that was never committed and should not be
+quoted). It is visible as association-sensitivity in
+`MonotoneMemoGates.lean:344–378`. The plan is a majorant
 representation with explicit sharing — `let`-bound sub-majorants evaluated once. It has not been
 attempted; `ARCHITECTURE.md` §14.7 is the standing statement.
 
@@ -68,8 +70,9 @@ purely universal premise set. But no classical bound reduces: `Probes/LemBoundDe
 records the term-route timeout and `Probes/ClassicalMfiProbe.lean:172–182` the MFI 12 GB
 `bad_alloc`. The cause is **not excluded middle** — `LemBoundDemo.lFinalExt` and `lFinalNoLem`
 are the *same derivation term at two `Allowed` values*, and the extended one reduces
-(`LemBoundDemo.lean:364`, `ClassicalMfiProbe.lean:197`) — it is `prenexify`'s 134 nested
-syllogisms hitting the ×5 of question 3.
+(`LemBoundDemo.lean:364`, `ClassicalMfiProbe.lean:197`) — it is `prenexify`'s composition
+**depth of 9** hitting the per-level growth of question 3. (Its *count* of `syllogism`s is 134;
+that is not the quantity the cost compounds along, and quoting it overstates the gap.)
 
 ### 5. How faithful is this to Kohlenbach?
 

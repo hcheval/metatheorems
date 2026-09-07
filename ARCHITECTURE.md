@@ -941,8 +941,11 @@ at ELABORATION. **But the numeral REDUCTION still OOMs** (gate G-C1/G-C2, `Probe
 `std::bad_alloc` at 12 GB. The first pass attributed this to "`prenexify` + the `¬¬`-combinator
 leaves"; hand-writing every leaf left the OOM unchanged, so that was wrong. Measured with the
 leaves hand-written: `lFinalNoLem` alone through the fused recursion reduces in 37 ms;
-`prenexify` alone (134 `syllogism`s) OOMs; a bare chain of k classical `syllogism`s grows ≈ ×5
-per syllogism (k=2 140 ms, k=4 3.7 s, k=8 OOM). The wall is §14.2's own caveat — MFI does not
+`prenexify` alone OOMs (composition depth 9 — its *count* of `syllogism`s is 134, which is not
+the figure that matters); and a bare chain of k classical `syllogism`s grows geometrically.
+**Quote the committed growth figure, ×3.7 per level with `std::bad_alloc` at k = 6**
+(`Probes/SharingProbe.lean`), not the "≈×5, k = 8" pair that circulated from an uncommitted
+run — see §14.8. The wall is §14.2's own caveat — MFI does not
 remove composition's duplication — realised as the counter-side fan-out of nested `syllogism`s
 under the `¬¬`-combinators, with kernel `whnf` sharing nothing across binder depths. The
 compiled evaluator (`#eval` of the hat-level ℕ) hits the same wall earlier (k ≤ 2 instant,
