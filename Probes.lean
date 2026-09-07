@@ -82,8 +82,12 @@ indices, and after any refactor that touches an inductive's constructors.
 permitted `sorry`; it is a record of a measurement, not something to keep green. Do not add
 it here — that would make this target unusable, which is how the rot started.
 
-**Three others are absent without a stated reason, which is the rot this file exists to
-prevent**: `LemBoundDemo`, `HilbertDepth` and `WExtRung3Scratch`. `LemBoundDemo` in particular
-is cited throughout `docs/RESULTS.md` and `CLAUDE.md` as the record of the classical route's
-cost, and nothing type-checks it. Either add them or say here why not.
+**Two others are absent without a stated reason, which is the rot this file exists to
+prevent**: `HilbertDepth` and `WExtRung3Scratch`. Nothing type-checks either. Add them or say
+here why not.
+
+(`LemBoundDemo` is *not* in the list above but **is** covered, transitively: four listed
+probes import it — `ClassicalMfiProbe`, `BoundLemmasP2`, `SizeProbe`, `NestingDepth`. Coverage
+by transitive import is real but invisible; if a file is meant to stay green, listing it here
+is what says so.)
 -/
