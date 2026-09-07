@@ -179,7 +179,7 @@ def MetricSpaceInterp.toSpaceInterp (m : MetricSpaceInterp) :
 -- ============================================================================
 
 /-! `Rounding.lean` proves Lemma 17.8 parts (2),(3),(5),(6); part (4) was blocked there
-because it mentions `s-maj₁`, which lives in `StrongMajorizability.lean`. With the two-clause
+because it mentions `s-maj₁`, which lives in `MajorizabilityRel.lean`. With the two-clause
 `bezemMaj` (2026-09-02) it is a corollary of (2) and (3): at type `1 = nat →ₜ nat` the
 relation unfolds to a *pair* of monotonicity statements, and (3) discharges the
 self-majorization one outright. -/

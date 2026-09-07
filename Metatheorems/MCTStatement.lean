@@ -91,7 +91,14 @@ example : (mctC₀ (F := F) (ι := ι)).isVFree = true := rfl
 
 /-! ## Does it actually fit `general_metatheorem`?
 
-If this elaborates, the shape is right: the only remaining input is the derivation. -/
+If this elaborates, the shape is right: the only remaining input is the derivation.
+
+**Note what this does and does not establish, because `general_metatheorem` is VESTIGIAL**
+— its `Majorizability` argument is uninhabitable (quarantine section of
+`MajorizabilityRel.lean`), so no instantiation of this `example` can ever be run. It is a
+*shape* check and remains a valid one: the statement's fit is a property of the statement,
+and the hypotheses being unsatisfiable does not make the elaboration vacuous. The live
+route for this statement is `mct_bound_p2` / `mct_bound_p2_at`. -/
 
 example
     {X : ι → Type} (si : SpaceInterp X F)

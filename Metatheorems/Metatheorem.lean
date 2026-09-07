@@ -3,7 +3,7 @@ Copyright (c) 2026. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Horatiu
 -/
-import Metatheorems.StrongMajorizability
+import Metatheorems.MajorizabilityRel
 import Metatheorems.NDTranslation
 
 
@@ -66,7 +66,8 @@ theorem dialecticaMatrix_iff_interpFormula
 /-- **General Metatheorem** (Theorem 6.1), Dialectica step.
 
 **VESTIGIAL — cannot be applied.** It takes a `Majorizability`, i.e. a *total* majorizer, and
-that structure has no instances and cannot have any (see its docstring for the refutation).
+that structure has no instances and cannot have any (the refutation is in the quarantine
+section at the bottom of `MajorizabilityRel.lean`).
 Kept as the faithful transcription of the document's Def. 6.0.1. **Use
 `syntactic_general_metatheorem`**, which needs only `AbstractMajorizability` and gets the
 majorants free from `all_closed_terms_majorizable`.
@@ -697,6 +698,12 @@ def general_metatheorem_classical
 -- ============================================================================
 
 /-- **Core of the General Metatheorem** (Theorem 6.1).
+
+**VESTIGIAL — cannot be applied**, and easy to mistake for the live one. It takes a
+`Majorizability` (the uninhabitable total majorizer; see the quarantine section of
+`MajorizabilityRel.lean`). **The live core is `metatheorem_core_of_majorants` below**, which
+takes only a `MajorizabilityRel` plus explicit majorants and is what every current entry
+point calls. The two names differ by a suffix and nothing else, so check which one you have.
 
 Given semantic witness functions `U V : Ty.interpret X ρ → ℕ` satisfying
 `∀x, B(x, U(x)) → C(x, V(x))` (the "extracted content" from the

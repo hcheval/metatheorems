@@ -9,27 +9,48 @@ import Metatheorems.Semantics
 namespace Metatheorems
 
 /-!
-# Strong Majorizability (total majorizer)
+# Majorizability, as a relation on semantic values
 
-This file defines the "strong" version of majorizability where every semantic
-value is majorizable (via a total `majorizer` function), following the Lean 3
-formalization. This is stronger than `AbstractMajorizability` (which only
-guarantees constants are majorizable), but is the natural assumption for
-the general metatheorem.
+The majorization relation `≽ᵃ` on the semantic type structure, and the structural lemmas
+about it. **Nothing here mentions `Term`** — that is the boundary against
+`Majorizability.lean`, which holds the recursion over terms (`termMajorizer`,
+`all_terms_majorizable`, `closedMajorizer`) and the per-constant data
+(`AbstractMajorizability`, `ConstMajorants`). This file is what that one is stated in
+terms of; it imports `Semantics` and nothing else.
 
-## Main Definitions
+## Main definitions
 
-* `Majorizability` — structure with a total majorizer on all semantic values
+* `MajorizabilityRel` — the relation plus the two properties the metatheorem uses
+  (respects `≥` on ℕ, respects application). Inhabited, by `bezemRel`.
+* `hatMaj` — `≽ᵃ_ρ̂`, the relation restricted to hat types; purely type-directed, no `base`
+* `bezemMaj` — Bezem's `≽ᵃ`, the concrete relation the whole space tower rests on
+* `maxT` — pointwise maximum at hat types, with its `hatMaj`/`bezemMaj` compatibility
+  lemmas; this is what `MaxCompat` and the MFI normal forms are built from
+
+## Quarantined at the bottom of this file
+
+* `Majorizability` — the total-majorizer structure. **Uninhabitable**; kept as a recorded
+  finding about the reference document's Def. 6.0.1, not as usable API. See the section
+  header there before building on it.
+
+## Renamed 2026-09-07
+
+This file was `StrongMajorizability.lean`. The old name advertised `Majorizability` — the
+one dead declaration in it — while the live content is the relation and its lemmas, which
+the metric, W-hyperbolic, CAT(0) and normed models all depend on. The old header also
+claimed the total majorizer was "the natural assumption for the general metatheorem",
+which is the 2025 design and is exactly what the uninhabitability argument refutes.
 -/
 
 -- ============================================================================
--- Majorizability (strong version with total majorizer)
+-- The majorizability relation
 -- ============================================================================
 
 /-- The majorizability *relation* and the two properties the metatheorem uses.
 
-This is everything `metatheorem_core` needs apart from the majorants themselves, and
-unlike `Majorizability` below it is inhabited — see `bezemRel`. -/
+This is everything `metatheorem_core_of_majorants` needs apart from the majorants
+themselves, and unlike `Majorizability` at the bottom of this file it is inhabited — see
+`bezemRel`. Conditions 1–2 of the document's Def. 6.0.1. -/
 structure MajorizabilityRel {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) where
   /-- The majorizability relation at type ρ: `maj ρ x_star x` means x* ≥*_ρ x. -/
@@ -41,40 +62,6 @@ structure MajorizabilityRel {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     {f_star : Ty.interpret X (ρ →ₜ τ).hat} {f : Ty.interpret X (ρ →ₜ τ)}
     {x_star : Ty.interpret X ρ.hat} {x : Ty.interpret X ρ},
     maj (ρ →ₜ τ) f_star f → maj ρ x_star x → maj τ (f_star x_star) (f x)
-
-/-- Majorizability with a total majorizer on all semantic values.
-
-**VESTIGIAL — this structure has no instances and cannot have any.** It is kept because it is
-the faithful transcription of the document's Def. 6.0.1 and matches the Lean 3 formalization,
-so the fact that it is uninhabitable is a finding *about that presentation*, worth recording
-rather than deleting. But nothing in the project constructs one, and the two metatheorems that
-take it (`general_metatheorem`, `general_metatheorem_classical`) are consequently inapplicable
-and are themselves vestigial.
-
-**The live route is the syntactic one.** Since the `syntactic-witnesses` merge (2026-09-01) the
-Dialectica witness/counter *types* are object-level `Ty ι`, so realizers are closed `Term`s and
-`all_closed_terms_majorizable` produces their majorants outright. That needs only
-`AbstractMajorizability` (inhabited by `bezemAbstract`) and no total majorizer at all. Use
-`syntactic_general_metatheorem` / `syntactic_general_metatheorem_classical`; both metric
-metatheorems already do.
-
-This is the "strong" version: instead of proving each constant is majorizable
-and deriving closed terms, we directly assume every element of the type
-structure has a majorant.
-
-**Caution.** Over the full set-theoretic type structure the `majorizer` field is not
-satisfiable for any relation that is genuinely a majorization: at type `(nat →ₜ nat) →ₜ nat`
-one would need, for each `Φ`, a `Φ*` with `Φ* f* ≥ Φ f` whenever `f*` majorizes `f`; taking
-`f* = id` the majorized `f` range over all `f` with `f n ≤ n`, an infinite set on which an
-arbitrary `Φ` is unbounded. Degenerate choices (e.g. `maj := Eq` when `ρ.hat = ρ`) do satisfy
-it, but then the bound depends on `x` itself and carries no uniformity. Prefer
-`MajorizabilityRel` plus explicit majorants — `metatheorem_core_of_majorants`. -/
-structure Majorizability {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
-    (si : SpaceInterp X F) extends MajorizabilityRel si where
-  /-- Total majorizer: every semantic value has a majorant. -/
-  majorizer : {ρ : Ty ι} → Ty.interpret X ρ → Ty.interpret X ρ.hat
-  /-- The majorizer actually majorizes. -/
-  majorizer_maj : ∀ {ρ : Ty ι} (x : Ty.interpret X ρ), maj ρ (majorizer x) x
 
 -- ============================================================================
 -- The Bezem relation: a concrete `MajorizabilityRel`
@@ -218,7 +205,7 @@ theorem bezemMaj_of_hatMaj {base : (i : ι) → Nat → X i → Prop} (hbase : B
 end BezemLemmas
 
 /-- `bezemMaj` satisfies the two properties the metatheorem uses. Both come from the *first*
-conjunct, which is why the widening leaves `general_metatheorem` untouched. -/
+conjunct, which is why the widening left the vestigial `general_metatheorem` untouched. -/
 def bezemRel {ι κ : Type} {X : ι → Type} {F : κ → Ty ι} (si : SpaceInterp X F)
     (base : (i : ι) → Nat → X i → Prop) : MajorizabilityRel si where
   maj := bezemMaj base
@@ -328,5 +315,60 @@ theorem maxT_bezemMaj_left {base : (i : ι) → Nat → X i → Prop} (hbase : B
     exact ⟨ihρ _ _ _ h₁.1 h₂.1, ihτ _ _ _ h₁.2 h₂.2⟩
 
 end MaxT
+
+-- ============================================================================
+-- ⚠ QUARANTINE — the total majorizer. Uninhabitable. Do not build on it.
+-- ============================================================================
+
+/-!
+## The 2025 design, kept as a recorded finding
+
+`Majorizability` below is the faithful transcription of the reference document's
+Def. 6.0.1 with a *total* majorizer, and matches the Lean 3 formalization. **It has no
+instances and cannot have any.** It is kept, rather than deleted, because its
+uninhabitability is a finding *about that presentation* — and because the docstrings of
+`SyntacticMetatheorem.lean` and `MetricSpaces.lean` explain the live design by contrast
+with it.
+
+**Nothing may be built on it.** The three declarations that take one —
+`metatheorem_core`, `general_metatheorem`, `general_metatheorem_classical`
+(`Metatheorem.lean`), plus the `example` at `MCTStatement.lean:96` — are inapplicable for
+the same reason and are labelled there.
+
+**Why it is uninhabitable, in one line.** `majorizer` quantifies over `Ty.interpret X ρ`,
+the *full set-theoretic* type structure, which is uncountable and contains non-definable
+functionals. At `(nat →ₜ nat) →ₜ nat`, take `f* = id`; the `f` it majorizes range over all
+`f` with `f n ≤ n`, and on that set `Φ f := the least n ≥ 1 with f n = 0, else 0` is
+unbounded — witnessed by `fₖ n := if n = k then 0 else n`. So no `Φ*` exists. Degenerate
+choices (e.g. `maj := Eq` where `ρ.hat = ρ`) do satisfy the field, but then the bound
+depends on `x` itself and carries no uniformity, which is the entire point.
+
+**This is not a defect of the semantic route as such.** `all_terms_majorizable` quantifies
+over `Term F Γ ρ` — countable syntax, every element definable — and goes through. That
+contrast (semantic values vs. terms) is the resolution, and it is written out in
+`all_terms_majorizable`'s docstring. The monotone functional interpretation reaches the
+same place differently: it carries no witness at all, only a majorant with its condition.
+
+**The live route.** Since the `syntactic-witnesses` merge (2026-09-01) the Dialectica
+witness/counter *types* are object-level `Ty ι`, so realizers are closed `Term`s and
+`all_closed_terms_majorizable` produces their majorants outright. That needs only
+`AbstractMajorizability` (inhabited by `bezemAbstract`) and no total majorizer at all. Use
+`syntactic_general_metatheorem` / `syntactic_general_metatheorem_classical`, or the MFI
+entry points; both metric metatheorems already do.
+-/
+
+/-- Majorizability with a total majorizer on all semantic values.
+
+**VESTIGIAL — this structure has no instances and cannot have any.** Read the quarantine
+note above this declaration before using it; the short version is that `majorizer` ranges
+over the full set-theoretic type structure, where an arbitrary functional is unbounded on
+the set a single majorant must cover. Prefer `MajorizabilityRel` plus explicit majorants
+(`metatheorem_core_of_majorants`), or the syntactic / MFI entry points. -/
+structure Majorizability {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
+    (si : SpaceInterp X F) extends MajorizabilityRel si where
+  /-- Total majorizer: every semantic value has a majorant. -/
+  majorizer : {ρ : Ty ι} → Ty.interpret X ρ → Ty.interpret X ρ.hat
+  /-- The majorizer actually majorizes. -/
+  majorizer_maj : ∀ {ρ : Ty ι} (x : Ty.interpret X ρ), maj ρ (majorizer x) x
 
 end Metatheorems

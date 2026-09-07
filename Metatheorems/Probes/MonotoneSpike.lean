@@ -22,7 +22,7 @@ used to define — `MRealizer`, `MaxCompat`, the nine combinators, `monotone_spi
 `mfiV`, `maxT_comm`, `bezemMaxCompat` — now lives in `Metatheorems/Dialectica/Monotone.lean`
 (`monotone_soundness`, every constructor, no fallback), `Metatheorems/Majorizability.lean`
 (`MaxCompat`'s three facts are fields of `AbstractMajorizability`, discharged in
-`bezemAbstract` from a `BaseMono` hypothesis) and `Metatheorems/StrongMajorizability.lean`
+`bezemAbstract` from a `BaseMono` hypothesis) and `Metatheorems/MajorizabilityRel.lean`
 (`maxT_comm`). This file keeps its header as the record of the spike, and **re-runs its
 gate against the library recursion** — same statements, same numbers, same normal forms —
 so that nothing regressed in the move. The full-recursion gate G1 (`tFinalTwice`, a genuine
