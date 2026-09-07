@@ -28,20 +28,33 @@ per constant, so the user discharges named goals in ordinary Lean and gets `spre
 ## Syntax
 
 ```
+/-- A doc comment here is allowed, and ignored. -/
 theory Foo
   index MetricSpace.ι                        -- optional; see "Two modes" below
   types X := xTy
   types R := realTy MetricSpace.ι
+  abbrev d := Term.dist ()                   -- a syntactic alias for axiom bodies
   constants W : X →ₜ X →ₜ R →ₜ X
   axioms W1 (z x y : X) (l : R) : <body>
   axioms W2 (x y : X)           : <body>
 endtheory
 ```
 
-One keyword per item; items may appear in any order, except that `index` and the `types` it
-governs must precede anything that mentions them.  The four keywords `index`, `types`,
-`constants`, `axioms` become parser tokens in every file that imports this module, so they
-cannot be used as identifiers there.
+One keyword per item; items may appear in any order, except that `index`, `types` and
+`abbrev` must precede anything that mentions them.  The three keywords `index`, `types` and
+`constants` become parser tokens in every file that imports this module, so they cannot be
+used as identifiers there; `abbrev` and `axioms` reuse tokens Lean already has.  **This is
+why `Theory.lean` is deliberately not imported by `Metatheorems.lean`** — putting it in the
+umbrella would make those three words keywords for the whole project.
+
+### `abbrev` items
+
+`abbrev n := e` is a *syntactic* alias, not a declaration: `n` is replaced by `(e)` wherever
+it occurs in a later axiom body (parenthesised, so a multi-token right-hand side is safe in
+an application spine).  It exists for the things an axiom body wants short that are not
+function constants — above all the structural metric `Term.dist i` and the base points
+`Term.zeroX i`, which are `Term` constructors rather than elements of the signature and so
+get no generated `abbrev`.
 
 ### Two modes for the index type `ι`
 
@@ -63,7 +76,8 @@ of syntax:
 
 * each binder name by its de Bruijn variable (`z ↦ Term.var (Var.vs (Var.vs Var.vz))`, …),
 * each declared type name by `Foo.<name>`,
-* each declared constant name by `Foo.<name>`.
+* each declared constant name by `Foo.<name>`,
+* each `abbrev` alias by its parenthesised right-hand side.
 
 So the body reads with **named variables**, and the index arithmetic — the single largest
 source of mistakes in the hand-written space files — is done by the command.  Binder names

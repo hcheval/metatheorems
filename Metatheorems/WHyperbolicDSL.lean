@@ -38,58 +38,61 @@ is a real cost of generating a fresh `κ`, and the reason a future version of th
 should be able to take an existing signature instead of generating one.
 -/
 
+set_option linter.style.emptyLine false
+
 namespace Metatheorems
 
 open Formula
 
--- W-hyperbolic spaces: `ι = MetricSpace.ι`, one constant `W : X →ₜ X →ₜ ℝ →ₜ X`, the four
--- axioms of `WHyperbolic.lean` at `clamp01 λ`.
---
--- Compare the original: the block below replaces `WHyperbolic.lean` lines 62–208, and it
--- contains no de Bruijn index at all.
+/-- W-hyperbolic spaces: `ι = MetricSpace.ι`, one constant `W : X →ₜ X →ₜ ℝ →ₜ X`, the four
+axioms of `WHyperbolic.lean` at `clamp01 λ`.
+
+This block replaces `WHyperbolic.lean` lines 62–208 and contains **no de Bruijn index at
+all** — the binder names `z x y λ` are written where the original writes
+`.var (.vs (.vs (.vs .vz)))`. -/
 theory WHypDSL
   index MetricSpace.ι
   types X := xTy
   types R := realTy MetricSpace.ι
 
+  abbrev d := Term.dist ()
+  abbrev clamp := Term.clamp01
+
   constants W : X →ₜ X →ₜ R →ₜ X
 
   axioms W1 (z x y : X) (l : R) :
     le_R_pu
-      (Term.app2 (Term.dist ()) z (Term.app3 W x y (.app Term.clamp01 l)))
+      (Term.app2 d z (Term.app3 W x y (.app clamp l)))
       (Term.app2 Term.add_R
         (Term.app2 Term.mul_R
-          (Term.app2 Term.sub_R Term.one_R (.app Term.clamp01 l))
-          (Term.app2 (Term.dist ()) z x))
-        (Term.app2 Term.mul_R (.app Term.clamp01 l)
-          (Term.app2 (Term.dist ()) z y)))
+          (Term.app2 Term.sub_R Term.one_R (.app clamp l))
+          (Term.app2 d z x))
+        (Term.app2 Term.mul_R (.app clamp l) (Term.app2 d z y)))
 
   axioms W2 (x y : X) (l m : R) :
     eq_R
-      (Term.app2 (Term.dist ())
-        (Term.app3 W x y (.app Term.clamp01 l))
-        (Term.app3 W x y (.app Term.clamp01 m)))
+      (Term.app2 d
+        (Term.app3 W x y (.app clamp l))
+        (Term.app3 W x y (.app clamp m)))
       (Term.app2 Term.mul_R
-        (.app Term.abs_R
-          (Term.app2 Term.sub_R (.app Term.clamp01 l) (.app Term.clamp01 m)))
-        (Term.app2 (Term.dist ()) x y))
+        (.app Term.abs_R (Term.app2 Term.sub_R (.app clamp l) (.app clamp m)))
+        (Term.app2 d x y))
 
   axioms W3 (x y : X) (l : R) :
     eqAtType X
-      (Term.app3 W x y (.app Term.clamp01 l))
-      (Term.app3 W y x (Term.app2 Term.sub_R Term.one_R (.app Term.clamp01 l)))
+      (Term.app3 W x y (.app clamp l))
+      (Term.app3 W y x (Term.app2 Term.sub_R Term.one_R (.app clamp l)))
 
   axioms W4 (x y z w : X) (l : R) :
     le_R_pu
-      (Term.app2 (Term.dist ())
-        (Term.app3 W x z (.app Term.clamp01 l))
-        (Term.app3 W y w (.app Term.clamp01 l)))
+      (Term.app2 d
+        (Term.app3 W x z (.app clamp l))
+        (Term.app3 W y w (.app clamp l)))
       (Term.app2 Term.add_R
         (Term.app2 Term.mul_R
-          (Term.app2 Term.sub_R Term.one_R (.app Term.clamp01 l))
-          (Term.app2 (Term.dist ()) x y))
-        (Term.app2 Term.mul_R (.app Term.clamp01 l)
-          (Term.app2 (Term.dist ()) z w)))
+          (Term.app2 Term.sub_R Term.one_R (.app clamp l))
+          (Term.app2 d x y))
+        (Term.app2 Term.mul_R (.app clamp l) (Term.app2 d z w)))
 endtheory
 
 -- ============================================================================
