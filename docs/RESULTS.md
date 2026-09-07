@@ -22,8 +22,11 @@ Two conventions used throughout:
 * `U` = the bound on the premise variable of `∀x(∀u B → ∃v C)` — *how far into the assumption
   the proof reaches*. `V` = the bound on the existential witness. `Φ = coreBound U V`, which
   is `max` of the two at the given `x*`.
-* Every numeral is checked by a **refutation control** (`n ± 1 ≠ …`), because a `rfl` whose
-  two sides stall at the same point looks like a success (`CLAUDE.md` note 12).
+* Almost every numeral is checked by a **refutation control** (`n ± 1 ≠ …`), because a `rfl`
+  whose two sides stall at the same point looks like a success. Two exceptions, so that the
+  convention is not read as a universal: `Probes/TinyBoundDemo.lean` (rows 1–2) contains no
+  refutation theorem at all, and `Probes/WBoundDemo.lean` has one for four numerals
+  (rows 3–6). See `docs/CLAIMS_AUDIT.md` item 8.
 
 ---
 
