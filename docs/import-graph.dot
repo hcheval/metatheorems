@@ -1,0 +1,287 @@
+// Import graph of the Metatheorems library (the modules reachable from the
+// `Metatheorems` umbrella, plus the tooling modules that import it).
+//
+// Edge  A -> B  means  A's source contains `import B`, i.e. B is BELOW A.
+// Rendered with:  dot -Tsvg docs/import-graph.dot -o docs/import-graph.svg
+// Regenerate the edge list with:
+//   grep -rHn '^import ' --include='*.lean' Metatheorems Metatheorems.lean
+//
+// Probes and demos are in docs/import-graph-probes.dot, so this one stays the
+// library proper. External imports (Mathlib, Lean, Std) are listed in a comment
+// below rather than drawn, since drawing them stretches the layout for no information.
+
+digraph Metatheorems {
+  rankdir = BT;
+  graph [fontname="Helvetica", fontsize=11, compound=true, ranksep=0.55, nodesep=0.25,
+         labelloc="t", label="Metatheorems — import graph (arrows point at what a module DEPENDS ON)"];
+  node  [fontname="Helvetica", fontsize=10, shape=box, style="rounded,filled",
+         fillcolor="white", color="#666666", height=0.3, margin="0.10,0.05"];
+  edge  [color="#888888", arrowsize=0.6];
+
+  // ---------------------------------------------------------------- kernel
+  subgraph cluster_kernel {
+    label = "kernel — syntax and proof system";
+    style = "filled"; fillcolor = "#eef4fb"; color = "#9dbde0";
+    node [fillcolor="#dbe8f7"];
+    TypeSystem; Term; Subst; Language; EqAtType; Derivable; Semantics; SimpSets;
+  }
+
+  // ------------------------------------------------------------ term layer
+  subgraph cluster_terms {
+    label = "object-level terms";
+    style = "filled"; fillcolor = "#f3f0fa"; color = "#b4a8d8";
+    node [fillcolor="#e5dff5"];
+    "Terms.Arith"; "Terms.Rational"; "Terms.Real"; "Terms.ClosedSubst";
+  }
+
+  // ---------------------------------------------------------- logic lemmas
+  subgraph cluster_logic {
+    label = "logical combinators";
+    style = "filled"; fillcolor = "#eef8f0"; color = "#9fce9f";
+    node [fillcolor="#dcf0de"];
+    PropositionalLemmas; PureFOLLemmas; Arithmetic; NegTrans;
+  }
+
+  // ------------------------------------------------------------- proofmode
+  subgraph cluster_pm {
+    label = "ProofMode";
+    style = "filled"; fillcolor = "#fdf3e8"; color = "#e0b98a";
+    node [fillcolor="#fae3c9"];
+    "PM.Packing"; "PM.Pretty"; "PM.Display"; "PM.Induction"; "PM.Linter";
+    "PM.Tactics"; "PM.Rewrite"; "PM.Arith";
+  }
+
+  // ------------------------------------------------------------ dialectica
+  subgraph cluster_dial {
+    label = "Dialectica + monotone functional interpretation";
+    style = "filled"; fillcolor = "#fbeef2"; color = "#dda3b6";
+    node [fillcolor="#f7dde5"];
+    "Dial.Defs"; "Dial.Lemmas"; "Dialectica"; "Dial.Syntactic";
+    "Dial.Monotone"; "Dial.MonotoneMemo"; "Dial.MonotoneNDLeaves";
+    "Dial.MonotoneND"; "Dial.MfiMemoAttr"; "Dial.MonotoneSeq";
+    NDTranslation;
+  }
+
+  // --------------------------------------------------------- metatheorems
+  subgraph cluster_meta {
+    label = "the metatheorems";
+    style = "filled"; fillcolor = "#fdf7db"; color = "#d8c86a";
+    node [fillcolor="#f8f0bd"];
+    MajorizabilityRel; Majorizability; Metatheorem; SyntacticMetatheorem;
+    MonotoneMetatheorem; MonotoneMetatheoremClassical; Soundness;
+  }
+
+  // -------------------------------------------------------------- numbers
+  subgraph cluster_num {
+    label = "ℚ / ℝ tower and the evaluation bridge";
+    style = "filled"; fillcolor = "#eef6f8"; color = "#8fc0cd";
+    node [fillcolor="#d8ecf2"];
+    RationalNumbers;
+    "R.Defs"; "R.Cauchyfy"; "R.QBounds"; "R.Estimates"; "R.Bounds"; "R.Field";
+    "R.Negation"; "R.Mul"; "R.OrderBounds"; "R.Approx"; "R.Order"; "R.LeOrder";
+    "R.Metric"; "R.Interval"; "R.MCTLemmas"; RealNumbers;
+    Rounding; QVal; QValBridge; QValBridgeMul; CodeReal; CodeRealOps; BaseEquality;
+  }
+
+  // --------------------------------------------------------------- spaces
+  subgraph cluster_spaces {
+    label = "space tower";
+    style = "filled"; fillcolor = "#f0f7ee"; color = "#a9c98f";
+    node [fillcolor="#dfeed6"];
+    MetricSpaces; MetricTransfer; WHyperbolic; WHyperbolicLemmas; CAT0; Normed;
+    Instances; Theory; WHyperbolicDSL; TheoryDemo;
+  }
+
+  // ------------------------------------------------------- MCT statements
+  subgraph cluster_mct {
+    label = "MCT — statements and derivations";
+    style = "filled"; fillcolor = "#f7f0f7"; color = "#c39cc3";
+    node [fillcolor="#eddfed"];
+    MCTStatement; "PM.MCT"; "PM.MCTLazy"; RealMCTStatement; "PM.RealMCT";
+  }
+
+  // -------------------------------------------------------------- tooling
+  subgraph cluster_tool {
+    label = "umbrella + tooling";
+    style = "filled"; fillcolor = "#f2f2f2"; color = "#aaaaaa";
+    node [fillcolor="#e4e4e4"];
+    "Metatheorems (umbrella)"; Hilbert; Headline; TermPretty;
+  }
+
+  // External imports are NOT drawn: they are edges from everywhere to one node, which
+  // stretches the layout across the page for no information. For the record, the only
+  // modules that import outside the project are
+  //   Mathlib      — Semantics, CodeReal, Normed
+  //   Lean / Std   — SimpSets, Dial.MfiMemoAttr, PM.Pretty, PM.Display, TermPretty
+
+  // ================================================================ edges
+  // kernel
+  Term -> TypeSystem;
+  Subst -> Term;
+  Language -> Subst;
+  EqAtType -> "Terms.ClosedSubst";
+  Derivable -> EqAtType;
+  Semantics -> Language;
+
+  // terms
+  "Terms.Arith" -> Term;
+  "Terms.Rational" -> "Terms.Arith";
+  "Terms.Real" -> "Terms.Rational";
+  "Terms.Real" -> Language;
+  "Terms.ClosedSubst" -> "Terms.Real";
+  "Terms.ClosedSubst" -> SimpSets;
+
+  // logic
+  PropositionalLemmas -> Derivable;
+  PureFOLLemmas -> Derivable;
+  PureFOLLemmas -> PropositionalLemmas;
+  Arithmetic -> Derivable;
+  Arithmetic -> PropositionalLemmas;
+  Arithmetic -> PureFOLLemmas;
+  Arithmetic -> SimpSets;
+  Arithmetic -> "Terms.Arith";
+  NegTrans -> Derivable;
+  NegTrans -> PropositionalLemmas;
+  NegTrans -> PureFOLLemmas;
+  NegTrans -> Arithmetic;
+  NegTrans -> "PM.Tactics";
+
+  // proof mode
+  "PM.Packing" -> PureFOLLemmas;
+  "PM.Pretty" -> Language;
+  "PM.Display" -> "PM.Packing";
+  "PM.Display" -> "PM.Pretty";
+  "PM.Induction" -> "PM.Packing";
+  "PM.Linter" -> "PM.Packing";
+  "PM.Tactics" -> "PM.Display";
+  "PM.Tactics" -> "PM.Induction";
+  "PM.Tactics" -> "PM.Linter";
+  "PM.Rewrite" -> Arithmetic;
+  "PM.Rewrite" -> "PM.Tactics";
+  "PM.Arith" -> Arithmetic;
+  "PM.Arith" -> "PM.Tactics";
+  "PM.Arith" -> "PM.Rewrite";
+
+  // dialectica
+  "Dial.Defs" -> Semantics;
+  "Dial.Defs" -> Derivable;
+  "Dial.Lemmas" -> "Dial.Defs";
+  Dialectica -> "Dial.Defs";
+  Dialectica -> "Dial.Lemmas";
+  NDTranslation -> Dialectica;
+  NDTranslation -> NegTrans;
+  "Dial.Syntactic" -> "Dial.Defs";
+  "Dial.Syntactic" -> "Dial.Lemmas";
+  "Dial.Syntactic" -> Majorizability;
+  "Dial.Syntactic" -> Arithmetic;
+  "Dial.Monotone" -> "Dial.Syntactic";
+  "Dial.MonotoneMemo" -> "Dial.Monotone";
+  "Dial.MonotoneNDLeaves" -> "Dial.MonotoneMemo";
+  "Dial.MonotoneND" -> "Dial.MonotoneMemo";
+  "Dial.MonotoneND" -> "Dial.MonotoneNDLeaves";
+  "Dial.MonotoneND" -> NegTrans;
+  "Dial.MonotoneSeq" -> "Dial.MfiMemoAttr";
+  "Dial.MonotoneSeq" -> "Dial.MonotoneMemo";
+  "Dial.MonotoneSeq" -> "PM.Tactics";
+  "Dial.MonotoneSeq" -> "PM.Rewrite";
+
+  // metatheorems
+  MajorizabilityRel -> Semantics;
+  Majorizability -> Semantics;
+  Majorizability -> MajorizabilityRel;
+  Metatheorem -> MajorizabilityRel;
+  Metatheorem -> NDTranslation;
+  SyntacticMetatheorem -> Metatheorem;
+  SyntacticMetatheorem -> "Dial.Syntactic";
+  MonotoneMetatheorem -> SyntacticMetatheorem;
+  MonotoneMetatheorem -> "Dial.Monotone";
+  MonotoneMetatheoremClassical -> "Dial.MonotoneND";
+  MonotoneMetatheoremClassical -> MonotoneMetatheorem;
+  MonotoneMetatheoremClassical -> SyntacticMetatheorem;
+  Soundness -> Metatheorem;
+
+  // numbers
+  RationalNumbers -> Arithmetic;
+  RationalNumbers -> "PM.Rewrite";
+  RationalNumbers -> "Terms.Rational";
+  "R.Defs" -> RationalNumbers;
+  "R.Defs" -> "Terms.Real";
+  "R.Cauchyfy" -> "R.Defs";
+  "R.QBounds" -> RationalNumbers;
+  "R.Estimates" -> "R.Cauchyfy";
+  "R.Bounds" -> "R.Estimates";
+  "R.Bounds" -> "R.QBounds";
+  "R.Field" -> "R.Estimates";
+  "R.Negation" -> "R.Field";
+  "R.Mul" -> "R.Negation";
+  "R.Mul" -> "R.Bounds";
+  "R.OrderBounds" -> "R.Mul";
+  "R.Approx" -> "R.Negation";
+  "R.Approx" -> "R.Bounds";
+  "R.Order" -> "R.OrderBounds";
+  "R.LeOrder" -> "R.Order";
+  "R.LeOrder" -> "R.Approx";
+  "R.Metric" -> "R.Field";
+  "R.Metric" -> "R.Bounds";
+  "R.Metric" -> "R.Approx";
+  "R.Interval" -> "R.OrderBounds";
+  "R.Interval" -> "R.Bounds";
+  "R.MCTLemmas" -> "R.LeOrder";
+  RealNumbers -> "R.Defs"; RealNumbers -> "R.Cauchyfy"; RealNumbers -> "R.QBounds";
+  RealNumbers -> "R.Estimates"; RealNumbers -> "R.Bounds"; RealNumbers -> "R.Field";
+  RealNumbers -> "R.Negation"; RealNumbers -> "R.Mul"; RealNumbers -> "R.OrderBounds";
+  RealNumbers -> "R.Approx"; RealNumbers -> "R.Order"; RealNumbers -> "R.LeOrder";
+  RealNumbers -> "R.Metric"; RealNumbers -> "R.Interval"; RealNumbers -> "R.MCTLemmas";
+  BaseEquality -> RealNumbers;
+  Rounding -> Semantics;
+  QVal -> Rounding;
+  QValBridge -> QVal;
+  QValBridge -> "Terms.Real";
+  QValBridgeMul -> QValBridge;
+  CodeReal -> QValBridge;
+  CodeRealOps -> QValBridgeMul;
+  CodeRealOps -> CodeReal;
+  CodeRealOps -> "R.Interval";
+
+  // spaces
+  MetricSpaces -> Semantics; MetricSpaces -> Derivable; MetricSpaces -> RealNumbers;
+  MetricSpaces -> Rounding; MetricSpaces -> QValBridge; MetricSpaces -> Majorizability;
+  MetricSpaces -> SyntacticMetatheorem; MetricSpaces -> Soundness;
+  MetricTransfer -> MetricSpaces;
+  WHyperbolic -> MetricTransfer; WHyperbolic -> CodeReal; WHyperbolic -> CodeRealOps;
+  WHyperbolic -> BaseEquality;
+  WHyperbolicLemmas -> WHyperbolic;
+  CAT0 -> WHyperbolic;
+  Normed -> MetricTransfer; Normed -> CodeReal; Normed -> CodeRealOps;
+  Instances -> CAT0; Instances -> Normed;
+  Theory -> SyntacticMetatheorem; Theory -> Majorizability;
+  WHyperbolicDSL -> Theory; WHyperbolicDSL -> WHyperbolic;
+  TheoryDemo -> Theory; TheoryDemo -> MetricSpaces;
+
+  // MCT
+  MCTStatement -> Arithmetic; MCTStatement -> Metatheorem;
+  "PM.MCT" -> MCTStatement; "PM.MCT" -> "PM.Arith"; "PM.MCT" -> SyntacticMetatheorem;
+  "PM.MCTLazy" -> "PM.MCT";
+  RealMCTStatement -> SyntacticMetatheorem; RealMCTStatement -> RealNumbers;
+  RealMCTStatement -> CodeRealOps;
+  "PM.RealMCT" -> RealMCTStatement; "PM.RealMCT" -> RealNumbers; "PM.RealMCT" -> "PM.Arith";
+
+  // umbrella + tooling
+  // Metatheorems.lean lists 45 imports; only the maximal ones are drawn (the rest are
+  // implied transitively). Not implied, and worth knowing: it also imports five PROBES
+  // directly — Probes.P1, .R1, .RwBase, .RwArrow, .GeneralMatricesDemo — so those five
+  // ARE covered by a plain `lake build` while every other probe is not.
+  "Metatheorems (umbrella)" -> MonotoneMetatheoremClassical;
+  "Metatheorems (umbrella)" -> "Dial.MonotoneSeq";
+  "Metatheorems (umbrella)" -> Instances;
+  "Metatheorems (umbrella)" -> WHyperbolicLemmas;
+  "Metatheorems (umbrella)" -> Soundness;
+  "Metatheorems (umbrella)" -> BaseEquality;
+  "Metatheorems (umbrella)" -> CodeRealOps;
+  "Metatheorems (umbrella)" -> "PM.MCTLazy";
+  "Metatheorems (umbrella)" -> "PM.RealMCT";
+  "Metatheorems (umbrella)" -> MetricTransfer;
+  Hilbert -> "Metatheorems (umbrella)";
+  Headline -> "Metatheorems (umbrella)";
+  TermPretty -> Term;
+}

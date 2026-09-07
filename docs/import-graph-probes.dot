@@ -1,0 +1,176 @@
+// Import graph of the Probes / Demo / Reference layer.
+//
+// Edge  A -> B  means  A's source contains `import B`.
+// Library modules appear as grey entry points only — their own dependencies are in
+// docs/import-graph.dot.  Rendered with:
+//   dot -Tsvg docs/import-graph-probes.dot -o docs/import-graph-probes.svg
+//
+// The shape to notice: the probes are NOT a flat fan off the library. They form a long
+// chain (TinyBound → BoundLemmasP2 → SeqMpBound → CounterSide; WBound → UPremise →
+// Triangle → Conj → MonotoneSpike/LaneA → LaneB → …), because each probe reuses the
+// previous one's derivation rather than rebuilding it. That is why `lake build Probes`
+// is the only target that covers them: `Probes.lean` is the sweep list, and a merged
+// lane's probe has to be added to it by hand.
+
+digraph Probes {
+  rankdir = BT;
+  graph [fontname="Helvetica", fontsize=11, ranksep=0.5, nodesep=0.22,
+         labelloc="t",
+         label="Probes / Demo / Reference — import graph\lgrey = library entry point (its own deps are in import-graph.dot);  green border = in the `lake build Probes` sweep list\l"];
+  node  [fontname="Helvetica", fontsize=10, shape=box, style="rounded,filled",
+         fillcolor="#fef6e0", color="#c9a45c", height=0.3, margin="0.10,0.05"];
+  edge  [color="#888888", arrowsize=0.6];
+
+  // library entry points (dependencies elided — see import-graph.dot)
+  // Not a cluster: boxing ~30 entry points onto one contiguous rank flattens the graph.
+  {
+    node [fillcolor="#e0e0e0", color="#999999", shape=box, style="filled"];
+    Language; Arithmetic; Metatheorem; Majorizability; SyntacticMetatheorem;
+    Soundness; "Dial.Syntactic"; "Dial.Monotone"; "Dial.MonotoneMemo";
+    "Dial.MonotoneND"; "Dial.MonotoneSeq"; NegTrans;
+    MonotoneMetatheorem; MonotoneMetatheoremClassical;
+    RationalNumbers; RealNumbers; "R.Cauchyfy"; BaseEquality; MetricSpaces;
+    CodeRealOps; "Terms.Real"; WHyperbolic; WHyperbolicLemmas; Instances;
+    "PM.Rewrite"; "PM.Arith"; "PM.MCT"; "PM.RealMCT"; Hilbert; TermPretty;
+    Headline; Mathlib;
+  }
+
+  // sweep targets
+  {
+    node [fillcolor="#d7e8d7", color="#4a8f4a", penwidth=2.2];
+    "Demo.Walkthrough";
+  }
+
+  subgraph cluster_ref {
+    label = "Reference (Mathlib-level, not in the build)";
+    style = "dashed"; color = "#bbbbbb";
+    node [fillcolor="#f7f7f7", color="#bbbbbb"];
+    "Ref.MCT"; "Ref.MCTBridge"; "Ref.Mine";
+  }
+
+  // ---------------------------------------------------------------- probes
+  "P.P1" -> Language;
+  "P.R1" -> Metatheorem; "P.R1" -> Arithmetic;
+  "P.RwBase" -> "PM.Rewrite";
+  "P.RwArrow" -> "PM.Rewrite";
+  "P.QComm" -> RationalNumbers; "P.QComm" -> "PM.Rewrite";
+  "P.PapplyDemo" -> "R.Cauchyfy"; "P.PapplyDemo" -> "PM.Arith";
+  "P.SoundnessProbe" -> MetricSpaces;
+  "P.SyntacticND" -> "Dial.Syntactic"; "P.SyntacticND" -> NegTrans;
+  "P.ProductRulesDemo" -> SyntacticMetatheorem; "P.ProductRulesDemo" -> Soundness;
+  "P.GeneralMatricesDemo" -> SyntacticMetatheorem; "P.GeneralMatricesDemo" -> Majorizability;
+  "P.GeneralMatricesDemo" -> "Terms.Real";
+  "P.HilbertDemo" -> Hilbert;
+  "P.HilbertDepth" -> Hilbert;
+
+  // the term-route bound chain
+  "P.TinyBoundDemo" -> SyntacticMetatheorem; "P.TinyBoundDemo" -> Majorizability;
+  "P.BoundProbe" -> "PM.MCT"; "P.BoundProbe" -> Majorizability;
+  "P.BoundLemmasP2" -> "PM.MCT"; "P.BoundLemmasP2" -> Majorizability;
+  "P.BoundLemmasP2" -> "P.BoundProbe";
+  "P.SeqMpBoundProbe" -> "P.BoundLemmasP2";
+  "P.CounterSideProbe" -> "P.SeqMpBoundProbe";
+  "P.CombinatorLemmas" -> "P.SeqMpBoundProbe";
+
+  // the space-bound chain
+  "P.WBoundDemo" -> WHyperbolic;
+  "P.UPremiseDemo" -> WHyperbolic; "P.UPremiseDemo" -> "P.WBoundDemo";
+  "P.TriangleBoundDemo" -> WHyperbolic; "P.TriangleBoundDemo" -> "P.UPremiseDemo";
+  "P.ConjBoundDemo" -> WHyperbolic; "P.ConjBoundDemo" -> "P.TriangleBoundDemo";
+  "P.ExtractTermDemo" -> "P.UPremiseDemo";
+  "P.TermPrintDemo" -> TermPretty; "P.TermPrintDemo" -> "P.ExtractTermDemo";
+  "P.TermPrintDemo" -> "P.TriangleBoundDemo";
+  "P.LemBoundDemo" -> SyntacticMetatheorem; "P.LemBoundDemo" -> Majorizability;
+  "P.SizeProbe" -> "P.ConjBoundDemo"; "P.SizeProbe" -> "P.ExtractTermDemo";
+  "P.SizeProbe" -> "P.LemBoundDemo";
+  "P.RevTriangleDemo" -> BaseEquality; "P.RevTriangleDemo" -> MetricSpaces;
+  "P.RevTriangleDemo" -> CodeRealOps; "P.RevTriangleDemo" -> "P.SizeProbe";
+  "P.WHyperbolicLemmasDemo" -> WHyperbolicLemmas; "P.WHyperbolicLemmasDemo" -> Instances;
+  "P.WHyperbolicLemmasDemo" -> "P.RevTriangleDemo";
+
+  // the MFI chain
+  "P.MonotoneSpike" -> "Dial.Monotone"; "P.MonotoneSpike" -> "P.ConjBoundDemo";
+  "P.ExprBound" -> "P.MonotoneSpike";
+  "P.MonotoneLaneA" -> "Dial.Monotone"; "P.MonotoneLaneA" -> "P.ConjBoundDemo";
+  "P.MonotoneLaneB" -> MonotoneMetatheorem; "P.MonotoneLaneB" -> "P.MonotoneLaneA";
+  "P.MonotoneLaneBp" -> "Dial.MonotoneMemo"; "P.MonotoneLaneBp" -> "P.UPremiseDemo";
+  "P.MonotoneLaneBp" -> "P.MonotoneLaneB";
+  "P.MonotoneMCT" -> MonotoneMetatheorem; "P.MonotoneMCT" -> "PM.MCT";
+  "P.MonotoneMCT" -> "P.TinyBoundDemo"; "P.MonotoneMCT" -> "P.MonotoneLaneB";
+  "P.MonotoneMemoGates" -> "Dial.MonotoneSeq"; "P.MonotoneMemoGates" -> "P.MonotoneLaneB";
+  "P.MonotoneMemoGates" -> "P.MonotoneMCT";
+  "P.ContentExampleNat" -> "P.MonotoneMCT";
+  "P.ContentExampleSpace" -> "P.MonotoneMemoGates";
+  "P.ClassicalMfiProbe" -> "Dial.MonotoneMemo";
+  "P.ClassicalMfiProbe" -> MonotoneMetatheoremClassical;
+  "P.ClassicalMfiProbe" -> "P.LemBoundDemo"; "P.ClassicalMfiProbe" -> "P.MonotoneLaneB";
+  "P.SharingProbe" -> "Dial.MonotoneND"; "P.SharingProbe" -> "P.LemBoundDemo";
+  "P.SharingProbe" -> "P.MonotoneLaneB";
+  "P.NestingDepth" -> "P.LemBoundDemo"; "P.NestingDepth" -> "P.ConjBoundDemo";
+  "P.NestingDepth" -> "P.MonotoneLaneB"; "P.NestingDepth" -> "PM.MCT";
+  "P.NestingDepth" -> "PM.RealMCT";
+  "P.WExtBoundDemo" -> "P.ContentExampleSpace"; "P.WExtBoundDemo" -> "P.NestingDepth";
+  "P.WExtBoundDemo" -> WHyperbolicLemmas;
+
+  // ------------------------------------------------------------- the sweep
+  // `Probes.lean` imports 39 of these directly. Drawing those edges would put one node
+  // above nearly every other and flatten the picture, so membership of the sweep list is
+  // marked on the NODE instead: a green double border = in `lake build Probes`.
+  // NB: a bare re-declaration does NOT pick up a later `node [...]` default — graphviz
+  // applies defaults at node CREATION, and every node below already exists from an edge.
+  // The attributes have to be written out per node.
+  "P.BoundLemmasP2" [color="#4a8f4a", penwidth=2];
+  "P.BoundProbe" [color="#4a8f4a", penwidth=2];
+  "P.CombinatorLemmas" [color="#4a8f4a", penwidth=2];
+  "P.ConjBoundDemo" [color="#4a8f4a", penwidth=2];
+  "P.ExtractTermDemo" [color="#4a8f4a", penwidth=2];
+  "P.GeneralMatricesDemo" [color="#4a8f4a", penwidth=2];
+  "P.HilbertDemo" [color="#4a8f4a", penwidth=2];
+  "P.P1" [color="#4a8f4a", penwidth=2];
+  "P.PapplyDemo" [color="#4a8f4a", penwidth=2];
+  "P.QComm" [color="#4a8f4a", penwidth=2];
+  "P.R1" [color="#4a8f4a", penwidth=2];
+  "P.RevTriangleDemo" [color="#4a8f4a", penwidth=2];
+  "P.WHyperbolicLemmasDemo" [color="#4a8f4a", penwidth=2];
+  "P.RwArrow" [color="#4a8f4a", penwidth=2];
+  "P.RwBase" [color="#4a8f4a", penwidth=2];
+  "P.SeqMpBoundProbe" [color="#4a8f4a", penwidth=2];
+  "P.SoundnessProbe" [color="#4a8f4a", penwidth=2];
+  "P.MonotoneSpike" [color="#4a8f4a", penwidth=2];
+  "P.SyntacticND" [color="#4a8f4a", penwidth=2];
+  "P.SizeProbe" [color="#4a8f4a", penwidth=2];
+  "P.ProductRulesDemo" [color="#4a8f4a", penwidth=2];
+  "P.MonotoneLaneA" [color="#4a8f4a", penwidth=2];
+  "P.MonotoneLaneB" [color="#4a8f4a", penwidth=2];
+  "P.MonotoneLaneBp" [color="#4a8f4a", penwidth=2];
+  "P.MonotoneMCT" [color="#4a8f4a", penwidth=2];
+  "P.MonotoneMemoGates" [color="#4a8f4a", penwidth=2];
+  "P.ClassicalMfiProbe" [color="#4a8f4a", penwidth=2];
+  "P.ContentExampleNat" [color="#4a8f4a", penwidth=2];
+  "P.ContentExampleSpace" [color="#4a8f4a", penwidth=2];
+  "P.NestingDepth" [color="#4a8f4a", penwidth=2];
+  "P.SharingProbe" [color="#4a8f4a", penwidth=2];
+  "P.ExprBound" [color="#4a8f4a", penwidth=2];
+  "P.WExtBoundDemo" [color="#4a8f4a", penwidth=2];
+  "P.TermPrintDemo" [color="#4a8f4a", penwidth=2];
+  "P.TinyBoundDemo" [color="#4a8f4a", penwidth=2];
+  "P.TriangleBoundDemo" [color="#4a8f4a", penwidth=2];
+  "P.UPremiseDemo" [color="#4a8f4a", penwidth=2];
+  "P.WBoundDemo" [color="#4a8f4a", penwidth=2];
+  Headline [color="#4a8f4a", penwidth=2];   // library module, but swept by Probes.lean
+
+  "Demo.Walkthrough" -> Hilbert; "Demo.Walkthrough" -> MonotoneMetatheoremClassical;
+  "Demo.Walkthrough" -> "PM.RealMCT"; "Demo.Walkthrough" -> "P.MonotoneLaneA";
+  "Demo.Walkthrough" -> "P.MonotoneLaneB"; "Demo.Walkthrough" -> "P.TermPrintDemo";
+  "Demo.Walkthrough" -> "P.LemBoundDemo"; "Demo.Walkthrough" -> "P.MonotoneMemoGates";
+
+  edge [color="#bbbbbb", style=dotted];
+  "Ref.MCT" -> Mathlib; "Ref.MCTBridge" -> Mathlib; "Ref.Mine" -> Mathlib;
+
+  // The three probes WITHOUT a green border, i.e. not named in Probes.lean:
+  //   P.CounterSideProbe  deliberately absent — OOMs, holds the only permitted sorries
+  //   P.HilbertDepth      rendering probe, run by hand
+  //   P.LemBoundDemo      not named, but covered transitively (P.SizeProbe imports it)
+  // The last is the pattern to watch: a probe can be swept without being listed, so the
+  // list is not a reliable inventory of what `lake build Probes` actually checks.
+}
