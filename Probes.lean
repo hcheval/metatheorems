@@ -32,7 +32,7 @@ import Metatheorems.Probes.SharingProbe
 import Metatheorems.Probes.ExprBound
 import Metatheorems.Probes.WExtBoundDemo
 -- Not a probe: `Metatheorems.Headline` is the project's `#print axioms` block for every
--- headline declaration. It is not reachable from the umbrella either, so until 2026-09-07 it
+-- headline declaration. It is not reachable from the umbrella either, so for a long time it
 -- was built by nobody and six of its names — `syntactic_general_metatheorem` and its four
 -- variants, `add_Q_assoc`, `distrib_Q` — had no axiom line in any build; the lists quoted for
 -- them in the docs were prose. Imported here so the sweep covers them (`docs/CLAIMS_AUDIT.md`
@@ -53,9 +53,16 @@ import Metatheorems.Probes.WBoundDemo
 /-!
 # Probe sweep target
 
-`Metatheorems/Probes/` is **not** reachable from `Metatheorems.lean`, deliberately — the
+Most of `Metatheorems/Probes/` is not reachable from `Metatheorems.lean`, deliberately — the
 probes are experiments and measurements, not library content, and several are expensive.
 The cost of that is that `lake build` never type-checks them, so they rot silently.
+
+**Five are the exception and ARE imported by the umbrella**: `P1`, `R1`, `RwBase`, `RwArrow`
+and `GeneralMatricesDemo`. They are regression tests for the rewriting engine and for the
+general-matrix metatheorem, so a break in them breaks the library itself. Read
+`Metatheorems.lean`'s import list rather than trusting prose here: the sentence "`Probes/` is
+not reachable from the umbrella" was stated in several documents long after it stopped being
+true.
 
 They did: the `ι`/`κ` split (`3089af9`+`f17fddc`) left **five** probe files with
 `@Derivable ι F …` one argument short, and each was found by accident, weeks apart —
@@ -74,4 +81,9 @@ indices, and after any refactor that touches an inductive's constructors.
 (`INTERNAL PANIC: out of memory` even under a 12 GB cap) and holds the project's only
 permitted `sorry`; it is a record of a measurement, not something to keep green. Do not add
 it here — that would make this target unusable, which is how the rot started.
+
+**Three others are absent without a stated reason, which is the rot this file exists to
+prevent**: `LemBoundDemo`, `HilbertDepth` and `WExtRung3Scratch`. `LemBoundDemo` in particular
+is cited throughout `docs/RESULTS.md` and `CLAUDE.md` as the record of the classical route's
+cost, and nothing type-checks it. Either add them or say here why not.
 -/

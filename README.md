@@ -106,7 +106,7 @@ layer). The tower, bottom to top:
 ## Further reading
 
 * [`docs/report/report.pdf`](docs/report/report.pdf) — a self-contained mathematical account of
-  the formalization (~50 pages): the type system, the proof system, the interpretations, the
+  the formalization: the type system, the proof system, the interpretations, the
   majorizability layer, the metatheorems, the number tower, the space theories, and extraction.
 * [`ARCHITECTURE.md`](ARCHITECTURE.md) — the *reasoning*: why the parametrisation is what it is,
   which alternatives were tried and rejected, and what each redesign cost. Read it before

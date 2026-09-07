@@ -511,7 +511,7 @@ macro "pnorm" : tactic =>
 macro "pforall" : tactic => `(tactic| refine pm_allI ?_)
 
 /-- `pspecialize` instantiates a weakened `∀`-*goal* at the bound variable;
-`pspecialize h as k` instantiates a weakened `∀`-*hypothesis*, which is how a `∀`-hypothesis
+`pspecialize h with k` instantiates a weakened `∀`-*hypothesis*, which is how a `∀`-hypothesis
 is used after `pforall`.
 
 The `colGt` matters: without it the bare form would swallow the next line's tactic name as
@@ -1012,7 +1012,7 @@ elab "pinst " h:ident ppSpace tStx:term " with " k:ident : tactic => withMainCon
   evalTactic (← `(tactic| refine pm_inst $(Lean.quote k.getId.toString) $tStx
     (by pexact $h) ?_))
 
-/-- `pqfac h as k` applies QF-AC to the `∀∃`-hypothesis `h`, naming the choice function
+/-- `pqfac h with k` applies QF-AC to the `∀∃`-hypothesis `h`, naming the choice function
 statement `k`. -/
 macro "pqfac " h:ident " with " k:ident : tactic =>
   -- Unlike Markov, the matrix here is fixed by the *hypothesis*, not by the goal, so that
