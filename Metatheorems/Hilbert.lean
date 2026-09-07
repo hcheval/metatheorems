@@ -428,7 +428,14 @@ Two escape hatches, and they are independent:
 
 Note the asymmetry, which is deliberate: a non-proof-mode constant costs nothing. The
 budget is a statement about the *proof-mode layer's* depth, which is what is unbounded in
-practice; ordinary library lemmas bottom out in `Derivable` constructors quickly. -/
+practice; ordinary library lemmas bottom out in `Derivable` constructors quickly.
+
+**Backward compatibility is definitional, not merely tested.** At `d = 0` with `keep` empty —
+every invocation written before 2026-09-07 — the body below is
+`unfold.contains n || (if isProofModeName n then 0 > 0 else unfoldAll)`, i.e. exactly the old
+`shouldUnfold`'s `unfold.contains n || (unfoldAll && !isProofModeName n)`. The eight listings
+of `Probes/HilbertDemo.lean` are byte-identical across the change, which is the empirical half
+of the same claim. -/
 def shouldUnfoldAt (cfg : Config) (d : Nat) (n : Name) : Bool :=
   !cfg.keep.contains n
     && (cfg.unfold.contains n || (if isProofModeName n then d > 0 else cfg.unfoldAll))
