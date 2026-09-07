@@ -143,9 +143,11 @@ theorem extC_all : Formula.all Ty.nat (eqBody dWW Term.zero_R) = eqAtType xTy W0
 -- Rung 1: assume the conclusion, exhibit it — the plumbing, with a `W` matrix
 -- ============================================================================
 
-/-- The witness: the space's own number `⌈d(W, W')⌉₀`, as in `ContentExampleSpace.D0`. Its
-majorant is what `U` and `V` report. -/
-abbrev D0 : Term WHyperbolic.F K0 Ty.nat := Term.app dWW Term.zero
+/-- The witness: the space's own number `⌈d(x,x')⌉₀`, as in `ContentExampleSpace.D0`. Its
+majorant is what `U` and `V` report — `distMajorant nx nx' 0 = pairN (2·((nx+nx')·2), 1)`,
+i.e. `901` at `(5,5)` and `1273` at `(7,5)`, the numbers `Probes/TriangleBoundDemo.lean`
+already calibrated. -/
+abbrev D0 : Term WHyperbolic.F K0 Ty.nat := Term.app dXX Term.zero
 
 def dirInner : DS K0 (Formula.all Ty.nat (eqBody dWW Term.zero_R) →ᶠ
     Formula.ex Ty.nat (eqBody dWW Term.zero_R)) :=
@@ -174,8 +176,8 @@ def w2thm : DS K0 (Formula.all Ty.nat (eqBody w2lhs w2rhs)) :=
 def axInner : DS K0 (Formula.all Ty.nat (eqBody dWW Term.zero_R) →ᶠ
     Formula.ex Ty.nat (eqBody w2lhs w2rhs)) :=
   Derivable.mp
-    (Derivable.mp (Derivable.mp w2thm (Derivable.forall_ax Term.zero))
-      (Derivable.exist_ax Term.zero (eqBody w2lhs w2rhs)))
+    (Derivable.mp (Derivable.mp w2thm (Derivable.forall_ax D0))
+      (Derivable.exist_ax D0 (eqBody w2lhs w2rhs)))
     K_comb
 
 -- ============================================================================
@@ -266,8 +268,52 @@ theorem Udir : (901 : ℕ) = mfiU (triCm M h) (rDir M h) (qs M 5 5 5) := by
   pushDirU
   kernel_rfl
 
+/-- …and it moves with the space majorant of `x`: `1273` at `nx = 7`. -/
+theorem Vdirb : (1273 : ℕ) = mfiV (triCm M h) (rDir M h) (qs M 7 5 5) := by
+  pushDirV
+  kernel_rfl
+
 theorem Vdir_ne_900 : (900 : ℕ) ≠ mfiV (triCm M h) (rDir M h) (qs M 5 5 5) := by
   rw [← Vdir M h]; decide
+
+theorem Vdirb_ne_901 : (901 : ℕ) ≠ mfiV (triCm M h) (rDir M h) (qs M 7 5 5) := by
+  rw [← Vdirb M h]; decide
+
+/-! ### Rung 2: the conclusion is (W2) itself, instantiated through the proof mode
+
+`W2_at` is a **proof-mode** derivation (four `pinst`/`znorm` rounds) that ends in
+`Derivable.premise WHyperbolic.W2` — so unlike every earlier space extraction in the project
+(`TriangleBoundDemo`, `ContentExampleSpace`), which consume the *free* constructor
+`Derivable.dist_tri`, this one runs `monotone_soundness` through a real `.premise` of a space
+theory and through the `pm_*` layer. `U = 0` (the premise formula is weakened away by
+`K_comb`); `V` is the majorant of the witness `⌈d(x,x')⌉₀`, i.e. the same `901`/`1273`. -/
+
+noncomputable def rAx : MRealizer (triCm M h)
+    (Formula.all qTy (Formula.all Ty.nat (eqBody dWW Term.zero_R) →ᶠ
+      Formula.ex Ty.nat (eqBody w2lhs w2rhs))) :=
+  monotone_soundness M.eqXInterp M.spremise (triCm M h) wAx
+
+macro "pushAxV" : tactic =>
+  `(tactic| (unfold mfiV rAx
+             mfi_push [wAx, wrap, wrapW, axInner, w2thm]))
+macro "pushAxU" : tactic =>
+  `(tactic| (unfold mfiU rAx
+             mfi_push [wAx, wrap, wrapW, axInner, w2thm]))
+
+theorem Vax : (901 : ℕ) = mfiV (triCm M h) (rAx M h) (qs M 5 5 5) := by
+  pushAxV
+  kernel_rfl
+
+theorem Vaxb : (1273 : ℕ) = mfiV (triCm M h) (rAx M h) (qs M 7 5 5) := by
+  pushAxV
+  kernel_rfl
+
+theorem Uax : (0 : ℕ) = mfiU (triCm M h) (rAx M h) (qs M 5 5 5) := by
+  pushAxU
+  kernel_rfl
+
+theorem Vax_ne_900 : (900 : ℕ) ≠ mfiV (triCm M h) (rAx M h) (qs M 5 5 5) := by
+  rw [← Vax M h]; decide
 
 end Model
 
