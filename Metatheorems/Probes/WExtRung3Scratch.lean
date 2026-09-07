@@ -5,11 +5,12 @@ Authors: Horatiu
 -/
 
 /-!
-# (dead) — the rung-3 scratch file of `Probes/WExtBoundDemo.lean`
+# (dead) — the scratch file of `Probes/WExtBoundDemo.lean`
 
-This file held the two throwaway measurements of rung 3 of the `WExtBoundDemo` ladder. Both
-have been folded into `Probes/WExtBoundDemo.lean` (the two that pass as theorems, the one that
-does not as a reproduction snippet in its header), so nothing is left here.
+This file held the throwaway rung-3 and rung-4 measurements of the `WExtBoundDemo` ladder.
+Everything has been folded into `Probes/WExtBoundDemo.lean` — the measurements that pass as
+theorems, the one that does not (`mfiU` of rung 3, a 12 GB `std::bad_alloc`) as a
+reproduction snippet in that file's header.
 
 **It is empty rather than deleted because an agent may not delete files in this repo.** It is
 not in `Probes.lean`'s sweep list and imports nothing; delete it by hand if you want it gone.

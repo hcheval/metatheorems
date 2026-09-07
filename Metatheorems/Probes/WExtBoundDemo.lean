@@ -32,7 +32,7 @@ space (no `whnf` cache with free model variables — `MonotoneLaneB`'s finding).
 | 1 `wDir` | `W(x,y,λ̃) =_X W(x',y,λ̃)` | the same, at some `v` | `forall_ax D₀` ⟶ `exist_ax D₀` | **3** | **901** / **1273** | **901** |
 | 2 `wAx` | unused | `∃v` (W2)'s body at `v` | `W2_at` (the axiom at abstract terms, via the proof mode) | **8** | **901** / **1273** | **0** |
 | 3 `wExt` / `wExtD` | `x =_X x'` | `W(x,y,λ̃) =_X W(x',y,λ̃)` at some `v` | **`W_ext_left`** | **≥66** | **901** (36 s) | **OOM** |
-| 4 `wExtP` | `λ =ℝ μ` | `W(x,y,λ̃) =_X W(x,y,μ̃)` at some `v` | **`W_ext_param`** | **≥62** | not run | not run |
+| 4 `wExtP` / `wExtPD` | `λ =ℝ μ` | `W(x,y,λ̃) =_X W(x,y,μ̃)` at some `v` | **`W_ext_param`** | **≥62** | **901** (35 s) | not run |
 
 Rung 3 is the one with content: premise and conclusion are *different formulas*, the premise
 is genuinely consumed (it is `W_ext_left`'s only hypothesis), and `U` is the precision at
@@ -97,14 +97,44 @@ theorem UextD : (0 : ℕ) = mfiU (triCm M h) (rExtD M h) (qs M 5 5 5) := by
 reports nothing about it. Nine candidates (`0`–`6`, `901`) were tried in one module and the
 module died at 12 GB, so the failure is not a mis-guessed constant.
 
+6. **`NestingDepth`'s depth does not discriminate *inside* the ℝ layer, and a conjecture made
+   from it was refuted the same night.** The first draft of this header guessed that rung 4's
+   depth of ≥62 came from `eq_R_trans_core`'s `eqR_tail`/`eqR_le`/`eqR_strict` squeeze, and
+   proposed a squeeze-free `=ℝ`-transitivity as the fix. Measuring the components refutes it:
+
+   | declaration | dag | tree | DEPTH | capped? |
+   |---|---|---|---|---|
+   | `WHyperbolic.W2_at` | 252 | 1478 | **3** | no |
+   | `WHyperbolic.W4_at` | 491 | 2944 | **7** | no |
+   | `le_R_antisymm_core` | 48124 | 61285 | ≥23 | yes |
+   | `dist_nonneg` | 46734 | 71961 | ≥26 | yes |
+   | `clamp01_congr_R` | 47952 | 61026 | ≥35 | yes |
+   | `abs_sub_eq_zero_R` | 45305 | 128042 | ≥36 | yes |
+   | `eq_R_trans_core` | 47885 | 110275 | ≥37 | yes |
+   | `mul_eq_zero_R_core` | 45195 | 101685 | ≥37 | yes |
+   | `WHyperbolic.dist_W_mono_left` | 48141 | 105226 | ≥38 | yes |
+
+   `clamp01_congr_R` is a **slack-free single-index** lemma written in this same pass —
+   `clamp01_Q_lip` and one `le_lt_Q_trans`, no estimate, no telescope — and it still reports
+   ≥35. Every row that reaches the ℚ constants hits the walk's 250 000-`Expr` budget and lands
+   in the same 23–38 band, so those figures are lower bounds produced by the *cap*, not
+   measurements of the lemmas. The only discriminating rows are the uncapped ones, and they
+   say what finding 5 says: the space axioms are cheap (3 and 7) and everything downstream of
+   ℚ is not separable by this instrument.
+
+   Consequence for the next lane: **do not pick an ℝ-layer target by its `NestingDepth`
+   figure.** The empirical witness/counter split (finding 3) is the only signal currently
+   available, and it is cheap to run — a `mfiV` and a `mfiU` at a non-trivial witness, ≈40 s
+   and ≈100 s-to-OOM respectively.
+
 ## What this suggests for the next lane
 
-Finding 5 is actionable: a W-hyperbolic statement whose *only* ℝ content is `=ℝ` extracts, and
-one that touches `≤ℝ` does not. `W_ext_param` (rung 4) is the interesting case — it is proved
-from (W2) plus `mul_zero_l_R`, `clamp01_congr_R`, `abs_sub_eq_zero_R` and `eq_R_trans_core`,
-with **no `le_R_trans_core`** — yet it measures at depth ≥62. The candidate culprit is
-`eq_R_trans_core`, which carries the `eqR_tail`/`eqR_le`/`eqR_strict` telescope; if so, an
-`=ℝ`-transitivity that avoided the squeeze would move rung 4 into range. Not measured here.
+The witness side is *not* where the wall is, at any depth reached here: both rung 3 and rung 4
+give `901` in ~35 s through derivations of depth ≥66 and ≥62. Every failure measured tonight
+is on the counter side, where `MRealizer.syllogism` re-evaluates `hAB` three times and `hBC`
+twice per level. So the ×5-per-level sharing problem (`ARCHITECTURE.md` §14.7, Lane D1's memo
+direction) is the whole remaining obstacle for space theorems — not induction, not the proof
+mode, not `.premise`, not casts, and not the extensionality argument.
 
 ## Honest limits
 
@@ -273,6 +303,13 @@ def parInner : DS K0 (Formula.all Ty.nat (eqBody l0 m0) →ᶠ
     (Derivable.syllogism (Derivable.forall_ax (A := eqBody dWWp Term.zero_R) Term.zero)
       (Derivable.exist_ax Term.zero (eqBody dWWp Term.zero_R)))
 
+/-- The same at the non-trivial witness `⌈d(x,x')⌉₀`. -/
+def parInnerD : DS K0 (Formula.all Ty.nat (eqBody l0 m0) →ᶠ
+    Formula.ex Ty.nat (eqBody dWWp Term.zero_R)) :=
+  Derivable.syllogism (WHyperbolic.W_ext_param x0 y0 l0 m0)
+    (Derivable.syllogism (Derivable.forall_ax (A := eqBody dWWp Term.zero_R) D0)
+      (Derivable.exist_ax D0 (eqBody dWWp Term.zero_R)))
+
 -- ============================================================================
 -- Metatheorem shape
 -- ============================================================================
@@ -295,6 +332,7 @@ def wAx := wrap axInner
 def wExt := wrap extInner
 def wExtD := wrap extInnerD
 def wExtP := wrap parInner
+def wExtPD := wrap parInnerD
 
 -- ============================================================================
 -- The numerals, at an arbitrary W-hyperbolic model with `d(a, 0_X) ≤ 5`
@@ -414,6 +452,25 @@ theorem VextD : (901 : ℕ) = mfiV (triCm M h) (rExtD M h) (qs M 5 5 5) := by
 theorem VextD_ne_900 : (900 : ℕ) ≠ mfiV (triCm M h) (rExtD M h) (qs M 5 5 5) := by
   rw [← VextD M h]; decide
 
+/-! ### Rung 4: `W_ext_param` — witness side only
+
+Same picture as rung 3, through the *parameter* case, which uses (W2) and the three new `=ℝ`
+facts (`clamp01_congr_R`, `abs_sub_eq_zero_R`, `mul_zero_l_R`) and **no** `le_R_trans_core`.
+Composition depth ≥62; `V` at the non-trivial witness is `901` in ≈35 s. -/
+
+noncomputable def rExtPD : MRealizer (triCm M h)
+    (Formula.all qTy (Formula.all Ty.nat (eqBody l0 m0) →ᶠ
+      Formula.ex Ty.nat (eqBody dWWp Term.zero_R))) :=
+  monotone_soundness M.eqXInterp M.spremise (triCm M h) wExtPD
+
+theorem VextPD : (901 : ℕ) = mfiV (triCm M h) (rExtPD M h) (qs M 5 5 5) := by
+  unfold mfiV rExtPD
+  mfi_push [wExtPD, wrap, wrapW, parInnerD]
+  kernel_rfl
+
+theorem VextPD_ne_900 : (900 : ℕ) ≠ mfiV (triCm M h) (rExtPD M h) (qs M 5 5 5) := by
+  rw [← VextPD M h]; decide
+
 end Model
 
 -- ============================================================================
@@ -430,6 +487,13 @@ end Model
 #eval show Lean.MetaM Unit from NestingDepth.report ``Metatheorems.WExtBoundDemo.wExt
 #eval show Lean.MetaM Unit from NestingDepth.report ``Metatheorems.WExtBoundDemo.wExtP
 #eval show Lean.MetaM Unit from NestingDepth.report ``Metatheorems.WHyperbolic.dist_W_mono_left
+#eval show Lean.MetaM Unit from NestingDepth.report ``Metatheorems.WHyperbolic.W4_at
+#eval show Lean.MetaM Unit from NestingDepth.report ``Metatheorems.eq_R_trans_core
+#eval show Lean.MetaM Unit from NestingDepth.report ``Metatheorems.le_R_antisymm_core
+#eval show Lean.MetaM Unit from NestingDepth.report ``Metatheorems.dist_nonneg
+#eval show Lean.MetaM Unit from NestingDepth.report ``Metatheorems.mul_eq_zero_R_core
+#eval show Lean.MetaM Unit from NestingDepth.report ``Metatheorems.clamp01_congr_R
+#eval show Lean.MetaM Unit from NestingDepth.report ``Metatheorems.abs_sub_eq_zero_R
 
 -- ============================================================================
 -- Axiom hygiene
@@ -442,6 +506,7 @@ end Model
 #print axioms wExt
 #print axioms wExtD
 #print axioms wExtP
+#print axioms wExtPD
 
 end WExtBoundDemo
 end Metatheorems
