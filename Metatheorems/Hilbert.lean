@@ -52,11 +52,16 @@ at a time — and see `shouldUnfoldAt` for why `all` stops where it does.
 
 ## `depth n` — the fueled unfolding (2026-09-07)
 
-`#hilbert foo depth 2` makes the proof-mode layer transparent, but only **two `ProofMode`
-unfoldings deep along any path**; below that a proof-mode constant is cited by name exactly as
-the default does. So the listing degrades gracefully instead of not terminating, and the fuel
-is a *display knob*: at depth 1 you see which proof-mode tactic each step was, at depth 2 you
-see the `seq_*` combinators it is built from, and so on down to raw `Derivable` constructors.
+`#hilbert foo depth 2` makes the proof-mode layer transparent, but expands each step only
+**two `ProofMode` unfoldings deep**; what it has become by then is cited by name exactly as the
+default does. So the listing degrades gracefully instead of not terminating, and the fuel is a
+*display knob*: at depth 0 you see which proof-mode tactic each step was, at depth 1 the
+`seq_*` combinator it is defined as, and so on down to raw `Derivable` constructors.
+
+**The fuel is per step, not per path**, and this is the one thing to get right — see
+`subProofs`, where it is reset. A proof-mode derivation is a chain, so a path-counted fuel is
+spent entirely on the spine: measured, `depth 1` and `depth 2` on `mct_body` then differ from
+`depth 0` in one line each and in nothing else.
 
 The design is `Probes/ExprBound.lean`'s, one level up: fuel plus a name-based stop set
 (`keeping g h`), with the memo keyed on the fuel as well as the expression. Keying the memo on
@@ -357,7 +362,16 @@ def conclusionOf (e : Expr) : MetaM Format := withObjNotation do
   | (``ProofMode.Seq, args) => if args.size == 8 then sequent args 6 none else render ty
   | _ =>
     match ← derivConcl? ty with
-    | some c => render c
+    -- `Derivable … (pack Δ B)` — what `Seq` *unfolds to*, and therefore what every step of a
+    -- `depth`-expanded proof-mode listing is typed as. Without this case the packing is
+    -- printed in full, and on `mct_body` that is not merely ugly: the delaborator exhausts
+    -- the heartbeat budget on it, which is the whole reason `depth 1` failed when it was
+    -- first run. `pack {ι κ F Γ} Δ B` — the context is argument 4, the goal argument 5.
+    | some c =>
+      match c.getAppFnArgs with
+      | (``ProofMode.pack, cargs) =>
+        if cargs.size == 6 then sequent cargs 4 none else render c
+      | _ => render c
     | none => render ty
 
 -- ============================================================================
@@ -376,25 +390,41 @@ def push (concl : Expr) (rule : String) (prems : List Nat) : M Nat := do
 /-- Short display name of a constant: everything is inside `Metatheorems`, so that prefix
 carries no information and is dropped. -/
 def shortName (n : Name) : String :=
-  match n.components with
+  match (privateToUserName n).components with
   | `Metatheorems :: rest => String.intercalate "." (rest.map toString)
   | _ => toString n
 
-/-- Does this constant belong to the proof-mode layer? -/
-def isProofModeName (n : Name) : Bool := (`Metatheorems.ProofMode).isPrefixOf n
+/-- Does this constant belong to the proof-mode layer?
+
+`privateToUserName` first: a `private def` in `ProofMode/Packing.lean` is stored as
+`_private.Metatheorems.ProofMode.Packing.0.Metatheorems.ProofMode.weaken_intro_h`, whose
+*prefix* is `_private`, so a bare `isPrefixOf` calls it a non-proof-mode constant. That
+mattered: `weaken_intro_h` is one of the two things `pintro` is built from, and it survived
+into the fully-expanded listing as a cited name at every depth until this was fixed. -/
+def isProofModeName (n : Name) : Bool :=
+  (`Metatheorems.ProofMode).isPrefixOf (privateToUserName n)
 
 /-- Should this constant be walked into rather than cited, with `d` of the proof-mode budget
 left?
 
 `all` deliberately stops at the proof-mode layer. Expanding it without a bound is not merely
-verbose: on `mct_body` it does not finish at all — every `pintro`/`prw` is a derivation over a
-packed hypothesis context, and unfolding them exhausts the heartbeat budget inside `whnf`
-before producing a line. Two escape hatches, and they are independent:
+verbose: on `mct_body` it does not finish at all.
+
+**Which constant does it, measured** (`Probes/HilbertDepth.lean`, 2026-09-07): `seq_id`, and
+essentially only `seq_id`. This docstring used to blame "every `pintro`/`prw`" collectively;
+the discriminating test is that `keeping seq_id` — that one name, nothing else — turns
+`#hilbert ProofMode.mct_descent depth 1` from a heartbeat timeout into 1766 steps in 18 s.
+`seq_id` is hypothesis lookup, so it recurses on the hypothesis context through `HVar.rec`
+with a dependent cast per level, and it is cited 35 times in `mct_descent`'s 112 steps; the
+stalling profile is `Eq.rec ↦ 2802` with `seq_id ↦ HVar.rec ↦ List.noConfusion ↦ 442` beneath
+it. Every other tactic expands without trouble.
+
+Two escape hatches, and they are independent:
 
 * naming a constant under `unfolding` expands it wherever it occurs, at no cost to the budget
   (this is how one proof-mode tactic at a time was expanded before `depth` existed);
-* `depth n` spends one unit of budget per `ProofMode` unfolding along a path, so the expansion
-  is bounded by construction rather than by luck.
+* `depth n` spends one unit of budget per consecutive `ProofMode` unfolding of one step, so
+  the expansion is bounded by construction rather than by luck.
 
 Note the asymmetry, which is deliberate: a non-proof-mode constant costs nothing. The
 budget is a statement about the *proof-mode layer's* depth, which is what is unbounded in
@@ -405,8 +435,21 @@ def shouldUnfoldAt (cfg : Config) (d : Nat) (n : Name) : Bool :=
 
 mutual
 
-/-- Number the `Derivable`-typed explicit arguments of an application, in order. -/
-partial def subProofs (d : Nat) (args : Array Expr) : M (List Nat) := do
+/-- Number the `Derivable`-typed explicit arguments of an application, in order.
+
+**The budget is reset here, and that is the whole meaning of `depth`.** A proof-mode
+derivation is a *chain*: `pm_cut a b`'s derivation arguments are the earlier steps of the same
+script, so the path from the root to a leaf passes through every step of the proof. A fuel
+counted along that path is therefore spent on the spine and never reaches any definition —
+measured on `mct_body`, `depth 1` and `depth 2` unfolded only the outermost one or two
+tactics and were otherwise byte-identical to `depth 0`.
+
+So the fuel counts **consecutive unfoldings of one step's head constant** and is restored when
+we move to a premise. `depth n` then reads as: expand every proof-mode step `n` definition
+levels, and cite whatever it has become. `depth 0` is the old opaque behaviour and an
+unbounded depth is the full expansion that does not terminate. -/
+partial def subProofs (args : Array Expr) : M (List Nat) := do
+  let d := (← read).pmDepth
   let mut out := #[]
   for a in args do
     if ← isDerivProof a then
@@ -478,25 +521,25 @@ partial def step (d : Nat) (e : Expr) : M Nat := do
     | .const c _ =>
       if isTransparentWrapper c then
         -- No content: walk straight through to the single derivation argument.
-        let subs ← subProofs d e.getAppArgs
+        let subs ← subProofs e.getAppArgs
         match subs with
         | [k] => return k
         | _   => return ← push e (shortName c) subs
       if let some r := ctorRuleName c then
         let args := e.getAppArgs
-        let subs ← subProofs d args
+        let subs ← subProofs args
         let ann ← termAnnotation c args
         return ← push e (r ++ ann) subs
       if shouldUnfoldAt cfg d c then
         if let some u ← unfoldDefinition? e then
           -- Only the proof-mode layer draws on the budget; see `shouldUnfoldAt`.
           return ← go (if isProofModeName c then d - 1 else d) u
-      let subs ← subProofs d e.getAppArgs
+      let subs ← subProofs e.getAppArgs
       let r := (libRuleName c).getD (shortName c)
       return ← push e r subs
     | _ =>
       -- A lambda- or projection-headed proof: no name to cite, so show it as a leaf.
-      let subs ← subProofs d e.getAppArgs
+      let subs ← subProofs e.getAppArgs
       return ← push e "(term)" subs
 
 end
