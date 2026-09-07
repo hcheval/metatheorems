@@ -104,6 +104,14 @@ do not do that.
 | `Foo.spremise` | `Obligations → ` premise realizers, via `srealizer_of_pu` |
 | `Foo.Majorants am` | structure: one majorant and one proof per constant |
 | `Foo.Majorants.funcM`, `.funcM_maj` | those two, in the shape `ConstMajorants` asks for |
+| `Foo.metatheorem` | `syntactic_general_metatheorem` at this premise set |
+| `Foo.metatheorem_classical` | `syntactic_general_metatheorem_classical`, ditto |
+
+The last two are the reason to read the list as a **contract**.  Their hypotheses are exactly
+`EqXInterp`, `Foo.Obligations`, `AbstractMajorizability`, and the derivation — the two
+premise-set side conditions the metatheorems ask for (`premises_pu`, `premises_vf`) are
+generated *and discharged*.  So "what does a model of this theory still owe?" has a
+mechanical answer: those three things and nothing else.
 
 ## Admissibility
 
@@ -459,6 +467,47 @@ def elabTheory : CommandElab := fun stx => do
       fun Γ' B hp =>
         srealizer_of_pu B ($(qid `premises_pu) Γ' B hp) ($(qid `premises_vf) Γ' B hp)
           ($(qid `axiomsHold) $oId B hp)))
+
+  -- ------------------------------------------------- the theory's metatheorems
+  -- The point of emitting these is that they name, in one signature, *everything* a model of
+  -- the theory still owes: an `EqXInterp`, the axioms' truth (`Obligations`), and a
+  -- majorizability relation.  Nothing else — the two premise-set side conditions the
+  -- metatheorems ask for are generated and discharged above.
+  elabCommand (← `(command|
+    theorem $(qid `metatheorem) {$xId : $iotaId → Type} {$siId : SpaceInterp $xId $fId}
+        (eqxi : EqXInterp $xId $fId $siId) ($oId : $(qid `Obligations) $siId)
+        (am : AbstractMajorizability $siId)
+        {ρ : Ty $iotaId} {B₀ C₀ : Formula $fId [Ty.nat, ρ]}
+        (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
+        (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
+        (prf : @Derivable $iotaId $kappaId $fId Allowed.extended $premId []
+          (Formula.all ρ (Formula.imp (Formula.all Ty.nat B₀) (Formula.ex Ty.nat C₀)))) :
+        ∃ Φ : Ty.interpret $xId ρ.hat → Nat,
+          ∀ (x : Ty.interpret $xId ρ) (x_star : Ty.interpret $xId ρ.hat),
+            am.toRel.maj ρ x_star x →
+            (∀ u : Nat, u ≤ Φ x_star → Formula.interpret $siId B₀ (u, (x, ()))) →
+            ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret $siId C₀ (v, (x, ())) :=
+      syntactic_general_metatheorem eqxi ($(qid `spremise) $oId) am
+        hB_qf hB_vf hC_qf hC_vf prf))
+
+  elabCommand (← `(command|
+    theorem $(qid `metatheorem_classical) {$xId : $iotaId → Type}
+        {$siId : SpaceInterp $xId $fId}
+        (eqxi : EqXInterp $xId $fId $siId) ($oId : $(qid `Obligations) $siId)
+        (am : AbstractMajorizability $siId)
+        {ρ : Ty $iotaId} {B₀ C₀ : Formula $fId [Ty.nat, ρ]}
+        (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
+        (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
+        (prf : @Derivable $iotaId $kappaId $fId Allowed.classical $premId []
+          (Formula.all ρ (Formula.imp (Formula.all Ty.nat B₀) (Formula.ex Ty.nat C₀)))) :
+        ∃ Φ : Ty.interpret $xId ρ.hat → Nat,
+          ∀ (x : Ty.interpret $xId ρ) (x_star : Ty.interpret $xId ρ.hat),
+            am.toRel.maj ρ x_star x →
+            (∀ u : Nat, u ≤ Φ x_star → Formula.interpret $siId B₀ (u, (x, ()))) →
+            ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret $siId C₀ (v, (x, ())) :=
+      syntactic_general_metatheorem_classical eqxi
+        (ntStable_of_pu $(qid `premises_pu)) ($(qid `spremise) $oId) am
+        hB_qf hB_vf hC_qf hC_vf prf))
 
   -- ------------------------------------------------------ majorant obligations
   let amId := mkIdent `am

@@ -223,6 +223,26 @@ example {X : MetricSpace.ι → Type} {si : SpaceInterp X WHypDSL.F}
       am.maj (WHypDSL.F c) (WHypDSL.Majorants.funcM m c n) (si.funcInterp c) :=
   WHypDSL.Majorants.funcM_maj m
 
+/-- **`WHyperbolicModel.w_metatheorem`, generated.**  Statement for statement the same, with
+the model's three contributions — `M.eqXInterp`, `M.axiomsHold`, `M.abstractMajorizability` —
+appearing as the three explicit hypotheses instead of being supplied by the model.  Feeding
+it a `WHyperbolicModel` is the step this file does not take (see the header): the model's
+`W1_holds` … `W4_holds` are over `WHyperbolic.F`, not `WHypDSL.F`. -/
+example {X : MetricSpace.ι → Type} {si : SpaceInterp X WHypDSL.F}
+    (eqxi : EqXInterp X WHypDSL.F si) (o : WHypDSL.Obligations si)
+    (am : AbstractMajorizability si)
+    {ρ : Ty MetricSpace.ι} {B₀ C₀ : Formula WHypDSL.F [Ty.nat, ρ]}
+    (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
+    (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
+    (prf : @Derivable MetricSpace.ι WHypDSL.κ WHypDSL.F Allowed.extended WHypDSL.Premises []
+      (Formula.all ρ (Formula.imp (Formula.all Ty.nat B₀) (Formula.ex Ty.nat C₀)))) :
+    ∃ Φ : Ty.interpret X ρ.hat → Nat,
+      ∀ (x : Ty.interpret X ρ) (x_star : Ty.interpret X ρ.hat),
+        am.toRel.maj ρ x_star x →
+        (∀ u : Nat, u ≤ Φ x_star → Formula.interpret si B₀ (u, (x, ()))) →
+        ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret si C₀ (v, (x, ())) :=
+  WHypDSL.metatheorem eqxi o am hB_qf hB_vf hC_qf hC_vf prf
+
 end Generated
 
 end Metatheorems

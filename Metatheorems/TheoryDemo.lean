@@ -135,6 +135,41 @@ example {am : AbstractMajorizability si} (m : Nonexp.Majorants am) :
       am.maj (Nonexp.F c) (Nonexp.Majorants.funcM m c n) (si.funcInterp c) :=
   Nonexp.Majorants.funcM_maj m
 
+/-- **The contract, closed.**  The generated `Nonexp.metatheorem` is
+`syntactic_general_metatheorem` at this premise set, and its hypotheses are the whole of what
+a model still owes: an `EqXInterp`, the `Obligations`, and an `AbstractMajorizability`.  The
+two premise-set side conditions are generated *and* discharged, so they do not appear.
+
+Compare `WHyperbolicModel.w_metatheorem`, which is this statement written out by hand. -/
+example (eqxi : EqXInterp X Nonexp.F si) (o : Nonexp.Obligations si)
+    (am : AbstractMajorizability si)
+    {ρ : Ty MetricSpace.ι} {B₀ C₀ : Formula Nonexp.F [Ty.nat, ρ]}
+    (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
+    (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
+    (prf : @Derivable MetricSpace.ι Nonexp.κ Nonexp.F Allowed.extended Nonexp.Premises []
+      (Formula.all ρ (Formula.imp (Formula.all Ty.nat B₀) (Formula.ex Ty.nat C₀)))) :
+    ∃ Φ : Ty.interpret X ρ.hat → Nat,
+      ∀ (x : Ty.interpret X ρ) (x_star : Ty.interpret X ρ.hat),
+        am.toRel.maj ρ x_star x →
+        (∀ u : Nat, u ≤ Φ x_star → Formula.interpret si B₀ (u, (x, ()))) →
+        ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret si C₀ (v, (x, ())) :=
+  Nonexp.metatheorem eqxi o am hB_qf hB_vf hC_qf hC_vf prf
+
+/-- And the classical one, from a derivation at `Allowed.classical`. -/
+example (eqxi : EqXInterp X Nonexp.F si) (o : Nonexp.Obligations si)
+    (am : AbstractMajorizability si)
+    {ρ : Ty MetricSpace.ι} {B₀ C₀ : Formula Nonexp.F [Ty.nat, ρ]}
+    (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
+    (hC_qf : C₀.isQF = true) (hC_vf : C₀.isVFree = true)
+    (prf : @Derivable MetricSpace.ι Nonexp.κ Nonexp.F Allowed.classical Nonexp.Premises []
+      (Formula.all ρ (Formula.imp (Formula.all Ty.nat B₀) (Formula.ex Ty.nat C₀)))) :
+    ∃ Φ : Ty.interpret X ρ.hat → Nat,
+      ∀ (x : Ty.interpret X ρ) (x_star : Ty.interpret X ρ.hat),
+        am.toRel.maj ρ x_star x →
+        (∀ u : Nat, u ≤ Φ x_star → Formula.interpret si B₀ (u, (x, ()))) →
+        ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret si C₀ (v, (x, ())) :=
+  Nonexp.metatheorem_classical eqxi o am hB_qf hB_vf hC_qf hC_vf prf
+
 end Obligations
 
 -- ============================================================================
