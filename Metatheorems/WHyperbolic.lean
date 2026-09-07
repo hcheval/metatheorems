@@ -33,8 +33,10 @@ structural `Term.dist ()`, and `dist_self`/`dist_comm`/`dist_tri` are constructo
 
 `λ` ranges over **all** of type `1 = ℕ → ℕ`. The axioms are stated at `clamp01 λ`
 (`RealNumbers/Interval.lean`), the object-level retraction onto `[0,1]`: `∀λ ∈ [0,1] A(λ)` is
-literally `∀λ¹ A(clamp01 λ)`, so no quantifier ranges over a subset of a type. See CLAUDE.md,
-Track C item C0.
+literally `∀λ¹ A(clamp01 λ)`, so no quantifier ranges over a subset of a type. This is
+Kohlenbach's device for keeping the metatheorem applicable: every `f : ℕ → ℕ` codes an
+element of `[0,1]`, so there is no side condition to discharge, and majorization at that type
+is uniform in `λ`.
 
 ## The premise set
 
@@ -370,11 +372,11 @@ demonstrate that the majorization layer computes at this model's constants, and 
 `WMajorant` genuinely discards its real argument — they do **not** exhibit a bound extracted
 from a proof.
 
-The only place in the project where a `Derivable` actually reaches `closedMajorizer` is
-`Probes/TinyBoundDemo.lean`: a 12-constructor derivation built by hand from raw constructors
-at `ι = Empty`. **Nothing at the space level has gone end-to-end from a derivation**, and
-doing so is the open work — see CLAUDE.md Track A. Read the numbers below as majorants of
-terms, not as mined bounds.
+Bounds *are* mined from derivations at this model elsewhere —
+`Probes/WBoundDemo.lean`, `Probes/UPremiseDemo.lean`, `Probes/ContentExampleSpace.lean` and
+`Probes/WExtBoundDemo.lean`, the last of these through a `Derivable.premise` on
+`WHyperbolic.Premises` itself, with `docs/RESULTS.md` tabulating the values. But none of that
+is happening here. Read the numbers below as majorants of terms, not as mined bounds.
 -/
 
 /-- **The uniformity, kernel-checked**: for *any* closed real `f`, the majorant of
@@ -646,7 +648,8 @@ Two general ℝ-layer facts were missing and are supplied here:
   `⟨2^b⟩ · 2^{-(k+b)} = 2^{-k}`. It belongs in `RealNumbers/Mul.lean` and is kept here only
   to leave that module untouched in this pass;
 * `le_R_of_le_R_pu_nf`, a `le_R_of_le_R_pu` whose antecedent is stated over the *pushed-in*
-  weakenings. This is trap 12 again: the instance of an axiom that `pinst`/`rnorm` produces
+  weakenings. This is the display-hiding trap again: the instance of an axiom that
+  `pinst`/`rnorm` produces
   has `Term.weaken` distributed over the application spine with every closed constant
   restored, while `le_R_pu f g` carries `f.weaken` around the whole composite. Unifying the
   two makes `isDefEq` push `rename` through `clamp01`, `mul_R`, … — the delta-expansion

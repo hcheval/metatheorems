@@ -160,9 +160,9 @@ def snd_pair {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat) :=
     state(Sk) = pair(fst(state(k)) + snd(state(k)), sg_bar(snd(state(k))))
     div2(n) = fst_pair(state(n)).
 
-    **The name and the old docstring said `⌊n/2⌋`; that is wrong**, and was corrected on
-    2026-09-03 when the semantic mirror was built (`QValBridge.rec_div2_state` proves the true
-    invariant `state k = pairN ((k+1)/2) (1 - k%2)`). The step adds `snd` *before* flipping the
+    **The name says `⌊n/2⌋`; that is wrong — this computes `⌈n/2⌉`.**
+    `QValBridge.rec_div2_state` proves the true invariant,
+    `state k = pairN ((k+1)/2) (1 - k%2)`. The step adds `snd` *before* flipping the
     parity flag, so the values run 0,1,1,2,2,… — `div2 1 = 1`, while `⌊1/2⌋ = 0`.
 
     Nothing downstream is affected. `rat_num = div2 (j + isOdd j)` is `⌈j/2⌉` for both

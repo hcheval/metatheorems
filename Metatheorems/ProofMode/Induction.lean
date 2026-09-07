@@ -23,7 +23,7 @@ Those two lemmas are the entire cost of the general rule, and they are the reaso
 separate file from `Packing.lean`: everything there is pure combinator plumbing, whereas
 this needs facts about de Bruijn substitution.
 
-## Rule or axiom? Keep the rule. (Settled 2026-09-07; do not reopen without new evidence.)
+## Rule or axiom? Keep the rule. (Settled; do not reopen without new evidence.)
 
 The two are interderivable, and `Derivable` could carry the axiom instead — you can even
 derive the axiom from the rule with no kernel change, by inducting on
@@ -41,7 +41,7 @@ the axiom form would add work on the **counter side**, which is where compositio
 lives and where extraction currently dies.
 
 The one motivation that would have justified it is gone: `sInduction`'s Δ-generic obstacle
-(Track A item 2) is a *term-route* problem, and under the monotone functional interpretation
+is a *term-route* problem, and under the monotone functional interpretation
 it does not arise — `MRealizer.induction` is semantic, and a real `pinduction` derivation
 extracts through it (`Probes/MonotoneMCT.lean`: `V(5) = 5`, `V(9) = 9`, `U = 0`, counter side
 included). What remains open about induction is unaffected by rule-vs-axiom: `recMaj` iterates

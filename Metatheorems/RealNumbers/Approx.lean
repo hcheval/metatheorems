@@ -17,10 +17,9 @@ Support for Kohlenbach §4.1's Lemma 4.2 (`approx_R`/`approx_le_R`) and Lemma 4.
 
 1. ℚ-level moves that were still missing: `sub_Q` reassociation (`sub_Q_sub`), the
    `<`/`≤`-against-`sub_Q` conversions, the strict two-step dyadic decrease, and the
-   **reverse triangle inequality** `| |a|ℚ −ℚ |b|ℚ |ℚ ≤ℚ |a −ℚ b|ℚ` (REALS_PLAN §0.8
-   item 1 — its three listed prerequisites all existed by 2026-09-03).
+   **reverse triangle inequality** `| |a|ℚ −ℚ |b|ℚ |ℚ ≤ℚ |a −ℚ b|ℚ`.
 2. `cauchyfy` evaluation for three new shapes: an arbitrary constant sequence
-   (`cauchyfy_const` — §0.8 item 3), `abs_R w` for an arbitrary `w` (`cauchyfy_abs_R` —
+   (`cauchyfy_const`), `abs_R w` for an arbitrary `w` (`cauchyfy_abs_R` —
    the reverse triangle inequality is exactly what licenses this), and `sub_R f g`
    (`cauchyfy_sub_R`, via `add_R_check` on `f +ℝ (−ℝ g)`).
 3. The two converters between `le_R (abs_R (sub_R u v)) (const_R q)` and its pointwise
@@ -163,9 +162,9 @@ def pow2neg_Q_lt_two (n : Term F Γ Ty.nat) :
 
 /-- **The reverse triangle inequality**: `| |a|ℚ −ℚ |b|ℚ |ℚ ≤ℚ |a −ℚ b|ℚ`.
 
-REALS_PLAN §0.8 item 1 said its three prerequisites — `z ≤ℚ |z|`, `−|z| ≤ℚ z` and the
-two-sided bound — did not exist; by 2026-09-03 they did (`le_Q_self_abs`,
-`abs_Q_le_cases`, `abs_Q_le_add_diff`), and this is assembly on top of them. It is what
+Its three prerequisites — `z ≤ℚ |z|`, `−|z| ≤ℚ z` and the two-sided bound — are
+`le_Q_self_abs`, `abs_Q_le_cases` and `abs_Q_le_add_diff`, and this is assembly on top of
+them. It is what
 makes `abs_R w` pass the Cauchy check for *any* `w` (`abs_R_check` below). -/
 def abs_Q_rev_triangle (a b : Term F Γ Ty.nat) :
     Derivable F al Premises
@@ -208,8 +207,7 @@ def abs_Q_rev_triangle (a b : Term F Γ Ty.nat) :
 
 -- ── `const_R`: the constant real at an arbitrary rational code ─────────────
 --
--- Moved here from `Metric.lean` (2026-09-03, unchanged) so its `cauchyfy` theory can
--- sit beside it.
+-- Lives here rather than in `Metric.lean` so its `cauchyfy` theory can sit beside it.
 
 /-- The constant real sequence at a rational code — the book's `r ↦ λn.⟨r⟩` embedding
     of ℚ into ℝ (p. 80). `⟨2^{-k}⟩_ℝ` is `const_R (pow2neg_Q k)`. -/

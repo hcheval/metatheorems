@@ -171,7 +171,7 @@ variable {Γ : Ctx MetricSpace.ι}
 /-- **The check.**  The command's output and `WHyperbolic.lean`'s hand-written de Bruijn
 spelling are the same formula, at every context.
 
-**Non-degeneracy, checked and not assumed** (2026-09-07): swapping the two `X` arguments of
+**Non-degeneracy, checked and not assumed.** Swapping the two `X` arguments of
 the second `W` in `expW3` — i.e. writing `(.var (.vs (.vs .vz))) (.var (.vs .vz))` where
 (W3) has `(.var (.vs .vz)) (.var (.vs (.vs .vz)))`, which is *exactly* the mistake a person
 counting `.vs`es makes — turns the third line below into a `Type mismatch` at

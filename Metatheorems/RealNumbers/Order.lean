@@ -671,14 +671,14 @@ by `n₁` and then `add_comm` — where the two differences simply add:
 other contributes through `0_ℚ ≤ℚ 2^{-m} ≤ℚ ĥ −ℚ ĝ`, which is why no `max` and no doubling of
 the dyadic scale is needed.
 
-**CLOSED 2026-09-03 via exit 3 of the note that used to stand here.** The history, kept
-because it is a worked example of the display-hiding trap family (CLAUDE.md note 12): the
+**How it is proved, and why not the obvious way** — a worked example of the display-hiding
+trap family. The
 first attempt ran **two nested `pobtain`s**, and `pm_exE` wraps every earlier hypothesis in
 `Formula.weakenBy`, which the delaborator hides — `pexact` on the wrapped hypothesis was a
 measured heartbeat timeout, not a type error. Adding `Term.subst_shift_eq_weaken` /
-`Formula.substF_shift_eq_weakenBy` to `canorm` (exit 1) was necessary but not sufficient:
-the failure moved to `canorm` itself timing out on the large packed goal. What landed is
-exit 3 — **both `∃`-eliminations happen at the Lean level with `Derivable.exist_rule`**
+`Formula.substF_shift_eq_weakenBy` to `canorm` was necessary but not sufficient:
+the failure moved to `canorm` itself timing out on the large packed goal. What works is
+that **both `∃`-eliminations happen at the Lean level with `Derivable.exist_rule`**
 (`lt_R_ex` presents the antecedent in the `le_Q` spelling, `ltBody_weakenBy` /
 `lt_R_weakenBy` compute the `weakenBy` the rule's premise carries, `flip_comb` swaps the
 antecedents between the two peels), so no `pobtain` ever runs and no hypothesis is ever

@@ -10,8 +10,8 @@ namespace Metatheorems
 /-! **No `import Metatheorems.ProofMode.Arith` here.** That module declares the *global*
 notations `S`, `+ᵗ`, `∸ᵗ`, `*ᵗ`, `pdᵗ`; importing it from a module below the `RealNumbers`
 umbrella leaks them into every importer of the umbrella, and `MetricSpaces.lean` uses `S` as
-an identifier (found 2026-09-05: the full build broke at `MetricSpaces.lean:717` with
-"unexpected token 'S'"). So this file spells `S t` as `.app .succ t`, `s +ᵗ t` as
+an identifier — the build then fails there with "unexpected token 'S'", a long way from the
+cause. So this file spells `S t` as `.app .succ t`, `s +ᵗ t` as
 `Term.app2 Term.add s t`, and carries its own copy of `anorm_cons`'s rule list (`mcons`). -/
 
 /-!
@@ -218,7 +218,8 @@ above (a weakened QF or `le_R` hypothesis becomes the syntactic weakening of its
 rename push/fold pair, and a `_weaken'` cleanup for every closed constant the derivation
 mentions. The goal is that a hypothesis weakened by `pforall` and a lemma instance elaborated
 with the weakening *coercion* agree syntactically, so `pexact` never has to unfold a closed
-constant under a rename (CLAUDE.md trap 12). `∀`-hypotheses keep their `weakenBy` wrapper,
+constant under a rename — that is the delta-expansion pathology, and it surfaces as a
+heartbeat timeout rather than a type error. `∀`-hypotheses keep their `weakenBy` wrapper,
 which is what `pspecialize`/`pinst` match on.
 
 `mcons` is `ProofMode.Arith`'s `anorm_cons`, copied verbatim (that module cannot be imported

@@ -163,7 +163,7 @@ inductive Derivable {ι κ : Type} (F : κ → Ty ι)
                    Derivable F allowed Premises
       (eqAtType τ (Term.app (Term.lam body) u) (Term.subst0 body u))
 
-  -- Product β/η-equality (for the primitive `mkPair`/`fst`/`snd`; added 2026-09-05).
+  -- Product β/η-equality, for the primitive `mkPair`/`fst`/`snd`.
   -- Same family as `beta_eq`: the two sides have definitionally equal interpretations,
   -- so every pass over `Derivable` handles them with the line `beta_eq` uses. Without them
   -- `fst (mkPair a b) =_ρ a` was underivable — the wall the classical route's `∃u∃v`
@@ -321,7 +321,7 @@ def Derivable.castAllowed {ι κ : Type} {F : κ → Ty ι}
   | .qfac h1 hqf hvf   => .qfac (h_le.2.2.2.2 h1) hqf hvf
 
 -- ============================================================================
--- `AdmissibleEqX` — DELETED 2026-09-02
+-- `AdmissibleEqX` — deleted; where each of its conditions went
 -- ============================================================================
 --
 -- The structure bundled five conditions on an abstract base-type equality: `substF_nat`,

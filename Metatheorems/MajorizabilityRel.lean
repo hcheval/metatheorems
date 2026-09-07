@@ -31,8 +31,8 @@ terms of; it imports `Semantics` and nothing else.
 
 The file was `StrongMajorizability.lean` and held a `Majorizability` structure — the
 total majorizer of the document's Def. 6.0.1, which is **uninhabitable**. Both the name and
-the structure went on 2026-09-07; the closing section records why, since the argument is a
-finding about that presentation and is worth more than the dead code was.
+the structure are gone; the closing section records why, since the argument is a finding
+about that presentation and is worth more than the dead code was.
 -/
 
 -- ============================================================================
@@ -97,8 +97,8 @@ base type to `nat`, so `base i` relates a natural to a point of `X i` — that i
 "majorized by a natural relative to a reference point", and it is exactly the
 space-specific datum.
 
-**Widened to two clauses on 2026-09-02** (it used to carry only the first conjunct, i.e.
-Howard majorizability). The self-majorization clause is what makes `bezem_prec_maj` provable:
+**Two clauses, not one** — it carried only the first conjunct (Howard majorizability) at
+first. The self-majorization clause is what makes `bezem_prec_maj` provable:
 the document's induction (`.tex:82–96`) gives `R n y* z* ≽ R n y z` at *equal* `n`, while
 `maj` at `nat →ₜ ρ` demands `n* ≥ n → …`, and the bridge is `hatMaj_of_bezemMaj` plus
 `bezemMaj_of_hatMaj`. -/
@@ -225,7 +225,7 @@ def maxT : (ρ : Ty ι) → Ty.interpret X ρ.hat → Ty.interpret X ρ.hat → 
 
 /-- `maxT` is commutative at every hat type. Needed to get the right-handed
 `maxT_bezemMaj_left` from the left-handed one (`AbstractMajorizability.maxT_maj_right`).
-Promoted 2026-09-05 from `Probes/MonotoneSpike.lean`. -/
+Promoted here from `Probes/MonotoneSpike.lean`. -/
 theorem maxT_comm : ∀ (ρ : Ty ι) (a b : Ty.interpret X ρ.hat), maxT ρ a b = maxT ρ b a
   -- `omega` treats `Ty.interpret X Ty.nat.hat`-typed atoms as opaque (CLAUDE.md), so the
   -- two numeric cases go by the core lemma directly
@@ -310,7 +310,7 @@ theorem maxT_bezemMaj_left {base : (i : ι) → Nat → X i → Prop} (hbase : B
 end MaxT
 
 /-!
-## Removed 2026-09-07: `Majorizability`, the total majorizer
+## Removed: `Majorizability`, the total majorizer
 
 A `Majorizability` structure used to sit here — `MajorizabilityRel` extended with
 
@@ -342,8 +342,8 @@ definable — and goes through. Its docstring writes this out. The monotone func
 interpretation reaches the same place a third way: it carries no witness at all, only a
 majorant with its condition.
 
-**What replaced it.** Since the `syntactic-witnesses` merge (2026-09-01) the Dialectica
-witness/counter *types* are object-level `Ty ι`, so realizers are closed `Term`s and
+**What replaced it.** The Dialectica witness/counter *types* are object-level `Ty ι`, so
+realizers are closed `Term`s and
 `all_closed_terms_majorizable` produces their majorants outright. That needs only
 `AbstractMajorizability` (inhabited by `bezemAbstract`) and no total majorizer at all. The
 live entry points are `syntactic_general_metatheorem{,_classical,_at,_gen}` and the MFI

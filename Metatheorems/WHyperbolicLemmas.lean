@@ -108,11 +108,11 @@ identities (`mul_comm_R`, `mul_assoc_R`, `distrib_R`, `mul_one_R`) but nothing t
 factor. The additive congruence, by contrast, **is** derivable from `le_R_add_mono_*` plus
 `le_R_antisymm_core`, which is why nothing additive is blocked.
 
-**Two corrections to what this paragraph used to say** (2026-09-07):
+**Two things about that missing statement are easy to get wrong, so they are spelled out:**
 
-1. **The missing statement is the congruence, not multiplicative monotonicity
-   (`0ℝ ≤ℝ f → g ≤ℝ g' → f ·ℝ g ≤ℝ f ·ℝ g'`).** The header used to name monotonicity and then
-   argue that the congruence "is again multiplicative monotonicity". That is backwards: the
+1. **What is missing is the congruence, not multiplicative monotonicity
+   (`0ℝ ≤ℝ f → g ≤ℝ g' → f ·ℝ g ≤ℝ f ·ℝ g'`).** Naming monotonicity and then arguing that the
+   congruence "is again multiplicative monotonicity" is backwards: the
    congruence is strictly weaker (it is monotonicity's two-sided instance, with no sign
    hypothesis and no sign case split), it is what both stalled statements actually consume,
    and it is what should be attempted first. Monotonicity additionally needs a four-way case

@@ -30,11 +30,11 @@ The proof factors into:
 `monotone_general_metatheorem{_at,_classical_at}` (`MonotoneMetatheorem.lean`,
 `MonotoneMetatheoremClassical.lean`); both are built from the three parts above.
 
-*Until 2026-09-07 this file also held `general_metatheorem`, `general_metatheorem_classical`
-and `metatheorem_core`, the transcription of the reference document's Def. 6.0.1 with a
+*This file used to hold `general_metatheorem`, `general_metatheorem_classical` and
+`metatheorem_core` as well — the transcription of the reference document's Def. 6.0.1 with a
 total majorizer. All three were deleted with the `Majorizability` structure they took, which
-is uninhabitable — see `MajorizabilityRel.lean`. Everything else here is live and is what
-both routes above rest on.*
+is uninhabitable; see `MajorizabilityRel.lean`. Do not re-add them. Everything else here is
+live and is what both routes above rest on.*
 -/
 
 open Formula
@@ -195,7 +195,7 @@ theorem Formula.interpret_renameF_gen {ι κ : Type} {X : ι → Type} {F : κ �
       LEM on P: B₀ holds for all u (→ ∃v C₀ from hypothesis) and ¬C₀ holds
       for all v (→ contradiction).
 
-    **`prenexify_gen` is the general form (2026-09-04): no hypothesis on `B₀`, `C₀` at all.**
+    **`prenexify_gen` is the general form: no hypothesis on `B₀`, `C₀` at all.**
     The argument is pure classical predicate logic — `Derivable.lem` on arbitrary formulas —
     and never inspected the matrices; `prenexify`'s four QF/∨-free hypotheses were always
     unused, and it is now a wrapper. This is what lets the general-matrix metatheorem
@@ -389,7 +389,7 @@ since `dialectica_soundness_ctx'` already brings in `Classical.choice` via its o
 case.
 
 *Provenance.* The three paragraphs above were the docstring of
-`general_metatheorem_classical`, deleted 2026-09-07 along with `general_metatheorem` and
+`general_metatheorem_classical`, deleted along with `general_metatheorem` and
 `metatheorem_core` because all three took the uninhabitable `Majorizability`. Proving the
 classical one is what produced this factoring in the first place, so its reasoning is
 inherited here rather than lost with it. -/
@@ -538,7 +538,7 @@ That is what makes this form usable: it needs only `MajorizabilityRel`, which is
 (`bezemRel`), together with majorants for the two extracted functionals — which
 `all_closed_terms_majorizable` or a `ConstMajorants` provides.
 
-*Until 2026-09-07 there was also a `metatheorem_core` taking a whole `Majorizability`, with
+*There was also a `metatheorem_core` taking a whole `Majorizability`, with
 `U_star := majorizer U`, `V_star := majorizer V` as the special case. It was deleted with
 that structure: the total majorizer is uninhabitable (`MajorizabilityRel.lean`), so it could
 never be applied, and its name differed from the live one by a suffix.*

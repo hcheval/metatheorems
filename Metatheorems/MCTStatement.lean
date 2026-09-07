@@ -92,11 +92,10 @@ example : (mctC₀ (F := F) (ι := ι)).isVFree = true := rfl
 
 /-! ## Does it actually fit a metatheorem entry point?
 
-An `example` used to sit here applying `general_metatheorem` to `mctStatement`, as the
-shape check: if it elaborates, the only remaining input is the derivation. It was **deleted
-on 2026-09-07** with `general_metatheorem` itself, whose `Majorizability` argument is
-uninhabitable (`MajorizabilityRel.lean`), so no instantiation of it could ever have been
-run.
+An `example` used to sit here applying `general_metatheorem` to `mctStatement`, as the shape
+check: if it elaborates, the only remaining input is the derivation. It went with
+`general_metatheorem` itself, whose `Majorizability` argument is uninhabitable
+(`MajorizabilityRel.lean`), so no instantiation of it could ever have been run.
 
 Nothing is lost, because the check is made twice over further down and both times against a
 live entry point: **Probe P2d** (`mctExtract` / `mct_bound`, below) composes
@@ -285,13 +284,13 @@ def mctExtract
 
 /-- **The bound**, from the extraction plus majorants for `U` and `V`.
 
-**Superseded 2026-09-03 and no longer called.** `mct_bound_p1`/`mct_bound_p2` now go through
+**Superseded and no longer called.** `mct_bound_p1`/`mct_bound_p2` go through
 `syntactic_general_metatheorem`, which produces the two majorants itself from
 `all_closed_terms_majorizable` — so the `mj`, `U_star`, `V_star`, `hU`, `hV` arguments below
-are all unnecessary. Kept as the record of Probe P2d, which was written before the
-`syntactic-witnesses` merge and correctly established that the extraction/bounding split
-composes at a time when the only alternative was the total-majorizer route, which turned out
-to be uninhabitable and was deleted on 2026-09-07. -/
+are all unnecessary. It is kept as the record of an early probe, written before the Dialectica
+witness types became object-level, which established that the extraction/bounding split
+composes — at a time when the only alternative was the total-majorizer route, which turned out
+to be uninhabitable and was deleted. -/
 theorem mct_bound
     {X : ι → Type} (si : SpaceInterp X F) (eqxi : EqXInterp X F si)
     (mj : MajorizabilityRel si)

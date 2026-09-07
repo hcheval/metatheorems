@@ -21,8 +21,7 @@ to within 2^{-n}.
 1. **Cauchyfication**: `cauchyfy` (f ↦ f̂)
 2. **Real operations**: `zero_R`, `one_R`, `add_R`, `neg_R`, `sub_R`, `mul_R`, `abs_R`
 3. **Real formulas**: `eq_R`, `lt_R`, `le_R`, `le_R_pu`
-4. **Ordered field axioms** — all proved (this line read "(sorry'd)" until 2026-09-04; the
-   ℝ layer has had zero sorries since 2026-09-03)
+4. **Ordered field axioms** — all proved; the ℝ layer has no `sorry`
 -/
 
 open Formula

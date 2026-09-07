@@ -23,8 +23,7 @@ import Metatheorems.RealNumbers.MCTLemmas
 # Real Numbers in WE-HA^{ω} — umbrella module
 
 This file used to hold the whole ℝ layer (3,615 lines); a one-character edit cost a 37.5 s
-rebuild. It was split on 2026-09-03 into `Metatheorems/RealNumbers/*.lean`, in dependency
-order:
+rebuild. It is now split into `Metatheorems/RealNumbers/*.lean`, in dependency order:
 
 | module | content |
 |---|---|
@@ -34,11 +33,15 @@ order:
 | `Field` | the additive axioms (`add_zero_R`, `add_comm_R`, `add_assoc_R`), the `le_R`/`le_R_pu` bridges, the ℚ rearrangements |
 | `Negation` | `cauchyState_neg`/`cauchyfy_neg`, `add_neg_R`, `cauchyState_congr`/`cauchyfy_congr` |
 | `Mul` | `mul_R_apply`, `mul_comm_R`, `mul_one_R`, `mul_R_check`/`cauchyfy_mul_R`, `mul_assoc_R`, `distrib_R` — the multiplicative side, complete |
-| `LeOrder` | the **non-strict** order package (2026-09-04): `le_R_refl`, `le_R_trans`, `le_R_of_eq_R_core`, `lt_imp_le_R_core`, `le_R_antisymm_core`, `le_R_congr`, additive monotonicity on either side and two-sided — plus the one-sided telescope `leR_pair_step`/`leR_tail`/`leR_le`/`leR_strict` that transitivity needs. None of this existed before; `≤_ℝ` had only the `Field.lean` conversions, so two `Derivable.dist_tri`s could not be chained |
-| `Order` | `lt_irrefl_R`, `lt_add_R`/`lt_mul_pos_R`/`archimedean_R`, `zero_lt_one_R`, `lt_shift*`, `lt_trans_R` — all proved; this row said "(sorried)" until 2026-09-04, two days after they closed |
 | `QBounds` | ℚ-code bounds: `abs_le_encode` (a code dominates its magnitude), `rat_num_le_self`, the encode-parts cluster, `exp2_add`, `sub_lt_of_le` — pure ℚ/ℕ, sits beside `Defs` |
 | `Bounds` | `cauchyfy_mag_le`, `abs_R_apply`/`embed_nat_R_apply`, `cauchyfy_embed` — the cauchyfy-level magnitude layer |
-| `Metric` | `add_eq_zero_R`, `le_zero_eq_zero_R`, `nonneg_of_add_self_nonneg`, `abs_R_bound`, Kohlenbach §4.1 |
+| `OrderBounds` | the ℚ kit the `<_ℝ` axioms rest on: `pow2neg_Q_mul`, `cauchyfy_lb_imp`, `le_Q_mul_o`, `le_Q_add_cancel`, `le_Q_sub_of_le_add_{r,l}` |
+| `Approx` | Kohlenbach §4.1: `const_R`, `abs_R`/`sub_R` under `cauchyfy`, `approx_R` (Lemma 4.2) and `cauchy_complete_R` (Lemma 4.3) |
+| `Order` | the **strict** order: `lt_irrefl_R`, `lt_add_R`/`lt_mul_pos_R`/`archimedean_R`, `zero_lt_one_R`, `lt_shift*`, `lt_trans_R` |
+| `LeOrder` | the **non-strict** order package: `le_R_refl`, `le_R_trans`, `le_R_of_eq_R_core`, `lt_imp_le_R_core`, `le_R_antisymm_core`, `le_R_congr`, additive monotonicity on either side and two-sided — plus the one-sided telescope `leR_pair_step`/`leR_tail`/`leR_le`/`leR_strict` that transitivity needs, and the reverse-triangle lemmas. `≤_ℝ` had only the `Field.lean` conversions before this module existed, so two `Derivable.dist_tri`s could not be chained |
+| `Metric` | `add_eq_zero_R`, `le_zero_eq_zero_R`, `nonneg_of_add_self_nonneg`, `abs_R_bound` |
+| `Interval` | `clamp01`, the object-level retraction onto `[0,1]`, and the four facts about it the space theories need |
+| `MCTLemmas` | what ℝ-MCT consumes: constants, cancellation, `window_drop`, `antitone_chain_R`, `le_R_app_congr_l` |
 
 The import graph is deliberately flat below `Field`: `Negation → Mul` is a real dependency
 (`mul_comm_R_core` needs `cauchyfy_congr`), but `Order` and `Metric` import only `Field`, so an
@@ -53,7 +56,7 @@ namespace Metatheorems
 -- ============================================================================
 -- Axiom hygiene: every axiom claimed proved above is checked here
 -- ============================================================================
--- A falling `sorry` count is not evidence (CLAUDE.md note 9); these are.
+-- A falling `sorry` count is not evidence; these are. Add new results to this block.
 
 #print axioms eq_R_refl
 #print axioms eq_R_sym
@@ -86,8 +89,8 @@ namespace Metatheorems
 #print axioms lt_shift1
 #print axioms lt_shift
 #print axioms lt_shift_at
--- The order axioms (closed 2026-09-03, branch `reals-order`): both `∃`-eliminations at the
--- Lean level via `Derivable.exist_rule` (exit 3 of the old note at `lt_trans_R_core`).
+-- The order axioms: both `∃`-eliminations happen at the Lean level, via
+-- `Derivable.exist_rule`.
 #print axioms lt_trans_R
 #print axioms lt_trans_R_core
 #print axioms lt_add_R
@@ -100,9 +103,8 @@ namespace Metatheorems
 #print axioms cauchyfy_lb_imp
 #print axioms le_Q_mul_o
 #print axioms le_Q_add_cancel
--- Two genuinely different lemmas, one per lane, that collided on a name at merge time
--- (2026-09-03): `_r` subtracts the right summand, `_l` the left. See the note in CLAUDE.md's
--- parallel-agent recipe — a name collision across lanes builds cleanly and then fails.
+-- Two genuinely different lemmas that once shared a name: `_r` subtracts the right summand,
+-- `_l` the left. Both are true and they are not interchangeable, so neither could be dropped.
 #print axioms le_Q_sub_of_le_add_r
 #print axioms le_Q_sub_of_le_add_l
 #print axioms neg_Q_antitone
@@ -111,7 +113,7 @@ namespace Metatheorems
 #print axioms eqR_tail
 #print axioms eqR_le
 #print axioms eqR_strict
--- The symbolic-shift telescope (2026-09-03) — what `mul_one_R` is built on.
+-- The symbolic-shift telescope — what `mul_one_R` is built on.
 #print axioms cauchyfy_tele
 #print axioms cauchyfy_tele_at
 #print axioms cauchyfy_shift_le
@@ -138,7 +140,7 @@ namespace Metatheorems
 #print axioms cauchyState_id_of_cauchy
 #print axioms cauchyfy_zero_R
 #print axioms cauchyfy_one_R
--- The code-dominates chain and `abs_R_bound` (2026-09-03):
+-- The code-dominates chain and `abs_R_bound`:
 #print axioms rat_num_le_self
 #print axioms abs_le_encode
 #print axioms encode_succ
@@ -147,20 +149,20 @@ namespace Metatheorems
 #print axioms cauchyfy_mag_le
 #print axioms cauchyfy_embed
 #print axioms abs_R_bound
--- `mul_R` is provably Cauchy (2026-09-03) — REALS_PLAN §1's majorization argument:
+-- `mul_R` is provably Cauchy, by the majorization argument:
 #print axioms mul_R_check
 #print axioms cauchyfy_mul_R
 #print axioms encode_pow2_mul
 #print axioms encode_add
 #print axioms mul_move_le
 #print axioms abs_Q_mul
--- The last two ring axioms (2026-09-03): four `mul_move_le` moves onto a common index,
+-- The last two ring axioms: four `mul_move_le` moves onto a common index,
 -- where `mul_Q_assoc_inst` / `distrib_Q_inst` close the gap exactly.
 #print axioms mul_assoc_R
 #print axioms mul_assoc_R_core
 #print axioms distrib_R
 #print axioms distrib_R_core
--- Kohlenbach §4.1, Lemmas 4.2 and 4.3 (2026-09-03): the approximation layer
+-- Kohlenbach §4.1, Lemmas 4.2 and 4.3: the approximation layer
 -- (`RealNumbers/Approx.lean`) and the two `Metric.lean` results built on it.
 #print axioms abs_Q_rev_triangle
 #print axioms cauchyfy_const
@@ -176,8 +178,8 @@ namespace Metatheorems
 #print axioms approx_R
 #print axioms approx_R_core
 #print axioms cauchy_complete_R
--- The `[0,1]` representation (`RealNumbers/Interval.lean`, 2026-09-03): the retraction
--- `clamp01` for CLAUDE.md Track C item C0, and the four results it needs.
+-- The `[0,1]` representation (`RealNumbers/Interval.lean`): the retraction `clamp01`, which is
+-- what lets `∀λ ∈ [0,1]` be an unrestricted `∀λ¹`, and the four results it needs.
 #print axioms clamp01_Q_lip
 #print axioms clamp01_Q_lip_core
 #print axioms sub_Q_mono
@@ -191,7 +193,7 @@ namespace Metatheorems
 #print axioms clamp01_le_one_core
 #print axioms clamp01_eq
 #print axioms clamp01_eq_core
--- The NON-STRICT order package (`RealNumbers/LeOrder.lean`, 2026-09-04). Before it the ℝ
+-- The NON-STRICT order package (`RealNumbers/LeOrder.lean`). Before it the ℝ
 -- layer had reflexivity/transitivity/monotonicity for `<_ℝ` and *nothing* for `≤_ℝ` beyond
 -- the `le_R`/`le_R_pu`/bound conversions in `Field.lean`, so two `Derivable.dist_tri`s could
 -- not be chained. `BaseEquality.dist_tri_chain` is the first consumer.
@@ -211,7 +213,7 @@ namespace Metatheorems
 #print axioms le_R_add_mono_r_core
 #print axioms le_R_add_mono_l_core
 #print axioms le_R_add_mono_core
--- Subtraction (2026-09-05): the ℝ content of the reverse triangle inequality
+-- Subtraction: the ℝ content of the reverse triangle inequality
 -- (`BaseEquality.dist_rev_tri`). Tight as a direct estimate, but *no new estimate* — right
 -- monotonicity, then the cancellation `(g +ℝ h) +ℝ (−ℝ h) ≤ℝ g`, chained by `le_R_trans_core`;
 -- the two `=ℝ` facts hold on the nose at every index.
@@ -220,7 +222,7 @@ namespace Metatheorems
 #print axioms add_neg_cancel_le_R_core
 #print axioms le_sub_R_of_le_add_core
 #print axioms abs_R_le_of_le_le_core
--- The ℝ-MCT assembly (`RealNumbers/MCTLemmas.lean`, 2026-09-05): constants, cancellation,
+-- The ℝ-MCT assembly (`RealNumbers/MCTLemmas.lean`): constants, cancellation,
 -- absolute value, the sample lower bound, the window drop, transport along ℕ-equalities and
 -- the antitone chain over ℝ — everything `ProofMode/RealMCT.lean` consumes. All algebra over
 -- `LeOrder.lean`; no new estimate.

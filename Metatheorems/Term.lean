@@ -17,13 +17,13 @@ intrinsically typed terms of Weakly Extensional Heyting Arithmetic over T^X.
 The primitive constants are `0`, `S`, `R` (recursor), the space constants `0_X` and `f_χ`,
 and the unit/product constructors, plus application and **lambda abstraction**.
 
-**There are no `Π` and `Σ` combinators.** An earlier version of this docstring claimed there
-were — that was stale, left over from when combinatory compilation (Def. 2.3.19) was the plan.
+**There are no `Π` and `Σ` combinators**, and no combinatory compilation (Def. 2.3.19).
 Lambda is a primitive constructor instead, and beta reduction `(λx.t) u =_τ t[u/x]` is an
 axiom of the proof system (`Derivable.beta_eq`) rather than a consequence of combinator
 axioms. So the combinatory sublanguage the reference document works in **does not exist here**;
-see the design-table entry in `CLAUDE.md` for what that costs and why it was still the right
-call.
+`CLAUDE.md`'s "Lambda vs. combinators" section sets out what that costs — in short, an
+arrow-introduction condition on the majorizability relation, which is Kohlenbach's Lemma 17.80
+and which the document pays for its combinators anyway — and why it is still the right call.
 
 ## Main Definitions
 

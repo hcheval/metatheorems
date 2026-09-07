@@ -22,7 +22,7 @@ derivation. This is the book's "ND-interpretation" — negative translation foll
 applies a fixed closed Hilbert combinator (`neg_neg_mp`, `neg_neg_imp_rev`, …, each ~50–200
 constructors) and `dnn_intro`, so a 12-constructor classical derivation becomes 85,180
 constructors and reducing `monotone_soundness` through that output is a 12 GB `std::bad_alloc`
-in the kernel (`Probes/ClassicalMfiProbe.lean`, Part C0). The fix is to never build that
+in the kernel (measured in `Probes/ClassicalMfiProbe.lean`). The fix is to never build that
 derivation: interpret the CLASSICAL derivation directly.
 
 The recursion mirrors `negTrans_sound`'s match arm for arm. Per node:
@@ -67,8 +67,8 @@ namespace Metatheorems
 open Formula
 
 -- The transport equations below prove `negTrans`/`kurodaInner` commutations; `simp only` closes
--- some outright and leaves others as a defeq goal (a `weakenBy` pushed through `¬¬`, invisible
--- to the printer — trap 12), so every transport ends `<;> rfl`. The resulting linter noise
+-- some outright and leaves others as a defeq goal (a `weakenBy` pushed through `¬¬`, which the
+-- pretty-printer does not show), so every transport ends `<;> rfl`. The resulting linter noise
 -- (some `rfl`s are then unreachable) is not worth splitting each case by hand.
 set_option linter.unreachableTactic false
 set_option linter.unusedTactic false

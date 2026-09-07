@@ -15,7 +15,9 @@ W-hyperbolic spaces have `W : X × X × [0,1] → X`, and `∀λ ∈ [0,1]` is a
 *subset* of type 1, which the metatheorem cannot take. Kohlenbach's move is to represent
 `[0,1]` so that **every** `f : ℕ → ℕ` codes an element of it, via a retraction `f ↦ λ̃(f)`
 landing in `[0,1]` and identical (as a real) on codes already there. Then `∀λ∈[0,1] A(λ)`
-is literally `∀f¹ A(λ̃ f)` — unrestricted, no side condition. See CLAUDE.md, Track C item C0.
+is literally `∀f¹ A(λ̃ f)` — unrestricted, no side condition. The payoff is uniformity: every
+element of `[0,1]` is majorized by one fixed function, so bounds extracted from a hyperbolic
+space come out independent of `λ`.
 
 Here `λ̃` is `clamp01`:
 

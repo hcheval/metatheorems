@@ -65,8 +65,8 @@ three norm axioms (`‖α·x‖`, the triangle inequality, `‖−x‖ =ℝ ‖x
 `‖1_X‖ =ℝ 1ℝ`, and the `d`/norm link. All thirteen are purely universal and ∨-free, and
 **all thirteen hold in every nontrivial real normed space** (`NormedModel.axiomsHold` below).
 
-**Checked against Kohlenbach's `A^ω[X,‖·‖]`** (Applied Proof Theory §17.3, pp. 411–412) on
-2026-09-04. His signature is `0_X, 1_X, +_X, −_X, ·_X, ‖·‖_X`, with `x =_X y :≡ ‖x −_X y‖ =ℝ 0`
+**Checked against Kohlenbach's `A^ω[X,‖·‖]`** (Applied Proof Theory §17.3, pp. 411–412).
+His signature is `0_X, 1_X, +_X, −_X, ·_X, ‖·‖_X`, with `x =_X y :≡ ‖x −_X y‖ =ℝ 0`
 and no `d_X`; his axioms are **(0)** "the purely universal vector space axioms formulated with
 `=_X`" — exactly our (1)–(8) — followed by nine norm axioms in *difference* form, (1)–(3)
 `‖x−x‖=0`, `‖x−y‖=‖y−x‖`, the triangle inequality, (4) `‖αx−αy‖=|α|‖x−y‖`,
@@ -78,7 +78,7 @@ list — goes through because every `=_X` fact it needs is a closed theorem, so 
 the congruences; it has been checked on paper, **not in Lean**. His (1)–(3) are our `Derivable`
 pseudometric constructors carried across the link (13).
 
-**Both former omissions are now closed** (2026-09-04). The signature is his, modulo his `−_X`
+**Both former omissions are now closed.** The signature is his, modulo his `−_X`
 being binary-sugar `x −_X y :≡ +_X(x, −_X y)`, which we spell out at the two use sites:
 
 * **`1_X` and (9) are in.** `ax_norm_one : ‖1_X‖ =ℝ 1ℝ` — Kohlenbach's (9), "a Skolemized form

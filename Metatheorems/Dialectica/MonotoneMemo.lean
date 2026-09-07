@@ -15,7 +15,7 @@ and `syntactic_soundness_eqmpr`). To reduce `monotone_soundness … (Eq.mpr h d)
 must bring `Eq.mpr h d` to a constructor, i.e. decide `Derivable … B ≡ Derivable … B'`, i.e.
 `B ≡ B'` — which runs `Term.subst` through the ℚ constants (the delta-expansion pathology of
 CLAUDE.md's "Build cost"). On the ℝ lemmas that is a kernel `std::bad_alloc` at 12 GB
-(`Probes/MonotoneLaneB.lean`, finding 3).
+(measured in `Probes/MonotoneLaneB.lean`).
 
 `MRealizer.transport` and the three commutation lemmas here are the MFI analogue of
 `syntactic_soundness_eqmpr`: applied as rewrite rules **with the formula equation given**, they
@@ -35,9 +35,9 @@ irrelevance).
 
 **Reach.** These lemmas fire only where `monotone_soundness` is applied *directly* to a cast.
 On a proof-mode-written derivation the casts are buried under the `pm_*`/`seq_*` layer, so
-reaching them needs the MRealizer analogues of `Probes/CombinatorLemmas.lean`'s `wit_seq_*`
-(the counter-side programme), which is a separate lane. See `Probes/MonotoneLaneBp.lean` for
-what this entry does and does not reach, with measurements.
+reaching them needs the MRealizer analogues of `Probes/CombinatorLemmas.lean`'s `wit_seq_*` —
+that is what `Dialectica/MonotoneSeq.lean` supplies. See `Probes/MonotoneLaneBp.lean` for what
+this entry does and does not reach on its own, with measurements.
 -/
 
 namespace Metatheorems

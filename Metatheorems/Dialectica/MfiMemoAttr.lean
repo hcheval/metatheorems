@@ -16,8 +16,8 @@ lives in its own module.
 functional interpretation, `Dialectica/Monotone.lean`) through the proof-mode packaging layer
 (`ProofMode/Packing.lean`'s `seq_*`, `Tactics.lean`'s `pm_*`) and through the casts that
 `anorm`/`canorm`/`qfer_*_nf`/`seq_cast` leave in a derivation. Populated in
-`Dialectica/MonotoneSeq.lean` (2026-09-05, MFI Lane D1), which also tags in the three cast
-entries of `Dialectica/MonotoneMemo.lean`.
+`Dialectica/MonotoneSeq.lean`, which also tags in the three cast entries of
+`Dialectica/MonotoneMemo.lean`.
 -/
 
 register_simp_attr mfi_memo
