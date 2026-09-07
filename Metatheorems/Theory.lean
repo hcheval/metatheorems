@@ -103,6 +103,10 @@ majorants) are emitted rather than checked because they are not decidable proper
 syntax.
 -/
 
+-- The `theory` block is written with blank lines between its items, and the elaborator below
+-- with blank lines between its phases; Mathlib's style linter objects to both.
+set_option linter.style.emptyLine false
+
 namespace Metatheorems
 
 open Lean Elab Command Meta
@@ -124,12 +128,17 @@ syntax "index " term : thyItem
 syntax "types " ident (" := " term)? : thyItem
 /-- Declare a function constant of the signature. -/
 syntax "constants " ident " : " term : thyItem
+/-- A *syntactic* alias usable in axiom bodies: `abbrev d := Term.dist ()`.  The right-hand
+side is substituted (parenthesised) wherever the name occurs in a later axiom body.  It
+generates no declaration, so it can name anything an axiom body wants short — the structural
+metric above all, which is not a function constant and so has no generated `abbrev`. -/
+syntax "abbrev " ident " := " term : thyItem
 /-- Declare an axiom, with named binders. -/
 syntax "axioms " ident thyBinderGroup* " : " term : thyItem
 
 /-- Declare a proof-mining theory: index type, signature, axioms, and the obligations a model
 of it owes.  See the module docstring for the full grammar. -/
-syntax (name := theoryCmd) "theory " ident thyItem* "endtheory" : command
+syntax (name := theoryCmd) (docComment)? "theory " ident thyItem* "endtheory" : command
 
 /-! ## Collected data -/
 
@@ -221,7 +230,7 @@ private def evalBoolStx (stx : TSTerm) : CommandElabM Bool := do
 
 @[command_elab theoryCmd]
 def elabTheory : CommandElab := fun stx => do
-  let `(command| theory $thy:ident $items:thyItem* endtheory) := stx
+  let `(command| $[$_doc:docComment]? theory $thy:ident $items:thyItem* endtheory) := stx
     | throwUnsupportedSyntax
   let thyName := thy.getId
 
@@ -231,6 +240,7 @@ def elabTheory : CommandElab := fun stx => do
   -- so they cannot be used as local names anywhere below this point in this file.
   let mut tyDecls : Array TypeDecl := #[]
   let mut consts : Array ConstDecl := #[]
+  let mut aliases : Array (Ident × TSTerm) := #[]
   let mut axs : Array AxiomDecl := #[]
   for it in items do
     match it with
@@ -241,6 +251,8 @@ def elabTheory : CommandElab := fun stx => do
         tyDecls := tyDecls.push { id := n, defn? := e? }
     | `(thyItem| constants $n:ident : $t:term) =>
         consts := consts.push { id := n, ty := t }
+    | `(thyItem| abbrev $n:ident := $e:term) =>
+        aliases := aliases.push (n, e)
     | `(thyItem| axioms $n:ident $gs:thyBinderGroup* : $b:term) =>
         let mut bs : Array (Ident × TSTerm) := #[]
         for g in gs do
@@ -315,6 +327,11 @@ def elabTheory : CommandElab := fun stx => do
   -- ------------------------------------------------------------- the axioms
   let mut baseSubst := typeSubst
   for (k, v) in constSubst.toList do baseSubst := baseSubst.insert k v
+  -- `abbrev` aliases, in declaration order, each seeing the ones before it.  Parenthesised,
+  -- so that a multi-token right-hand side is safe in an application spine.
+  for (n, e) in aliases do
+    let rhs ← `(($(substT baseSubst e)))
+    baseSubst := baseSubst.insert n.getId rhs.raw
 
   let mut axIds : Array Ident := #[]
   for a in axs do

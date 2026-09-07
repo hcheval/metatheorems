@@ -22,21 +22,31 @@ command rejects, with the error captured by `#guard_msgs` so that the rejection 
 green build rather than a comment claiming one.
 -/
 
+set_option linter.style.emptyLine false
+
 namespace Metatheorems
 
 open Formula
 
--- A metric space with a nonexpansive self-map fixing `0_X`.
--- (A `theory` block takes no doc comment: it is not a single declaration.)
+/-- A metric space with a nonexpansive self-map fixing `0_X`.
+
+`abbrev d := Term.dist ()` is a *syntactic* alias: the structural metric is not a function
+constant, so it gets no generated `abbrev`, and without the alias every axiom body would have
+to spell `(Term.dist ())` out. -/
 theory Nonexp
   index MetricSpace.ι
   types X := xTy
+
+  abbrev d := Term.dist ()
+  abbrev zeroX := Term.zeroX ()
+
   constants f : X →ₜ X
+
   axioms nonexp (x y : X) :
-    le_R_pu (Term.app2 (Term.dist ()) (.app f x) (.app f y))
-            (Term.app2 (Term.dist ()) x y)
+    le_R_pu (Term.app2 d (.app f x) (.app f y)) (Term.app2 d x y)
+
   axioms fixpt :
-    eqAtType X (.app f (Term.zeroX ())) (Term.zeroX ())
+    eqAtType X (.app f zeroX) zeroX
 endtheory
 
 -- ============================================================================
@@ -131,14 +141,24 @@ end Obligations
 -- Generated `ι`: the other mode
 -- ============================================================================
 
--- With no `index` clause the index type is generated too.  Two base types, one constant
--- between them, one axiom.
+/-- With no `index` clause the index type is generated too: two base types, one constant
+between them, two axioms — the second a **conjunction**, which `isPurelyUniversal` admits
+(it is closed under `∧` since the 2026-09-01 products merge) and which therefore has to pass
+the admissibility check. -/
 theory TwoSorted
   types A
   types B
+
+  abbrev dA := Term.dist TwoSorted.ι.A
+
   constants g : A →ₜ B
+
   axioms g_const (x y : A) :
     eqAtType B (.app g x) (.app g y)
+
+  axioms g_isom (x y : A) :
+    le_R_pu (Term.app2 dA x y) (Term.app2 dA x y)
+      ∧ᶠ le_R_pu (Term.app2 dA y x) (Term.app2 dA y x)
 endtheory
 
 example : TwoSorted.A = Ty.base TwoSorted.ι.A := rfl
@@ -146,6 +166,46 @@ example : TwoSorted.F TwoSorted.κ.g = (TwoSorted.A →ₜ TwoSorted.B) := rfl
 example {Γ : Ctx TwoSorted.ι} {al : Allowed} :
     Derivable TwoSorted.F al TwoSorted.Premises (TwoSorted.ax_g_const (Γ := Γ)) :=
   TwoSorted.g_const
+example {Γ : Ctx TwoSorted.ι} {al : Allowed} :
+    Derivable TwoSorted.F al TwoSorted.Premises (TwoSorted.ax_g_isom (Γ := Γ)) :=
+  TwoSorted.g_isom
+example : (TwoSorted.ax_g_isom (Γ := ([] : Ctx TwoSorted.ι))).isPurelyUniversal = true :=
+  TwoSorted.ax_g_isom_pu
+
+-- ============================================================================
+-- The degenerate corners
+-- ============================================================================
+
+/-- **No function constants** — `MetricSpaces.lean`'s own shape, where the metric is
+structural.  `κ` is `Empty` and `Majorants` is `PUnit`. -/
+theory NoConstants
+  index MetricSpace.ι
+  types X := xTy
+  abbrev d := Term.dist ()
+
+  axioms self (x : X) : le_R_pu (Term.app2 d x x) (Term.app2 d x x)
+endtheory
+
+example : NoConstants.κ = Empty := rfl
+example {Γ : Ctx MetricSpace.ι} {al : Allowed} :
+    Derivable NoConstants.F al NoConstants.Premises (NoConstants.ax_self (Γ := Γ)) :=
+  NoConstants.self
+
+/-- **No axioms** — the premise set is `False`, so `premises_pu` and `axiomsHold` are proved
+by `False.elim` and `Obligations` is `True`.  A model owes nothing. -/
+theory NoAxioms
+  index MetricSpace.ι
+  types X := xTy
+  constants h : X →ₜ X
+endtheory
+
+example {X : MetricSpace.ι → Type} {si : SpaceInterp X NoAxioms.F} :
+    NoAxioms.Obligations si := trivial
+example {X : MetricSpace.ι → Type} {si : SpaceInterp X NoAxioms.F}
+    (o : NoAxioms.Obligations si) :
+    ∀ (Γ' : Ctx MetricSpace.ι) (B : Formula NoAxioms.F Γ'),
+      NoAxioms.Premises ⟨Γ', B⟩ → SRealizer si B :=
+  NoAxioms.spremise o
 
 -- ============================================================================
 -- Rejection: the admissibility check, and what it says
