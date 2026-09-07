@@ -271,7 +271,8 @@ object premise, `eq_of_eqAtType_base_gen` (separation) turns the object conclusi
 a carrier equation. Nothing here consults `M.W1`–`M.W4`. -/
 theorem W_ext_left_in_model (a b c : M.carrier) (r : ℕ → ℕ) (hac : a = c) :
     M.W a b (par r) = M.W c b (par r) := by
-  have hs := M.soundness (WHyperbolic.W_ext_left px pz py pl) (envW M a b c r)
+  have hs := M.soundness (WHyperbolic.W_ext_left (a := Allowed.extended) px pz py pl)
+    (envW M a b c r)
   have hp := M.toMetricModel.eqAtType_base_holds_gen M.si (fun _ _ => rfl) px pz
     (envW M a b c r) hac
   have he := M.toMetricModel.eq_of_eqAtType_base_gen M.si (fun _ _ => rfl) _ _ _ (hs hp)
@@ -283,7 +284,8 @@ theorem W_ext_left_in_model (a b c : M.carrier) (r : ℕ → ℕ) (hac : a = c) 
 /-- **Extensionality of `W` in its second argument**, from `W_ext_right`. -/
 theorem W_ext_right_in_model (a b c : M.carrier) (r : ℕ → ℕ) (hbc : b = c) :
     M.W a b (par r) = M.W a c (par r) := by
-  have hs := M.soundness (WHyperbolic.W_ext_right px py pz pl) (envW M a b c r)
+  have hs := M.soundness (WHyperbolic.W_ext_right (a := Allowed.extended) px py pz pl)
+    (envW M a b c r)
   have hp := M.toMetricModel.eqAtType_base_holds_gen M.si (fun _ _ => rfl) py pz
     (envW M a b c r) hbc
   have he := M.toMetricModel.eq_of_eqAtType_base_gen M.si (fun _ _ => rfl) _ _ _ (hs hp)
