@@ -55,7 +55,7 @@ Together they are most of this file's ≈58 s. Everything here is a *value*-driv
 
 ## Instrument
 
-`kernel_rfl` (`Probes/MonotoneLaneB.lean`) assigns `Eq.refl` and lets the kernel decide the
+`kernel_rfl` (`Metatheorems/KernelRfl.lean`) assigns `Eq.refl` and lets the kernel decide the
 equation — the evaluator of record at this scale; `#eval` appears nowhere, so nothing here
 rests on compiler trust. Each block ends with a **refutation control**, a `decide` that the
 neighbouring value is *not* the bound: without one, a `rfl` that stalls and a `rfl` that
@@ -71,59 +71,55 @@ set_option Elab.async false
 namespace Metatheorems
 namespace DemoChecks
 
-open Metatheorems.Demo (linearR doublingR at5 at9 xs ys doubling)
-open MonotoneMCT (cmE)
-open TinyBoundDemo (tEqxiE tSpremiseE)
+open Metatheorems.Demo (linearR doublingR xs ys doubling eB_qf eB_vf eC_qf eC_vf)
+open PureWEHA (cm eqxi spremise)
 
 -- ============================================================================
 -- §6a — the LINEAR bound: witness is the induction variable, nothing iterates
 -- ============================================================================
 
-theorem lin_V_5 : (5 : ℕ) = mfiV cmE linearR at5 := by kernel_rfl
-theorem lin_V_9 : (9 : ℕ) = mfiV cmE linearR at9 := by kernel_rfl
-theorem lin_U_5 : (0 : ℕ) = mfiU cmE linearR at5 := by kernel_rfl
+theorem lin_V_5 : (5 : ℕ) = mfiV cm linearR (5 : ℕ) := by kernel_rfl
+theorem lin_V_9 : (9 : ℕ) = mfiV cm linearR (9 : ℕ) := by kernel_rfl
+theorem lin_U_5 : (0 : ℕ) = mfiU cm linearR (5 : ℕ) := by kernel_rfl
 
-theorem lin_V_5_ne_4 : (4 : ℕ) ≠ mfiV cmE linearR at5 := by rw [← lin_V_5]; decide
-theorem lin_V_9_ne_5 : (5 : ℕ) ≠ mfiV cmE linearR at9 := by rw [← lin_V_9]; decide
+theorem lin_V_5_ne_4 : (4 : ℕ) ≠ mfiV cm linearR (5 : ℕ) := by rw [← lin_V_5]; decide
+theorem lin_V_9_ne_5 : (5 : ℕ) ≠ mfiV cm linearR (9 : ℕ) := by rw [← lin_V_9]; decide
 
 -- ============================================================================
 -- §6b — the EXPONENTIAL bound: witness built from the previous witness
 -- ============================================================================
 
-theorem exp_V_0 : (1 : ℕ) = mfiV cmE doublingR (xs 0) := by kernel_rfl
-theorem exp_V_3 : (8 : ℕ) = mfiV cmE doublingR (xs 3) := by kernel_rfl
-theorem exp_V_5 : (32 : ℕ) = mfiV cmE doublingR (xs 5) := by kernel_rfl
+theorem exp_V_0 : (1 : ℕ) = mfiV cm doublingR (xs 0) := by kernel_rfl
+theorem exp_V_3 : (8 : ℕ) = mfiV cm doublingR (xs 3) := by kernel_rfl
+theorem exp_V_5 : (32 : ℕ) = mfiV cm doublingR (xs 5) := by kernel_rfl
 
-theorem exp_V_3_ne_7 : (7 : ℕ) ≠ mfiV cmE doublingR (xs 3) := by rw [← exp_V_3]; decide
-theorem exp_V_5_ne_8 : (8 : ℕ) ≠ mfiV cmE doublingR (xs 5) := by rw [← exp_V_5]; decide
+theorem exp_V_3_ne_7 : (7 : ℕ) ≠ mfiV cm doublingR (xs 3) := by rw [← exp_V_3]; decide
+theorem exp_V_5_ne_8 : (8 : ℕ) ≠ mfiV cm doublingR (xs 5) := by rw [← exp_V_5]; decide
 
 /-- The bound tracks the *function* majorant too, not only the index: `f*(0) = 3` triples
 every value. -/
-theorem exp_V_ys_0 : (3 : ℕ) = mfiV cmE doublingR (ys 0) := by kernel_rfl
-theorem exp_V_ys_2 : (12 : ℕ) = mfiV cmE doublingR (ys 2) := by kernel_rfl
-theorem exp_V_ys_2_ne_4 : (4 : ℕ) ≠ mfiV cmE doublingR (ys 2) := by rw [← exp_V_ys_2]; decide
+theorem exp_V_ys_0 : (3 : ℕ) = mfiV cm doublingR (ys 0) := by kernel_rfl
+theorem exp_V_ys_2 : (12 : ℕ) = mfiV cm doublingR (ys 2) := by kernel_rfl
+theorem exp_V_ys_2_ne_4 : (4 : ℕ) ≠ mfiV cm doublingR (ys 2) := by rw [← exp_V_ys_2]; decide
 
 /-- `U(k*) = k* − 1`, sharp — so `U` is visibly not a copy of `V`. -/
-theorem exp_U_0 : (0 : ℕ) = mfiU cmE doublingR (xs 0) := by kernel_rfl
-theorem exp_U_2 : (1 : ℕ) = mfiU cmE doublingR (xs 2) := by kernel_rfl
-theorem exp_U_3 : (2 : ℕ) = mfiU cmE doublingR (xs 3) := by kernel_rfl
-theorem exp_U_5 : (4 : ℕ) = mfiU cmE doublingR (xs 5) := by kernel_rfl
+theorem exp_U_0 : (0 : ℕ) = mfiU cm doublingR (xs 0) := by kernel_rfl
+theorem exp_U_2 : (1 : ℕ) = mfiU cm doublingR (xs 2) := by kernel_rfl
+theorem exp_U_3 : (2 : ℕ) = mfiU cm doublingR (xs 3) := by kernel_rfl
+theorem exp_U_5 : (4 : ℕ) = mfiU cm doublingR (xs 5) := by kernel_rfl
 
-theorem exp_U_3_ne_1 : (1 : ℕ) ≠ mfiU cmE doublingR (xs 3) := by rw [← exp_U_3]; decide
-theorem exp_U_3_ne_3 : (3 : ℕ) ≠ mfiU cmE doublingR (xs 3) := by rw [← exp_U_3]; decide
+theorem exp_U_3_ne_1 : (1 : ℕ) ≠ mfiU cm doublingR (xs 3) := by rw [← exp_U_3]; decide
+theorem exp_U_3_ne_3 : (3 : ℕ) ≠ mfiU cm doublingR (xs 3) := by rw [← exp_U_3]; decide
 
 /-- `Φ` through the metatheorem's own entry point: `Φ = max U V`. -/
-theorem exp_Phi_3 : (8 : ℕ) = (monotone_general_metatheorem_at tEqxiE tSpremiseE cmE
-    ContentExampleNat.eB_qf ContentExampleNat.eB_vf
-    ContentExampleNat.eC_qf ContentExampleNat.eC_vf doubling).val (xs 3) := by kernel_rfl
+theorem exp_Phi_3 : (8 : ℕ) = (monotone_general_metatheorem_at eqxi spremise cm
+    eB_qf eB_vf eC_qf eC_vf doubling).val (xs 3) := by kernel_rfl
 
-theorem exp_Phi_5 : (32 : ℕ) = (monotone_general_metatheorem_at tEqxiE tSpremiseE cmE
-    ContentExampleNat.eB_qf ContentExampleNat.eB_vf
-    ContentExampleNat.eC_qf ContentExampleNat.eC_vf doubling).val (xs 5) := by kernel_rfl
+theorem exp_Phi_5 : (32 : ℕ) = (monotone_general_metatheorem_at eqxi spremise cm
+    eB_qf eB_vf eC_qf eC_vf doubling).val (xs 5) := by kernel_rfl
 
-theorem exp_Phi_3_ne_16 : (16 : ℕ) ≠ (monotone_general_metatheorem_at tEqxiE tSpremiseE cmE
-    ContentExampleNat.eB_qf ContentExampleNat.eB_vf
-    ContentExampleNat.eC_qf ContentExampleNat.eC_vf doubling).val (xs 3) := by
+theorem exp_Phi_3_ne_16 : (16 : ℕ) ≠ (monotone_general_metatheorem_at eqxi spremise cm
+    eB_qf eB_vf eC_qf eC_vf doubling).val (xs 3) := by
   rw [← exp_Phi_3]; decide
 
 -- ============================================================================
@@ -134,9 +130,9 @@ theorem exp_Phi_3_ne_16 : (16 : ℕ) ≠ (monotone_general_metatheorem_at tEqxiE
 kernel time. At `k* = 8` the same `kernel_rfl` is out of memory at the 12 GB cap — which is
 why `exp_V_8` exists nowhere, in this file or the Walkthrough. The ceiling is the **value**,
 not the derivation: `recMaj` iterates value-many times with nothing shared. -/
-theorem exp_V_7 : (128 : ℕ) = mfiV cmE doublingR (xs 7) := by kernel_rfl
+theorem exp_V_7 : (128 : ℕ) = mfiV cm doublingR (xs 7) := by kernel_rfl
 
-theorem exp_V_7_ne_127 : (127 : ℕ) ≠ mfiV cmE doublingR (xs 7) := by rw [← exp_V_7]; decide
+theorem exp_V_7_ne_127 : (127 : ℕ) ≠ mfiV cm doublingR (xs 7) := by rw [← exp_V_7]; decide
 
 -- ============================================================================
 -- Axiom hygiene — verify by name, after a completed `lake build`

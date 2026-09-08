@@ -44,6 +44,8 @@ import Metatheorems.RealMCTStatement
 import Metatheorems.ProofMode.MCT
 import Metatheorems.ProofMode.MCTLazy
 import Metatheorems.ProofMode.RealMCT
+import Metatheorems.PureWEHA
+import Metatheorems.KernelRfl
 import Metatheorems.Probes.P1
 import Metatheorems.Probes.R1
 import Metatheorems.Probes.RwBase

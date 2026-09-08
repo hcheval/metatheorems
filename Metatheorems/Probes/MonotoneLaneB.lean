@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Horatiu
 -/
 import Metatheorems.MonotoneMetatheorem
+import Metatheorems.KernelRfl
 import Metatheorems.Probes.MonotoneLaneA
 import Std.Data.HashMap
 
@@ -147,17 +148,9 @@ open MonotoneLaneA (derivSizeA)
 -- Tools
 -- ============================================================================
 
-open Lean Elab Tactic in
-/-- Assign `Eq.refl lhs` to a goal `lhs = rhs` with **no** `Meta`-level defeq check: the
-kernel alone decides `lhs ≡ rhs` when the declaration is added. Sound (the kernel checks);
-the point is the instrument — `Meta.isDefEq` has no cache on terms with free variables and
-recomputes `Ty.interpret` at every step, the kernel does not. Non-vacuity: `e1_U_900`. -/
-elab "kernel_rfl" : tactic => do
-  let g ← getMainGoal
-  let t ← instantiateMVars (← g.getType)
-  let some (α, lhs, _) := t.eq? | throwError "kernel_rfl: the goal is not an equation"
-  let u ← Meta.getLevel α
-  g.assign (mkApp2 (mkConst ``Eq.refl [u]) α lhs)
+-- `kernel_rfl` was defined here until 2026-09-08. It is `Metatheorems/KernelRfl.lean` now
+-- (imported above), so that `Demo/` and the library can use it without importing a probe.
+-- The instrument's rationale and its non-vacuity control (`e1_U_900`) are unchanged.
 
 open Lean Meta in
 /-- Transitive constant walk from a definition, through every `Metatheorems.*` definition

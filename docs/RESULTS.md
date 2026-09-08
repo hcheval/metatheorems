@@ -78,7 +78,8 @@ same derivation term at two `Allowed` values**, so the cost is classicality's *p
 ## 2. Monotone functional interpretation (MFI) — majorant computed directly, no realizer term
 
 `monotone_soundness` → `mfiU`/`mfiV`, or `monotone_general_metatheorem_at(_gen)` for `Φ`.
-The evaluator of record is `kernel_rfl` (`Probes/MonotoneLaneB.lean:155`): assign `Eq.refl`
+The evaluator of record is `kernel_rfl` (`Metatheorems/KernelRfl.lean`; it was
+`Probes/MonotoneLaneB.lean:155` until 2026-09-08): assign `Eq.refl`
 and let the **kernel** decide. Meta-level `rfl` has no `whnf` cache when the model `M`, `h`
 are free variables and times out where the kernel succeeds in seconds; its live non-vacuity
 control is the kernel *rejecting* `900` (`MonotoneLaneB.lean:462–476`).

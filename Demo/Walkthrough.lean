@@ -5,7 +5,9 @@ Authors: Horatiu
 -/
 import Metatheorems
 import Metatheorems.Hilbert
-import Metatheorems.Probes.ContentExampleNat
+-- Nothing from `Metatheorems/Probes/`: probes are measurements. The `ι = Empty` setting is
+-- `Metatheorems/PureWEHA.lean`, `kernel_rfl` is `Metatheorems/KernelRfl.lean`, and both
+-- derivations of §6 are written out below.
 
 /-!
 # The live walkthrough — scroll from the top, one part at a time
@@ -18,7 +20,7 @@ Six parts, in the order they are meant to be shown:
 
 | § | what is on the screen | costs |
 |---|---|---|
-| 1 | the proof mode — first contact on pure logic, then **`x + y = y + x`** by induction | instant |
+| 1 | the proof mode: first contact on pure logic, then `x + y = y + x` by induction | instant |
 | 2 | the same tactics at a **metric space**: the chained triangle inequality | ~2 s |
 | 3 | …and at a **W-hyperbolic space**: extensionality of the convex combination `W` | ~1 s |
 | 4 | the **same theorem as §1 from bare `Derivable` constructors** — the contrast | instant |
@@ -483,7 +485,7 @@ hence no `weaken`, no `rename`, no dependent casts for the kernel to reduce.
 
 ## The instrument
 
-`kernel_rfl` (from `Probes/MonotoneLaneB.lean`) assigns `Eq.refl` and lets the **kernel** decide
+`kernel_rfl` (`Metatheorems/KernelRfl.lean`) assigns `Eq.refl` and lets the **kernel** decide
 the equation. That is the evaluator of record here, not `#eval` and not bare `rfl`: nothing
 below rests on compiler trust. Every numeral also has a **refutation control** — a theorem that
 the neighbouring value is *not* the bound — because a `rfl` that gets stuck and a `rfl` that
@@ -496,10 +498,18 @@ computes are otherwise indistinguishable from a green build.
 difference is visible in the proofs.
 ============================================================================ -/
 
-open MonotoneMCT (cmE)
-open TinyBoundDemo (tXE tFE tSiE tEqxiE tPremE tSpremiseE tB0 tC0)
+/-! ## The setting: pure `WE-HA^ω`
 
-/-! ## 6a. A proof whose witness is a projection ⟹ a LINEAR bound
+`PureWEHA` (`Metatheorems/PureWEHA.lean`) is the instance with no space: `PureWEHA.F` has no
+constants, `PureWEHA.Premises` is empty, `PureWEHA.cm` is the Bezem majorants of `0`, `S`,
+`R`. Every value below is therefore a plain natural number.
+
+Statements are written out. The binder tokens number binders **from the outside**, the way
+the `#hilbert` listings print them (`∀ᶠ x₀ : nat, …`): under `∀x`, `x` is `x₀`; a binder
+inside it introduces `x₁`, and `x` is still `x₀`. So `Formula.all Ty.nat (x₁ =₀ x₁)` under
+`∀x` is `∀u (u =₀ u)`, and `Formula.ex Ty.nat (x₁ =₀ x₀)` is `∃v (v =₀ x)`.
+
+## 6a. A proof whose witness is a projection ⟹ a LINEAR bound
 
 Statement: `∀x ( ∀u (u =₀ u) → ∃v (v =₀ x) )`.
 
@@ -507,11 +517,11 @@ Proved by induction on `x`, with the witness at every step being the induction v
 itself. Nothing is built *from* the previous witness, so the primitive recursion that
 Dialectica assigns to `Derivable.induction` has nothing to iterate. -/
 
-/-- **The derivation.** `∀x (∀u (u =₀ u) → ∃v (v =₀ x))`, by `pinduction`; the witness is
-`0` in the base case and `S x₀` in the step. 368 `Derivable` constructors.
-(Restated from `Probes/MonotoneMCT.lean`'s `indFinal`.) -/
-def linearInduction : @Derivable Empty Empty tFE Allowed.extended tPremE []
-    (Formula.all Ty.nat (Formula.all Ty.nat tB0 →ᶠ Formula.ex Ty.nat tC0)) := by
+/-- **The derivation.** `⊢ ∀x ( ∀u (u =₀ u) → ∃v (v =₀ x) )`, by `pinduction`; the witness
+is `0` in the base case and `S x₀` in the step. 368 `Derivable` constructors. -/
+def linearInduction : Derivable PureWEHA.F Allowed.extended PureWEHA.Premises (Γ := [])
+    (Formula.all Ty.nat
+      (Formula.all Ty.nat (x₁ =₀ x₁) →ᶠ Formula.ex Ty.nat (x₁ =₀ x₀))) := by
   pmode
   pinduction
   · pintro h
@@ -520,24 +530,21 @@ def linearInduction : @Derivable Empty Empty tFE Allowed.extended tPremE []
   · pforall
     pintro ih
     pintro h
-    pexists (Term.app Term.succ (Term.var Var.vz))
+    pexists (S x₀)
     pthm Derivable.refl0
 
-/-- The monotone realizer of it — an ordinary `def`, elaborates instantly. -/
-def linearR : MRealizer cmE
-    (Formula.all Ty.nat (Formula.all Ty.nat tB0 →ᶠ Formula.ex Ty.nat tC0)) :=
-  monotone_soundness tEqxiE tSpremiseE cmE linearInduction
+/-- The monotone realizer of it — an ordinary `def`, elaborates instantly. Its type is
+`MRealizer PureWEHA.cm <the statement above>`. -/
+def linearR := monotone_soundness PureWEHA.eqxi PureWEHA.spremise PureWEHA.cm linearInduction
 
-/-- Majorants of `x` to evaluate at. -/
-def at5 : Ty.interpret tXE Ty.nat.hat := (5 : ℕ)
-def at9 : Ty.interpret tXE Ty.nat.hat := (9 : ℕ)
-
--- Extraction — uncomment to run live (measured kernel time: 2.2 s, 2.6 s, 2.5 s, instant):
+-- Extraction at the majorants `x* = 5` and `x* = 9` — uncomment to run live
+-- (measured kernel time: 2.2 s, 2.6 s, 2.5 s, instant):
 --
--- theorem lin_V_5 : (5 : ℕ) = mfiV cmE linearR at5 := by kernel_rfl
--- theorem lin_V_9 : (9 : ℕ) = mfiV cmE linearR at9 := by kernel_rfl
--- theorem lin_U_5 : (0 : ℕ) = mfiU cmE linearR at5 := by kernel_rfl
--- theorem lin_V_5_ne_4 : (4 : ℕ) ≠ mfiV cmE linearR at5 := by rw [← lin_V_5]; decide
+-- theorem lin_V_5 : (5 : ℕ) = mfiV PureWEHA.cm linearR (5 : ℕ) := by kernel_rfl
+-- theorem lin_V_9 : (9 : ℕ) = mfiV PureWEHA.cm linearR (9 : ℕ) := by kernel_rfl
+-- theorem lin_U_5 : (0 : ℕ) = mfiU PureWEHA.cm linearR (5 : ℕ) := by kernel_rfl
+-- theorem lin_V_5_ne_4 : (4 : ℕ) ≠ mfiV PureWEHA.cm linearR (5 : ℕ) := by
+--   rw [← lin_V_5]; decide
 --
 --   ⟹ V(k) = k. Linear, and it moves with the input. U = 0 because the premise
 --     `∀u (u =₀ u)` is never consulted — nothing is read out of it at any step.
@@ -573,58 +580,197 @@ property of the proof and not a default. And **no witness term written by hand m
 `Term.prec`**: the surface-recursor ban (`ProofMode/Linter.lean`) is enforced, so the iteration
 in the bound is produced by the extraction, not smuggled into the derivation. -/
 
-/-- **The derivation.** 145 raw `Derivable` constructors, built in
-`Probes/ContentExampleNat.lean` from `induction`, `forall_ax`, `exist_ax`, `exist_rule`,
-`syllogism`, `exportation` and one quantifier-free extensionality step — no proof mode at all.
-Its fifteen named pieces are worth scrolling through in that file; the one that matters is
-`inner3`, quoted above. -/
-def doubling := ContentExampleNat.eFinal
+/-! ### The derivation, piece by piece
+
+Raw `Derivable` constructors throughout — `induction`, `forall_ax`, `exist_ax`, `exist_rule`,
+`syllogism`, `exportation`, and one quantifier-free extensionality step — no proof mode at
+all; 145 constructors in total (first built and measured in `Probes/ContentExampleNat.lean`;
+this is that derivation, owned here). `x = (k, f)` at type `nat ×ₜ (nat →ₜ nat)`, with
+`k := fst x`, `f := snd x`. The contexts grow inward: `[x]`, then `[k, x]` under the
+induction, then `[u, k, x]` or `[v, k, x]` under the inner quantifier; the abbreviations
+`f₀ f₁ f₂`, `k₁ k₂`, `v₂` name the variables by role at each depth. -/
+
+section Doubling
+
+abbrev sTy : Ty Empty := Ty.nat ×ₜ (Ty.nat →ₜ Ty.nat)
+abbrev G0 : Ctx Empty := [sTy]
+abbrev G1 : Ctx Empty := Ty.nat :: G0
+abbrev G2 : Ctx Empty := Ty.nat :: G1
+
+/-- `⊢` in the pure system, at a fixed context. -/
+abbrev D (Γ : Ctx Empty) (A : Formula PureWEHA.F Γ) :=
+  Derivable PureWEHA.F Allowed.extended PureWEHA.Premises A
+
+abbrev f0 : Term PureWEHA.F G0 (Ty.nat →ₜ Ty.nat) := Term.snd (.var .vz)
+abbrev f1 : Term PureWEHA.F G1 (Ty.nat →ₜ Ty.nat) := Term.snd (.var (.vs .vz))
+abbrev f2 : Term PureWEHA.F G2 (Ty.nat →ₜ Ty.nat) := Term.snd (.var (.vs (.vs .vz)))
+abbrev k1 : Term PureWEHA.F G1 Ty.nat := .var .vz
+abbrev k2 : Term PureWEHA.F G2 Ty.nat := .var (.vs .vz)
+abbrev v2 : Term PureWEHA.F G2 Ty.nat := .var .vz
+
+/-- `f (S u) =₀ f u +ᵗ f u` — the premise matrix, `u` the bound variable. -/
+def B2 : Formula PureWEHA.F G2 := f2 ⬝ S v2 =₀ f2 ⬝ v2 +ᵗ f2 ⬝ v2
+/-- `f k =₀ v` — the conclusion matrix. -/
+def C2 : Formula PureWEHA.F G2 := f2 ⬝ k2 =₀ v2
+/-- `f (S k) =₀ v` — the conclusion matrix at `k+1`. -/
+def CS : Formula PureWEHA.F G2 := f2 ⬝ S k2 =₀ v2
+
+/-- The formula inducted on: `∀u B₀ →ᶠ ∃v (f k =₀ v)`. -/
+def A1 : Formula PureWEHA.F G1 := Formula.all Ty.nat B2 →ᶠ Formula.ex Ty.nat C2
+def P1 : Formula PureWEHA.F G1 := Formula.all Ty.nat B2
+def Q1 : Formula PureWEHA.F G1 := Formula.ex Ty.nat C2
+def R1 : Formula PureWEHA.F G1 := Formula.ex Ty.nat CS
+
+/-- The premise instance at `u := k`: `f (S k) =₀ f k +ᵗ f k`. -/
+def E1f : Formula PureWEHA.F G1 := f1 ⬝ S k1 =₀ f1 ⬝ k1 +ᵗ f1 ⬝ k1
+/-- …the same, one binder in. -/
+def E2f : Formula PureWEHA.F G2 := f2 ⬝ S k2 =₀ f2 ⬝ k2 +ᵗ f2 ⬝ k2
+
+theorem E2f_eq : Formula.weakenBy Ty.nat E1f = E2f := rfl
+
+/-- **The premise is consumed**, at `u := k`: `(∀u B₀) →ᶠ f (S k) =₀ f k + f k`. -/
+def hi : D G1 (P1 →ᶠ E1f) := Derivable.forall_ax (A := B2) k1
+
+/-- The step's one arithmetic fact, a single QF-ER at `r := x₀ +ᵗ x₀`:
+`f k =₀ v ⊢ f k + f k =₀ v + v`. -/
+def cong2 : D G2 (C2 →ᶠ (f2 ⬝ k2 +ᵗ f2 ⬝ k2 =₀ v2 +ᵗ v2)) :=
+  qfer_nat_nf (A₀ := C2) rfl rfl I_comb
+    (r := Term.app2 Term.add (.var .vz) (.var .vz)) (by rfl) (by rfl)
+
+/-- `CS` under one more binder: `f (S k) =₀ w`, in `[w, v, k, x]`. -/
+def CS3 : Formula PureWEHA.F (Ty.nat :: G2) :=
+  Formula.eq0
+    (Term.app (Term.snd (.var (.vs (.vs (.vs .vz))))) (Term.app Term.succ (.var (.vs (.vs .vz)))))
+    (.var .vz)
+
+theorem CS3_eq : Formula.weakenBy Ty.nat R1 = Formula.ex Ty.nat CS3 := rfl
+
+/-- **The witness is built from the induction hypothesis's witness**: under the `∃`, from
+`f k =₀ v` and the premise instance, `f (S k) =₀ v +ᵗ v`, and `exist_ax` at `v +ᵗ v`. -/
+def inner3 : D G2 (C2 ∧ᶠ E2f →ᶠ Formula.weakenBy Ty.nat R1) :=
+  Derivable.syllogism
+    (pair_h and_proj2 (Derivable.syllogism and_proj1 cong2))
+    (Derivable.syllogism Derivable.trans0
+      (Derivable.exist_ax (v2 +ᵗ v2) CS3))
+
+/-- The ∃-elimination: `ex_and_left` keeps the premise instance available across it. -/
+def keyEA : D G1 (E1f ∧ᶠ Q1 →ᶠ R1) :=
+  Derivable.syllogism Derivable.and_perm
+    (Derivable.syllogism ex_and_left (Derivable.exist_rule inner3))
+
+def key : D G1 (P1 →ᶠ Q1 →ᶠ R1) :=
+  Derivable.syllogism hi (Derivable.exportation keyEA)
+
+/-- The induction step, `A1 →ᶠ A1[k := S k]`, by `S_comb` (the premise is used on both
+sides of the implication). -/
+def stepBody : D G1 ((P1 →ᶠ Q1) →ᶠ (P1 →ᶠ R1)) := Derivable.mp key S_comb
+
+def dummy0 : Formula PureWEHA.F G0 := Term.zero =₀ Term.zero
+
+def stepW : D G1 (Formula.weakenBy Ty.nat dummy0 →ᶠ
+    (A1 →ᶠ Formula.substVar0 A1 (Term.app Term.succ (.var .vz)))) :=
+  Derivable.mp stepBody (Derivable.exportation Derivable.and_weak)
+
+def stepD : D G0 (Formula.all Ty.nat
+    (A1 →ᶠ Formula.substVar0 A1 (Term.app Term.succ (.var .vz)))) :=
+  Derivable.mp Derivable.refl0 (Derivable.forall_rule stepW)
+
+/-- The `∃`-body at `k := 0`: `f 0 =₀ v`. -/
+def C0 : Formula PureWEHA.F (Ty.nat :: G0) :=
+  Formula.eq0 (Term.app (Term.snd (.var (.vs .vz))) Term.zero) (.var .vz)
+
+/-- The base case: witness `f 0`. -/
+def baseD : D G0 (A1.subst0 Term.zero) :=
+  Derivable.mp
+    (Derivable.mp Derivable.refl0 (Derivable.exist_ax (f0 ⬝ Term.zero) C0))
+    (Derivable.exportation Derivable.and_weak)
+
+/-- `⊢ ∀k ( ∀u (f (S u) =₀ f u + f u) → ∃v (f k =₀ v) )`, in context `[x]`. -/
+def Lraw : D G0 (Formula.all Ty.nat A1) := Derivable.induction baseD stepD
+
+/-- The premise matrix in the metatheorem's shape, `B₀ := f (S u) =₀ f u +ᵗ f u` in `[u, x]`:
+`x` is `x₀` (the outer binder), `u` is `x₁`, `f := snd x`. -/
+def eB : Formula PureWEHA.F [Ty.nat, sTy] :=
+  Term.snd x₀ ⬝ S x₁ =₀ Term.snd x₀ ⬝ x₁ +ᵗ Term.snd x₀ ⬝ x₁
+
+/-- The conclusion matrix, `C₀ := f k =₀ v` in `[v, x]`: `x` is `x₀`, `v` is `x₁`,
+`k := fst x`. -/
+def eC : Formula PureWEHA.F [Ty.nat, sTy] :=
+  Term.snd x₀ ⬝ Term.fst x₀ =₀ x₁
+
+theorem eB_qf : eB.isQF = true := rfl
+theorem eB_vf : eB.isVFree = true := rfl
+theorem eC_qf : eC.isQF = true := rfl
+theorem eC_vf : eC.isVFree = true := rfl
+
+/-- `∀k` instantiated at `k := fst x`. -/
+def innerD : D G0 (Formula.all Ty.nat eB →ᶠ Formula.ex Ty.nat eC) :=
+  Derivable.mp Lraw (Derivable.forall_ax (Term.fst (Term.var .vz)))
+
+def eDummy : Formula PureWEHA.F ([] : Ctx Empty) := Term.zero =₀ Term.zero
+
+def eInnerW : D [sTy] (Formula.weakenBy sTy eDummy →ᶠ
+    (Formula.all Ty.nat eB →ᶠ Formula.ex Ty.nat eC)) :=
+  Derivable.mp innerD (Derivable.exportation Derivable.and_weak)
+
+/-- **The theorem, written out**:
+
+    ⊢ ∀x^(nat × (nat→nat)) ( ∀u ( f (S u) =₀ f u +ᵗ f u )  →  ∃v ( f k =₀ v ) )
+
+with `f := snd x`, `k := fst x`. -/
+def doubling : Derivable PureWEHA.F Allowed.extended PureWEHA.Premises (Γ := [])
+    (Formula.all (Ty.nat ×ₜ (Ty.nat →ₜ Ty.nat))
+      (Formula.all Ty.nat (Term.snd x₀ ⬝ S x₁ =₀ Term.snd x₀ ⬝ x₁ +ᵗ Term.snd x₀ ⬝ x₁)
+        →ᶠ Formula.ex Ty.nat (Term.snd x₀ ⬝ Term.fst x₀ =₀ x₁))) :=
+  Derivable.mp Derivable.refl0 (Derivable.forall_rule eInnerW)
 
 /-- Its monotone realizer. -/
-def doublingR := ContentExampleNat.rE
+def doublingR := monotone_soundness PureWEHA.eqxi PureWEHA.spremise PureWEHA.cm doubling
 
-/-- `x* = (k*, λn. n+1)`, so the majorant of `f` at `0` is `1`. -/
-def xs (k : ℕ) : Ty.interpret tXE ContentExampleNat.sTy.hat := ContentExampleNat.xs k
+/-- The majorant `x* = (k*, λn. n+1)`, so `f*(0) = 1`. -/
+def xs (k : ℕ) : Ty.interpret PureWEHA.X sTy.hat := (k, fun (n : ℕ) => n + 1)
 /-- `x* = (k*, λn. n+3)` — the *other* component of the majorant, so `f*(0) = 3`. -/
-def ys (k : ℕ) : Ty.interpret tXE ContentExampleNat.sTy.hat := ContentExampleNat.ys k
+def ys (k : ℕ) : Ty.interpret PureWEHA.X sTy.hat := (k, fun (n : ℕ) => n + 3)
+
+end Doubling
 
 -- Extraction, the witness side — uncomment to run live
 -- (measured kernel time: 0.05 s at k*=0, 1.2 s at k*=3, 4.3 s at k*=5 — the cost grows with
 --  the VALUE, see §6c):
 --
--- theorem exp_V_0 : (1 : ℕ) = mfiV cmE doublingR (xs 0) := by kernel_rfl
--- theorem exp_V_3 : (8 : ℕ) = mfiV cmE doublingR (xs 3) := by kernel_rfl
--- theorem exp_V_5 : (32 : ℕ) = mfiV cmE doublingR (xs 5) := by kernel_rfl
--- theorem exp_V_3_ne_7 : (7 : ℕ) ≠ mfiV cmE doublingR (xs 3) := by rw [← exp_V_3]; decide
+-- theorem exp_V_0 : (1 : ℕ) = mfiV PureWEHA.cm doublingR (xs 0) := by kernel_rfl
+-- theorem exp_V_3 : (8 : ℕ) = mfiV PureWEHA.cm doublingR (xs 3) := by kernel_rfl
+-- theorem exp_V_5 : (32 : ℕ) = mfiV PureWEHA.cm doublingR (xs 5) := by kernel_rfl
+-- theorem exp_V_3_ne_7 : (7 : ℕ) ≠ mfiV PureWEHA.cm doublingR (xs 3) := by rw [← exp_V_3]; decide
 --
 --   ⟹ V(k*, f*) = 2^{k*} · f*(0). Exponential — and it is *tight*: 2^k·f(0) is exactly f k.
 
 -- …and it tracks the function majorant, not only the index (0.06 s, 0.8 s):
 --
--- theorem exp_V_ys_0 : (3 : ℕ) = mfiV cmE doublingR (ys 0) := by kernel_rfl
--- theorem exp_V_ys_2 : (12 : ℕ) = mfiV cmE doublingR (ys 2) := by kernel_rfl
+-- theorem exp_V_ys_0 : (3 : ℕ) = mfiV PureWEHA.cm doublingR (ys 0) := by kernel_rfl
+-- theorem exp_V_ys_2 : (12 : ℕ) = mfiV PureWEHA.cm doublingR (ys 2) := by kernel_rfl
 --
 --   ⟹ f*(0) = 3 triples every value: 2^2 · 3 = 12, not the 4 that f*(0) = 1 would give.
 
 -- The premise side — U is NOT a copy of V, and it is sharp
 -- (0.06 s, 0.9 s, 1.5 s, 5.5 s):
 --
--- theorem exp_U_0 : (0 : ℕ) = mfiU cmE doublingR (xs 0) := by kernel_rfl
--- theorem exp_U_2 : (1 : ℕ) = mfiU cmE doublingR (xs 2) := by kernel_rfl
--- theorem exp_U_3 : (2 : ℕ) = mfiU cmE doublingR (xs 3) := by kernel_rfl
--- theorem exp_U_5 : (4 : ℕ) = mfiU cmE doublingR (xs 5) := by kernel_rfl
+-- theorem exp_U_0 : (0 : ℕ) = mfiU PureWEHA.cm doublingR (xs 0) := by kernel_rfl
+-- theorem exp_U_2 : (1 : ℕ) = mfiU PureWEHA.cm doublingR (xs 2) := by kernel_rfl
+-- theorem exp_U_3 : (2 : ℕ) = mfiU PureWEHA.cm doublingR (xs 3) := by kernel_rfl
+-- theorem exp_U_5 : (4 : ℕ) = mfiU PureWEHA.cm doublingR (xs 5) := by kernel_rfl
 --
 --   ⟹ U(k*) = k* − 1, exactly: the step at k consults ∀u B₀ at u := k, for k = 0 … k*−1.
 --     "How far into the premise the proof reaches", as a genuine function of x*.
 
 -- Φ, through the metatheorem itself (2.3 s, 10.5 s — the second is a slow cell, warn the room):
 --
--- theorem exp_Phi_3 : (8 : ℕ) = (monotone_general_metatheorem_at tEqxiE tSpremiseE cmE
---     ContentExampleNat.eB_qf ContentExampleNat.eB_vf
---     ContentExampleNat.eC_qf ContentExampleNat.eC_vf doubling).val (xs 3) := by kernel_rfl
--- theorem exp_Phi_5 : (32 : ℕ) = (monotone_general_metatheorem_at tEqxiE tSpremiseE cmE
---     ContentExampleNat.eB_qf ContentExampleNat.eB_vf
---     ContentExampleNat.eC_qf ContentExampleNat.eC_vf doubling).val (xs 5) := by kernel_rfl
+-- theorem exp_Phi_3 : (8 : ℕ) =
+--     (monotone_general_metatheorem_at PureWEHA.eqxi PureWEHA.spremise PureWEHA.cm
+--       eB_qf eB_vf eC_qf eC_vf doubling).val (xs 3) := by kernel_rfl
+-- theorem exp_Phi_5 : (32 : ℕ) =
+--     (monotone_general_metatheorem_at PureWEHA.eqxi PureWEHA.spremise PureWEHA.cm
+--       eB_qf eB_vf eC_qf eC_vf doubling).val (xs 5) := by kernel_rfl
 --
 --   ⟹ Φ = max U V, from the metatheorem's own entry point rather than its two components.
 
@@ -644,8 +790,8 @@ object-level `Term.add` is a `prec` term, so `recMaj` iterates *value*-many time
 shared. `k* = 7` is the last one that finishes — and it is a *slow* cell, so run it only if
 there is time.
 
-    -- theorem exp_V_7 : (128 : ℕ) = mfiV cmE doublingR (xs 7) := by kernel_rfl  -- 9–30 s
-    -- theorem exp_V_8 : (256 : ℕ) = mfiV cmE doublingR (xs 8) := by kernel_rfl  -- OOM
+    -- theorem exp_V_7 : (128 : ℕ) = mfiV PureWEHA.cm doublingR (xs 7) := by kernel_rfl  -- 9–30 s
+    -- theorem exp_V_8 : (256 : ℕ) = mfiV PureWEHA.cm doublingR (xs 8) := by kernel_rfl  -- OOM
 
 (`exp_V_7` is verified on every build in `Probes/DemoChecks.lean`; `exp_V_8` exists nowhere.)
 
