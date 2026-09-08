@@ -151,6 +151,19 @@ rest are numbers whose provenance is weaker than the sentence around them.
    they are named individually"; not safe as a single structure-level theorem, and an audience
    of this kind will ask which axiomatisation and where the bundle is.
 
+   > **CORRECTION, 2026-09-08 — the paragraph above is itself wrong, and this is the more
+   > important finding.** It is not merely a bundling problem. **The claim is false**: there
+   > is no multiplicative inverse anywhere in the ℚ or ℝ towers — no `inv_Q`, `div_Q`,
+   > `inv_R`, `div_R`, no reciprocal term, and no derived `x ≠ 0 → ∃y (x ·ℝ y =ℝ 1ℝ)`. So
+   > "each of the ordered-field axioms is proved" is not a safe rephrasing; the axiom that
+   > fails is one of them. The correct statement is a **commutative Archimedean ordered ring
+   > with unit, Cauchy-complete with a modulus** — Kohlenbach condition (m) minus division.
+   >
+   > **The methodological point.** This audit checked whether the claim was *bundled*, which
+   > it is, and stopped there — it never asked whether the conjunction was *true*. Verifying
+   > the form of a claim is not verifying the claim. One `grep` for `inv_` would have settled
+   > it. Found by the docs-pass lane while rewriting `RealNumbers/Defs.lean`'s header.
+
 ---
 
 ## Corrections — small, mechanical, and each one findable on a slide

@@ -147,11 +147,24 @@ end Term
 -- ============================================================================
 
 -- ============================================================================
--- Ordered Field Axioms (Derivable in WE-HA^ω)
+-- Ordered Ring Axioms (Derivable in WE-HA^ω)
 -- ============================================================================
 
--- Following Kohlenbach's condition (m): (ℕ^ℕ, +_ℝ, ·_ℝ, 0_ℝ, 1_ℝ, <_ℝ)
--- is an Archimedean ordered field, provably in WE-HA^ω.
+-- Following Kohlenbach's condition (m): (ℕ^ℕ, +_ℝ, ·_ℝ, 0_ℝ, 1_ℝ, <_ℝ) is an Archimedean
+-- ordered RING, provably in WE-HA^ω — condition (m) minus division.
+--
+-- This header said "ordered field" until 2026-09-08, and that was false: there is no
+-- multiplicative inverse anywhere in the ℚ or ℝ towers. No `inv_Q`/`div_Q`/`inv_R`/`div_R`,
+-- no reciprocal term, and no derived `x ≠ 0 → ∃y (x ·ℝ y =ℝ 1ℝ)`.
+--
+-- The gap is in what is FORMALIZED, not in what is REPRESENTABLE, and the difference matters
+-- because this layer is full of fractions. `rat_encode` is sign/numerator/denominator, so
+-- every rational has a code, reciprocals included; `pow2neg_Q n = pair(2, exp2 n - 1)` is
+-- literally the code of 1/2^n. The dyadic constants below — the Cauchy moduli `2^{-n}`, and
+-- MCT's rungs `q_j = j ·ℚ 2^{-(k+1)}` — are constants and products of constants, never
+-- quotients. What is missing is the operation and the axiom, not the power to state them.
+--
+-- Nothing downstream needs either: the space axioms use only +, ·, |·|, ≤ℝ and =ℝ.
 
 variable {al : Allowed} {Premises : PremiseSet F}
 

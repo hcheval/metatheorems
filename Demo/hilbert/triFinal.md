@@ -1,6 +1,6 @@
 # `Metatheorems.TriangleBoundDemo.triFinal`
 
-9 steps.
+9 steps, `all`.
 
 | # | Formula | Justification |
 |---:|---|---|

@@ -222,8 +222,11 @@ argument works by majorizing closed terms of that language. A real number has to
 of the language — Kohlenbach's representation, a Cauchy sequence of rational codes with a fixed
 modulus, `realTy ι = nat →ₜ nat` — or there is nothing to majorize and the theorem is about
 something else. The cost was the whole ℚ/ℝ tower (`RationalNumbers.lean`, `RealNumbers/*.lean`,
-zero sorries): the encoded reals are a complete Archimedean ordered field inside the object
-theory, which is Kohlenbach's condition (m). Mathlib's `ℝ` is used on the *semantic* side, and
+zero sorries): the encoded reals are a complete Archimedean ordered **ring** inside the object
+theory — Kohlenbach's condition (m) *minus division*. There is no multiplicative inverse in
+either tower; every other ordered-field axiom is derived, along with the Archimedean property
+and Cauchy completeness with a modulus. Nothing downstream needs the inverse: the space axioms
+are stated with `+`, `·`, `|·|`, `≤ℝ` and `=ℝ` only. Mathlib's `ℝ` is used on the *semantic* side, and
 `QValBridge.lean`/`CodeReal.lean` is the bridge (`qval` for codes, `codeReal` for sequences).
 The representation is also what makes the metatheorem's uniformity work: `Ty.hat` sends every
 base type to `nat` (`TypeSystem.lean:80`), so a majorant is always an ℕ-valued object and
