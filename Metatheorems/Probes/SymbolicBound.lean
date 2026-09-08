@@ -9,13 +9,51 @@ import Metatheorems.Probes.ContentExampleNat
 /-!
 # `Φ` as an EXPRESSION — the symbolic route, on the two induction targets
 
-`Probes/ExprBound.lean` recovered the *shape* of a bound on a 13-constructor derivation at a
-space. This file runs the same instrument, in its fuel-free form (`ExprBound.pr2`), on the two
-derivations whose bounds are *recursions*: `MonotoneMCT.rI` (a proof-mode `pinduction`, bound
-`V(n) = n`) and `ContentExampleNat.rE` (a raw `Derivable.induction` with a doubling witness,
-bound `V(k, f*) = 2^k · f*(0)`).
+Every number this project reports is `Φ` **applied at a point**, and several of them are
+Cantor pairing codes rather than magnitudes. But a metatheorem produces a *function*. This
+file displays two of them as functions.
 
-Findings and figures are in the per-section comments; the headline is at the top of each.
+## The two targets, and which proof each bound comes from
+
+| target | input proof | route | bound at points |
+|---|---|---|---|
+| `tgtI` | `MonotoneMCT.indFinal` — `∀x(∀u(u=u) → ∃v(v=x))` by **proof-mode `pinduction`**, witness `x` itself, 368 constructors | MFI (`rI = monotone_soundness … indFinal`) | `V(5)=5`, `V(9)=9` |
+| `tgtE` | `ContentExampleNat.eFinal` — `∀x(∀u (f(Su) =₀ f u +ᵗ f u) → ∃v (f k =₀ v))` by **raw `Derivable.induction`**, witness at `k+1` built from the previous witness, 145 constructors | MFI (`rE = monotone_soundness … eFinal`) | `V = 2^k·f*(0)`: 1, 8, 32, 128 |
+
+Same induction rule; the bounds differ because the witness is a *projection* in the first and
+a *function of the previous witness* in the second. That is the whole content of "bounds are
+properties of proofs, not theorems", and it is visible in the displays below.
+
+## RESULT — the kernel is the reducer, not `Meta`
+
+`ExprBound.knf`/`runK` (`Lean.Kernel.whnf` plus the blocklist) converges on both targets;
+`ExprBound.pr`/`pr2` (the `Meta`-level reducers) do not. **Every `KERNEL` run below reports
+`capAbort=false`; every `Meta` run reports `capAbort=true` or `hbAbort=true`.** The kernel
+consumes no heartbeats and has a structural cache `Meta.whnf` lacks — the same asymmetry
+`MonotoneLaneB` records for `kernel_rfl` being the evaluator of record.
+
+Measured (this file, 2026-09-08), all converged:
+
+| display | time | visits | `numObjs` |
+|---|---|---|---|
+| `tgtE` at `k=0` | 113 ms | 4 | **6** |
+| `tgtE` at `k=1` | 3.46 s | 39 | 9,735 |
+| `tgtE` at `k=2` | 12.0 s | 73 | 15,593 |
+| `tgtE` at `k=3` | 30.8 s | 141 | 27,429 |
+| `tgtE`, both `k` and `g` symbolic | 8.4 s | 170 | 38,861 |
+| `tgtI`, symbolic in `n` | 4.24 s | 74 | 2,962 |
+
+Unrolling is **superlinear in `k`** — 3.5 s, 12 s, 31 s — so do not expect to read the pattern
+off at `k = 5`.
+
+## What is PROVED versus what is READ OFF
+
+Proved, kernel-checked, universally quantified in the majorant: `V_closed_0`, that
+`mfiV cmE rE (0, g) = g 0` for every `g`. Nothing else.
+
+The general form `V(k, f*) = 2^k · f*(0)` is a **conjecture read off the displays**. The
+`k = 1` candidates were probed and the kernel **rejected** the one that looked right; see the
+retraction note at `V_closed_0`. Do not promote the reading to a claim.
 -/
 
 set_option linter.unusedTactic false

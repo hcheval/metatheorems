@@ -30,6 +30,7 @@ import Metatheorems.Probes.ContentExampleSpace
 import Metatheorems.Probes.NestingDepth
 import Metatheorems.Probes.SharingProbe
 import Metatheorems.Probes.ExprBound
+import Metatheorems.Probes.SymbolicBound
 import Metatheorems.Probes.WExtBoundDemo
 -- Not a probe: `Metatheorems.Headline` is the project's `#print axioms` block for every
 -- headline declaration. It is not reachable from the umbrella either, so until 2026-09-07 it

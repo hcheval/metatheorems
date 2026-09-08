@@ -103,11 +103,17 @@ per-path re-expansion that defeats evaluation, appearing in the display tool for
 reason, and the memo does not stop it because it is keyed on **`(fuel, ExprStructEq)`**: the
 identical subterm reached at two different fuels is two different keys.
 
-**The obvious next experiment** (untried): drop `fuel` from the design entirely and reduce to a
-normal form with respect to the blocklist alone, memoising on `ExprStructEq` only. The blocklist
-already stops reduction, so fuel may be doing nothing but breaking sharing. The risk is
-non-termination on a recursive definition that always delta-expands, which would need the
-recursors added to the blocklist.
+**That experiment was run on 2026-09-08 and REFUTED** — drop `fuel`, memoise on `ExprStructEq`
+alone, and the reduction goes *deeper* and *larger* (`tgtI`: 53,447 → 6,503,304 objects), then
+aborts on the heartbeat guard below the cap. Sharing was not the blocker. The figures and the
+three side findings are at the `pr2` section below.
+
+**What works instead: reduce with the KERNEL** (`knf`/`runK`, at the bottom of this file).
+`Lean.Kernel.whnf` consumes no heartbeats and has the structural cache `Meta.whnf` lacks, so it
+converges where every `Meta`-level variant aborts — every `KERNEL` run in
+`Probes/SymbolicBound.lean` reports `capAbort=false`, every `Meta` run reports an abort. That
+is the same asymmetry `MonotoneLaneB` records for `kernel_rfl` being the evaluator of record,
+and it is the result of this line of work.
 - **Proof-mode derivations need `mfi_push` first**, since `Derivable.rec` cannot fire until the
   `pm_*`/`seq_*` layer and its `Eq.mpr` casts are rewritten away. Raw-constructor derivations
   like this one need nothing.
@@ -211,8 +217,46 @@ where
     | _ => return e
 
 -- ============================================================================
--- The FUEL-FREE reducer (2026-09-08) — the experiment this file's header names
+-- The FUEL-FREE reducer (2026-09-08) — the experiment this file's header named,
+-- ⚠ RUN AND **REFUTED**. Kept as the record of the measurement. Use `knf`/`runK` below.
 -- ============================================================================
+
+/-!
+## The hypothesis, and why it was wrong
+
+This file's header proposed dropping `fuel` and memoising on `ExprStructEq` alone, on the
+theory that keying the memo on `(fuel, ExprStructEq)` was defeating sharing and that sharing
+was the blocker. **It is not.** Dropping fuel makes the reduction go *deeper* and the result
+*larger*:
+
+| target | cap 500 | cap 2000 | cap 8000 / 30000 |
+|---|---|---|---|
+| `SymbolicBound.tgtI` | 501 visits, **53,447** objects | 704, **6,503,304** | 704, **6,503,304** |
+| `SymbolicBound.tgtE` | 501 visits, **1,500,524** | 512, 1,500,524 | 512, 1,500,524 |
+
+The figures stop changing not because the reduction converged but because it aborts at the
+same place every time — 704 / 512 visits, on the heartbeat guard, *below* the cap. Sharing was
+never the blocker. **The blocker is that `Meta.whnf` has no structural cache and a heartbeat
+budget; the kernel has the cache and no budget.** That is what `knf` exploits, and it is the
+result of this lane.
+
+Three further measurements, each of which cost time to find:
+
+1. **A single `Meta` call can eat the whole 200,000-heartbeat budget, uninterruptibly.** The
+   first version died at visit 154 with `lastConst = Prod.snd`, `lastStage = unfoldDefinition?`:
+   `mfiU`/`mfiV` read the bound with `.1`/`.2`, which are `Prod.fst`/`Prod.snd` *applications*,
+   and smart unfolding whnfs the pair argument to expose a `Prod.mk` — i.e. runs the entire
+   realizer computation in one step. `prodProj?` below handles projections by hand, which moved
+   the wall to `termMajorizer`.
+2. **A heartbeat timeout is a RUNTIME exception.** Plain `try`/`catch` and `<|>` both silently
+   re-throw it; `tryCatchRuntimeEx` is the one that catches. Without it every diagnostic run
+   just failed the build with no statistics to show for it.
+3. **Skipping type-valued subterms buys nothing**: 1,500,524 → 1,500,567 and 6,503,304 →
+   6,503,301. The blow-up is entirely value-level. The flag is kept but defaults to `false`,
+   because it *enlarges* small displays (`acSpike` 162 → 219 objects).
+
+Do not re-run this experiment expecting a different answer; run `knf` instead.
+-/
 
 /-- The state of the fuel-free reducer: the memo (keyed on `ExprStructEq` **alone**, which is
 the whole point — the fuelled version keys on `(fuel, ExprStructEq)` and so cannot share the
