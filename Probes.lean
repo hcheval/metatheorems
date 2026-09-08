@@ -51,6 +51,9 @@ import Metatheorems.Probes.WBoundDemo
 -- `DemoChecks`: the walkthrough's §6 commands are commented so a presenter can run them
 -- live, and commented code rots.
 import Metatheorems.Probes.DemoChecks
+-- `#bound` (`Metatheorems/BoundPrint.lean`) measured on the Demo derivations and on
+-- `real_mct_p2`: structural depth sweeps and the capped kernel reducer.
+import Metatheorems.Probes.BoundPrintDemo
 
 /-!
 # Probe sweep target

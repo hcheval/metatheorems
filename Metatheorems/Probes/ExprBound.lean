@@ -120,6 +120,13 @@ and it is the result of this line of work.
 - Residual cosmetic noise: `maxT nat` should print as `max`, and `2^(0+1)` should normalise.
   A delaborator and a `norm_num` pass on the result; not done.
 
+**`knf`/`runK` now also exist in the library**, as `BoundPrint.knf` behind
+`#bound <name> eval [cap n]` (`Metatheorems/BoundPrint.lean`, in the umbrella). The copy here
+is kept as the record of the measurements above; new evaluative runs should use the command,
+whose own measurements — including that its visit cap does **not** bound the work of a single
+`Kernel.whnf`, so `real_mct_p2` still `bad_alloc`s at 12 GB — are in
+`Probes/BoundPrintDemo.lean`.
+
 The same fuel-plus-blocklist design is what `Hilbert.lean`'s `shouldUnfold` wants: it is
 currently a *binary* predicate that stops at the whole `ProofMode` namespace, which is why
 `#hilbert … all` cannot expand a proof-mode derivation at all.
