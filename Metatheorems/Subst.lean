@@ -26,10 +26,6 @@ def Renaming.id : Renaming Γ Γ := fun v => v
 
 variable {ι κ : Type} {F : κ → Ty ι}
 
--- ============================================================================
--- Substitutions (variable-to-term maps)
--- ============================================================================
-
 /-- A substitution from context Γ to context Δ: maps each variable in Γ to
     a term of the same type in Δ. -/
 def Subst (F : κ → Ty ι) (Γ Δ : Ctx ι) : Type :=
@@ -60,10 +56,6 @@ def subst (s : Subst F Γ Δ) : Term F Γ τ → Term F Δ τ
   | .fst pr        => .fst (subst s pr)
   | .snd pr        => .snd (subst s pr)
 
--- ============================================================================
--- Substitution for variable 0
--- ============================================================================
-
 /-- The single-variable substitution: replace variable 0 with `s`,
     and shift all other variables down by one. -/
 def subst0_map (s : Term F Γ ρ) : Subst F (ρ :: Γ) Γ :=
@@ -75,9 +67,7 @@ def subst0_map (s : Term F Γ ρ) : Subst F (ρ :: Γ) Γ :=
 def subst0 (t : Term F (ρ :: Γ) τ) (s : Term F Γ ρ) : Term F Γ τ :=
   subst (subst0_map s) t
 
--- ============================================================================
--- Foundational substitution/renaming commutation lemmas
--- ============================================================================
+/-! ### Substitution/renaming commutation lemmas -/
 
 /-- Composing two renamings. -/
 theorem rename_rename {Γ Δ Δ' : Ctx ι} {τ : Ty ι}
@@ -198,9 +188,8 @@ theorem weaken_subst0 (t : Term F Γ τ) (s : Term F Γ ρ) :
   rw [rename_subst]
   exact subst_id t
 
-/-- `Subst.ext` at the two variable shapes, and weakening of a variable. Needed to normalise
-a goal under *nested* binders, where the substitution arrives as an iterated `Subst.ext`.
-Stated so that `simp` can step through: unfolding alone leaves a `match`. -/
+/-- `Subst.ext` at the two variable shapes, and weakening of a variable, so that `simp` can
+step through an iterated `Subst.ext` under nested binders. -/
 @[simp] theorem Subst.ext_vz {σ : Ty ι} (s : Subst F Γ Δ) :
     Subst.ext s (σ := σ) (τ := σ) .vz = .var .vz := rfl
 
@@ -210,38 +199,23 @@ Stated so that `simp` can step through: unfolding alone leaves a `match`. -/
 @[simp] theorem weaken_var {σ τ : Ty ι} (v : Var Γ τ) :
     (Term.var v : Term F Γ τ).weaken (σ := σ) = .var (.vs v) := rfl
 
-/-- `subst0_map` at the two variable shapes. Stated so that `simp` can step through them:
-unfolding the definition alone leaves a `match`. -/
+/-- `subst0_map` at the two variable shapes, so that `simp` can step through them. -/
 @[simp] theorem subst0_map_vz (s : Term F Γ ρ) : subst0_map s (τ := ρ) .vz = s := rfl
 
 @[simp] theorem subst0_map_vs (s : Term F Γ ρ) {τ : Ty ι} (w : Var Γ τ) :
     subst0_map s (.vs w) = .var w := rfl
 
-/-- `weaken_subst0` with `subst0` unfolded.
-
-Normalizing a goal left behind by `induction` pushes `Formula.subst0` down to bare
-`Term.subst`, at which point `weaken_subst0` no longer matches. This form does. -/
+/-- `weaken_subst0` with `subst0` unfolded — the form that matches a goal left by
+`induction`, where `Formula.subst0` has been pushed down to bare `Term.subst`. -/
 theorem subst_subst0_map_weaken (t : Term F Γ τ) (s : Term F Γ ρ) :
     Term.subst (Term.subst0_map s) (Term.weaken t) = t :=
   weaken_subst0 t s
 
--- ============================================================================
--- A normal form for substitute-after-rename
--- ============================================================================
-
 /-!
-Instantiating a *weakened* `∀` at a term composes a renaming with a substitution. Written
-naively — via `rename_subst` — the composite is an anonymous `fun v => s (r v)`, which matches
-none of the named forms above, so no rewrite can fire on it. It can still be pushed
-structurally down to the variables, where it beta-reduces; but at an *opaque* leaf (a term
-parameter, as opposed to a variable or a constant) there is nothing to push into, and
-collapsing it needs `subst_id` under a `funext` — not a rewrite.
+### A normal form for substitute-after-rename
 
-Every composite we actually meet has one shape: *put `t` at variable 0, rename the rest by
-`r`*. Naming that shape, `Subst.cons`, is enough. It is closed under the compositions that
-arise (`Renaming.comp` absorbs the renamings), and — the point — it has a leaf rule,
-`subst_cons_weaken`, that fires on an opaque term because the substitution is a named
-constructor rather than a lambda.
+`Subst.cons t r` — put `t` at variable 0, rename the rest by `r` — is the normal form for
+every substitution-after-renaming composite that arises here.
 -/
 
 /-- Composition of renamings, as a named combinator rather than a lambda. -/
@@ -264,13 +238,8 @@ rename back into the notation the user sees. -/
 theorem rename_shift {σ : Ty ι} (t : Term F Γ τ) :
     t.rename (Renaming.shift (σ := σ)) = t.weaken := rfl
 
-/-- Substituting the shift renaming *viewed as a substitution* is weakening.
-
-`rename_eq_subst` reads left-to-right, turning a rename into a subst; this is the
-right-to-left direction at `Renaming.shift`, which is the form a `Formula.weakenBy` leaves
-behind once `renameF_eq_substF` has been applied to it.  Without this, a weakened hypothesis
-and a hand-written `t.weaken.weaken` are equal but not syntactically so, and the proof mode
-cannot match them. -/
+/-- Substituting the shift renaming *viewed as a substitution* is weakening — the
+right-to-left direction of `rename_eq_subst` at `Renaming.shift`. -/
 theorem subst_shift_eq_weaken {σ : Ty ι} (t : Term F Γ τ) :
     t.subst (fun {_} v => Term.var (Renaming.shift (σ := σ) v)) = t.weaken := by
   rw [← rename_eq_subst]; rfl
@@ -289,8 +258,7 @@ def Subst.cons (t : Term F Δ σ) (r : Renaming Γ Δ) : Subst F (σ :: Γ) Δ :
 @[simp] theorem Subst.cons_vs {σ τ : Ty ι} (t : Term F Δ σ) (r : Renaming Γ Δ) (w : Var Γ τ) :
     Subst.cons t r (.vs w) = .var (r w) := rfl
 
-/-- **The leaf rule.** Because `Subst.cons` is a named constructor, this fires on an opaque
-term `u` — which is exactly what the anonymous composite could not do. -/
+/-- The leaf rule for `Subst.cons`: being a named constructor, it fires on an opaque term. -/
 @[simp] theorem subst_cons_weaken {σ : Ty ι} (t : Term F Δ σ) (r : Renaming Γ Δ)
     (u : Term F Γ τ) :
     (u.weaken (σ := σ)).subst (Subst.cons t r) = u.rename r := by
@@ -305,10 +273,7 @@ theorem subst_subst0_map_rename_ext {Γ Δ : Ctx ι} {σ τ : Ty ι}
     (u.rename (Renaming.ext r)).subst (subst0_map t) = u.subst (Subst.cons t r) := by
   rw [rename_subst]; congr 1; funext _τ v; cases v <;> rfl
 
-/-- A renaming under a binder is a `cons` too: it keeps variable 0 and renames the rest.
-
-This is what lets a bare *weakening under a binder* — the shape `∀`-elimination at the bound
-variable leaves behind — join the same normal form, opaque leaves included. -/
+/-- A renaming under a binder is a `cons` too: it keeps variable 0 and renames the rest. -/
 theorem rename_ext_eq_subst_cons {Γ Δ : Ctx ι} {σ τ : Ty ι}
     (r : Renaming Γ Δ) (u : Term F (σ :: Γ) τ) :
     u.rename (Renaming.ext r)
@@ -325,7 +290,7 @@ theorem subst_cons_rename_ext {Γ Δ Δ' : Ctx ι} {σ τ : Ty ι}
 
 end Term
 
--- Re-export Renaming at Metatheorems level for backwards compatibility
+/-- `Term.Renaming` re-exported at the `Metatheorems` level. -/
 abbrev Renaming {ι : Type} (Γ Δ : Ctx ι) := Term.Renaming Γ Δ
 
 namespace Renaming

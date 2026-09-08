@@ -23,10 +23,6 @@ type 0, propositional connectives, and quantifiers over all types.
 * `Formula.subst0` — Substitute a term for the outermost bound variable.
 -/
 
--- ============================================================================
--- Formulas
--- ============================================================================
-
 /-- Formulas of WE-HA^{ω,X} (Definition 2.1.5). -/
 inductive Formula {ι κ : Type} (F : κ → Ty ι) : Ctx ι → Type where
   /-- Falsity ⊥. -/
@@ -48,9 +44,7 @@ namespace Formula
 
 variable {ι κ : Type} {F : κ → Ty ι}
 
--- ============================================================================
--- Notation
--- ============================================================================
+/-! ### Notation -/
 
 scoped notation "⊥ᶠ" => Formula.bot
 scoped infixl:35 " ∧ᶠ " => Formula.and
@@ -67,9 +61,7 @@ def iff' (A B : Formula F Γ) : Formula F Γ := (A →ᶠ B) ∧ᶠ (B →ᶠ A)
 
 scoped infix:20 " ↔ᶠ " => Formula.iff'
 
--- ============================================================================
--- Quantifier-free predicate
--- ============================================================================
+/-! ### Syntactic classes of formulas -/
 
 /-- A formula is quantifier-free if it contains no ∀ or ∃. -/
 def isQF : Formula F Γ → Bool
@@ -81,31 +73,21 @@ def isQF : Formula F Γ → Bool
   | .all _ _ => false
   | .ex  _ _ => false
 
-/-- A formula is purely universal: a nesting of ∀ around a QF core.
-    Needed for lem:negative-forall-equiv: purely universal formulas are
-    equivalent to their negative translations in the base theory. -/
+/-- A formula is purely universal: a nesting of ∀ and ∧ around a QF core. Such formulas are
+equivalent to their negative translations in the base theory. -/
 def isPurelyUniversal : Formula F Γ → Bool
   | .all _ A => A.isPurelyUniversal
-  -- closed under ∧ as well: `eqAtType` at a product type is a conjunction of two
-  -- ∀-formulas, which is still ∃-free and ∨-free, hence still trivially realized.
   | .and A B => A.isPurelyUniversal && B.isPurelyUniversal
   | A        => A.isQF
 
-/-- A formula is purely existential: a nesting of ∃ around a QF core — Kohlenbach's
-"∃-formula" (`C∃` in Theorem 17.52). The mirror image of `isPurelyUniversal`, closed under
-`∧` for the same reason (the Dialectica witness of `∃c C₀ ∧ ∃c' C₀'` is still just the pair
-of witnesses, with nothing to challenge).
-
-Exists for the general-matrix metatheorem, `syntactic_general_metatheorem_gen`, which takes a
-purely universal premise matrix and a purely existential conclusion matrix, as 17.52 does. -/
+/-- A formula is purely existential: a nesting of ∃ and ∧ around a QF core — Kohlenbach's
+"∃-formula" (`C∃` in Theorem 17.52), the mirror image of `isPurelyUniversal`. Used by the
+general-matrix metatheorem `syntactic_general_metatheorem_gen`. -/
 def isPurelyExistential : Formula F Γ → Bool
   | .ex _ A  => A.isPurelyExistential
   | .and A B => A.isPurelyExistential && B.isPurelyExistential
   | A        => A.isQF
 
--- ============================================================================
--- ∨-free predicate (needed for Markov and IP Dialectica proofs)
--- ============================================================================
 
 /-- A formula is ∨-free if it contains no disjunctions. -/
 def isVFree : Formula F Γ → Bool
@@ -121,9 +103,7 @@ def isVFree : Formula F Γ → Bool
     of Markov's principle and Independence of Premise). -/
 def isQFVFree : Formula F Γ → Bool := fun A => A.isQF && A.isVFree
 
--- ============================================================================
--- Renaming on Formulas
--- ============================================================================
+/-! ### Renaming and substitution on formulas -/
 
 /-- Apply a variable renaming to a formula. -/
 def renameF (r : Term.Renaming Γ Δ) : Formula F Γ → Formula F Δ
@@ -135,9 +115,6 @@ def renameF (r : Term.Renaming Γ Δ) : Formula F Γ → Formula F Δ
   | .all ρ A => .all ρ (renameF (Term.Renaming.ext r) A)
   | .ex  ρ A => .ex  ρ (renameF (Term.Renaming.ext r) A)
 
--- ============================================================================
--- Substitution on Formulas
--- ============================================================================
 
 /-- Apply a substitution to a formula. -/
 def substF (s : Term.Subst F Γ Δ) : Formula F Γ → Formula F Δ
@@ -214,19 +191,13 @@ theorem renameF_eq_substF {Γ Γ' : Ctx ι}
     | vz => rfl
     | vs w => rfl
 
--- ============================================================================
--- Substitute-after-rename, in normal form
--- ============================================================================
-
 /-!
-The formula-level counterparts of `Term.subst_subst0_map_rename_ext` and
-`Term.subst_cons_rename_ext`. Together they say: instantiating a formula that has been
-weakened any number of times is a single `substF (Term.Subst.cons t r)`, with all the
-weakenings collected into one `Term.Renaming.comp` tower.
+### Substitute-after-rename, in normal form
 
-`substF` then pushes down through the connectives as usual; under a binder the substitution
-becomes `Term.Subst.ext (Term.Subst.cons t r)`, where the existing `Term.weaken_subst_ext`
-takes over. At the leaves, `Term.subst_cons_weaken` fires even on opaque terms.
+The formula-level counterparts of `Term.subst_subst0_map_rename_ext` and
+`Term.subst_cons_rename_ext`: instantiating a formula weakened any number of times is a
+single `substF (Term.Subst.cons t r)`, with the weakenings collected into one
+`Term.Renaming.comp` tower.
 -/
 
 /-- Substituting for variable 0 after a renaming under the binder is a single `cons`. This is
@@ -266,9 +237,7 @@ theorem substF_cons_renameF_ext {Γ Δ Δ' : Ctx ι} {σ : Ty ι}
 def weaken : Formula F Γ → Formula F (σ :: Γ) :=
   renameF Term.Renaming.shift
 
--- ============================================================================
--- In-place substitution of variable 0
--- ============================================================================
+/-! ### In-place substitution of variable 0 -/
 
 /-- Substitution map that replaces variable 0 with `t` and keeps others in place.
     Unlike `subst0_map`, the replacement term lives in the same context. -/
@@ -292,9 +261,6 @@ def Term.substVar0_map (t : Term F (ρ :: Γ) ρ) : Term.Subst F (ρ :: Γ) (ρ 
 def substVar0 (A : Formula F (ρ :: Γ)) (t : Term F (ρ :: Γ) ρ) : Formula F (ρ :: Γ) :=
   substF (Term.substVar0_map t) A
 
--- ============================================================================
--- AC substitution (for the axiom of choice axiom schema)
--- ============================================================================
 
 /-- Substitution used in the AC conclusion `∃Y^{ρ→τ}. ∀x^ρ. A(x, Yx)`.
     Maps context `τ :: ρ :: Γ` to `ρ :: (ρ →ₜ τ) :: Γ`:
@@ -307,9 +273,7 @@ def acSubst {ρ τ : Ty ι} : Term.Subst F (τ :: ρ :: Γ) (ρ :: (ρ →ₜ τ
   | .vs .vz     => .var .vz
   | .vs (.vs w) => .var (.vs (.vs w))
 
--- ============================================================================
--- Iterated quantifiers (for Dialectica)
--- ============================================================================
+/-! ### Iterated quantifiers -/
 
 /-- Wrap a formula in iterated ∀ over a list of types. -/
 def wrapAll : (ρs : List (Ty ι)) → Formula F (ρs ++ Γ) → Formula F Γ
@@ -323,9 +287,6 @@ def wrapEx : (ρs : List (Ty ι)) → Formula F (ρs ++ Γ) → Formula F Γ
 
 end Formula
 
--- `eqAtType` moved to `Metatheorems/EqAtType.lean`. Base-type equality is now *defined* as
--- `d_i(s,t) =ℝ 0ℝ`, so it depends on the ℚ/ℝ term layer, which depends on `Formula` — this
--- file. It was the last declaration here and had no dependants inside it, so the split is
--- clean. See ARCHITECTURE.md.
+-- `eqAtType` lives in `Metatheorems/EqAtType.lean`, above the ℚ/ℝ term layer.
 
 end Metatheorems

@@ -15,15 +15,9 @@ Following Chapter 2 (Definition 2.3.1) of the reference document, we define the
 intrinsically typed terms of Weakly Extensional Heyting Arithmetic over T^X.
 
 The primitive constants are `0`, `S`, `R` (recursor), the space constants `0_X` and `f_χ`,
-and the unit/product constructors, plus application and **lambda abstraction**.
-
-**There are no `Π` and `Σ` combinators**, and no combinatory compilation (Def. 2.3.19).
-Lambda is a primitive constructor instead, and beta reduction `(λx.t) u =_τ t[u/x]` is an
-axiom of the proof system (`Derivable.beta_eq`) rather than a consequence of combinator
-axioms. So the combinatory sublanguage the reference document works in **does not exist here**;
-`CLAUDE.md`'s "Lambda vs. combinators" section sets out what that costs — in short, an
-arrow-introduction condition on the majorizability relation, which is Kohlenbach's Lemma 17.80
-and which the document pays for its combinators anyway — and why it is still the right call.
+and the unit/product constructors, plus application and lambda abstraction. Lambda is a
+primitive constructor: there are no `Π`/`Σ` combinators, and beta reduction is the axiom
+`Derivable.beta_eq`.
 
 ## Main Definitions
 
@@ -41,10 +35,6 @@ abbrev Ctx (ι : Type) := List (Ty ι)
 def recTy {ι : Type} (ρ : Ty ι) : Ty ι :=
   ρ →ₜ (ρ →ₜ Ty.nat →ₜ ρ) →ₜ Ty.nat →ₜ ρ
 
--- ============================================================================
--- Well-typed de Bruijn variables
--- ============================================================================
-
 /-- A well-typed de Bruijn variable in context Γ of type τ.
     `Var.vz` is the most recently bound variable (index 0).
     `Var.vs` shifts past one binding. -/
@@ -61,10 +51,6 @@ def weaken : Var Γ τ → Var (σ :: Γ) τ := .vs
 
 end Var
 
--- ============================================================================
--- Terms
--- ============================================================================
-
 /-- Terms of WE-HA^{ω,X} (Definition 2.3.1) with intrinsic typing.
 
 `Term F Γ τ` is a term of type `τ` in typing context `Γ`, where:
@@ -72,9 +58,8 @@ end Var
 - `κ` is the index set for abstract space function constants
 - `F : κ → Ty ι` assigns a type to each abstract space function constant
 
-The two index sets are separate (ARCHITECTURE.md §6) so that a theory may have one base
-type and several constants (normed spaces: `+`, scalar multiplication, `‖·‖`). Every
-existing instantiation takes `κ := ι`, which is inferred when `F : ι → Ty ι`. -/
+The two index sets are separate so that a theory may have one base type and several
+constants. Every existing instantiation takes `κ := ι`, inferred when `F : ι → Ty ι`. -/
 inductive Term {ι κ : Type} (F : κ → Ty ι) : Ctx ι → Ty ι → Type where
   /-- Variable: well-typed de Bruijn index into the context. -/
   | var   : Var Γ τ → Term F Γ τ
@@ -95,9 +80,7 @@ inductive Term {ι κ : Type} (F : κ → Ty ι) : Ctx ι → Ty ι → Type whe
   /-- The distance `d_{X_i} : X_i → X_i → ℝ` carried by every base type.
 
       Structural rather than a function constant in `F`, because equality at a base type is
-      *defined* as `d_i(s,t) =ℝ 0ℝ` — so `eqAtType` must be able to name it without going
-      through a signature. The pseudometric axioms for it are constructors of `Derivable`,
-      and every model owes a `distInterp` satisfying them. See ARCHITECTURE.md. -/
+      *defined* as `d_i(s,t) =ℝ 0ℝ`. Its pseudometric axioms are constructors of `Derivable`. -/
   | dist  : (i : ι) → Term F Γ (Ty.base i →ₜ Ty.base i →ₜ realTy ι)
   /-- The inhabitant of the unit type. -/
   | unitI : Term F Γ Ty.unit
@@ -111,10 +94,6 @@ inductive Term {ι κ : Type} (F : κ → Ty ι) : Ctx ι → Ty ι → Type whe
 namespace Term
 
 variable {ι κ : Type} {F : κ → Ty ι}
-
--- ============================================================================
--- Convenience
--- ============================================================================
 
 /-- Apply to two arguments. -/
 def app2 (f : Term F Γ (ρ →ₜ τ →ₜ σ)) (a : Term F Γ ρ) (b : Term F Γ τ) : Term F Γ σ :=
@@ -130,10 +109,6 @@ def ofNat : (n : Nat) → Term F Γ Ty.nat
   | 0     => .zero
   | n + 1 => .app .succ (ofNat n)
 
--- ============================================================================
--- Renamings and weakening
--- ============================================================================
-
 /-- A renaming from context Γ to context Δ: maps each variable in Γ to
     a variable of the same type in Δ. -/
 def Renaming (Γ Δ : Ctx ι) : Type :=
@@ -148,8 +123,7 @@ def Renaming.ext (r : Renaming Γ Δ) : Renaming (σ :: Γ) (σ :: Δ) :=
 /-- Shift renaming: weakens all variables by one. -/
 def Renaming.shift : Renaming Γ (σ :: Γ) := Var.vs
 
-/-- `Renaming.ext` at the two variable shapes. Stated so that `simp` can step through them:
-unfolding the definition alone leaves a `match`. -/
+/-- `Renaming.ext` at the two variable shapes, so that `simp` can step through them. -/
 @[simp] theorem Renaming.ext_vz {Γ Δ : Ctx ι} {σ : Ty ι} (r : Renaming Γ Δ) :
     Renaming.ext r (σ := σ) (τ := σ) .vz = .vz := rfl
 
