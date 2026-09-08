@@ -22,3 +22,11 @@ name = "Metatheorems"
 # to Term's/Derivable's indices. See Probes.lean for why this exists.
 [[lean_lib]]
 name = "Probes"
+
+# The presenter's live-demo file, `Demo/Walkthrough.lean`. Deliberately NOT in
+# `defaultTargets`: a plain `lake build` stays fast. `lake build Demo` builds it, and
+# `Metatheorems/Probes/DemoChecks.lean` (in the `Probes` sweep) imports it, so the sweep
+# keeps it green and checks its extraction commands.
+[[lean_lib]]
+name = "Demo"
+roots = ["Demo.Walkthrough"]
