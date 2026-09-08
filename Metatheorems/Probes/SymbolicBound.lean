@@ -101,16 +101,19 @@ theorem dblMaj_eq (v : ℕ) : ∀ m, dblMaj v m = v + m
   | 0 => rfl
   | m + 1 => by rw [dblMaj, dblMaj_eq v m]; omega
 
-/-- **The shape at `k = 1`, by the kernel**, universally quantified in the majorant `f*`.
-Confirmed first with `#kdefeq` (below) so that no build was spent on a wrong candidate: the
-running `max` of `recMaj_succ` collapses here, and what survives is the `Term.add` majorant's
-iteration applied to `f*(0)` twice. -/
-theorem V_shape_1 (g : ℕ → ℕ) : tgtE 1 g = dblMaj (g 0) (g 0) := by kernel_rfl
-
-/-- **`V(1, f*) = 2 · f*(0)` for EVERY `f*`** — a closed form, not a numeral at a point.
-The defeq half is `V_shape_1` (kernel), the arithmetic half `dblMaj_eq` (induction). -/
-theorem V_closed_1 (g : ℕ → ℕ) : tgtE 1 g = 2 * g 0 := by
-  rw [V_shape_1, dblMaj_eq]; omega
+-- **NOT PROVED, 2026-09-08 — the k = 1 closed form is OPEN.** Both of the following were
+-- written and REJECTED BY THE KERNEL (`(kernel) declaration type mismatch`), so they are
+-- recorded here as the candidates that fail rather than kept as theorems:
+--
+--     theorem V_shape_1 (g) : tgtE 1 g = dblMaj (g 0) (g 0) := by kernel_rfl
+--     theorem V_closed_1 (g) : tgtE 1 g = 2 * g 0 := by rw [V_shape_1, dblMaj_eq]; omega
+--
+-- `dblMaj` and `dblMaj_eq` are kept because the kernel *display* of `tgtE1` (see the `runK`
+-- output above) is that iteration; what has not been pinned down is the exact spelling — the
+-- `max`/`maxT` instance and the placement of `recMaj`'s running maximum. Use `#kdefeq` below
+-- to settle a candidate BEFORE spending a build on it; a `#kdefeq` reading of `true` on a
+-- multi-line probe must be attributed to the right line (the reported line is the FIRST line
+-- of the command), which is where this attempt went wrong.
 
 open Lean Elab Command Term in
 /-- `#kdefeq a ≟ b` — ask the **kernel** whether two closed terms are definitionally equal,
