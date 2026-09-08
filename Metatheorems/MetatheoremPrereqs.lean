@@ -10,13 +10,18 @@ import Metatheorems.NDTranslation
 namespace Metatheorems
 
 /-!
-# General Logical Metatheorem (Theorem 6.1)
+# Prerequisites of the general logical metatheorem (Theorem 6.1)
 
-The general metatheorem: from a classical proof of
+**This file is a library of shared parts, not a metatheorem.** It is named for what it
+contains rather than for what it once contained: the three components below, out of which
+every live entry point is assembled. Nothing here is an entry point, and nothing here is
+dead — 16 of its 17 declarations are cited from other modules.
+
+The metatheorem those parts serve: from a classical proof of
 `∀x^ρ (∀u⁰ B(x,u) → ∃v⁰ C(x,v))`, extract a computable bound Φ such that
 `∀u ≤ Φ(x*) B(x,u) → ∃v ≤ Φ(x*) C(x,v)` for all x* ≥*_ρ x.
 
-The proof factors into:
+It factors into:
 1. **Core bound construction** (`coreBound` / `metatheorem_core_of_majorants{,_at}`): given
    semantic witnesses U, V with `∀x, B(x, U(x)) → C(x, V(x))` and majorants for them,
    construct Φ as their pointwise max.
@@ -25,16 +30,17 @@ The proof factors into:
 3. **The classical reduction** (`prenexify`, `classical_to_prenex_extended{,_gen}`): the
    proof-theoretic half, shared by every classical entry point.
 
-**This file holds no entry point of its own.** The live ones are
-`syntactic_general_metatheorem{,_classical,_at,_gen}` (`SyntacticMetatheorem.lean`) and
-`monotone_general_metatheorem{_at,_classical_at}` (`MonotoneMetatheorem.lean`,
-`MonotoneMetatheoremClassical.lean`); both are built from the three parts above.
+The live entry points are `syntactic_general_metatheorem{,_classical,_at,_gen}`
+(`SyntacticMetatheorem.lean`) and `monotone_general_metatheorem{_at,_classical_at}`
+(`MonotoneMetatheorem.lean`, `MonotoneMetatheoremClassical.lean`); both are built from the
+three parts above. Delete this file and every metatheorem in the project stops compiling.
 
-*This file used to hold `general_metatheorem`, `general_metatheorem_classical` and
-`metatheorem_core` as well — the transcription of the reference document's Def. 6.0.1 with a
-total majorizer. All three were deleted with the `Majorizability` structure they took, which
-is uninhabitable; see `MajorizabilityRel.lean`. Do not re-add them. Everything else here is
-live and is what both routes above rest on.*
+*Named `Metatheorem.lean` until 2026-09-08. It did hold `general_metatheorem`,
+`general_metatheorem_classical` and `metatheorem_core` — the transcription of the reference
+document's Def. 6.0.1 with a total majorizer — and all three were deleted on 2026-09-07 with
+the `Majorizability` structure they took, which is uninhabitable (`MajorizabilityRel.lean`).
+Do not re-add them. What the old name then advertised was a metatheorem that was no longer
+here, which reads as a vestigial file; the rename says what survived instead.*
 -/
 
 open Formula

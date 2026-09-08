@@ -319,7 +319,7 @@ A `Majorizability` structure used to sit here — `MajorizabilityRel` extended w
 
 the faithful transcription of the reference document's Def. 6.0.1, matching the Lean 3
 formalization. It was deleted along with its only consumers — `metatheorem_core`,
-`general_metatheorem`, `general_metatheorem_classical` (`Metatheorem.lean`) and the shape
+`general_metatheorem`, `general_metatheorem_classical` (`MetatheoremPrereqs.lean`) and the shape
 probe in `MCTStatement.lean`. **The reason is recorded here rather than in code, because it
 is a finding about that presentation and the code could never do anything.**
 

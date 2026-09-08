@@ -704,9 +704,9 @@ theorem dialecticaMatrix_weaken {ι κ : Type} {X : ι → Type} {F : κ → Ty 
 semantic interpretation — at *every* witness and *every* counter, because both types are
 subsingletons (`dialecticaWitness_subsingleton`).
 
-This duplicates `dialecticaMatrix_iff_interpFormula` (`Metatheorem.lean`), which cannot be
-used here: `Metatheorem.lean` sits far above this file. When the two are ever unified, this
-is the one to keep — it is the lower of the two. -/
+This duplicates `dialecticaMatrix_iff_interpFormula` (`MetatheoremPrereqs.lean`), which cannot
+be used here: that file sits far above this one. When the two are ever unified, this is the
+one to keep — it is the lower of the two. -/
 theorem dialecticaMatrix_iff_interp_qf {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) {Γ : Ctx ι}
     (A : Formula F Γ) (hqf : A.isQF = true) (hvf : A.isVFree = true)

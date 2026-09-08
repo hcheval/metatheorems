@@ -12,7 +12,7 @@ import Metatheorems.Soundness
 Until 2026-09-05 `Derivable` had **no** rule about `mkPair`/`fst`/`snd` — the constructors
 were in `Term` (since the `syntactic-witnesses` merge) but `fst (mkPair a b) =₀ a` was not a
 theorem of the object system. Two things were blocked on exactly that: the `∃u∃v` collapse on
-the classical route (`classical_to_prenex_extended`'s docstring in `Metatheorem.lean`, "no
+the classical route (`classical_to_prenex_extended`'s docstring in `MetatheoremPrereqs.lean`, "no
 product β-rules") and the nested existentials of `Probes/ConjBoundDemo.lean`. This file shows
 the wall is gone.
 

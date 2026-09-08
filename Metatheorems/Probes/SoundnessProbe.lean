@@ -19,7 +19,7 @@ VERDICT (everything below compiles, zero `sorry`):
   One genuinely missing general lemma turned up: `Formula.interpret_substF`, the formula-level
   counterpart of `Term.interpret_substF`. It is 10 lines and any soundness theorem needs it
   (`forall_ax`, `exist_ax`, `qfer`, `induction`, `ac`, `qfac`).
-  `Formula.interpret_renameF_gen` (weakening) already exists in `Metatheorem.lean`.
+  `Formula.interpret_renameF_gen` (weakening) already exists in `MetatheoremPrereqs.lean`.
 
 * Given soundness, `realize`, `realizeTerm_sound` and `dist_comm_holds` do follow — see
   `probe_realize_truth`, `probe_realize`, `probe_dist_comm`.

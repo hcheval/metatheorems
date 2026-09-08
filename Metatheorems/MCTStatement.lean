@@ -1,5 +1,5 @@
 import Metatheorems.Arithmetic
-import Metatheorems.Metatheorem
+import Metatheorems.MetatheoremPrereqs
 
 /-!
 # Probe P2: is the ℕ-level MCT statement expressible in the shape the metatheorem wants?
