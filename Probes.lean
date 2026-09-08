@@ -43,12 +43,13 @@ import Metatheorems.Probes.TinyBoundDemo
 import Metatheorems.Probes.TriangleBoundDemo
 import Metatheorems.Probes.UPremiseDemo
 import Metatheorems.Probes.WBoundDemo
--- NOT imported here: `Demo/Walkthrough.lean`, the presenter's guided walkthrough. It must stay
--- green, and it is reachable from nothing else, but `Demo` is not a `lean_lib` in
--- `lakefile.toml`, so `import Demo.Walkthrough` fails with "unknown module prefix 'Demo'".
--- Check it with `scripts/lean.sh <repo>/Demo/Walkthrough.lean` (≈1 min, no errors expected).
--- To fold it into this sweep, add to `lakefile.toml`:  [[lean_lib]]  name = "Demo"
--- and then the import line here.
+-- `Demo/Walkthrough.lean`, the presenter's live-demo file, IS in this sweep — indirectly.
+-- `Demo` is now a `lean_lib` in `lakefile.toml` (not in `defaultTargets`, so a plain
+-- `lake build` is unaffected), and `DemoChecks` imports it, so building `Probes` builds the
+-- walkthrough and re-runs every extraction §6 shows commented-out. That is the point of
+-- `DemoChecks`: the walkthrough's §6 commands are commented so a presenter can run them
+-- live, and commented code rots.
+import Metatheorems.Probes.DemoChecks
 
 /-!
 # Probe sweep target
