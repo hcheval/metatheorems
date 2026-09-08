@@ -225,6 +225,32 @@ structure PRState where
   memo : Std.HashMap ExprStructEq Expr := {}
   visits : Nat := 0
   aborted : Bool := false
+  /-- The visit cap for this run. Lower it to sweep: if the rendered result stops changing as
+  the cap rises, the reduction has converged; if it keeps growing, it has not. -/
+  cap : Nat := 250000
+  /-- `IO.getNumHeartbeats` at the start of the run. -/
+  hb0 : Nat := 0
+  /-- Abort when this many heartbeats have been spent. Set **below** the 200,000 × 1000 default
+  budget so the reducer stops itself and reports, instead of dying at `checkMaxHeartbeats`
+  with no statistics. No limit is raised anywhere. -/
+  hbLimit : Nat := 120000000
+  /-- Set when `hbLimit` rather than `cap` is what stopped the run. -/
+  hbAborted : Bool := false
+  /-- The head constant the reducer was working on last, and what it was doing to it. Read
+  after a run that threw: a `Meta` call is not interruptible, so if one call eats the whole
+  heartbeat budget this is the only record of which one. -/
+  lastConst : Name := .anonymous
+  lastStage : String := "—"
+  /-- Leave type-valued subterms unreduced (see `core`). **Measured 2026-09-08: off by
+  default, because it buys nothing.** On the two induction targets it changed the aborted
+  size by 3 objects in 1.5 million (1,500,524 → 1,500,567; 6,503,304 → 6,503,301) — the
+  blow-up is entirely value-level — while it *enlarges* the small displays (`acSpike`'s
+  normal form went 162 → 219 objects, with unreduced `Ty.interpret` types left in). -/
+  skipTypes : Bool := false
+  /-- The blocklist for this run — the output vocabulary, per target. Defaults to `blocked`;
+  a caller can widen it (`run2p … (extra := [``termMajorizer])`) to keep a constant symbolic
+  when unfolding it is what explodes. -/
+  blk : Std.HashSet Name := blocked
 
 abbrev M2 := StateRefT PRState MetaM
 
@@ -232,6 +258,21 @@ abbrev M2 := StateRefT PRState MetaM
 def prCap : Nat := 250000
 /-- Recursion-depth cap, so a pathological chain aborts rather than overflowing the stack. -/
 def prDepthCap : Nat := 3000
+
+/-- `Prod.fst e` / `Prod.snd e` as `(isSnd, e)`.
+
+**Why this needs its own case, measured 2026-09-08.** `mfiU`/`mfiV` read the bound off a pair
+with `.1`/`.2`, which elaborate to `Prod.fst`/`Prod.snd` *applications* (not `Expr.proj`). On
+the induction target, `unfoldDefinition?` at such a node uses **smart unfolding**: it whnfs the
+pair argument to expose a `Prod.mk`, and that single call runs the entire realizer computation
+and eats the whole 200,000-heartbeat budget in one uninterruptible step — the reducer's own
+visit cap and heartbeat guard never get a turn (visit 154, ≈5.4 s, at every cap). So the
+projection is reduced **by hand**: reduce the pair under our control first, then select. -/
+def prodProj? (e : Expr) : Option (Bool × Expr) :=
+  match e.getAppFn, e.getAppArgs with
+  | .const ``Prod.fst _, #[_, _, p] => some (false, p)
+  | .const ``Prod.snd _, #[_, _, p] => some (true, p)
+  | _, _ => none
 
 /-- **Fuel-free partial delta-reduction**: reduce to a normal form with respect to `blocked`
 alone, memoising on `ExprStructEq` only.
@@ -246,18 +287,39 @@ partial def pr2 (depth : Nat) (e : Expr) : M2 Expr := do
     modify fun s => { s with aborted := true }
     return e
   modify fun s => { s with visits := s.visits + 1 }
-  if (← get).visits > prCap then
+  let st ← get
+  if st.visits > st.cap then
     modify fun s => { s with aborted := true }
     return e
+  if st.visits % 64 == 0 then
+    if (← IO.getNumHeartbeats) - st.hb0 > st.hbLimit then
+      modify fun s => { s with aborted := true, hbAborted := true }
+      return e
   let r ← core depth e
   modify fun s => { s with memo := s.memo.insert (ExprStructEq.mk e) r }
   return r
 where
   core (depth : Nat) (e0 : Expr) : M2 Expr := do
     if ← isProof e0 then return e0
+    -- Type-valued subterms carry no arithmetic and are where the size goes: an argument like
+    -- `Ty.interpret X (wTy A).hat` expands into the whole formula's structure. Leave them
+    -- alone, exactly as proofs are left alone. Cheap syntactic test — no `whnf` on the type.
+    if (← get).skipTypes then
+      if (← inferType e0).isSort then return e0
+    if let .const c0 _ := e0.getAppFn then
+      modify fun s => { s with lastConst := c0, lastStage := "whnfCore" }
     let e ← whnfCore e0
+    if let some (isSnd, p) := prodProj? e then
+      modify fun s => { s with lastStage := "prodProj" }
+      let p' ← pr2 (depth + 1) p
+      if p'.isAppOfArity ``Prod.mk 4 then
+        let as := p'.getAppArgs
+        return ← pr2 (depth + 1) (if isSnd then as[3]! else as[2]!)
+      else
+        return mkAppN e.getAppFn (e.getAppArgs.set! 2 p')
     if let .const c _ := e.getAppFn then
-      if !blocked.contains c then
+      if !(← get).blk.contains c then
+        modify fun s => { s with lastConst := c, lastStage := "unfoldDefinition?" }
         if let some e' ← unfoldDefinition? e then
           return ← pr2 (depth + 1) e'
         else if let some e' ← forceDelta e then
@@ -267,6 +329,7 @@ where
       let f ← pr2 (depth + 1) e.getAppFn
       let args ← e.getAppArgs.mapM (pr2 (depth + 1))
       let e' := mkAppN f args
+      if (← get).aborted then return e'
       let e'' ← whnfCore e'
       if e'' == e' then return e' else pr2 (depth + 1) e''
     | .lam n t b bi => withLocalDecl n bi t fun x => do
@@ -275,31 +338,63 @@ where
     | .proj s i b => do
       let b' ← pr2 (depth + 1) b
       let e' := Expr.proj s i b'
+      if (← get).aborted then return e'
       let e'' ← whnfCore e'
       if e'' == e' then return e' else pr2 (depth + 1) e''
     | _ => return e
 
 /-- Reduce a constant with the fuel-free reducer and log time, visits, whether the cap fired,
 `Expr.numObjs`, and the rendered result. -/
-def run2 (nm : Name) (chars : Nat := 3000) : MetaM Unit := do
+def run2 (nm : Name) (chars : Nat := 3000) (cap : Nat := prCap) : MetaM Unit := do
   let e ← mkConstWithLevelParams nm
   let t0 ← IO.monoMsNow
-  let (r, st) ← (pr2 0 e).run {}
+  let (r, st) ← (pr2 0 e).run { cap := cap, hb0 := ← IO.getNumHeartbeats }
   let t1 ← IO.monoMsNow
   let n : Nat ← liftM (m := MetaM) r.numObjs
   logInfo m!"=== {nm} FUEL-FREE  time={t1 - t0}ms  visits={st.visits}  \
-capAbort={st.aborted}  numObjs={n}"
+capAbort={st.aborted}  hbAbort={st.hbAborted}  numObjs={n}"
   let s := toString (← ppExpr r)
   logInfo (m!"{s.take chars |>.toString}")
 
-/-- Reduce an already-elaborated term (not a constant) with the fuel-free reducer. -/
-def run2e (label : String) (e : Expr) (chars : Nat := 3000) : MetaM Unit := do
+/-- Like `run2`, but the state lives in a ref held by the caller, so a heartbeat timeout inside
+the reduction is **caught and reported with the statistics reached** instead of killing the
+command. This is what distinguishes "the visit cap fired" from "one `whnfCore` call ate the
+whole heartbeat budget". -/
+def run2p (nm : Name) (chars : Nat := 3000) (cap : Nat := prCap) (extra : List Name := []) :
+    MetaM Unit := do
+  let e ← mkConstWithLevelParams nm
+  let hb ← IO.getNumHeartbeats
+  let bl := extra.foldl (fun (s : Std.HashSet Name) n => s.insert n) blocked
+  let ref ← IO.mkRef ({ cap := cap, hb0 := hb, blk := bl } : PRState)
   let t0 ← IO.monoMsNow
-  let (r, st) ← (pr2 0 e).run {}
+  -- A heartbeat timeout is a *runtime* exception, which plain `try`/`catch` (and `<|>`)
+  -- deliberately re-throw — measured 2026-09-08, both silently failed to catch it.
+  -- `tryCatchRuntimeEx` is the one that does.
+  let r? ← tryCatchRuntimeEx
+    (do let r ← ReaderT.run (pr2 0 e) ref; pure (some r))
+    (fun ex => do logInfo m!"(reduction threw: {ex.toMessageData})"; pure none)
+  let t1 ← IO.monoMsNow
+  let st ← ref.get
+  logInfo m!"=== {nm} FUEL-FREE cap={cap}  time={t1 - t0}ms  visits={st.visits}  \
+capAbort={st.aborted}  hbAbort={st.hbAborted}  finished={r?.isSome}  \
+last={st.lastConst} ({st.lastStage})"
+  match r? with
+  | some r =>
+    let n : Nat ← liftM (m := MetaM) r.numObjs
+    logInfo m!"numObjs={n}"
+    let s := toString (← ppExpr r)
+    logInfo (m!"{s.take chars |>.toString}")
+  | none => pure ()
+
+/-- Reduce an already-elaborated term (not a constant) with the fuel-free reducer. -/
+def run2e (label : String) (e : Expr) (chars : Nat := 3000) (cap : Nat := prCap) :
+    MetaM Unit := do
+  let t0 ← IO.monoMsNow
+  let (r, st) ← (pr2 0 e).run { cap := cap, hb0 := ← IO.getNumHeartbeats }
   let t1 ← IO.monoMsNow
   let n : Nat ← liftM (m := MetaM) r.numObjs
   logInfo m!"=== {label} FUEL-FREE  time={t1 - t0}ms  visits={st.visits}  \
-capAbort={st.aborted}  numObjs={n}"
+capAbort={st.aborted}  hbAbort={st.hbAborted}  numObjs={n}"
   let s := toString (← ppExpr r)
   logInfo (m!"{s.take chars |>.toString}")
 
