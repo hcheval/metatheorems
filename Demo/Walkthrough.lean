@@ -22,7 +22,7 @@ Six parts, in the order they are meant to be shown:
 | 2 | the same tactics at a **metric space**: the chained triangle inequality | ~2 s |
 | 3 | …and at a **W-hyperbolic space**: extensionality of the convex combination `W` | ~1 s |
 | 4 | the **same theorem as §1 from bare `Derivable` constructors** — the contrast | instant |
-| 5 | `#hilbert`: what those six tactic lines actually *denote* | ~2 s |
+| 5 | `#hilbert`: what those seven tactic lines actually *denote* | ~2 s |
 | 6 | **extraction** — two proofs by induction, one linear bound, one exponential | see below |
 
 **Every extraction in §6 is written twice**: once here, commented out, ready to be
@@ -80,7 +80,7 @@ variable {Γ : Ctx ι} {A B C : Formula F Γ}
 /-- **Composition of implications**, in the object logic:
 `⊢ (A →ᶠ B) →ᶠ (B →ᶠ C) →ᶠ (A →ᶠ C)`.
 
-Five tactic lines. `pmode` opens the hypothesis context; each `pintro` moves an antecedent
+Seven tactic lines. `pmode` opens the hypothesis context; each `pintro` moves an antecedent
 into it; `papply h in ha with h1` is forward reasoning — apply the hypothesis `h` to the
 hypothesis `ha`, naming the result `h1`; `pexact` closes.
 
@@ -176,7 +176,7 @@ def demo_dist_tri_chain {Γ : Ctx ι} (i : ι) (x y z w : Term F Γ (Ty.base i))
 /-- **The reverse triangle inequality**, the other orientation:
 `⊢ d(y,z) −ℝ d(x,z) ≤ℝ d(x,y)`.
 
-Seven lines. `Metatheorems.dist_rev_tri` at `(y,x,z)` gives it with `d(y,x)` on the right;
+Six lines. `Metatheorems.dist_rev_tri` at `(y,x,z)` gives it with `d(y,x)` on the right;
 `dist_comm` — again a free constructor — turns that into `d(x,y)`.
 
 `Probes/RevTriangleDemo.lean` reads this back through `MetricModel.soundness` in an
@@ -278,7 +278,7 @@ end WHyperbolicSpace
 # §4. The same theorem as §1, from bare `Derivable` constructors
 
 This is the contrast. `compose_pm` (§1) and `compose_raw` (here) prove **the same formula**.
-One is five tactic lines; the other is what a Hilbert system actually offers.
+One is seven tactic lines; the other is what a Hilbert system actually offers.
 
 There is no `syllogism` *axiom* — `Derivable.syllogism` is a **rule**, so it cannot be
 discharged into the object implication. What is available is: conjunction weakening
@@ -341,19 +341,34 @@ remains by name; `keeping g` never expands `g` whatever else is said; `all` expa
 propositional combinators too. (Note `unfolding *` does **not** exist — the parser takes
 identifiers.)
 
-**The size is the argument for having a proof mode.** Five tactic lines of §1 denote:
+**The size is the argument for having a proof mode.** The tactic lines of §1 denote:
 
 | invocation | steps | wall |
 |---|---|---|
-| `contract_pm` (depth 0) | 12 | 66 ms |
+| `contract_pm` (depth 0) | 12 | 15 ms |
 | `contract_pm depth 2` | 54 | 0.24 s |
-| `contract_pm depth 4` | 117 | 1.3 s |
+| `contract_pm depth 4` | 117 | 0.42 s |
 | `contract_pm depth 6` and `depth 10` | **120** — a fixed point | 1.1 s |
 | `contract_pm all depth 10` | **1844** raw-axiom steps | 15.3 s |
+| `compose_pm` (depth 0) | 13 | 15 ms |
+| **`compose_pm depth 4`** | **271** | 1.1 s |
+| `compose_raw` (§4, raw already) | 14 | 20 ms |
+
+**271 steps from seven tactic lines** is the number to put on the slide, and it is still
+scrollable. `Demo/hilbert/compose_pm_d4.md` has it.
+
+(Rows measured by the commands in this file report their own wall time when it is elaborated;
+the depth-2/6/10 rows are `Probes/HilbertDepth.lean`'s, on the same machine under load.)
 
 The fixed point at 120 is a genuine Hilbert derivation: 30 modus ponens, 24 `S`, 20
 `weaken_intro_h`, 4 `I`, 2 `K`, and no `ProofMode` name anywhere. With `all` the combinators
 expand too and the same proof is 1844 steps.
+
+Read the depth-0 listings side by side and the point of §4 becomes visual:
+`Demo/hilbert/compose_pm_d0.md` is 13 lines of `seq_id`/`pm_mp`/`pm_intro` that mirror the
+tactic script one-for-one, while `Demo/hilbert/compose_raw.md` is 14 lines of
+`∧-weakening` / `∧-permutation` / `syllogism` / `exportation` over conjunctions nobody wrote.
+They are proofs of the same formula.
 
 Those figures are from `Probes/HilbertDepth.lean`, which also records the ceiling on a *real*
 derivation and what causes it: on `ProofMode.mct_descent` (112 steps of ℕ-MCT), `depth 1` is a
@@ -372,6 +387,8 @@ relative to the process's working directory, which is not this file's.
   to "/home/horatiu/LeanMisc/metatheorems/.worktrees/demo-lane/Demo/hilbert/contract_pm_d4"
 #hilbert compose_pm
   to "/home/horatiu/LeanMisc/metatheorems/.worktrees/demo-lane/Demo/hilbert/compose_pm_d0"
+#hilbert compose_pm depth 4
+  to "/home/horatiu/LeanMisc/metatheorems/.worktrees/demo-lane/Demo/hilbert/compose_pm_d4"
 #hilbert compose_raw
   to "/home/horatiu/LeanMisc/metatheorems/.worktrees/demo-lane/Demo/hilbert/compose_raw"
 
@@ -381,7 +398,7 @@ relative to the process's working directory, which is not this file's.
 --   to "/home/horatiu/LeanMisc/metatheorems/.worktrees/demo-lane/Demo/hilbert/contract_pm_d10"
 -- #hilbert contract_pm all depth 10
 --   to "/home/horatiu/LeanMisc/metatheorems/.worktrees/demo-lane/Demo/hilbert/contract_pm_all"
---   ⟹ 120 steps, then 1844. Five tactic lines; 1844 applications of Hilbert axioms.
+--   ⟹ 120 steps, then 1844. Six tactic lines; 1844 applications of Hilbert axioms.
 
 /-! ============================================================================
 # §6. Extraction — the centrepiece
@@ -460,7 +477,7 @@ def linearR : MRealizer cmE
 def at5 : Ty.interpret tXE Ty.nat.hat := (5 : ℕ)
 def at9 : Ty.interpret tXE Ty.nat.hat := (9 : ℕ)
 
--- Extraction — uncomment to run live (≈2 s of kernel time each):
+-- Extraction — uncomment to run live (measured kernel time: 2.2 s, 2.6 s, 2.5 s, instant):
 --
 -- theorem lin_V_5 : (5 : ℕ) = mfiV cmE linearR at5 := by kernel_rfl
 -- theorem lin_V_9 : (9 : ℕ) = mfiV cmE linearR at9 := by kernel_rfl
@@ -517,7 +534,8 @@ def xs (k : ℕ) : Ty.interpret tXE ContentExampleNat.sTy.hat := ContentExampleN
 def ys (k : ℕ) : Ty.interpret tXE ContentExampleNat.sTy.hat := ContentExampleNat.ys k
 
 -- Extraction, the witness side — uncomment to run live
--- (≈1 s at k*=0, ≈2 s at k*=3, ≈3 s at k*=5):
+-- (measured kernel time: 0.05 s at k*=0, 1.2 s at k*=3, 4.3 s at k*=5 — the cost grows with
+--  the VALUE, see §6c):
 --
 -- theorem exp_V_0 : (1 : ℕ) = mfiV cmE doublingR (xs 0) := by kernel_rfl
 -- theorem exp_V_3 : (8 : ℕ) = mfiV cmE doublingR (xs 3) := by kernel_rfl
@@ -526,14 +544,15 @@ def ys (k : ℕ) : Ty.interpret tXE ContentExampleNat.sTy.hat := ContentExampleN
 --
 --   ⟹ V(k*, f*) = 2^{k*} · f*(0). Exponential — and it is *tight*: 2^k·f(0) is exactly f k.
 
--- …and it tracks the function majorant, not only the index (≈1 s, ≈2 s):
+-- …and it tracks the function majorant, not only the index (0.06 s, 0.8 s):
 --
 -- theorem exp_V_ys_0 : (3 : ℕ) = mfiV cmE doublingR (ys 0) := by kernel_rfl
 -- theorem exp_V_ys_2 : (12 : ℕ) = mfiV cmE doublingR (ys 2) := by kernel_rfl
 --
 --   ⟹ f*(0) = 3 triples every value: 2^2 · 3 = 12, not the 4 that f*(0) = 1 would give.
 
--- The premise side — U is NOT a copy of V, and it is sharp (≈1–3 s each):
+-- The premise side — U is NOT a copy of V, and it is sharp
+-- (0.06 s, 0.9 s, 1.5 s, 5.5 s):
 --
 -- theorem exp_U_0 : (0 : ℕ) = mfiU cmE doublingR (xs 0) := by kernel_rfl
 -- theorem exp_U_2 : (1 : ℕ) = mfiU cmE doublingR (xs 2) := by kernel_rfl
@@ -543,7 +562,7 @@ def ys (k : ℕ) : Ty.interpret tXE ContentExampleNat.sTy.hat := ContentExampleN
 --   ⟹ U(k*) = k* − 1, exactly: the step at k consults ∀u B₀ at u := k, for k = 0 … k*−1.
 --     "How far into the premise the proof reaches", as a genuine function of x*.
 
--- Φ, through the metatheorem itself (≈2 s, ≈4 s):
+-- Φ, through the metatheorem itself (2.3 s, 10.5 s — the second is a slow cell, warn the room):
 --
 -- theorem exp_Phi_3 : (8 : ℕ) = (monotone_general_metatheorem_at tEqxiE tSpremiseE cmE
 --     ContentExampleNat.eB_qf ContentExampleNat.eB_vf
@@ -560,16 +579,20 @@ On this **same** 145-constructor derivation, with nothing else changed:
 
 | `k*` | `V` | outcome |
 |---|---|---|
-| 5 | 32 | ≈3 s |
-| **7** | **128** | kernel-checked, **≈9 s** |
+| 3 | 8 | 1.2 s |
+| 5 | 32 | 4.3 s |
+| **7** | **128** | kernel-checked, **9–30 s depending on machine load** |
 | **8** | 256 | **`INTERNAL PANIC: out of memory` at the 12 GB cap** |
 
 The ceiling is the **value**, not the derivation and not the proof: the majorant of the
 object-level `Term.add` is a `prec` term, so `recMaj` iterates *value*-many times with nothing
-shared. `k* = 7` is the last one that finishes.
+shared. `k* = 7` is the last one that finishes — and it is a *slow* cell, so run it only if
+there is time.
 
-    -- theorem exp_V_7 : (128 : ℕ) = mfiV cmE doublingR (xs 7) := by kernel_rfl   -- ≈9 s
-    -- theorem exp_V_8 : (256 : ℕ) = mfiV cmE doublingR (xs 8) := by kernel_rfl   -- OOM
+    -- theorem exp_V_7 : (128 : ℕ) = mfiV cmE doublingR (xs 7) := by kernel_rfl  -- 9–30 s
+    -- theorem exp_V_8 : (256 : ℕ) = mfiV cmE doublingR (xs 8) := by kernel_rfl  -- OOM
+
+(`exp_V_7` is verified on every build in `Probes/DemoChecks.lean`; `exp_V_8` exists nowhere.)
 
 ## 6d. What the two together show
 
