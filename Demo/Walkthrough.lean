@@ -18,7 +18,7 @@ Six parts, in the order they are meant to be shown:
 
 | § | what is on the screen | costs |
 |---|---|---|
-| 1 | the proof mode, on a purely logical statement — first contact | instant |
+| 1 | the proof mode — first contact on pure logic, then **`x + y = y + x`** by induction | instant |
 | 2 | the same tactics at a **metric space**: the chained triangle inequality | ~2 s |
 | 3 | …and at a **W-hyperbolic space**: extensionality of the convex combination `W` | ~1 s |
 | 4 | the **same theorem as §1 from bare `Derivable` constructors** — the contrast | instant |
@@ -56,7 +56,7 @@ namespace Demo
 open Formula ProofMode
 
 /-! ============================================================================
-# §1. First contact: the proof mode on pure logic
+# §1. First contact: the proof mode, on pure logic and then on arithmetic
 
 `Derivable F al Premises A` is a **`Type`**: a proof is a term whose head constructors are the
 inference rules of the object logic. That makes the object logic a first-class citizen — but a
@@ -108,6 +108,56 @@ def contract_pm : Derivable F al Premises ((A →ᶠ A →ᶠ B) →ᶠ A →ᶠ
   pexact h2
 
 end PureLogic
+
+/-! ## 1b. The same mode with induction and rewriting: `x + y = y + x`
+
+Pure logic needs neither. Arithmetic needs both, and they are the two things a Hilbert system
+makes painful: induction is a *rule* whose premises are stated through substitution (`A[0]`
+and `∀n (A[n] → A[Sn])`), and "substituting equals for equals" exists only as
+quantifier-free extensionality (`Derivable.qfer`) — the system is *weakly* extensional, and
+full extensionality is deliberately unavailable because it would break the metatheorems.
+
+The script below is the textbook one — induct on the second argument, rewrite by the two
+defining equations of `+`, use the induction hypothesis — and it is Mathlib's `Nat.add_comm`
+script with two differences. `anorm` normalises the substitutions `pinduction` leaves in the
+goal (`A.subst0 0`, `A[Sn]`), which the hand-written proof pays as three separate `simp only`
+lemmas. And the rewrite splits in two: `prw` rewrites by a *closed* equation, `prwby` by a
+*hypothesis* — forced by QF-ER carrying a premise.
+
+`x₀` is the bound variable (a token, `Term.var Var.vz`), and `x` is used under the `∀`
+binder as itself: a `scoped` coercion inserts the weakening, so the goal reads `x`, never
+`x.weaken`.
+
+Compare `Metatheorems.add_comm` in `Arithmetic.lean`: the same theorem from raw constructors,
+using the same four lemmas, in 38 lines — the §1/§4 contrast with induction in it. §5 renders
+this proof too: 49 Hilbert steps at depth 0, 198 at depth 4, arithmetic constants and all.
+(Restated from `ProofMode.ByScript.add_comm`.) -/
+
+section Arithmetic
+
+variable {ι κ : Type} {F : κ → Ty ι} {al : Allowed} {Premises : PremiseSet F} {Γ : Ctx ι}
+
+/-- **Commutativity of addition**: `⊢ ∀y (x + y =₀ y + x)`, by induction on `y`. -/
+def demo_add_comm (x : Term F Γ Ty.nat) :
+    Derivable F al Premises (Γ := Γ)
+      (Formula.all Ty.nat (Formula.eq0 (x +ᵗ x₀) (x₀ +ᵗ x))) := by
+  pmode
+  pinduction
+  · -- x + 0 = 0 + x
+    anorm
+    prw (add_zero_r x)
+    prw (add_zero_l x)
+    prefl
+  · pforall
+    pintro ih
+    anorm
+    -- x + Sy = S(x + y) = S(y + x) = Sy + x
+    prw (add_succ _ _)
+    prw (add_succ_l _ _)
+    prwby ih
+    prefl
+
+end Arithmetic
 
 /-! ============================================================================
 # §2. The same tactics at a metric space
@@ -353,6 +403,7 @@ identifiers.)
 | `compose_pm` (depth 0) | 13 | 15 ms |
 | **`compose_pm depth 4`** | **271** | 1.1 s |
 | `compose_raw` (§4, raw already) | 14 | 20 ms |
+| `demo_add_comm` (§1b, depth 0 / 2 / 4) | 49 / 157 / **198** | 0.13 s / 1.0 s / 1.7 s |
 
 **271 steps from seven tactic lines** is the number to put on the slide, and it is still
 scrollable. `Demo/hilbert/compose_pm_d4.md` has it.
@@ -391,6 +442,10 @@ relative to the process's working directory, which is not this file's.
   to "/home/horatiu/LeanMisc/metatheorems/Demo/hilbert/compose_pm_d4"
 #hilbert compose_raw
   to "/home/horatiu/LeanMisc/metatheorems/Demo/hilbert/compose_raw"
+#hilbert demo_add_comm
+  to "/home/horatiu/LeanMisc/metatheorems/Demo/hilbert/add_comm_pm_d0"
+#hilbert demo_add_comm depth 4
+  to "/home/horatiu/LeanMisc/metatheorems/Demo/hilbert/add_comm_pm_d4"
 
 -- The fixed point, and the fully expanded 1844-step listing — uncomment to run live
 -- (≈1.1 s and ≈15.3 s respectively; the second is too slow to sit in the build):
@@ -638,6 +693,7 @@ in the project; `Probes/DemoChecks.lean` does it for the §6 numerals.)
 
 #print axioms compose_pm
 #print axioms compose_raw
+#print axioms demo_add_comm
 #print axioms demo_dist_tri_chain
 #print axioms demo_dist_rev_tri
 #print axioms demo_W_ext
