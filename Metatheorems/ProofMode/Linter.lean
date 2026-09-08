@@ -8,8 +8,8 @@ import Metatheorems.ProofMode.Packing
 /-!
 # Non-vacuity of extraction: the surface-recursor ban
 
-`HANDOFF.md` D-2 adopts two checks against a bound being *smuggled* into a proof rather than
-extracted from it. This file implements the mechanical half of the second one: witness terms
+Decision D-2 (`ARCHITECTURE.md` §12) adopts two checks against a bound being *smuggled* into a
+proof rather than extracted from it. This file implements the mechanical half of the second one: witness terms
 written by hand at a headline `∃`-position must be **recursor-free**.
 
 The rationale is that iteration is what extraction is supposed to *produce*. Across the
@@ -61,8 +61,8 @@ variable {ι κ : Type} {F : κ → Ty ι}
 
 A user-written *formula* is a surface position too: a cut on `A` contributes `A`'s witness
 and counter types to the Dialectica interpretation, so a hand-written iterating term inside
-`A` reaches the extracted content by the same route `R4`'s attempt C used for
-instantiations. `HANDOFF` D-2's list of surface positions does not name this one. -/
+`A` reaches the extracted content by the same route an instantiation does. D-2's list of
+surface positions does not name this one, so it is covered here. -/
 def usesPrec : {Γ : Ctx ι} → Formula F Γ → Bool
   | _, .bot     => false
   | _, .eq0 s t => s.usesPrec || t.usesPrec

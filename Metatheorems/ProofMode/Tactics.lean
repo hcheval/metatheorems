@@ -371,7 +371,7 @@ private def evalBoolCheck (e : Expr) : TacticM (Option Bool) := do
 node, and without stripping it `isAppOf ``SeqD` is false — so every proof-mode tactic used
 after a plain `have` failed with "the goal is not a proof-mode sequent", even though the goal
 was displayed as a perfectly good sequent box (the delaborator looks through `mdata`, so the
-display gave no hint). Measured 2026-09-01: `ctor=app, nargs=9` before a `have`, `ctor=mdata,
+display gave no hint). Measured: `ctor=app, nargs=9` before a `have`, `ctor=mdata,
 nargs=0` after. -/
 def seqDGoalArgs (who : String) : TacticM (Array Expr) := do
   let ty := (← instantiateMVars (← (← getMainGoal).getType)).consumeMData
@@ -437,13 +437,13 @@ def derivableInGoal (args : Array Expr) : TacticM Expr := do
 
 /-- Elaborate a term the *user wrote* at a surface position, and enforce the recursor ban.
 
-`HANDOFF` D-2 puts the ban on the surface language as a whole — "instantiation witnesses,
-`bound` instantiations, `split` precisions, `ind` motives" — not only on headline `∃`
-witnesses. That is deliberately stronger than a headline-only check and is what makes the
-non-triviality claim a statement about *expressiveness*: the input language cannot write the
-bound, so no enumeration of smuggling routes is needed. R4's attempt C reached the extracted
-term through an *instantiation*, never touching an `∃`, which is exactly why the check has
-to live here rather than at `∃`-introduction. -/
+Decision D-2 (`ARCHITECTURE.md` §12) puts the ban on the surface language as a whole —
+instantiation witnesses, `pbound` instantiations, case-split precisions, induction motives —
+not only on headline `∃` witnesses. That is deliberately stronger than a headline-only check
+and is what makes the non-triviality claim a statement about *expressiveness*: the input
+language cannot write the bound, so no enumeration of smuggling routes is needed. The route
+that motivated it reached the extracted term through an *instantiation*, never touching an
+`∃`, which is exactly why the check has to live here rather than at `∃`-introduction. -/
 private def elabSurfaceTerm (who : String) (ι κ F Γ ρ : Expr) (tStx : TSyntax `term) :
     TacticM Expr := withMainContext do
   let t ← elabTerm tStx (some (mkAppN (.const ``Term []) #[ι, κ, F, Γ, ρ]))
@@ -511,7 +511,7 @@ macro "pnorm" : tactic =>
 macro "pforall" : tactic => `(tactic| refine pm_allI ?_)
 
 /-- `pspecialize` instantiates a weakened `∀`-*goal* at the bound variable;
-`pspecialize h as k` instantiates a weakened `∀`-*hypothesis*, which is how a `∀`-hypothesis
+`pspecialize h with k` instantiates a weakened `∀`-*hypothesis*, which is how a `∀`-hypothesis
 is used after `pforall`.
 
 The `colGt` matters: without it the bare form would swallow the next line's tactic name as
@@ -631,8 +631,8 @@ private def peelImp (e : Expr) : MetaM (Option (Expr × Expr × Bool)) := do
   return none
 
 /-- Run a unification attempt, keeping its assignments on success and dropping them on
-failure. Exceptions — a heartbeat timeout in particular — propagate: hiding one here would
-turn trap 12 into silence. -/
+failure. Exceptions — a heartbeat timeout in particular — propagate: catching one here would
+turn a display-hiding mismatch into silence. -/
 private def tryDefEq (x : TacticM Bool) : TacticM Bool := do
   let s ← saveState
   if ← x then return true
@@ -964,9 +964,9 @@ macro "pinduction" : tactic => `(tactic| refine pm_induction ?_ ?_)
 /-- `pby_contra h` proves an `∃` over a QF ∨-free matrix by contradiction, via Markov. The
 goal becomes `⊥ᶠ` with `h` the negated `∃`.
 
-**The shape check comes first, and the tactic is atomic.** `HANDOFF` D-4 makes `by_contra`
-*be* the Markov rule, and D-1 makes "is this proof translated?" the question a refusal
-should provoke. Both require that a wrong-shaped goal be refused before anything is applied
+**The shape check comes first, and the tactic is atomic.** Decision D-4
+(`ARCHITECTURE.md` §12) makes `by_contra` *be* the Markov rule, and D-1 makes "is this proof
+translated?" the question a refusal should provoke. Both require that a wrong-shaped goal be refused before anything is applied
 to it — a tactic that half-applies and then complains leaves the user reading errors about a
 goal they did not write. -/
 elab "pby_contra " h:ident : tactic => do
@@ -997,12 +997,12 @@ elab "pby_contra " h:ident : tactic => do
                            case hvf => pside
                            pintro $h)))
 
-/-- `pinst h t as k` instantiates the `∀`-hypothesis `h` at `t`, naming the result `k`.
+/-- `pinst h t with k` instantiates the `∀`-hypothesis `h` at `t`, naming the result `k`.
 
-The instantiation term is a surface term, so the recursor ban applies. This is the route
-R4's attempt C used: a `∀`-premise instantiated at a hand-written iterating term contributes
-that term to the Dialectica challenge side, and thence to the extracted bound, without ever
-introducing an `∃` for a headline-scoped linter to notice. -/
+The instantiation term is a surface term, so the recursor ban applies. This is exactly the
+route that motivates the ban: a `∀`-premise instantiated at a hand-written iterating term
+contributes that term to the Dialectica challenge side, and thence to the extracted bound,
+without ever introducing an `∃` for a headline-scoped linter to notice. -/
 elab "pinst " h:ident ppSpace tStx:term " with " k:ident : tactic => withMainContext do
   let A ← whnfD (← hypFormula "pinst" h.getId.toString)
   let aargs := A.getAppArgs
@@ -1012,7 +1012,7 @@ elab "pinst " h:ident ppSpace tStx:term " with " k:ident : tactic => withMainCon
   evalTactic (← `(tactic| refine pm_inst $(Lean.quote k.getId.toString) $tStx
     (by pexact $h) ?_))
 
-/-- `pqfac h as k` applies QF-AC to the `∀∃`-hypothesis `h`, naming the choice function
+/-- `pqfac h with k` applies QF-AC to the `∀∃`-hypothesis `h`, naming the choice function
 statement `k`. -/
 macro "pqfac " h:ident " with " k:ident : tactic =>
   -- Unlike Markov, the matrix here is fixed by the *hypothesis*, not by the goal, so that

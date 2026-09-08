@@ -179,10 +179,10 @@ defines `qval : ℕ → ℚ`, the missing Lean-level "meaning of a rational code
 relating it to the *object-level* decision term `Term.lt_Q_dec` under `Term.interpret` is
 still open, as is the `((x)◦)^b =₁ (x)◦` half, which needs `cauchyfy`.
 
-**Part (4)** used to be excluded too, blocked on the `bezemMaj` question in `METRIC_PLAN.md`
-§2.5 (the one-clause `bezemMaj` lacked the self-majorization conjunct, which at type
-`1 = ℕ → ℕ` is exactly what distinguishes `s-maj₁` from `≤₁`). The two-clause widening on
-2026-09-02 removed the blocker; it is `roundR_maj_pair` above. -/
+**Part (4)** used to be excluded too, blocked on the one-clause `bezemMaj`, which lacked the
+self-majorization conjunct — at type `1 = ℕ → ℕ` that conjunct is exactly what distinguishes
+`s-maj₁` from `≤₁`. Widening `bezemMaj` to two clauses removed the blocker; part (4) is
+`roundR_maj_pair` above. -/
 
 end Rounding
 

@@ -6,11 +6,11 @@ Authors: Horatiu
 import Metatheorems.Dialectica.MonotoneMemo
 
 /-!
-# Hand-written monotone realizers of the `¬¬`-combinators (MFI Lane C, "hand-write what dominates")
+# Hand-written monotone realizers of the `¬¬`-combinators
 
 The fused recursion `monotone_nd_soundness` (`MonotoneND.lean`) applies a handful of closed
-propositional combinators at every node of a classical derivation. On the gate derivation
-(`LemBoundDemo.lFinalNoLem` prenexified, 363 constructors) the profile is: 134 `syllogism`
+propositional combinators at every node of a classical derivation. On a representative
+derivation (`LemBoundDemo.lFinalNoLem` prenexified, 363 constructors) the profile is: 134 `syllogism`
 (each `neg_neg_mp` ×2, `K_comb`, `S_comb`, `neg_neg_imp_rev2`), 34 `exportation`, 30
 `importation`, 11 `forall_rule` (each `neg_neg_mp`, `dnn_intro` ×2, `neg_neg_imp_rev`), 4
 `expansion`, 2 `lem`, plus ~120 propositional axioms each wrapped in `dnn_intro`. Realizing

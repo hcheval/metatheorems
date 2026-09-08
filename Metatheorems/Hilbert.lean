@@ -46,11 +46,11 @@ walked). `#hilbert foo all` makes everything transparent **except the proof-mode
 which is what you want on a combinator and never what you want on `mct_p2`.
 
 There is **no** `unfolding *`: the parser takes `ident+` and resolves each through
-`realizeGlobalConstNoOverloadWithInfo`, so `*` does not even parse. This paragraph claimed
-otherwise until 2026-09-07. To expand a proof-mode constant, name it under `unfolding`, one
-at a time — and see `shouldUnfoldAt` for why `all` stops where it does.
+`realizeGlobalConstNoOverloadWithInfo`, so `*` does not even parse. To expand a proof-mode
+constant, name it under `unfolding`, one at a time — and see `shouldUnfoldAt` for why `all`
+stops where it does.
 
-## `depth n` — the fueled unfolding (2026-09-07)
+## `depth n` — the fueled unfolding
 
 `#hilbert foo depth 2` makes the proof-mode layer transparent, but expands each step only
 **two `ProofMode` unfoldings deep**; what it has become by then is cited by name exactly as the
@@ -200,9 +200,8 @@ structure State where
   lines : Array Line := #[]
   /-- Keyed on the remaining proof-mode budget as well as the expression: the same
   subderivation reached with different budgets left renders differently (expanded here, cited
-  there), so a fuel-blind key would report the first rendering for both. At `pmDepth = 0` —
-  every pre-2026-09-07 invocation — the key is constantly `(0, e)` and this is the old cache
-  exactly. -/
+  there), so a fuel-blind key would report the first rendering for both. At `pmDepth = 0` the
+  key is constantly `(0, e)`, i.e. the plain expression cache. -/
   cache : Std.HashMap (Nat × ExprStructEq) Nat := {}
   fvars : Std.HashMap (Nat × FVarId) Nat := {}
 
@@ -410,9 +409,9 @@ left?
 `all` deliberately stops at the proof-mode layer. Expanding it without a bound is not merely
 verbose: on `mct_body` it does not finish at all.
 
-**Which constant does it, measured** (`Probes/HilbertDepth.lean`, 2026-09-07): `seq_id`, and
-essentially only `seq_id`. This docstring used to blame "every `pintro`/`prw`" collectively;
-the discriminating test is that `keeping seq_id` — that one name, nothing else — turns
+**Which constant does it, measured** (`Probes/HilbertDepth.lean`): `seq_id`, and essentially
+only `seq_id` — not "every `pintro`/`prw`" collectively, as one might guess. The
+discriminating test is that `keeping seq_id` — that one name, nothing else — turns
 `#hilbert ProofMode.mct_descent depth 1` from a heartbeat timeout into 1766 steps in 18 s.
 `seq_id` is hypothesis lookup, so it recurses on the hypothesis context through `HVar.rec`
 with a dependent cast per level, and it is cited 35 times in `mct_descent`'s 112 steps; the
@@ -430,8 +429,8 @@ Note the asymmetry, which is deliberate: a non-proof-mode constant costs nothing
 budget is a statement about the *proof-mode layer's* depth, which is what is unbounded in
 practice; ordinary library lemmas bottom out in `Derivable` constructors quickly.
 
-**Backward compatibility is definitional, not merely tested.** At `d = 0` with `keep` empty —
-every invocation written before 2026-09-07 — the body below is
+**Backward compatibility is definitional, not merely tested.** At `d = 0` with `keep` empty
+the body below is
 `unfold.contains n || (if isProofModeName n then 0 > 0 else unfoldAll)`, i.e. exactly the old
 `shouldUnfold`'s `unfold.contains n || (unfoldAll && !isProofModeName n)`. The eight listings
 of `Probes/HilbertDemo.lean` are byte-identical across the change, which is the empirical half

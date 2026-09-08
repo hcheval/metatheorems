@@ -42,7 +42,7 @@ counterexample is worth keeping. Take `f := λn.⟨−1⟩_ℚ` and `g := 0_ℝ`
 
 So that formula was false in the standard model and hence not derivable: `f ≤_ℝ 0` says
 nothing about how far *below* `0` the real `f` is. Adding `0_ℝ ≤_ℝ f` repairs it, and the
-repaired form is what is proved here (2026-09-02).
+repaired form is what is proved here.
 
 The estimate, at the goal's index `n`. Write `a_k := f̂(k)`, `b_k := ĝ(k)`.
 
@@ -329,17 +329,16 @@ macro "rnorm" : tactic =>
 
 -- ── From Kohlenbach, *Applied Proof Theory*, §4.1 ───────────────────────────
 --
--- Three facts the book states and uses but does not prove. They are NOT in
--- `Metateorema-New3`, which is why they were missing here; added 2026-09-01
--- after reading the book directly.
+-- Three facts the book states and uses but does not prove. They are not in the reference
+-- document `Metateorema-New3` either, and come from the book directly.
 --
 -- Note the book's own calibration of effort: it calls the ℚ ordered-field
 -- package "easily verified" (p. 79) — that is the ~4,600 lines of
 -- `RationalNumbers.lean` — and asserts the ℝ package in one parenthesis
 -- (p. 80) with no proof at all.
 
--- `const_R` MOVED to `RealNumbers/Approx.lean` (2026-09-03, unchanged), so that its
--- `cauchyfy` theory (`cauchyfy_const`) can sit beside it.
+-- `const_R` lives in `RealNumbers/Approx.lean`, so that its `cauchyfy` theory
+-- (`cauchyfy_const`) can sit beside it.
 
 /-- **Lemma 4.2** (Kohlenbach p. 80). `f̂(k)` is a rational `2^{-k}`-approximation of `f`:
 
@@ -349,18 +348,19 @@ macro "rnorm" : tactic =>
     lets a proof move between a real and a rational approximation of it at a chosen
     index, which is exactly what the five-term split needs.
 
-    **Worked out 2026-09-01 (`REALS_PLAN.md` §0.8), PROVED 2026-09-03.** The goal reduces
+    **The shape of the proof, and the two things about it that are easy to get wrong.** The
+    goal reduces
     to `∃n. 2^{-k} −ℚ |f̂(n+2) −ℚ f̂(k)| ≥ℚ 2^{-n}`, and the crude telescoping bound falls
     short by a factor of 4 *at every `n`*. The witness must depend on `f` through the
     Cauchy slack at index `k` — `d := 2^{-(k+1)} −ℚ |f̂(k) −ℚ f̂(k+1)|`, positive for every
     `f` because `cauchyState_cauchy` is strict — and `pow2neg_rat_den_le` is the
-    Archimedean step. Two corrections to §0.8's plan, found in the proving:
+    Archimedean step. Two points the obvious plan gets wrong:
 
     * the witness is **`n := k +ℕ rat_den d`**, not `max(k, rat_den d)` — the sum
       dominates both (`pow2neg_Q_le_add_r`), so no object-level `max` lemmas and no case
       split are needed;
-    * §0.8's "refined telescope keeping the `k`-th step's slack out of the sum" (item 2)
-      is exactly `cauchyfy_tele_at` at `p = k+1`, which existed by 2026-09-03: the carried
+    * the "refined telescope keeping the `k`-th step's slack out of the sum" needs nothing
+      new — it is exactly `cauchyfy_tele_at` at `p = k+1`: the carried
       slack `2^{-((k+1)+(D+1))}` lands, after the index identity
       `(k+1)+(D+1) =₀ n+2`, on precisely the `2^{-(n+2)}` piece of the split
       `2^{-n} = 2^{-(n+2)} + (2^{-(n+1)} + 2^{-(n+2)})`, and the remaining

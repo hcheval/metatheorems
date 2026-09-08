@@ -64,9 +64,10 @@ The four W-axiom identities are all discharged by Mathlib's `module` tactic; han
 `ℝ`, `EuclideanSpace ℝ (Fin n)`, and essentially every concrete example. A space in `Type u`
 would need the structures generalised first.
 
-All three space theories are covered. Normed spaces were the last to join (2026-09-04): until
+All three space theories are covered. Normed spaces were the last to join: until
 `NormedModel.axiomsHold` was proved, `ofNormed` gave a model but the normed metatheorem still
-carried an `AxiomsHold` binder, so it was inhabited-but-not-applicable. No such gap remains.
+carried an `AxiomsHold` binder, so it was inhabited-but-not-applicable. No such gap remains,
+and no `AxiomsHold` binder survives anywhere in the tower.
 
 `ℝ` witnesses all of it — and `Nontrivial ℝ` is an instance, so the added binder costs the
 examples below nothing.

@@ -116,8 +116,8 @@ structure AbstractMajorizability {ι κ : Type} {X : ι → Type} {F : κ → Ty
       matrix-branching counter of contraction by a `max`, and "a `max` of majorants majorizes"
       is not derivable from the other fields — the abstract relation has no `max`. The book
       has it free because its `maj` is Howard's concrete relation; our abstraction must
-      state it. True of every `bezem*` instance (`maxT_bezemMaj_left`). Added 2026-09-05,
-      promoted from `Probes/MonotoneSpike.lean`'s `MaxCompat`. -/
+      state it. True of every `bezem*` instance (`maxT_bezemMaj_left`); promoted here from
+      `Probes/MonotoneSpike.lean`'s `MaxCompat`. -/
   maxT_maj_left : ∀ {ρ : Ty ι} {a b : Ty.interpret X ρ.hat} {c : Ty.interpret X ρ},
     maj ρ a c → selfMaj ρ b b → maj ρ (maxT ρ a b) c
   /-- **`maxT` compatibility, right** — the mirror image of `maxT_maj_left`. -/
@@ -530,8 +530,8 @@ forcing the wrapped term to whnf**. Without them the only route is delta-expansi
 the pathology in this file's sibling note and in "Build cost": a single `S_comb` is 82
 derivation nodes but ≈4×10⁷ leaf-realizer copies.
 
-Promoted 2026-09-04 from `Probes/BoundLemmasP2.lean` and `Probes/CounterSideProbe.lean`, where
-they were written; they are general facts about `termMajorizer`, not probe scaffolding. -/
+Promoted from `Probes/BoundLemmasP2.lean` and `Probes/CounterSideProbe.lean`, where they were
+written; they are general facts about `termMajorizer`, not probe scaffolding. -/
 
 section Structural
 
@@ -670,7 +670,7 @@ concrete space supplies only the per-constant obligations.
 `N` is the uniform threshold; the five majorant arguments are the document's per-constant
 conditions, stated against `bezemMaj base`.
 
-`hbase : BaseMono base` (added 2026-09-05) is what the three `maxT_*` fields cost at a base
+`hbase : BaseMono base` is what the three `maxT_*` fields cost at a base
 type: `maxT (.base i) a b = max a b`, and `base i (max a b) c` follows from `base i a c` only
 if the relation is upward closed in its numeric argument. Every instance in the tree already
 had it (`MetricModel.base_mono`), because `bezem_prec_maj` needed it for the same reason. -/

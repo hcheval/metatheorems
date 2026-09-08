@@ -10,8 +10,8 @@ import Metatheorems.SyntacticMetatheorem
 /-!
 # Rung 7 — ℕ-MCT, the dichotomy proof (p₂)
 
-`HANDOFF.md` A2. The statement is `MCTStatement.lean`'s `mctStatement`; what is built here is
-the derivation of it, as a script.
+The statement is `MCTStatement.lean`'s `mctStatement`; what is built here is the derivation of
+it, as a script.
 
 ## The proof
 
@@ -35,7 +35,7 @@ be manufactured.
 
 ## What it is built from
 
-Rungs 5, 6a and 6b, exactly as `HANDOFF.md` §3 A0 predicted: `antitone_chain` supplies
+The shared arithmetic lemmas of `ProofMode/Arith.lean`: `antitone_chain` supplies
 `a (m + i) ≤ a m`, and `strict_drop` turns "`a (m + g m) ≤ a m` and they differ" into
 "`a (m + g m) ≤ k`". The marginal cost of the derivation is the skeleton only.
 -/
@@ -191,13 +191,13 @@ def mct_extract_p2 (si : SpaceInterp X F) (eqxi : EqXInterp X F si)
       ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env) :=
   mctExtract si eqxi premise_realizer (mct_p2 (al := Allowed.extended))
 
-/-- **A4, second half.** The bound for p₂, **via the syntactic metatheorem**.
+/-- The bound for p₂, **via the syntactic metatheorem**.
 
-Migrated 2026-09-03. It used to route through `mct_bound` (Probe P2d), which predates the
-`syntactic-witnesses` merge and therefore had to hypothesise a `MajorizabilityRel` *and*
+It used to route through `mct_bound` (`MCTStatement.lean`), which predates the object-level
+Dialectica witness types and therefore had to hypothesise a `MajorizabilityRel` *and*
 majorants `U_star`/`V_star` for the two extracted functionals — because the only alternative
-then was the total-majorizer structure, which has no instances (and was deleted for it on
-2026-09-07; see `MajorizabilityRel.lean`). That is no longer the situation: the
+then was the total-majorizer structure, which has no instances and was deleted for it (see
+`MajorizabilityRel.lean`). That is no longer the situation: the
 extracted functionals are closed `Term`s, so `all_closed_terms_majorizable` supplies their
 majorants and the four extra hypotheses disappear. The only majorizability input is
 `AbstractMajorizability`, which `bezemAbstract` inhabits. -/

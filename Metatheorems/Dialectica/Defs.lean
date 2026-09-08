@@ -741,7 +741,8 @@ such). So a realizer carries no information, and all the content is that the for
 in the model — which is exactly the hypothesis `htrue`.
 
 The recursion has three cases: `∀` (a function), `∧` (a pair — `isPurelyUniversal` is
-closed under `∧` since the 2026-09-01 merge), and the quantifier-free core, where
+closed under `∧`, which is needed because `eqAtType` at a product type is a conjunction),
+and the quantifier-free core, where
 `dialecticaMatrix_iff_interp_qf` discharges the matrix *for every counter*.
 
 `srealizer_of_pu` (`Dialectica/Syntactic.lean`) is the syntactic counterpart. -/
@@ -993,7 +994,7 @@ theorem Formula.isPurelyExistential_of_qf {ι κ : Type} {F : κ → Ty ι} {Γ 
 -- Base-type equality is *defined*, so its Dialectica data is computable
 -- ============================================================================
 
-/-! Until 2026-09-02 base-type equality was an **abstract** predicate `EqX i s t`, and
+/-! Base-type equality used to be an **abstract** predicate `EqX i s t`, and
 nothing could be said about its Dialectica witness/counter types — hence four fields of
 `EqXInterp` (`witnessSubsingleton`, `witnessDefault`, `counterDefault`, `realizeTerm`) which
 had to be *supplied* by each theory.
@@ -1037,10 +1038,9 @@ theorem eqAtTypeBaseWitness_subsingleton {ι κ : Type} (X : ι → Type) {F : �
 
 /-- The Dialectica interface for base-type equality at each base type `X_i`.
 
-**What this structure is for, since 2026-09-04.** It asks *only for model facts* — things
-that are true of the space and are not derivable from the syntax. Everything that the
-2026-09-02 "base equality is defined" refactor made computable has been removed from it and
-lives as an ordinary definition (`eqAtTypeBaseWitness`, `eqAtTypeBaseCounter`,
+**What this structure is for.** It asks *only for model facts* — things that are true of the
+space and are not derivable from the syntax. Everything that the "base equality is defined"
+refactor made computable has been removed from it and lives as an ordinary definition (`eqAtTypeBaseWitness`, `eqAtTypeBaseCounter`,
 `eqAtTypeBaseWitness_subsingleton` above; `eqAtTypeBaseRealizeTerm` and
 `eqAtTypeBase_realizeTerm_sound` in `Dialectica/Syntactic.lean`).
 
@@ -1087,7 +1087,7 @@ structure EqXInterp {ι κ : Type} (X : ι → Type) (F : κ → Ty ι)
 
 /-- Symmetry of the distance, as a Dialectica realizer.
 
-Was a field (`dist_comm_realize`) until 2026-09-02; it is now derived from the model fact
+Was once a field (`dist_comm_realize`); it is now derived from the model fact
 `dist_comm_holds` by `realizer_of_pu`, since `eq_R` is purely universal and ∨-free
 (`isPurelyUniversal` and `isVFree` are both `true` by `rfl`). Its signature is unchanged,
 so call sites in `Dialectica/Lemmas.lean` are untouched. -/

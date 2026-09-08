@@ -234,9 +234,8 @@ end ByScript
 
 /-- **Rung 4 — transitivity of `≤`, written with monus.**
 
-`Arithmetic.lean` does *not* have this one: it is new, and it is the first of the shared
-lemmas `HANDOFF.md` §3 A0 asks for, so proving it here is Track A work rather than a
-re-proof.
+`Arithmetic.lean` does *not* have this one: it is new, and it is the first of the arithmetic
+lemmas the MCT derivations share, so proving it here is real work rather than a re-proof.
 
 It is also the first proof whose shape is not "induct and rewrite". It needs a case split on
 whether each of `y` and `z` is zero — the zero cases contradict `S x ∸ y = 0` — and in the
@@ -316,7 +315,7 @@ def monus_trans :
         · pexact h2'''
 
 /-- **Rung 5 — the antitone chain.** A nonincreasing sequence never comes back up:
-`a (m + i) ≤ a m`, by induction on `i`. The second of `HANDOFF.md` §3 A0's shared lemmas,
+`a (m + i) ≤ a m`, by induction on `i`. The second of the shared lemmas,
 and the first proof with a hypothesis that survives the induction and a *function* parameter
 rather than a variable.
 

@@ -305,8 +305,9 @@ lemma is stated separately rather than inlined into `syntactic_extraction_classi
 `syntactic_general_metatheorem_classical` gets its realizer from `obtain ⟨w, hw⟩`, so `w` is
 an opaque local and `Term.interpret si w` is stuck; written directly against
 `(prenexRealizer …).val` the `simp only [dialecticaMatrix]` step tries to reduce the realizer
-itself and the elaboration dies at a `whnf` heartbeat timeout with no error to point at. Same
-family as CLAUDE.md hard rule 4 and trap 12. -/
+itself and the elaboration dies at a `whnf` heartbeat timeout with no error to point at. This
+is the same failure mode as binding a large realizer with `let` instead of `obtain`: an
+enormous term in a position where every later defeq check tries to reduce it. -/
 theorem extraction_of_prenex_realizer
     {ρ : Ty ι} {B₀ C₀ : Formula F [Ty.nat, ρ]}
     (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)

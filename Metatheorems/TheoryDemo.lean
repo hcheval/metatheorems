@@ -178,7 +178,7 @@ end Obligations
 
 /-- With no `index` clause the index type is generated too: two base types, one constant
 between them, two axioms — the second a **conjunction**, which `isPurelyUniversal` admits
-(it is closed under `∧` since the 2026-09-01 products merge) and which therefore has to pass
+(it is closed under `∧`, which products in `Ty` require) and which therefore has to pass
 the admissibility check. -/
 theory TwoSorted
   types A

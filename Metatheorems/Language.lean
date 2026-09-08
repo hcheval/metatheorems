@@ -96,9 +96,8 @@ def isPurelyUniversal : Formula F Γ → Bool
 `∧` for the same reason (the Dialectica witness of `∃c C₀ ∧ ∃c' C₀'` is still just the pair
 of witnesses, with nothing to challenge).
 
-Added 2026-09-04 for the general-matrix metatheorem, `syntactic_general_metatheorem_gen`,
-which takes a purely universal premise matrix and a purely existential conclusion matrix,
-as 17.52 does. -/
+Exists for the general-matrix metatheorem, `syntactic_general_metatheorem_gen`, which takes a
+purely universal premise matrix and a purely existential conclusion matrix, as 17.52 does. -/
 def isPurelyExistential : Formula F Γ → Bool
   | .ex _ A  => A.isPurelyExistential
   | .and A B => A.isPurelyExistential && B.isPurelyExistential

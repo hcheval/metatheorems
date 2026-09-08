@@ -15,8 +15,8 @@ quantified — the book's
     (+)  ∃x (t* maj x ∧ ∀a,y A_D(x a, y, a))
 
 with `t*` the extracted datum and `x` a functional of the free variables `a`. The design and
-the measurements behind it are in `ARCHITECTURE.md` §14 and `Probes/MonotoneSpike.lean`
-(gate G0); this module is the spike's nine-constructor recursion completed to every
+the measurements behind it are in `ARCHITECTURE.md` §14 and `Probes/MonotoneSpike.lean`,
+which first ran the recursion on nine constructors. This module completes it to every
 constructor of `Derivable`, with no fallback.
 
 ## The statement (`MRealizer`)
@@ -60,8 +60,10 @@ the same cost class as the leaf cases.
 **`induction`** is the book's `t^M` (p. 144 case 7): `termMajorizer` of `Term.prec` is
 `cm.precM`, which in every instance in the tree is `recMaj` — the recursion with a running
 `maxT`. It is obtained here by the last row, not by the leaf strategy on the whole
-sub-derivation; the sub-realizers of base and step are variables. Lane B (ARCHITECTURE
-§14.5) may still want to review this case by hand; what it computes is `t^M` already.
+sub-derivation; the sub-realizers of base and step are variables. What it computes is `t^M`
+already, so nothing has to be written by hand here — but note the practical ceiling this
+carries: `recMaj` iterates *value*-many times without sharing, so a bound whose value is
+large is expensive to reduce however small the derivation is (ARCHITECTURE §14.5).
 -/
 
 namespace Metatheorems

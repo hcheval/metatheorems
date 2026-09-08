@@ -8,7 +8,7 @@ import Metatheorems.ProofMode.MCT
 /-!
 # ℕ-MCT, the lazy proof (p₁)
 
-`HANDOFF.md` A3. The *same statement* as `ProofMode/MCT.lean`, proved the way one actually
+The *same statement* as `ProofMode/MCT.lean`, proved the way one actually
 proves it on paper — and the point of the exercise is that the two derivations differ where it
 matters.
 
@@ -208,9 +208,8 @@ def mct_extract_p1 (si : SpaceInterp X F) (eqxi : EqXInterp X F si)
         Formula.interpret si mctC₀ (UV.2 x, (x, ())) } :=
   mctExtract si eqxi premise_realizer (mct_p1 (al := Allowed.extended) rfl)
 
-/-- The bound p₁ gives, **via the syntactic metatheorem**. Migrated 2026-09-03 alongside
-`mct_bound_p2`; see the note there for why the `MajorizabilityRel` and the two majorant
-hypotheses are gone. -/
+/-- The bound p₁ gives, **via the syntactic metatheorem**. See the note at `mct_bound_p2` for
+why the `MajorizabilityRel` and the two majorant hypotheses are gone. -/
 theorem mct_bound_p1 (si : SpaceInterp X F) (eqxi : EqXInterp X F si)
     (am : AbstractMajorizability si)
     (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B) :

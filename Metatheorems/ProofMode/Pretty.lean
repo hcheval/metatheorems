@@ -249,8 +249,8 @@ from a goal into a script.
 
 Left-associative at 80, so it binds tighter than `+ᵗ`/`∸ᵗ` (65) and `*ᵗ` (70) and chains
 `f ⬝ a ⬝ b` as `(f ⬝ a) ⬝ b`, matching `Term.app`. The precedences must stay *below* `max`
-and must differ between the two operands: written as `syntax:max term:max ⬝ term:max` — as
-it was until 2026-09-01 — the production is itself `max`, so a nested application needs no
+and must differ between the two operands. Written as `syntax:max term:max ⬝ term:max` the
+production is itself `max`, so a nested application needs no
 parentheses in *either* operand and `(f ⬝ a) ⬝ b` and `f ⬝ (a ⬝ b)` print identically. That
 defeats the copy-from-goal purpose above, and it made `#check` output on `RealNumbers.lean`
 unreadable. -/

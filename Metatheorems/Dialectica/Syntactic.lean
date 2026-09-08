@@ -74,7 +74,7 @@ def defaultCTerm (A : Formula F Γ) : Term F Γ (cTy A) := Term.defaultOf _
 
 -- Realizers as terms: see `SRealizer` below. A per-environment variant
 -- (`syntacticRealizerCtx`, taking `env` as a parameter and quantifying only over counters)
--- existed here until 2026-09-07 and was deleted unused — nothing ever constructed or consumed
+-- existed here and was deleted unused — nothing ever constructed or consumed
 -- it. `SRealizer` quantifies over environments *inside* the subtype, which is what the
 -- `forall_rule` case needs; the weaker form has no use site. The same asymmetry appears at
 -- `realizer_of_pu` vs `realizer_of_pu_at`, where both forms are genuinely used.
@@ -833,7 +833,8 @@ def sInduction {A : Formula F (Ty.nat :: Γ)}
 `nat →ₜ unit`, so `λn.⋆` is the only closed inhabitant up to the interpretation.
 
 Was the `EqXInterp.realizeTerm` field. It became definable when base equality stopped being
-an abstract predicate (2026-09-02); the field outlived that change by two days. -/
+an abstract predicate, and the field outlived that change — one instance of a recurring
+pattern, a binder kept after a refactor made the thing it demanded constructible. -/
 def eqAtTypeBaseRealizeTerm (i : ι) {Γ : Ctx ι} (s t : Term F Γ (Ty.base i)) :
     Term F Γ (wTy (eqAtType (Ty.base i) s t)) :=
   Term.lam Term.unitI
@@ -888,8 +889,8 @@ The syntactic counterpart of `realizer_of_pu` (`Dialectica/Defs.lean`), and the 
 `Term.defaultOf`, i.e. `defaultWTerm`. All the content is `htrue`, the formula's truth in
 the model, and `dialecticaMatrix_iff_interp_qf` turns it into the matrix *at every counter*.
 
-Three cases, mirroring `isPurelyUniversal`: `∀` (a `lam`), `∧` (a `mkPair` — the clause
-added by the 2026-09-01 products merge), and the quantifier-free core. -/
+Three cases, mirroring `isPurelyUniversal`: `∀` (a `lam`), `∧` (a `mkPair`, the clause
+products in `Ty` make necessary), and the quantifier-free core. -/
 def srealizer_of_pu {si : SpaceInterp X F} :
     {Γ : Ctx ι} → (B : Formula F Γ) →
       B.isPurelyUniversal = true → B.isVFree = true →

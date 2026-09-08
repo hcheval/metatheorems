@@ -315,8 +315,7 @@ def add_assoc_R :
 
 /-- **`le_R_pu` implies `le_R`** — `∀n ¬B(n) → ¬∃n B(n)`, which is intuitionistic.
 
-Since the `le_R_pu` argument-order repair (2026-09-02, see `Terms/Real.lean`) the two
-formulas are built from *literally the same* body `B`:
+The two formulas are built from *literally the same* body `B`:
 
 * `le_R f g` is `¬(g <ℝ f)`, i.e. `(∃n. B n) →ᶠ ⊥ᶠ`;
 * `le_R_pu f g` is `∀n. (B n →ᶠ ⊥ᶠ)`.
@@ -359,10 +358,9 @@ can be `pinst`-antiated *after* a `pforall`; instantiating is what lets `closed_
 the proof mode's weakening of `Term.zero_R`, which a direct `papplym` at the weakened
 hypothesis cannot do.
 
-Note the argument order: this is `le_R f g`, i.e. `f ≤ g`, and `le_R_pu f g` now means the
-same thing. (Until 2026-09-02 `le_R_pu` took its arguments the other way round and meant
-`g ≤_ℝ f`; that bug is fixed in `Terms/Real.lean`, and `le_R_of_le_R_pu` /
-`le_R_pu_of_le_R` above convert between the two forms in either direction.) -/
+Note the argument order: this is `le_R f g`, i.e. `f ≤ g`, and `le_R_pu f g` means the same
+thing. (It once meant `g ≤_ℝ f`; `le_R_of_le_R_pu` / `le_R_pu_of_le_R` above convert between
+the two spellings in either direction.) -/
 def le_R_all (f g : Term F Γ (realTy ι)) :
     Derivable F al Premises
       (le_R f g →ᶠ

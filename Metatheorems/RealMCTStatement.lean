@@ -12,7 +12,7 @@ import Metatheorems.CodeRealOps
 
 The *statement only* — design, side conditions, the semantic reading, and the plumbing that
 shows it fits `syntactic_general_metatheorem_at_gen` / `_classical_gen`. No derivation is
-built here; the derivation plan is `docs/REAL_MCT.md` (2026-09-05).
+built here — it is `ProofMode/RealMCT.lean`, and `docs/REAL_MCT.md` describes it.
 
 `MCTStatement.lean` is **ℕ**-MCT: values are naturals, order is `x ∸ y =₀ 0`, the conclusion
 is *exact* equality `a v =₀ a (v + g v)`, and the budget is a natural `K`. `Reference/MCT.lean`
@@ -50,11 +50,11 @@ sequences of ℚ-codes with the fixed modulus `2^{-n}`).
   `0 ≤ a ≤ 1` must be known** — a genuinely proof-mining-shaped quantity (the hypotheses
   need only hold up to `2^{-U}`), and the same reading `TriangleBoundDemo` gave its `U`.
   The alternative packing — `u` the sequence index, the Cauchy index inside — would make `U`
-  bound how far into the sequence the hypotheses are consulted; both are legitimate, the
-  brief asked for this one, and `docs/REAL_MCT.md` §1 records the trade.
+  bound how far into the sequence the hypotheses are consulted; both are legitimate, this one
+  is what is built, and `docs/REAL_MCT.md` §1 records the trade.
 
 * **The conclusion `∃v C` is the metastability statement with explicit slack at a fixed
-  index** (CLAUDE.md Track D4, "the one genuine design step"). The real-number statement
+  index** — the one genuine design step in the statement. The real-number statement
   `|a v −ℝ a (v + g v)|ℝ ≤ℝ 2^{-k}` is Π⁰₁ (`le_R_pu` is `∀n …`), so `∃v (…)` would be
   Σ⁰₂ and fits neither our metatheorem nor Kohlenbach 17.52, whose `C∃` is an ∃-formula.
   Because every encoded real carries the fixed modulus `2^{-n}`, one rational comparison at
@@ -93,8 +93,8 @@ sequences of ℚ-codes with the fixed modulus `2^{-n}`).
 
   The other natural conclusion — the *drop* form `a v ≤ℝ a(v + g v) +ℝ 2^{-k}`, which is
   what the descent literally produces and which involves no `neg_R` — is equivalent to the
-  absolute-value form under antitonicity; the brief asked for `|·|`, and the only cost was
-  one semantic lemma (`codeReal_negR`, below) that did not exist.
+  absolute-value form under antitonicity. The `|·|` form is what is used here, and the only
+  cost was one semantic lemma (`codeReal_negR`, below) that did not exist.
 
 ## What the extracted `Φ` would bound
 
@@ -321,8 +321,14 @@ example
         ∃ v : Nat, v ≤ Φ x_star ∧ Formula.interpret si rmC (v, (x, ())) :=
   syntactic_general_metatheorem_gen eqxi spremise am rmB_pu rmB_vf rmC_pe rmC_vf prf
 
-/-- **The classical version** — the intended entry point, since the ℝ-MCT derivation is the
-first genuine client of the classical metatheorem (CLAUDE.md Track D4). -/
+/-- **The classical version**, for a derivation that does use classical logic.
+
+Note that `ProofMode.real_mct_p2` is *not* such a derivation: the **metastable** form of ℝ-MCT
+needs no excluded middle and no Markov, so it is derivable at every `Allowed` and goes through
+the extended entry point above. (The *Cauchy* form is the one that needs classical logic —
+that is Kohlenbach's point about metastability, and it is reproduced here.) This shape check
+is for a client that genuinely is classical, such as a proof that assumes no good window
+exists and derives strict drops. -/
 example
     (eqxi : EqXInterp X F si)
     (nts : NTStableD Premises)
@@ -479,7 +485,7 @@ opaque to `norm_cast`/`omega` (CLAUDE.md, bridge section). -/
 
 /-! The three variable terms of `rmB`, evaluated. Stated as `rfl` facts and used by `rw`,
 never by unification against `codeReal (…)`: `codeReal` is a `limUnder`, and letting
-`isDefEq` unfold it is a `whnf` timeout with no error to point at (CLAUDE.md trap 12). -/
+`isDefEq` unfold it is a `whnf` timeout with no error to point at. -/
 
 theorem interp_aSucc (n u : ℕ) (a : ℕ → ℕ → ℕ) (g : ℕ → ℕ) (k : ℕ) :
     Term.interpret si (Term.app (aOf (xV3 (F := F))) (Term.app .succ nV))

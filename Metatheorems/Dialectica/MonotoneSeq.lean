@@ -9,7 +9,7 @@ import Metatheorems.ProofMode.Tactics
 import Metatheorems.ProofMode.Rewrite
 
 /-!
-# `monotone_soundness` through the proof-mode packaging layer (MFI Lane D1)
+# `monotone_soundness` through the proof-mode packaging layer
 
 `Dialectica/MonotoneMemo.lean` gives the `Eq.mpr` entry for `monotone_soundness`; it fires
 only where the recursion meets a cast *directly*. In a proof-mode-written derivation the casts
@@ -669,7 +669,7 @@ runs its K-rule, which checks the two sides definitionally equal — and the ker
 `wTy B =?= wTy B'`, i.e. `B =?= B'`: the formula before the normalisation against the formula
 after it, a `Term.subst`/`rename` computation through the closed ℚ constants on *both* sides,
 whose argument-first attempts at every node make it quadratic (`std::bad_alloc` at 12 GB on
-`le_R_pu_of_le_R`, measured 2026-09-05 with the transports in place). `wTy` itself never
+`le_R_pu_of_le_R`, measured with the transports in place). `wTy` itself never
 looks at a formula's terms, so this is entirely avoidable: route the cast through the
 *reduced* hat type `τ` — a bare `Ty` constructor tree — and the kernel, comparing
 `wTy B` against a constructor, can only *evaluate* `wTy B`, never compare two formulas.
@@ -700,8 +700,8 @@ end TransportTo
 
 open Lean Meta in
 /-- Normalise a `Ty`-valued expression to a constructor tree, **with the kernel's `whnf`** at
-every node (`Meta.reduce` leaves `wTy _` untouched, measured 2026-09-05: the transport was
-handed `τ := wTy B'` verbatim and nothing was gained). Recurses into `arr`/`prod`; the index of
+every node. `Meta.reduce` leaves `wTy _` untouched — measured: the transport was then handed
+`τ := wTy B'` verbatim and nothing was gained. Recurses into `arr`/`prod`; the index of
 `base` is left as it is. Anything the kernel cannot bring to a constructor is returned as is. -/
 partial def tyNF (e : Expr) : MetaM Expr := do
   let env ← getEnv
@@ -746,8 +746,8 @@ around `Derivable.forall_ax`, along `(A.renameF (ext shift)).subst0 (var vz) = A
 `forall_imp_pull`/`forall_imp_push`/`exist_imp_pull`/`forall_mono` all contain it. Kept folded
 (`fipComb := ms forall_imp_pull`), the kernel meets that `Eq.mp` and K-checks its equation —
 `substF σ (renameF ρ A) ≡ A`, a linear traversal through every closed ℚ constant of `A`, per
-hypothesis carried under a `∀` (measured 2026-09-05: `pintro h; pforall; pexact h` over
-`le_R dxw Tq` alone is a 12 GB `std::bad_alloc`). So the rewrite must reach *inside* them: the
+hypothesis carried under a `∀` (measured: `pintro h; pforall; pexact h` over `le_R dxw Tq`
+alone is a 12 GB `std::bad_alloc`). So the rewrite must reach *inside* them: the
 Δ-recursive combinators unfold at a literal `Δ`, the named combinators unfold to
 `monotone_soundness` of their theorem, the theorems unfold, and `forall_ax_vz` gets its own
 transport entry. -/
@@ -848,7 +848,7 @@ attribute [mfi_memo] forall_imp_pull forall_imp_push exist_imp_pull forall_mono 
 constructors *propositionally*: `simp only [monotone_soundness]` (the unfold target) reduces
 by smart unfolding, which at `ms (Eq.mp e d)` runs Meta's K-rule through the cast once and
 hands the kernel a *definitional* step it must re-run — the 12 GB `std::bad_alloc` on
-`pintro h; pforall; pexact h` (2026-09-05). The equation theorems below carry explicit proofs
+`pintro h; pforall; pexact h`. The equation theorems below carry explicit proofs
 when simp is run with `implicitDefEqProofs := false`; that pass kernel-checks in milliseconds
 on the same derivation. So: **never pass `monotone_soundness` itself to `simp`; use the set,
 with `(config := { implicitDefEqProofs := false })`.** -/
@@ -869,8 +869,7 @@ attribute [mfi_memo] monotone_soundness.eq_1 monotone_soundness.eq_2 monotone_so
 /-! The three cast entries of `MonotoneMemo.lean` belong to the set. **Not**
 `MRealizer.transport_rfl`: as a rewrite rule its implicit `B'` unifies with `B` at default
 transparency, which is exactly the comparison of a formula before and after normalisation
-that the casts exist to avoid — measured as an `isDefEq` heartbeat timeout inside `simp`
-(2026-09-05). -/
+that the casts exist to avoid — measured as an `isDefEq` heartbeat timeout inside `simp`. -/
 attribute [mfi_memo] monotone_soundness_eqmpr monotone_soundness_eqmp monotone_soundness_subst
 
 section ExAndLeft

@@ -199,13 +199,13 @@ def le_R {Γ : Ctx ι} (f g : Term F Γ (realTy ι)) : Formula F Γ :=
 /-- Alternative formulation of `≤ℝ` as a syntactically purely universal formula:
     `f ≤ℝ g :≡ ∀n. ¬(f̂(n+1) −ℚ ĝ(n+1) ≥ℚ ⟨2^{-n}⟩ℚ)`, i.e. `¬(g <ℝ f)` spelled out.
 
-**Argument order fixed 2026-09-02.** This previously negated the body of `lt_R f g` rather
-than of `lt_R g f`, so `le_R_pu f g` meant `g ≤ℝ f` — the opposite of `le_R f g`, and the
-opposite of what its own docstring claimed. Both agreed with each other and with nothing
-else, which is why it survived: `le_R_pu` had no consumers that cared about the direction
-until `Derivable.dist_tri` started asserting the triangle inequality with it, at which point
-the constructor was asserting `d(x,y) +ℝ d(y,z) ≤ℝ d(x,z)` — the *reverse* triangle
-inequality, satisfied by no metric. Found while proving `le_zero_eq_zero_R`.
+**A bug worth remembering, because of how long it survived.** This once negated the body of
+`lt_R f g` rather than of `lt_R g f`, so `le_R_pu f g` meant `g ≤ℝ f` — the opposite of
+`le_R f g`, and the opposite of what its own docstring claimed. Definition and docstring
+agreed with each other and with nothing else, and no consumer cared about the direction until
+`Derivable.dist_tri` began asserting the triangle inequality with it. At that point the
+constructor was asserting `d(x,y) +ℝ d(y,z) ≤ℝ d(x,z)` — the *reverse* triangle inequality,
+satisfied by no metric.
 
 It is now definitionally aligned with `le_R`: `le_R_pu f g` and `le_R f g` unfold to the
 same statement, the first as `∀n. ¬…` and the second as `¬∃n. …`. -/
