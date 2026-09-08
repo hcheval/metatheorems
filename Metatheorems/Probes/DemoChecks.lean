@@ -71,7 +71,7 @@ set_option Elab.async false
 namespace Metatheorems
 namespace DemoChecks
 
-open Metatheorems.Demo (linearR doublingR xs ys doubling eB_qf eB_vf eC_qf eC_vf)
+open Metatheorems.Demo (linearR doublingR xs ys doubling)
 open PureWEHA (cm eqxi spremise)
 
 -- ============================================================================
@@ -111,15 +111,16 @@ theorem exp_U_5 : (4 : ℕ) = mfiU cm doublingR (xs 5) := by kernel_rfl
 theorem exp_U_3_ne_1 : (1 : ℕ) ≠ mfiU cm doublingR (xs 3) := by rw [← exp_U_3]; decide
 theorem exp_U_3_ne_3 : (3 : ℕ) ≠ mfiU cm doublingR (xs 3) := by rw [← exp_U_3]; decide
 
-/-- `Φ` through the metatheorem's own entry point: `Φ = max U V`. -/
+/-- `Φ` through the metatheorem's own entry point: `Φ = max U V`. The four `rfl`s are its
+side conditions — `B₀` and `C₀` quantifier-free and ∨-free — read off `doubling`'s type. -/
 theorem exp_Phi_3 : (8 : ℕ) = (monotone_general_metatheorem_at eqxi spremise cm
-    eB_qf eB_vf eC_qf eC_vf doubling).val (xs 3) := by kernel_rfl
+    rfl rfl rfl rfl doubling).val (xs 3) := by kernel_rfl
 
 theorem exp_Phi_5 : (32 : ℕ) = (monotone_general_metatheorem_at eqxi spremise cm
-    eB_qf eB_vf eC_qf eC_vf doubling).val (xs 5) := by kernel_rfl
+    rfl rfl rfl rfl doubling).val (xs 5) := by kernel_rfl
 
 theorem exp_Phi_3_ne_16 : (16 : ℕ) ≠ (monotone_general_metatheorem_at eqxi spremise cm
-    eB_qf eB_vf eC_qf eC_vf doubling).val (xs 3) := by
+    rfl rfl rfl rfl doubling).val (xs 3) := by
   rw [← exp_Phi_3]; decide
 
 -- ============================================================================

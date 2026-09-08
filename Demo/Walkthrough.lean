@@ -5,6 +5,7 @@ Authors: Horatiu
 -/
 import Metatheorems
 import Metatheorems.Hilbert
+import Metatheorems.Examples.Doubling
 -- Nothing from `Metatheorems/Probes/`: probes are measurements. The `ι = Empty` setting is
 -- `Metatheorems/PureWEHA.lean`, `kernel_rfl` is `Metatheorems/KernelRfl.lean`, and both
 -- derivations of §6 are written out below.
@@ -160,6 +161,154 @@ def demo_add_comm (x : Term F Γ Ty.nat) :
     prefl
 
 end Arithmetic
+
+/-! ============================================================================
+# §1c. "Doesn't `prw` let you cheat on quantifier-free extensionality?"
+
+It cannot, and the refusals are on screen below.
+
+`WE-HA^{ω,X}` is **weakly** extensional: the only substitution-of-equals it has is
+`Derivable.qfer`, which turns `s =₀ t` into `r[s] =₀ r[t]` for a *term* abstraction `r`, under
+the side conditions that the premise formula be quantifier-free and ∨-free. Full
+extensionality is not merely absent, it is **deliberately excluded** — it is what would break
+the metatheorems.
+
+`prw`/`prwby` are the tactics that look like Lean's `rw`, and each one *emits a `qfer`
+application*, discharging `A₀.isQF = true` and `A₀.isVFree = true` by `rfl`
+(`ProofMode/Rewrite.lean`). Nothing else is available to them, so anything QF-ER does not
+license is refused at elaboration time.
+
+Two refusals follow, each of a rewrite Lean's own `rw` performs without blinking, each
+checked on **every build** by `#guard_msgs` (the expected error is the docstring; if the
+tactic ever stopped refusing, this file would fail to compile), and each paired with the
+legitimate route to the same theorem.
+============================================================================ -/
+
+section WeakExtensionality
+
+variable {ι κ : Type} {F : κ → Ty ι} {al : Allowed} {Premises : PremiseSet F} {Γ : Ctx ι}
+
+/-- **What QF-ER does license**: rewrite inside a *term*, under a hypothesis. -/
+def demo_qfer_ok (f : Term F Γ (Ty.nat →ₜ Ty.nat)) (s t : Term F Γ Ty.nat) :
+    Derivable F al Premises (s =₀ t →ᶠ f ⬝ s =₀ f ⬝ t) := by
+  pmode
+  pintro h
+  prwby h
+  prefl
+
+-- **Refusal 1 — under a quantifier.** `rw [h]` would rewrite happily inside `∀z (…)`. Here
+-- the goal is a `Formula.all`, not an equation, so there is no term abstraction to hand
+-- `qfer` and the tactic stops. The expected error is the docstring below, so this refusal is
+-- re-checked on every build.
+/--
+error: prwby: the goal is not an equation
+  ∀ᶠ x₀ : nat, x₀ +ᵗ s =₀ x₀ +ᵗ t
+-/
+#guard_msgs in
+example (s t : Term F Γ Ty.nat) :
+    Derivable F al Premises (s =₀ t →ᶠ Formula.all Ty.nat (x₀ +ᵗ s =₀ x₀ +ᵗ t)) := by
+  pmode
+  pintro h
+  prwby h
+
+/-- …and the legitimate route: introduce the `∀` **first** (`pforall`, whose eigenvariable
+condition is the §1d point), and then the goal *is* an equation and QF-ER applies. -/
+def demo_rewrite_under_forall (s t : Term F Γ Ty.nat) :
+    Derivable F al Premises (s =₀ t →ᶠ Formula.all Ty.nat (x₀ +ᵗ s =₀ x₀ +ᵗ t)) := by
+  pmode
+  pintro h
+  pforall
+  prwby h
+  prefl
+
+-- **Refusal 2 — a quantified equation as the rewrite rule.** `rw` unifies a `∀`-quantified
+-- equation against the goal. QF-ER's premise is the equation *itself*, and it must be
+-- quantifier-free; `∀u (f u =₀ g u)` is not.
+/--
+error: prwby: `h` is not an equation
+  ∀ᶠ x₀ : nat, f ⬝ x₀ =₀ g ⬝ x₀
+-/
+#guard_msgs in
+example (f g : Term F Γ (Ty.nat →ₜ Ty.nat)) (c : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (Formula.all Ty.nat (f ⬝ x₀ =₀ g ⬝ x₀) →ᶠ f ⬝ c =₀ g ⬝ c) := by
+  pmode
+  pintro h
+  prwby h
+
+/-- …and its legitimate route: instantiate the `∀` at the term you want (`pinst`), which is
+`Derivable.forall_ax`, and then rewrite by the *instance*, which is quantifier-free. -/
+def demo_rewrite_from_forall (f g : Term F Γ (Ty.nat →ₜ Ty.nat)) (c : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (Formula.all Ty.nat (f ⬝ x₀ =₀ g ⬝ x₀) →ᶠ f ⬝ c =₀ g ⬝ c) := by
+  pmode
+  pintro h
+  pinst h c with hc
+  anorm          -- `pinst` leaves the substitution `(f ⬝ x₀ =₀ g ⬝ x₀)[x₀ := c]` unevaluated
+  pexact hc
+
+end WeakExtensionality
+
+/-! ============================================================================
+# §1d. "A Hilbert system has no deduction theorem — where did `pintro` come from?"
+
+From nowhere: it is the identity function.
+
+`pack Δ B` folds the hypothesis list into a chain of object implications, with the **head of
+`Δ` innermost**, and `Seq F al Premises Δ B` is a *notation* for
+`Derivable F al Premises (pack Δ B)`. So `Δ, A ⊢ B` and `Δ ⊢ A →ᶠ B` are not merely
+interderivable, they are **the same type**, and `seq_intro`/`seq_revert` — the moves `pintro`
+and `prevert` call — are literally `id` (`ProofMode/Packing.lean`). Nothing is assumed, no
+rule is added, and a buggy tactic can only fail to elaborate: `SeqD` is `@[reducible]` over
+`Derivable`, so there is no soundness theorem for the proof mode and there does not need to
+be one.
+
+The one place a deduction theorem *would* be unsound is the eigenvariable condition, and the
+de Bruijn indices discharge it. `Derivable.forall_rule` concludes `B →ᶠ ∀x A` only from
+`weakenBy ρ B →ᶠ A`: the side formula must literally be a *weakening*, so "x not free in B"
+is not a check, it is a typing constraint. `seq_allI` (which is `pforall`) maps the **whole**
+hypothesis context through `weakenBy ρ`, one hypothesis at a time via `forall_imp_pull` — so
+after `pforall` every hypothesis lives one context out and none of them can mention the new
+variable. That is why generalising under assumptions is safe here without any side condition
+being tested anywhere.
+============================================================================ -/
+
+section DeductionTheorem
+
+variable {ι κ : Type} {F : κ → Ty ι} {al : Allowed} {Premises : PremiseSet F} {Γ : Ctx ι}
+variable {A B C : Formula F Γ} {Δ : ProofMode.HCtx F Γ} {ρ : Ty ι}
+
+/-- A sequent **is** a kernel derivation of the packed implication — by `rfl`, on the types. -/
+example : ProofMode.Seq F al Premises [A, B] C
+        = Derivable F al Premises (B →ᶠ A →ᶠ C) := rfl
+
+/-- …so introducing a hypothesis is the identity function, not a theorem. -/
+example : (ProofMode.seq_intro : ProofMode.Seq F al Premises (A :: Δ) B →
+    ProofMode.Seq F al Premises Δ (A →ᶠ B)) = id := rfl
+
+/-- …and so is reverting one. -/
+example : (ProofMode.seq_revert : ProofMode.Seq F al Premises Δ (A →ᶠ B) →
+    ProofMode.Seq F al Premises (A :: Δ) B) = id := rfl
+
+/-- **Universal generalisation is a rule, and `A →ᶠ ∀x A` is not a theorem** — unless the
+body is a weakening, which is exactly what the type of `forall_rule` demands. This is the
+implication form, and it needs no side condition because `weakenBy ρ B` cannot mention the
+new variable. -/
+example : Derivable F al Premises (B →ᶠ Formula.all ρ (Formula.weakenBy ρ B)) :=
+  .forall_rule I_comb
+
+/-- Generalising **under a hypothesis**, in the mode. The hypothesis `h` is still available
+after `pforall`; the goal display shows it weakened (`↑ᶜ`), which is the eigenvariable
+condition made visible rather than checked. -/
+def demo_forall_under_hyp (x : Term F Γ Ty.nat) :
+    Derivable F al Premises
+      (x =₀ x →ᶠ Formula.all Ty.nat (x₀ +ᵗ x =₀ x₀ +ᵗ x)) := by
+  pmode
+  pintro h
+  pforall
+  prefl
+
+end DeductionTheorem
 
 /-! ============================================================================
 # §2. The same tactics at a metric space
@@ -460,6 +609,15 @@ relative to the process's working directory, which is not this file's.
 /-! ============================================================================
 # §6. Extraction — the centrepiece
 
+## Presenter's note — say these out loud; the screen cannot show them
+
+* Both derivations below use the **same** rule, `Derivable.induction`. The two growth rates
+  come from what the *witnesses* are, not from different logic.
+* The numerals are **magnitudes**. At `ι = Empty` nothing routes through the ℚ/ℝ Cantor-pairing
+  encoding, so `32` means thirty-two and not a code for a rational.
+* `real_mct_p2` (§6e) proves the **metastable** statement — a bare `∃v`, with no bound inside
+  it — and *that statement* needs no classical logic. It is not the claim "MCT needs none".
+
 ## What the metatheorem says
 
 For a statement in the shape
@@ -562,12 +720,10 @@ Same induction rule. But now the step case takes the witness `w` the induction h
 supplies and returns `w +ᵗ w`:
 
 ```lean
-    def inner3 : D G2 (C2 ∧ᶠ E2f →ᶠ Formula.weakenBy Ty.nat R1) :=
-      Derivable.syllogism
-        (pair_h and_proj2 (Derivable.syllogism and_proj1 cong2))
-        (Derivable.syllogism Derivable.trans0
-          (Derivable.exist_ax (Term.app2 Term.add v2 v2) CS3))
-    --                        ^^^^^^^^^^^^^^^^^^^^^^^^^^ the new witness, `v +ᵗ v`
+    -- Examples/Doubling.lean, the step under the ∃: from `f k =₀ v` and the premise
+    -- instance `f (S k) =₀ f k +ᵗ f k`, conclude `f (S k) =₀ v +ᵗ v`.
+    Derivable.exist_ax (v2 +ᵗ v2) CS3
+    --                  ^^^^^^^^ the new witness, built from the previous one
 ```
 
 Dialectica interprets `Derivable.induction` as primitive recursion (`MRealizer.induction` =
@@ -580,159 +736,34 @@ property of the proof and not a default. And **no witness term written by hand m
 `Term.prec`**: the surface-recursor ban (`ProofMode/Linter.lean`) is enforced, so the iteration
 in the bound is produced by the extraction, not smuggled into the derivation. -/
 
-/-! ### The derivation, piece by piece
-
-Raw `Derivable` constructors throughout — `induction`, `forall_ax`, `exist_ax`, `exist_rule`,
-`syllogism`, `exportation`, and one quantifier-free extensionality step — no proof mode at
-all; 145 constructors in total (first built and measured in `Probes/ContentExampleNat.lean`;
-this is that derivation, owned here). `x = (k, f)` at type `nat ×ₜ (nat →ₜ nat)`, with
-`k := fst x`, `f := snd x`. The contexts grow inward: `[x]`, then `[k, x]` under the
-induction, then `[u, k, x]` or `[v, k, x]` under the inner quantifier; the abbreviations
-`f₀ f₁ f₂`, `k₁ k₂`, `v₂` name the variables by role at each depth. -/
-
-section Doubling
-
-abbrev sTy : Ty Empty := Ty.nat ×ₜ (Ty.nat →ₜ Ty.nat)
-abbrev G0 : Ctx Empty := [sTy]
-abbrev G1 : Ctx Empty := Ty.nat :: G0
-abbrev G2 : Ctx Empty := Ty.nat :: G1
-
-/-- `⊢` in the pure system, at a fixed context. -/
-abbrev D (Γ : Ctx Empty) (A : Formula PureWEHA.F Γ) :=
-  Derivable PureWEHA.F Allowed.extended PureWEHA.Premises A
-
-abbrev f0 : Term PureWEHA.F G0 (Ty.nat →ₜ Ty.nat) := Term.snd (.var .vz)
-abbrev f1 : Term PureWEHA.F G1 (Ty.nat →ₜ Ty.nat) := Term.snd (.var (.vs .vz))
-abbrev f2 : Term PureWEHA.F G2 (Ty.nat →ₜ Ty.nat) := Term.snd (.var (.vs (.vs .vz)))
-abbrev k1 : Term PureWEHA.F G1 Ty.nat := .var .vz
-abbrev k2 : Term PureWEHA.F G2 Ty.nat := .var (.vs .vz)
-abbrev v2 : Term PureWEHA.F G2 Ty.nat := .var .vz
-
-/-- `f (S u) =₀ f u +ᵗ f u` — the premise matrix, `u` the bound variable. -/
-def B2 : Formula PureWEHA.F G2 := f2 ⬝ S v2 =₀ f2 ⬝ v2 +ᵗ f2 ⬝ v2
-/-- `f k =₀ v` — the conclusion matrix. -/
-def C2 : Formula PureWEHA.F G2 := f2 ⬝ k2 =₀ v2
-/-- `f (S k) =₀ v` — the conclusion matrix at `k+1`. -/
-def CS : Formula PureWEHA.F G2 := f2 ⬝ S k2 =₀ v2
-
-/-- The formula inducted on: `∀u B₀ →ᶠ ∃v (f k =₀ v)`. -/
-def A1 : Formula PureWEHA.F G1 := Formula.all Ty.nat B2 →ᶠ Formula.ex Ty.nat C2
-def P1 : Formula PureWEHA.F G1 := Formula.all Ty.nat B2
-def Q1 : Formula PureWEHA.F G1 := Formula.ex Ty.nat C2
-def R1 : Formula PureWEHA.F G1 := Formula.ex Ty.nat CS
-
-/-- The premise instance at `u := k`: `f (S k) =₀ f k +ᵗ f k`. -/
-def E1f : Formula PureWEHA.F G1 := f1 ⬝ S k1 =₀ f1 ⬝ k1 +ᵗ f1 ⬝ k1
-/-- …the same, one binder in. -/
-def E2f : Formula PureWEHA.F G2 := f2 ⬝ S k2 =₀ f2 ⬝ k2 +ᵗ f2 ⬝ k2
-
-theorem E2f_eq : Formula.weakenBy Ty.nat E1f = E2f := rfl
-
-/-- **The premise is consumed**, at `u := k`: `(∀u B₀) →ᶠ f (S k) =₀ f k + f k`. -/
-def hi : D G1 (P1 →ᶠ E1f) := Derivable.forall_ax (A := B2) k1
-
-/-- The step's one arithmetic fact, a single QF-ER at `r := x₀ +ᵗ x₀`:
-`f k =₀ v ⊢ f k + f k =₀ v + v`. -/
-def cong2 : D G2 (C2 →ᶠ (f2 ⬝ k2 +ᵗ f2 ⬝ k2 =₀ v2 +ᵗ v2)) :=
-  qfer_nat_nf (A₀ := C2) rfl rfl I_comb
-    (r := Term.app2 Term.add (.var .vz) (.var .vz)) (by rfl) (by rfl)
-
-/-- `CS` under one more binder: `f (S k) =₀ w`, in `[w, v, k, x]`. -/
-def CS3 : Formula PureWEHA.F (Ty.nat :: G2) :=
-  Formula.eq0
-    (Term.app (Term.snd (.var (.vs (.vs (.vs .vz))))) (Term.app Term.succ (.var (.vs (.vs .vz)))))
-    (.var .vz)
-
-theorem CS3_eq : Formula.weakenBy Ty.nat R1 = Formula.ex Ty.nat CS3 := rfl
-
-/-- **The witness is built from the induction hypothesis's witness**: under the `∃`, from
-`f k =₀ v` and the premise instance, `f (S k) =₀ v +ᵗ v`, and `exist_ax` at `v +ᵗ v`. -/
-def inner3 : D G2 (C2 ∧ᶠ E2f →ᶠ Formula.weakenBy Ty.nat R1) :=
-  Derivable.syllogism
-    (pair_h and_proj2 (Derivable.syllogism and_proj1 cong2))
-    (Derivable.syllogism Derivable.trans0
-      (Derivable.exist_ax (v2 +ᵗ v2) CS3))
-
-/-- The ∃-elimination: `ex_and_left` keeps the premise instance available across it. -/
-def keyEA : D G1 (E1f ∧ᶠ Q1 →ᶠ R1) :=
-  Derivable.syllogism Derivable.and_perm
-    (Derivable.syllogism ex_and_left (Derivable.exist_rule inner3))
-
-def key : D G1 (P1 →ᶠ Q1 →ᶠ R1) :=
-  Derivable.syllogism hi (Derivable.exportation keyEA)
-
-/-- The induction step, `A1 →ᶠ A1[k := S k]`, by `S_comb` (the premise is used on both
-sides of the implication). -/
-def stepBody : D G1 ((P1 →ᶠ Q1) →ᶠ (P1 →ᶠ R1)) := Derivable.mp key S_comb
-
-def dummy0 : Formula PureWEHA.F G0 := Term.zero =₀ Term.zero
-
-def stepW : D G1 (Formula.weakenBy Ty.nat dummy0 →ᶠ
-    (A1 →ᶠ Formula.substVar0 A1 (Term.app Term.succ (.var .vz)))) :=
-  Derivable.mp stepBody (Derivable.exportation Derivable.and_weak)
-
-def stepD : D G0 (Formula.all Ty.nat
-    (A1 →ᶠ Formula.substVar0 A1 (Term.app Term.succ (.var .vz)))) :=
-  Derivable.mp Derivable.refl0 (Derivable.forall_rule stepW)
-
-/-- The `∃`-body at `k := 0`: `f 0 =₀ v`. -/
-def C0 : Formula PureWEHA.F (Ty.nat :: G0) :=
-  Formula.eq0 (Term.app (Term.snd (.var (.vs .vz))) Term.zero) (.var .vz)
-
-/-- The base case: witness `f 0`. -/
-def baseD : D G0 (A1.subst0 Term.zero) :=
-  Derivable.mp
-    (Derivable.mp Derivable.refl0 (Derivable.exist_ax (f0 ⬝ Term.zero) C0))
-    (Derivable.exportation Derivable.and_weak)
-
-/-- `⊢ ∀k ( ∀u (f (S u) =₀ f u + f u) → ∃v (f k =₀ v) )`, in context `[x]`. -/
-def Lraw : D G0 (Formula.all Ty.nat A1) := Derivable.induction baseD stepD
-
-/-- The premise matrix in the metatheorem's shape, `B₀ := f (S u) =₀ f u +ᵗ f u` in `[u, x]`:
-`x` is `x₀` (the outer binder), `u` is `x₁`, `f := snd x`. -/
-def eB : Formula PureWEHA.F [Ty.nat, sTy] :=
-  Term.snd x₀ ⬝ S x₁ =₀ Term.snd x₀ ⬝ x₁ +ᵗ Term.snd x₀ ⬝ x₁
-
-/-- The conclusion matrix, `C₀ := f k =₀ v` in `[v, x]`: `x` is `x₀`, `v` is `x₁`,
-`k := fst x`. -/
-def eC : Formula PureWEHA.F [Ty.nat, sTy] :=
-  Term.snd x₀ ⬝ Term.fst x₀ =₀ x₁
-
-theorem eB_qf : eB.isQF = true := rfl
-theorem eB_vf : eB.isVFree = true := rfl
-theorem eC_qf : eC.isQF = true := rfl
-theorem eC_vf : eC.isVFree = true := rfl
-
-/-- `∀k` instantiated at `k := fst x`. -/
-def innerD : D G0 (Formula.all Ty.nat eB →ᶠ Formula.ex Ty.nat eC) :=
-  Derivable.mp Lraw (Derivable.forall_ax (Term.fst (Term.var .vz)))
-
-def eDummy : Formula PureWEHA.F ([] : Ctx Empty) := Term.zero =₀ Term.zero
-
-def eInnerW : D [sTy] (Formula.weakenBy sTy eDummy →ᶠ
-    (Formula.all Ty.nat eB →ᶠ Formula.ex Ty.nat eC)) :=
-  Derivable.mp innerD (Derivable.exportation Derivable.and_weak)
-
 /-- **The theorem, written out**:
 
     ⊢ ∀x^(nat × (nat→nat)) ( ∀u ( f (S u) =₀ f u +ᵗ f u )  →  ∃v ( f k =₀ v ) )
 
-with `f := snd x`, `k := fst x`. -/
+with `f := snd x`, `k := fst x`.
+
+The derivation is **raw `Derivable` constructors** — `induction`, `forall_ax`, `exist_ax`,
+`exist_rule`, `syllogism`, `exportation`, and one quantifier-free extensionality step, 145 of
+them, no proof mode at all. It lives in `Metatheorems/Examples/Doubling.lean`, because the de
+Bruijn bookkeeping it needs (a page of contexts and intermediate formulas) says nothing about
+proof mining and would bury the extraction below. `Probes/ContentExampleNat.lean` measures
+what the proof-mode form of the *same argument* costs: 42,747 constructors, 295×, and a bound
+that reduces only at `k* = 0`. -/
 def doubling : Derivable PureWEHA.F Allowed.extended PureWEHA.Premises (Γ := [])
     (Formula.all (Ty.nat ×ₜ (Ty.nat →ₜ Ty.nat))
       (Formula.all Ty.nat (Term.snd x₀ ⬝ S x₁ =₀ Term.snd x₀ ⬝ x₁ +ᵗ Term.snd x₀ ⬝ x₁)
         →ᶠ Formula.ex Ty.nat (Term.snd x₀ ⬝ Term.fst x₀ =₀ x₁))) :=
-  Derivable.mp Derivable.refl0 (Derivable.forall_rule eInnerW)
+  Examples.Doubling.derivation
 
-/-- Its monotone realizer. -/
+/-- Its monotone realizer — an ordinary `def`, elaborates instantly. -/
 def doublingR := monotone_soundness PureWEHA.eqxi PureWEHA.spremise PureWEHA.cm doubling
 
 /-- The majorant `x* = (k*, λn. n+1)`, so `f*(0) = 1`. -/
-def xs (k : ℕ) : Ty.interpret PureWEHA.X sTy.hat := (k, fun (n : ℕ) => n + 1)
+def xs (k : ℕ) : Ty.interpret PureWEHA.X (Ty.nat ×ₜ (Ty.nat →ₜ Ty.nat)).hat :=
+  (k, fun (n : ℕ) => n + 1)
 /-- `x* = (k*, λn. n+3)` — the *other* component of the majorant, so `f*(0) = 3`. -/
-def ys (k : ℕ) : Ty.interpret PureWEHA.X sTy.hat := (k, fun (n : ℕ) => n + 3)
-
-end Doubling
+def ys (k : ℕ) : Ty.interpret PureWEHA.X (Ty.nat ×ₜ (Ty.nat →ₜ Ty.nat)).hat :=
+  (k, fun (n : ℕ) => n + 3)
 
 -- Extraction, the witness side — uncomment to run live
 -- (measured kernel time: 0.05 s at k*=0, 1.2 s at k*=3, 4.3 s at k*=5 — the cost grows with
@@ -767,12 +798,14 @@ end Doubling
 --
 -- theorem exp_Phi_3 : (8 : ℕ) =
 --     (monotone_general_metatheorem_at PureWEHA.eqxi PureWEHA.spremise PureWEHA.cm
---       eB_qf eB_vf eC_qf eC_vf doubling).val (xs 3) := by kernel_rfl
+--       rfl rfl rfl rfl doubling).val (xs 3) := by kernel_rfl
 -- theorem exp_Phi_5 : (32 : ℕ) =
 --     (monotone_general_metatheorem_at PureWEHA.eqxi PureWEHA.spremise PureWEHA.cm
---       eB_qf eB_vf eC_qf eC_vf doubling).val (xs 5) := by kernel_rfl
+--       rfl rfl rfl rfl doubling).val (xs 5) := by kernel_rfl
 --
 --   ⟹ Φ = max U V, from the metatheorem's own entry point rather than its two components.
+--     The four `rfl`s are the metatheorem's side conditions — that `B₀` and `C₀` are
+--     quantifier-free and ∨-free — decided on the spot from `doubling`'s own type.
 
 /-! ## 6c. ⚠ THE CEILING — do not type `8` or more on stage
 
