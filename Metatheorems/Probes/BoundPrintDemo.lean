@@ -44,7 +44,7 @@ and the command still returns in 1.2 s.
 not a display. So the useful dial on `real_mct_p2` is 1–8, and the cap is a guard rail rather
 than a working range.
 
-`#bound Demo.linearR depth 3` gives byte-identical output to `#bound Demo.linearInduction
+`#bound Demo.stepOnceR depth 3` gives byte-identical output to `#bound Demo.stepOnce
 depth 3` (20 nodes): the command peels `monotone_soundness` so the realizer and the derivation
 are the same target.
 
@@ -119,10 +119,13 @@ namespace BoundPrintDemo
 -- Structural mode — safe on every one of these, nothing is evaluated
 -- ============================================================================
 
-#bound Demo.linearInduction
-#bound Demo.linearInduction depth 1
-#bound Demo.linearInduction depth 2
-#bound Demo.linearInduction depth 3
+-- `Demo.linearInduction`, the target the header's linear rows were measured on, was replaced
+-- in the demo on 2026-09-09 by `Demo.stepOnce` (same premise as `doubling`, no induction);
+-- those rows stand as measurements of a derivation that now exists nowhere.
+#bound Demo.stepOnce
+#bound Demo.stepOnce depth 1
+#bound Demo.stepOnce depth 2
+#bound Demo.stepOnce depth 3
 
 #bound Demo.doubling
 #bound Demo.doubling depth 1
@@ -130,7 +133,7 @@ namespace BoundPrintDemo
 #bound Demo.doubling depth 3
 
 -- The realizer names the same target as its derivation.
-#bound Demo.linearR depth 3
+#bound Demo.stepOnceR depth 3
 
 -- The large derivation, to the point where the listing stops being a display.
 #bound ProofMode.real_mct_p2
@@ -144,12 +147,12 @@ namespace BoundPrintDemo
 -- Evaluative mode — the capped kernel reducer, on the Demo realizers
 -- ============================================================================
 
-/-- `V` of the linear derivation at the majorant `x* = 5`. -/
-def linV5 : ℕ := mfiV PureWEHA.cm Demo.linearR (5 : ℕ)
-/-- The same, left symbolic in the point: the bound as a function. -/
-def linVsym (n : ℕ) : ℕ := mfiV PureWEHA.cm Demo.linearR n
-/-- Its counter side. -/
-def linUsym (n : ℕ) : ℕ := mfiU PureWEHA.cm Demo.linearR n
+/-- `V` of the one-step derivation at the majorant `x* = (5, λn.n+1)`. -/
+def linV5 : ℕ := mfiV PureWEHA.cm Demo.stepOnceR (Demo.xs 5)
+/-- The same, left symbolic in the point: the bound as a function, `xs.2 xs.1`. -/
+def linVsym := mfiV PureWEHA.cm Demo.stepOnceR
+/-- Its counter side, `xs.1`. -/
+def linUsym := mfiU PureWEHA.cm Demo.stepOnceR
 
 /-- `V` of the doubling derivation at `x* = (k*, λn.n+1)`. -/
 def dblV (k : ℕ) : ℕ := mfiV PureWEHA.cm Demo.doublingR (Demo.xs k)

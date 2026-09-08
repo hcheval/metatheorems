@@ -27,7 +27,7 @@ Six parts, in the order they are meant to be shown:
 | 3 | …and at a **W-hyperbolic space**: extensionality of the convex combination `W` | ~1 s |
 | 4 | the **same theorem as §1 from bare `Derivable` constructors** — the contrast | instant |
 | 5 | `#hilbert`: what those seven tactic lines actually *denote* | ~2 s |
-| 6 | **extraction** — two proofs by induction, one linear bound, one exponential | see below |
+| 6 | **extraction** — one premise, two proofs: a linear bound and an exponential one, each printed | see below |
 
 **Every extraction in §6 is written twice**: once here, commented out, ready to be
 uncommented and run on stage with its measured wall-clock time beside it; and once,
@@ -653,9 +653,11 @@ computes are otherwise indistinguishable from a green build.
 
 ## The thesis, in one sentence
 
-**The bound mirrors the recursion in the proof.** Two derivations follow; both use the *same*
-`Derivable.induction` rule. One has a linear bound and one an exponential one, and the
-difference is visible in the proofs.
+**The bound mirrors the proof.** Two derivations follow, from the *same* premise,
+`∀u (f (S u) =₀ f u +ᵗ f u)`. One instantiates it once and exhibits its witness: the bound is
+`f*(k*)`, and `#bound` prints it as such. The other proves the closed form by induction, building
+each witness from the previous one: the bound is `2^{k*}·f*(0)`. The difference is visible in the
+proofs and nowhere else.
 ============================================================================ -/
 
 /-! ## The setting: pure `WE-HA^ω`
@@ -666,48 +668,67 @@ constants, `PureWEHA.Premises` is empty, `PureWEHA.cm` is the Bezem majorants of
 
 Statements are written out. The binder tokens number binders **from the outside**, the way
 the `#hilbert` listings print them (`∀ᶠ x₀ : nat, …`): under `∀x`, `x` is `x₀`; a binder
-inside it introduces `x₁`, and `x` is still `x₀`. So `Formula.all Ty.nat (x₁ =₀ x₁)` under
-`∀x` is `∀u (u =₀ u)`, and `Formula.ex Ty.nat (x₁ =₀ x₀)` is `∃v (v =₀ x)`.
+inside it introduces `x₁`, and `x` is still `x₀`. So with `x = (k, f)`, `Term.snd x₀ ⬝ S x₁`
+under `∀x ∀u` reads `f (S u)`, and `Term.snd x₀ ⬝ Term.fst x₀` is `f k`.
 
-## 6a. A proof whose witness is a projection ⟹ a LINEAR bound
+Both statements below share the premise `∀u ( f (S u) =₀ f u +ᵗ f u )`: `f` doubles at every
+step. The majorants they are evaluated at are `x* = (k*, λn. n+1)` and `(k*, λn. n+3)`, so
+`f*(0)` is `1` or `3`.
 
-Statement: `∀x ( ∀u (u =₀ u) → ∃v (v =₀ x) )`.
+## 6a. Instantiate the premise once, exhibit the witness ⟹ a LINEAR bound
 
-Proved by induction on `x`, with the witness at every step being the induction variable
-itself. Nothing is built *from* the previous witness, so the primitive recursion that
-Dialectica assigns to `Derivable.induction` has nothing to iterate. -/
+    ∀x ( ∀u ( f (S u) =₀ f u +ᵗ f u )  →  ∃v ( f (S k) =₀ v +ᵗ v ) )
 
-/-- **The derivation.** `⊢ ∀x ( ∀u (u =₀ u) → ∃v (v =₀ x) )`, by `pinduction`; the witness
-is `0` in the base case and `S x₀` in the step. 368 `Derivable` constructors. -/
-def linearInduction : Derivable PureWEHA.F Allowed.extended PureWEHA.Premises (Γ := [])
-    (Formula.all Ty.nat
-      (Formula.all Ty.nat (x₁ =₀ x₁) →ᶠ Formula.ex Ty.nat (x₁ =₀ x₀))) := by
+The conclusion asks for the half of `f (S k)`; the proof instantiates the premise at `u := k`
+and hands back `f k`. Nothing recurses, so the bound is a projection of the majorant —
+`V(k*, f*) = f*(k*)`, `U(k*) = k*` — and `#bound` prints it in that form. -/
+
+/-- **The derivation**, in the proof mode: instantiate, exhibit, done. -/
+def stepOnce : Derivable PureWEHA.F Allowed.extended PureWEHA.Premises (Γ := [])
+    (Formula.all (Ty.nat ×ₜ (Ty.nat →ₜ Ty.nat))
+      (Formula.all Ty.nat (Term.snd x₀ ⬝ S x₁ =₀ Term.snd x₀ ⬝ x₁ +ᵗ Term.snd x₀ ⬝ x₁)
+        →ᶠ Formula.ex Ty.nat (Term.snd x₀ ⬝ S (Term.fst x₀) =₀ x₁ +ᵗ x₁))) := by
   pmode
-  pinduction
-  · pintro h
-    pexists Term.zero
-    pthm Derivable.refl0
-  · pforall
-    pintro ih
-    pintro h
-    pexists (S x₀)
-    pthm Derivable.refl0
+  pforall
+  pintro h
+  pinst h (Term.fst x₀) with hk
+  anorm
+  pexists (Term.snd x₀ ⬝ Term.fst x₀)
+  pexact hk
 
-/-- The monotone realizer of it — an ordinary `def`, elaborates instantly. Its type is
-`MRealizer PureWEHA.cm <the statement above>`. -/
-def linearR := monotone_soundness PureWEHA.eqxi PureWEHA.spremise PureWEHA.cm linearInduction
+/-- Its monotone realizer — an ordinary `def`, elaborates instantly. -/
+def stepOnceR := monotone_soundness PureWEHA.eqxi PureWEHA.spremise PureWEHA.cm stepOnce
 
--- Extraction at the majorants `x* = 5` and `x* = 9` — uncomment to run live
--- (measured kernel time: 2.2 s, 3.4 s, 2.8 s, instant):
+/-- The majorant `x* = (k*, λn. n+1)`, so `f*(0) = 1`. -/
+def xs (k : ℕ) : Ty.interpret PureWEHA.X (Ty.nat ×ₜ (Ty.nat →ₜ Ty.nat)).hat :=
+  (k, fun (n : ℕ) => n + 1)
+/-- `x* = (k*, λn. n+3)` — the *other* component of the majorant, so `f*(0) = 3`. -/
+def ys (k : ℕ) : Ty.interpret PureWEHA.X (Ty.nat ×ₜ (Ty.nat →ₜ Ty.nat)).hat :=
+  (k, fun (n : ℕ) => n + 3)
+
+-- The bound, PRINTED. Structural: which `MRealizer` combinator each inference rule became,
+-- one level down the derivation. Symbolic: the functional itself, reduced by the kernel with
+-- the majorant left as a variable (`#bound … eval`, capped; ≈0.7 s, converges).
+#bound stepOnce depth 1
+def stepOnceV := mfiV PureWEHA.cm stepOnceR
+#bound stepOnceV eval
+--   ⟹ `fun xs => xs.2 xs.1`, i.e. `V(k*, f*) = f*(k*)`. That is the bound, as a term.
+
+-- Extraction at points — uncomment to run live (kernel time ≈0.7–1 s each, `U` ≈1.4 s):
 --
--- theorem lin_V_5 : (5 : ℕ) = mfiV PureWEHA.cm linearR (5 : ℕ) := by kernel_rfl
--- theorem lin_V_9 : (9 : ℕ) = mfiV PureWEHA.cm linearR (9 : ℕ) := by kernel_rfl
--- theorem lin_U_5 : (0 : ℕ) = mfiU PureWEHA.cm linearR (5 : ℕ) := by kernel_rfl
--- theorem lin_V_5_ne_4 : (4 : ℕ) ≠ mfiV PureWEHA.cm linearR (5 : ℕ) := by
---   rw [← lin_V_5]; decide
+-- theorem once_V_3 : (4 : ℕ) = mfiV PureWEHA.cm stepOnceR (xs 3) := by kernel_rfl
+-- theorem once_V_5 : (6 : ℕ) = mfiV PureWEHA.cm stepOnceR (xs 5) := by kernel_rfl
+-- theorem once_V_ys_3 : (6 : ℕ) = mfiV PureWEHA.cm stepOnceR (ys 3) := by kernel_rfl
+-- theorem once_U_3 : (3 : ℕ) = mfiU PureWEHA.cm stepOnceR (xs 3) := by kernel_rfl
+-- theorem once_U_5 : (5 : ℕ) = mfiU PureWEHA.cm stepOnceR (xs 5) := by kernel_rfl
+-- theorem once_V_3_ne_8 : (8 : ℕ) ≠ mfiV PureWEHA.cm stepOnceR (xs 3) := by
+--   rw [← once_V_3]; decide
+-- theorem once_Phi_3 : (4 : ℕ) =
+--     (monotone_general_metatheorem_at PureWEHA.eqxi PureWEHA.spremise PureWEHA.cm
+--       rfl rfl rfl rfl stepOnce).val (xs 3) := by kernel_rfl
 --
---   ⟹ V(k) = k. Linear, and it moves with the input. U = 0 because the premise
---     `∀u (u =₀ u)` is never consulted — nothing is read out of it at any step.
+--   ⟹ V = f*(k*): k*+1 under xs, k*+3 under ys. U = k*: the premise is consulted exactly
+--     at k. Φ = max U V = 4 at k* = 3, from the metatheorem's own entry point.
 
 /-! ## 6b. A proof whose witness is built from the previous one ⟹ an EXPONENTIAL bound
 
@@ -718,8 +739,8 @@ Statement (`ρ := nat ×ₜ (nat →ₜ nat)`, `x = (k, f)`):
 *If `f` doubles at every step, then `f k` is bounded* — and the metatheorem's `v ≤ Φ x*` is
 that bound.
 
-Same induction rule. But now the step case takes the witness `w` the induction hypothesis
-supplies and returns `w +ᵗ w`:
+Same premise. Now the closed form `f k` itself, by induction on `k`, and the step case takes
+the witness `w` the induction hypothesis supplies and returns `w +ᵗ w`:
 
 ```lean
     -- Examples/Doubling.lean, the step under the ∃: from `f k =₀ v` and the premise
@@ -760,12 +781,16 @@ def doubling : Derivable PureWEHA.F Allowed.extended PureWEHA.Premises (Γ := []
 /-- Its monotone realizer — an ordinary `def`, elaborates instantly. -/
 def doublingR := monotone_soundness PureWEHA.eqxi PureWEHA.spremise PureWEHA.cm doubling
 
-/-- The majorant `x* = (k*, λn. n+1)`, so `f*(0) = 1`. -/
-def xs (k : ℕ) : Ty.interpret PureWEHA.X (Ty.nat ×ₜ (Ty.nat →ₜ Ty.nat)).hat :=
-  (k, fun (n : ℕ) => n + 1)
-/-- `x* = (k*, λn. n+3)` — the *other* component of the majorant, so `f*(0) = 3`. -/
-def ys (k : ℕ) : Ty.interpret PureWEHA.X (Ty.nat ×ₜ (Ty.nat →ₜ Ty.nat)).hat :=
-  (k, fun (n : ℕ) => n + 3)
+-- The bound, PRINTED. Structurally the realizer is the induction, two levels down; symbolically,
+-- at `k* = 1` with `f*` left as a variable, the kernel reduces it to the first unrolling of the
+-- closed form (≈2 s, converges).
+#bound doubling depth 2
+def doublingV1 := fun (g : ℕ → ℕ) => mfiV PureWEHA.cm doublingR ((1 : ℕ), g)
+#bound doublingV1 eval
+--   ⟹ `fun g ↦ Decidable.rec (fun _ ↦ Nat.rec (g 0) (fun k ih ↦ maxT nat (S ih) ih) (g 0)) …`
+--     — a `Nat.rec` driven by `g 0`: `recMaj` iterating *value*-many times (the §6c ceiling,
+--     visible), which evaluates to `2·f*(0)`, the `k* = 1` case of `2^{k*}·f*(0)`.
+--     Against §6a's `xs.2 xs.1`, this is the whole thesis in two printed terms.
 
 -- Extraction, the witness side — uncomment to run live
 -- (measured kernel time: 0.06 s at k*=0, 1.3 s at k*=3, 5.5 s at k*=5 — the cost grows with
@@ -832,8 +857,9 @@ there is time.
 
 ## 6d. What the two together show
 
-Same rule, two proofs, two growth rates — and the growth rate is read off the *proof*, not the
-theorem. That is the whole content of "a bound is a property of a proof". `ProofMode/MCT.lean`
+Same premise, two proofs, two growth rates — read off the *proof*, not the theorem, and now
+printed from it: `xs.2 xs.1` against a `Nat.rec` driven by `g 0`. That is the whole content of
+"a bound is a property of a proof". `ProofMode/MCT.lean`
 and `ProofMode/MCTLazy.lean` are the same contrast at scale: two derivations of one ℕ-MCT
 statement, one of which is constructive and one of which must be hand-translated.
 
@@ -882,7 +908,7 @@ in the project; `Probes/DemoChecks.lean` does it for the §6 numerals.)
 #print axioms demo_dist_tri_chain
 #print axioms demo_dist_rev_tri
 #print axioms demo_W_ext
-#print axioms linearInduction
+#print axioms stepOnce
 #print axioms doubling
 #print axioms ProofMode.real_mct_p2
 

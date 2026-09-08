@@ -39,7 +39,8 @@ presenter knows which cell is slow:
 
 | theorem | time |
 |---|---|
-| `lin_V_5` / `lin_V_9` / `lin_U_5` | 2.2 / 3.4 / 2.8 s |
+| `once_V_3` / `once_V_5` / `once_V_ys_3` | 0.8 / 0.7 / 0.7 s |
+| `once_U_3` / `once_U_5` / `once_Phi_3` | 1.3 / 1.3 / 1.7 s |
 | `exp_V_0` / `exp_V_3` / `exp_V_5` | 0.06 / 1.3 / 5.5 s |
 | `exp_V_ys_0` / `exp_V_ys_2` | 0.05 / 0.7 s |
 | `exp_U_0` / `_2` / `_3` / `_5` | 0.05 / 0.8 / 1.6 / 5.6 s |
@@ -59,11 +60,13 @@ Together they are most of this file's ≈62 s. Everything here is a *value*-driv
 
 ## Where the derivations live
 
-`linearInduction` is written in the Walkthrough itself (proof mode, `pinduction`). `doubling`
-is an alias for `Metatheorems.Examples.Doubling.derivation` — the raw-constructor derivation
-was moved out of the Walkthrough on 2026-09-08, because its de Bruijn bookkeeping is a page of
-`abbrev`s that says nothing about proof mining. Nothing about the extraction changed: the
-alias is definitionally the same term, and every numeral below is unchanged.
+`stepOnce` is written in the Walkthrough itself (proof mode, six lines; it replaced
+`linearInduction` on 2026-09-09, whose premise `∀u (u =₀ u)` was never consulted, so its
+`U = 0` measured nothing). `doubling` is an alias for
+`Metatheorems.Examples.Doubling.derivation` — the raw-constructor derivation was moved out of
+the Walkthrough on 2026-09-08, because its de Bruijn bookkeeping is a page of `abbrev`s that
+says nothing about proof mining. Nothing about the extraction changed: the alias is
+definitionally the same term, and every numeral below is unchanged.
 
 ## Instrument
 
@@ -83,19 +86,25 @@ set_option Elab.async false
 namespace Metatheorems
 namespace DemoChecks
 
-open Metatheorems.Demo (linearR doublingR xs ys doubling)
+open Metatheorems.Demo (stepOnce stepOnceR doublingR xs ys doubling)
 open PureWEHA (cm eqxi spremise)
 
 -- ============================================================================
--- §6a — the LINEAR bound: witness is the induction variable, nothing iterates
+-- §6a — the LINEAR bound: the premise instantiated once, the witness a projection
 -- ============================================================================
 
-theorem lin_V_5 : (5 : ℕ) = mfiV cm linearR (5 : ℕ) := by kernel_rfl
-theorem lin_V_9 : (9 : ℕ) = mfiV cm linearR (9 : ℕ) := by kernel_rfl
-theorem lin_U_5 : (0 : ℕ) = mfiU cm linearR (5 : ℕ) := by kernel_rfl
+theorem once_V_3 : (4 : ℕ) = mfiV cm stepOnceR (xs 3) := by kernel_rfl
+theorem once_V_5 : (6 : ℕ) = mfiV cm stepOnceR (xs 5) := by kernel_rfl
+theorem once_V_ys_3 : (6 : ℕ) = mfiV cm stepOnceR (ys 3) := by kernel_rfl
+theorem once_U_3 : (3 : ℕ) = mfiU cm stepOnceR (xs 3) := by kernel_rfl
+theorem once_U_5 : (5 : ℕ) = mfiU cm stepOnceR (xs 5) := by kernel_rfl
 
-theorem lin_V_5_ne_4 : (4 : ℕ) ≠ mfiV cm linearR (5 : ℕ) := by rw [← lin_V_5]; decide
-theorem lin_V_9_ne_5 : (5 : ℕ) ≠ mfiV cm linearR (9 : ℕ) := by rw [← lin_V_9]; decide
+theorem once_V_3_ne_8 : (8 : ℕ) ≠ mfiV cm stepOnceR (xs 3) := by rw [← once_V_3]; decide
+theorem once_U_5_ne_4 : (4 : ℕ) ≠ mfiU cm stepOnceR (xs 5) := by rw [← once_U_5]; decide
+
+/-- `Φ` for §6a through the metatheorem's own entry point: `max U V = max 3 4`. -/
+theorem once_Phi_3 : (4 : ℕ) = (monotone_general_metatheorem_at eqxi spremise cm
+    rfl rfl rfl rfl stepOnce).val (xs 3) := by kernel_rfl
 
 -- ============================================================================
 -- §6b — the EXPONENTIAL bound: witness built from the previous witness
@@ -151,9 +160,10 @@ theorem exp_V_7_ne_127 : (127 : ℕ) ≠ mfiV cm doublingR (xs 7) := by rw [← 
 -- Axiom hygiene — verify by name, after a completed `lake build`
 -- ============================================================================
 
-#print axioms lin_V_5
-#print axioms lin_V_9
-#print axioms lin_U_5
+#print axioms once_V_3
+#print axioms once_V_5
+#print axioms once_U_5
+#print axioms once_Phi_3
 #print axioms exp_V_0
 #print axioms exp_V_3
 #print axioms exp_V_5
