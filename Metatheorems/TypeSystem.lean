@@ -37,8 +37,7 @@ inductive Ty (ι : Type) : Type where
   | arr  : Ty ι → Ty ι → Ty ι
   /-- The one-element type. Carries the trivial Dialectica witnesses. -/
   | unit : Ty ι
-  /-- Product type. Needed so that Dialectica witness/counter *types* are
-      object-level types, hence witnesses are `Term`s. -/
+  /-- Product type. -/
   | prod : Ty ι → Ty ι → Ty ι
   deriving DecidableEq, Repr
 
@@ -58,7 +57,6 @@ def isGround : Ty ι → Bool
   | .base _ => true
   | .unit   => true
   | .arr _ _ => false
-  -- products are not arrows, so they are "ground" for the ρ₁→…→ρₖ→ρ₀ decomposition
   | .prod _ _ => true
 
 /-- A type is T-based (or "nat-based") if it is built only from `nat` and `arr`,
@@ -102,10 +100,6 @@ def arity : Ty ι → Nat
   | .arr _ τ => τ.arity + 1
   | _        => 0
 
--- ============================================================================
--- Basic lemmas
--- ============================================================================
-
 theorem ground_isGround (τ : Ty ι) : τ.ground.isGround = true := by
   induction τ with
   | nat       => rfl
@@ -144,15 +138,8 @@ theorem isNatBased_hat_eq (τ : Ty ι) (h : τ.isNatBased = true) : τ.hat = τ 
 
 /-- Types at which `eqAtType` never reaches a base type.
 
-**The recursion must mirror `eqAtType`'s own, not the type's syntax.** `eqAtType` at an arrow
-recurses only into the *codomain* — the domain appears solely as a binder — so `X →ₜ nat` is
-eq-base-free even though `X` occurs in it. The obvious wrong definition
-(`| .arr ρ τ => ρ.eqBaseFree && τ.eqBaseFree`) is not an error, it just silently makes fewer
-lemmas applicable. Only the codomain spine matters.
-
-This is what lets the arithmetic tower — everything at `nat` and `realTy = nat →ₜ nat` — use
-`eqAtType_sym`/`eqAtType_trans` *below* the real-number layer, where the base case (which
-needs `eq_R` symmetry and transitivity) is not yet available. See ARCHITECTURE.md. -/
+The recursion mirrors `eqAtType`'s own rather than the type's syntax: at an arrow only the
+codomain matters, since the domain appears solely as a binder. -/
 def eqBaseFree : Ty ι → Bool
   | .base _      => false
   | .arr _ τ     => τ.eqBaseFree
@@ -171,10 +158,7 @@ end Ty
 
 /-- The type of real numbers: type level 1 = ℕ → ℕ.
     A real `x : realTy ι` is a function where `x(n)` encodes a rational approximation of the
-    real value to within `2^{-n}`.
-
-    Lives here rather than in `RationalNumbers.lean` because `Term.dist` mentions it, and
-    `Term` is below the ℚ layer. It is a pure `Ty` abbreviation, so nothing comes with it. -/
+    real value to within `2^{-n}`. -/
 abbrev realTy (ι : Type) : Ty ι := Ty.nat →ₜ Ty.nat
 
 end Metatheorems

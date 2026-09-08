@@ -18,16 +18,12 @@ The system is parametric in:
 - `F : κ → Ty ι` — the abstract space function constants (`κ` indexes constants, `ι` base types)
 - `allowed : Allowed` — which extension principles (LEM, AC, Markov, IP) are available
 
-Equality at a base type is no longer a parameter: it is *defined*, as
-`eqAtType (.base i) s t ≡ d_i(s,t) =ℝ 0ℝ`, with `Term.dist` structural and the three
-pseudometric axioms below as constructors. See `EqAtType.lean` and ARCHITECTURE.md.
+Equality at a base type is not a parameter: it is defined, as
+`eqAtType (.base i) s t ≡ d_i(s,t) =ℝ 0ℝ`, and the three pseudometric axioms for
+`Term.dist` are constructors below.
 -/
 
 open Formula
-
--- ============================================================================
--- Helper: weakening with explicit type annotation
--- ============================================================================
 
 /-- Weaken a formula into context extended by ρ. Same as `Formula.weaken` but
     with the new type ρ given explicitly for unification. -/
@@ -35,20 +31,13 @@ def Formula.weakenBy {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι}
     (ρ : Ty ι) (A : Formula F Γ) : Formula F (ρ :: Γ) :=
   A.weaken
 
-/-- `weakenBy` as a substitution, so that a substitution normaliser can push it inward.
-
-`Formula.weakenBy` is what `pm_exE` maps over the hypothesis context, so a hypothesis
-obtained by an earlier `pobtain` carries it while the goal carries hand-written
-`.weaken`s.  The two are equal but not syntactically so; this is the rewrite that closes
-the gap, together with `Term.subst_shift_eq_weaken` for the terms inside. -/
+/-- `weakenBy` as a substitution, so that a substitution normaliser can push it inward. -/
 theorem Formula.substF_shift_eq_weakenBy {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι} {σ : Ty ι}
     (A : Formula F Γ) :
     A.substF (fun {_} v => Term.var (Term.Renaming.shift (σ := σ) v)) = A.weakenBy σ := by
   rw [Formula.weakenBy, Formula.weaken, Formula.renameF_eq_substF]
 
--- ============================================================================
--- Allowed principles
--- ============================================================================
+/-! ### Allowed principles -/
 
 /-- Which extension principles are available in the proof system.
     The base theory WE-HA^{ω,X} has all fields `false`. -/
@@ -89,9 +78,7 @@ theorem base_le (a : Allowed) : Allowed.le Allowed.base a :=
 
 end Allowed
 
--- ============================================================================
--- The proof system
--- ============================================================================
+/-! ### The proof system -/
 
 /-- Derivability in WE-HA^{ω,X}_{=_X} + allowed extensions.
 
@@ -107,13 +94,9 @@ inductive Derivable {ι κ : Type} (F : κ → Ty ι)
     (allowed : Allowed)
     (Premises : PremiseSet F) :
     {Γ : Ctx ι} → Formula F Γ → Type where
-  -- Premises (theory axioms)
-  -- No condition on `A` here. The kernel does not care what shape a premise has; only
-  -- `negTrans_sound` does, and it asks for it itself (as NT-stability, which is weaker than
-  -- purely-universal). This constructor used to carry
-  -- `A.isPurelyUniversal = true ∧ Premises ⟨_, A⟩`; of the five sites that matched on it,
-  -- exactly one read the first component.
-  | premise       : Premises ⟨_, A⟩ → Derivable F allowed Premises A
+  -- Premises (theory axioms). No shape condition on `A`: only `negTrans_sound` needs one,
+  -- and it asks for it itself, as NT-stability.
+  | premise      : Premises ⟨_, A⟩ → Derivable F allowed Premises A
   -- Propositional axioms (§9.1)
   | or_contract  : Derivable F allowed Premises (A ∨ᶠ A →ᶠ A)
   | and_contract : Derivable F allowed Premises (A →ᶠ A ∧ᶠ A)
@@ -163,12 +146,7 @@ inductive Derivable {ι κ : Type} (F : κ → Ty ι)
                    Derivable F allowed Premises
       (eqAtType τ (Term.app (Term.lam body) u) (Term.subst0 body u))
 
-  -- Product β/η-equality, for the primitive `mkPair`/`fst`/`snd`.
-  -- Same family as `beta_eq`: the two sides have definitionally equal interpretations,
-  -- so every pass over `Derivable` handles them with the line `beta_eq` uses. Without them
-  -- `fst (mkPair a b) =_ρ a` was underivable — the wall the classical route's `∃u∃v`
-  -- collapse and `Probes/ConjBoundDemo.lean`'s nested existentials both hit. Written out
-  -- in `classical_to_prenex_extended`'s docstring (`MetatheoremPrereqs.lean`).
+  -- Product β/η-equality, for the primitive `mkPair`/`fst`/`snd`
   | pair_fst     : (a : Term F Γ ρ) → (b : Term F Γ τ) →
                    Derivable F allowed Premises
       (eqAtType ρ (Term.fst (Term.mkPair a b)) a)
@@ -187,16 +165,8 @@ inductive Derivable {ι κ : Type} (F : κ → Ty ι)
         (Term.app3 (Term.prec ρ) y z (Term.app Term.succ x))
         (Term.app2 z (Term.app3 (Term.prec ρ) y z x) x))
 
-  -- Equality (§9.7)
-  -- Pseudometric axioms for the structural `Term.dist` (§ metric spaces).
-  --
-  -- These are what make equality at a base type — `eqAtType (.base i) s t`, i.e.
-  -- `d_i(s,t) =ℝ 0ℝ` — an equivalence relation, *derivably*. They are all Π⁰₁, so their
-  -- Dialectica witness types are singletons and their soundness cases are the trivial
-  -- realizer plus the model's `distInterp` being a pseudometric. Keeping them Π⁰₁ is the
-  -- point: assuming symmetry of `=_X` directly would be an implication between Π⁰₁
-  -- formulas, whose realizer carries a genuine ℕ → ℕ counter-transformer. See
-  -- ARCHITECTURE.md.
+  -- Equality (§9.7). The pseudometric axioms for the structural `Term.dist` are what make
+  -- equality at a base type an equivalence relation derivably; all three are Π⁰₁.
   | dist_self {Γ : Ctx ι} (i : ι) (x : Term F Γ (Ty.base i)) :
       Derivable F allowed Premises
         (eq_R (Term.app2 (Term.dist i) x x) Term.zero_R)
@@ -214,11 +184,8 @@ inductive Derivable {ι κ : Type} (F : κ → Ty ι)
   | trans0       : Derivable F allowed Premises
       (Formula.eq0 s t ∧ᶠ Formula.eq0 t u →ᶠ Formula.eq0 s u)
 
-  -- QF-ER (§9.7, eq. 9.58)
-  -- NOTE: The document's QF-ER only requires QF, not ∨-free. We add isVFree here
-  -- because our Dialectica proof (dialectica_qfer) needs Subsingleton on the counter
-  -- type, which requires ∨-free. To remove hvf, the Dialectica proof would need to
-  -- first encode A₀ as `qf_term A₀ =₀ 0` (which IS ∨-free) via qf_term_correct.
+  -- QF-ER (§9.7, eq. 9.58). The ∨-freeness side condition is ours, not the document's:
+  -- the Dialectica proof needs `Subsingleton` on the counter type.
   | qfer         : {A₀ : Formula F Γ} →
                    A₀.isQF = true → A₀.isVFree = true →
                    Derivable F allowed Premises (A₀ →ᶠ eqAtType ρ s t) →
@@ -230,9 +197,7 @@ inductive Derivable {ι κ : Type} (F : κ → Ty ι)
                      (A →ᶠ Formula.substVar0 A (Term.app Term.succ (.var .vz)))) →
                    Derivable F allowed Premises (Formula.all Ty.nat A)
 
-  -- ══════════════════════════════════════════════════════════════════════════
   -- Extension principles (guarded by `allowed` fields)
-  -- ══════════════════════════════════════════════════════════════════════════
 
   -- Law of excluded middle
   | lem          : allowed.lem = true →
@@ -257,10 +222,7 @@ inductive Derivable {ι κ : Type} (F : κ → Ty ι)
                      ((Formula.all ρ (Formula.ex τ A)) →ᶠ
                       Formula.ex (ρ →ₜ τ) (Formula.all ρ (Formula.substF Formula.acSubst A)))
 
-  -- QF-Axiom of choice (matrix must be QF ∨-free)
-  -- NOTE: The document's QF-AC only requires QF. We add isVFree because the NT
-  -- proof uses Markov (which requires ∨-free). To remove hvf, one would derive
-  -- a general Markov for QF via the decision function (qf_term_correct).
+  -- QF-Axiom of choice (matrix must be QF ∨-free; ∨-freeness is ours, for the NT proof)
   | qfac         : allowed.qfac = true →
                    {A₀ : Formula F (τ :: ρ :: Γ)} → A₀.isQF = true →
                    Formula.isVFree A₀ = true →
@@ -268,12 +230,7 @@ inductive Derivable {ι κ : Type} (F : κ → Ty ι)
                      ((Formula.all ρ (Formula.ex τ A₀)) →ᶠ
                       Formula.ex (ρ →ₜ τ) (Formula.all ρ (Formula.substF Formula.acSubst A₀)))
 
--- ============================================================================
--- Weakening of allowed principles
--- ============================================================================
-
-/-- If `a₁ ≤ a₂`, then any derivation in system `a₁` is also a derivation in `a₂`.
-    Proved by structural recursion on the derivation. -/
+/-- If `a₁ ≤ a₂`, then any derivation in system `a₁` is also a derivation in `a₂`. -/
 def Derivable.castAllowed {ι κ : Type} {F : κ → Ty ι}
     {a₁ a₂ : Allowed} (h_le : Allowed.le a₁ a₂)
     {Premises : PremiseSet F}
@@ -319,28 +276,5 @@ def Derivable.castAllowed {ι κ : Type} {F : κ → Ty ι}
   | .ip h1 hqf hvf     => .ip (h_le.2.2.1 h1) hqf hvf
   | .ac h1             => .ac (h_le.2.2.2.1 h1)
   | .qfac h1 hqf hvf   => .qfac (h_le.2.2.2.2 h1) hqf hvf
-
--- ============================================================================
--- `AdmissibleEqX` — deleted; where each of its conditions went
--- ============================================================================
---
--- The structure bundled five conditions on an abstract base-type equality: `substF_nat`,
--- `eqx_refl`/`eqx_sym`/`eqx_trans`, `eqx_pu`. It was threaded as `adm` through ~2,700 call
--- sites, and it is gone because `EqX` is gone.
---
--- Where each condition went:
---
--- * `eqx_pu`     — a theorem, `eqAtType_base_isPurelyUniversal` in `EqAtType.lean`. `eq_R`
---                  is `∀n. QF` by construction, so this is `rfl`.
--- * `substF_nat` — a theorem, from `eq_R_substF` plus `dist` being closed under
---                  substitution (`Term.dist i` has no subterms).
--- * `eqx_refl`   — `dist_self` above, instantiated.
--- * `eqx_sym`    — `dist_comm` + symmetry/transitivity of `eq_R`.
--- * `eqx_trans`  — `dist_tri` + `add_eq_zero_R` + non-negativity of `d`, itself derivable
---                  from `dist_self`/`dist_tri`/`dist_comm`.
---
--- The last three are ordinary theorems now, provable *above* this file where the ℝ layer
--- lives. That is the whole point of the restructuring: they used to be record fields that
--- had to be supplied before the arithmetic that proves them could run. See ARCHITECTURE.md.
 
 end Metatheorems
