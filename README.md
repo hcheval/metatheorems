@@ -106,9 +106,12 @@ layer). The tower, bottom to top:
 
 ## Further reading
 
-* [`docs/report/report.pdf`](docs/report/report.pdf) — a self-contained mathematical account of
-  the formalization: the type system, the proof system, the interpretations, the
+* [`docs/report/`](docs/report/) — a self-contained mathematical account of the formalization,
+  in the style of a logic textbook: the type system, the proof system, the interpretations, the
   majorizability layer, the metatheorems, the number tower, the space theories, and extraction.
+  Every definition and theorem cites the Lean declaration that carries it. LaTeX sources are
+  tracked; the PDF is not (the repo ignores `*.pdf`), so build it with `make` in that
+  directory. Roughly 50 pages.
 * [`ARCHITECTURE.md`](ARCHITECTURE.md) — the *reasoning*: why the parametrisation is what it is,
   which alternatives were tried and rejected, and what each redesign cost. Read it before
   changing `Ty`, `Term`'s indices or `Derivable`'s indices.
