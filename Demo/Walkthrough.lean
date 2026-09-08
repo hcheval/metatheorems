@@ -382,22 +382,22 @@ relative to the process's working directory, which is not this file's.
 ============================================================================ -/
 
 #hilbert contract_pm
-  to "/home/horatiu/LeanMisc/metatheorems/.worktrees/demo-lane/Demo/hilbert/contract_pm_d0"
+  to "/home/horatiu/LeanMisc/metatheorems/Demo/hilbert/contract_pm_d0"
 #hilbert contract_pm depth 4
-  to "/home/horatiu/LeanMisc/metatheorems/.worktrees/demo-lane/Demo/hilbert/contract_pm_d4"
+  to "/home/horatiu/LeanMisc/metatheorems/Demo/hilbert/contract_pm_d4"
 #hilbert compose_pm
-  to "/home/horatiu/LeanMisc/metatheorems/.worktrees/demo-lane/Demo/hilbert/compose_pm_d0"
+  to "/home/horatiu/LeanMisc/metatheorems/Demo/hilbert/compose_pm_d0"
 #hilbert compose_pm depth 4
-  to "/home/horatiu/LeanMisc/metatheorems/.worktrees/demo-lane/Demo/hilbert/compose_pm_d4"
+  to "/home/horatiu/LeanMisc/metatheorems/Demo/hilbert/compose_pm_d4"
 #hilbert compose_raw
-  to "/home/horatiu/LeanMisc/metatheorems/.worktrees/demo-lane/Demo/hilbert/compose_raw"
+  to "/home/horatiu/LeanMisc/metatheorems/Demo/hilbert/compose_raw"
 
 -- The fixed point, and the fully expanded 1844-step listing — uncomment to run live
 -- (≈1.1 s and ≈15.3 s respectively; the second is too slow to sit in the build):
 -- #hilbert contract_pm depth 10
---   to "/home/horatiu/LeanMisc/metatheorems/.worktrees/demo-lane/Demo/hilbert/contract_pm_d10"
+--   to "/home/horatiu/LeanMisc/metatheorems/Demo/hilbert/contract_pm_d10"
 -- #hilbert contract_pm all depth 10
---   to "/home/horatiu/LeanMisc/metatheorems/.worktrees/demo-lane/Demo/hilbert/contract_pm_all"
+--   to "/home/horatiu/LeanMisc/metatheorems/Demo/hilbert/contract_pm_all"
 --   ⟹ 120 steps, then 1844. Six tactic lines; 1844 applications of Hilbert axioms.
 
 /-! ============================================================================
