@@ -398,6 +398,76 @@ capAbort={st.aborted}  hbAbort={st.hbAborted}  numObjs={n}"
   let s := toString (← ppExpr r)
   logInfo (m!"{s.take chars |>.toString}")
 
+-- ============================================================================
+-- The KERNEL-driven reducer (2026-09-08) — `Kernel.whnf` in place of `Meta.whnfCore`
+-- ============================================================================
+
+/-- **Normalise by repeated `Lean.Kernel.whnf`.**
+
+Why: on the induction targets the `Meta`-level reducer above dies inside `unfoldDefinition?`
+(one call eats the whole heartbeat budget) while the *kernel* reaches a stuck head in under a
+second — the same asymmetry `MonotoneLaneB` records for `kernel_rfl` against `Meta.isDefEq`
+(`Meta.whnf` caches closed terms only; the kernel caches by structure). So the display tool is
+driven by the kernel here: whnf the node, then recurse into the children of the result.
+
+There is no blocklist: the kernel stops on its own at a stuck head (`Decidable.rec` on a
+symbolic comparison, `g 0`, `Nat.add` of symbolic arguments), which is exactly the arithmetic
+vocabulary wanted. It consumes **no heartbeats**, so the visit cap is the only bound — keep it
+low. A kernel exception (type error in an open subterm) leaves the node untouched. -/
+partial def knf (depth : Nat) (e : Expr) : M2 Expr := do
+  if (← get).aborted then return e
+  if let some v := (← get).memo[ExprStructEq.mk e]? then return v
+  if depth > prDepthCap then
+    modify fun s => { s with aborted := true }
+    return e
+  modify fun s => { s with visits := s.visits + 1 }
+  if (← get).visits > (← get).cap then
+    modify fun s => { s with aborted := true }
+    return e
+  let r ← kcore depth e
+  modify fun s => { s with memo := s.memo.insert (ExprStructEq.mk e) r }
+  return r
+where
+  kcore (depth : Nat) (e0 : Expr) : M2 Expr := do
+    if ← isProof e0 then return e0
+    -- The blocklist has to be consulted BEFORE the whnf, not after: `Kernel.whnf` of
+    -- `max a b` is already `Decidable.rec …` and of `a + b` already a `Nat.rec` Church
+    -- iteration — the "`#reduce` goes too far" failure, one level down. Measured: without
+    -- this, `mfiV … (1, g)` normalises to 22,904 objects of `Decidable.rec`/`Nat.rec`.
+    let bl := (← get).blk
+    let blocked? := match e0.getAppFn with
+      | .const c _ => bl.contains c
+      | _ => false
+    let h ← if blocked? then pure e0 else (do
+      match Lean.Kernel.whnf (← getEnv) (← getLCtx) e0 with
+      | .ok r => pure r
+      | .error _ => pure e0)
+    match h with
+    | .app .. =>
+      let f ← knf (depth + 1) h.getAppFn
+      let args ← h.getAppArgs.mapM (knf (depth + 1))
+      return mkAppN f args
+    | .lam n t b bi => withLocalDecl n bi t fun x => do
+        mkLambdaFVars #[x] (← knf (depth + 1) (b.instantiate1 x))
+    | .mdata _ b => knf (depth + 1) b
+    | .proj s i b => return Expr.proj s i (← knf (depth + 1) b)
+    | _ => return h
+
+/-- Run `knf` on a constant and report time, visits, cap status, `Expr.numObjs`, result. -/
+def runK (nm : Name) (chars : Nat := 3000) (cap : Nat := 4000)
+    (extra : List Name := []) (unblock : List Name := []) : MetaM Unit := do
+  let e ← mkConstWithLevelParams nm
+  let bl0 := extra.foldl (fun (s : Std.HashSet Name) n => s.insert n) blocked
+  let bl := unblock.foldl (fun (s : Std.HashSet Name) n => s.erase n) bl0
+  let t0 ← IO.monoMsNow
+  let (r, st) ← (knf 0 e).run { cap := cap, blk := bl }
+  let t1 ← IO.monoMsNow
+  let n : Nat ← liftM (m := MetaM) r.numObjs
+  logInfo m!"=== {nm} KERNEL cap={cap}  time={t1 - t0}ms  visits={st.visits}  \
+capAbort={st.aborted}  numObjs={n}"
+  let s := toString (← ppExpr r)
+  logInfo (m!"{s.take chars |>.toString}")
+
 /-- Reduce a constant at the given fuel and log the time, the `Expr.numObjs` (NEVER a tree
 traversal — the sharing ratio here is ~10^5) and the rendered result. -/
 def run (fuel : Nat) (nm : Name) (chars : Nat := 3000) : MetaM Unit := do
