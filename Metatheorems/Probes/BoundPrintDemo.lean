@@ -55,6 +55,8 @@ are the same target.
 | `mfiV … linearR` | `5` | 2.42 s | 1 | false | 1 | `5` |
 | `mfiV … linearR` | symbolic `n` | 2.75 s | 74 | false | 2988 | stuck `Nat.rec` iteration |
 | `mfiU … linearR` | symbolic `n` | 2.86 s | 75 | false | 2989 | the same, `.2` side |
+| `mfiV … stepOnceR` (2026-09-09) | symbolic `xs` | 0.83 s | 6 | false | 24 | `fun xs ↦ xs.2 xs.1` — the bound as a term |
+| `mfiU … stepOnceR` (2026-09-09) | symbolic `xs` | 9.25 s | 106 | false | 44915 | converges, but a nested `Decidable.rec` decision tree: the counter side is case analysis, not a readable term |
 | `mfiV … doublingR` | `xs 0` | 0.07 s | 1 | false | 1 | `1` |
 | `mfiV … doublingR` | `xs 1` | 0.67 s | 1 | false | 1 | `2` |
 | `mfiV … doublingR` | `xs 3` | 1.34 s | 1 | false | 1 | `8` |
