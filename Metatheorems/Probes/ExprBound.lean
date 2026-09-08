@@ -210,6 +210,99 @@ where
       if e'' == e' then return e' else pr fuel e''
     | _ => return e
 
+-- ============================================================================
+-- The FUEL-FREE reducer (2026-09-08) — the experiment this file's header names
+-- ============================================================================
+
+/-- The state of the fuel-free reducer: the memo (keyed on `ExprStructEq` **alone**, which is
+the whole point — the fuelled version keys on `(fuel, ExprStructEq)` and so cannot share the
+same subterm reached at two different fuels), a visit counter, and an abort flag.
+
+Dropping fuel removes the termination guarantee, so the counter replaces it: at `prCap`
+visits the reducer stops descending and returns what it has, with `aborted := true`. It never
+runs unbounded. -/
+structure PRState where
+  memo : Std.HashMap ExprStructEq Expr := {}
+  visits : Nat := 0
+  aborted : Bool := false
+
+abbrev M2 := StateRefT PRState MetaM
+
+/-- Hard node cap. Same order as `Probes/NestingDepth.lean`'s 250,000. -/
+def prCap : Nat := 250000
+/-- Recursion-depth cap, so a pathological chain aborts rather than overflowing the stack. -/
+def prDepthCap : Nat := 3000
+
+/-- **Fuel-free partial delta-reduction**: reduce to a normal form with respect to `blocked`
+alone, memoising on `ExprStructEq` only.
+
+Identical to `pr` except that (a) there is no fuel, so unfolding continues until every head is
+either blocked or stuck, and (b) the memo key is the expression alone, so a subterm reached
+twice is reduced once. Bounded by `prCap` visits and `prDepthCap` depth. -/
+partial def pr2 (depth : Nat) (e : Expr) : M2 Expr := do
+  if (← get).aborted then return e
+  if let some v := (← get).memo[ExprStructEq.mk e]? then return v
+  if depth > prDepthCap then
+    modify fun s => { s with aborted := true }
+    return e
+  modify fun s => { s with visits := s.visits + 1 }
+  if (← get).visits > prCap then
+    modify fun s => { s with aborted := true }
+    return e
+  let r ← core depth e
+  modify fun s => { s with memo := s.memo.insert (ExprStructEq.mk e) r }
+  return r
+where
+  core (depth : Nat) (e0 : Expr) : M2 Expr := do
+    if ← isProof e0 then return e0
+    let e ← whnfCore e0
+    if let .const c _ := e.getAppFn then
+      if !blocked.contains c then
+        if let some e' ← unfoldDefinition? e then
+          return ← pr2 (depth + 1) e'
+        else if let some e' ← forceDelta e then
+          return ← pr2 (depth + 1) e'
+    match e with
+    | .app .. =>
+      let f ← pr2 (depth + 1) e.getAppFn
+      let args ← e.getAppArgs.mapM (pr2 (depth + 1))
+      let e' := mkAppN f args
+      let e'' ← whnfCore e'
+      if e'' == e' then return e' else pr2 (depth + 1) e''
+    | .lam n t b bi => withLocalDecl n bi t fun x => do
+        mkLambdaFVars #[x] (← pr2 (depth + 1) (b.instantiate1 x))
+    | .mdata _ b => pr2 (depth + 1) b
+    | .proj s i b => do
+      let b' ← pr2 (depth + 1) b
+      let e' := Expr.proj s i b'
+      let e'' ← whnfCore e'
+      if e'' == e' then return e' else pr2 (depth + 1) e''
+    | _ => return e
+
+/-- Reduce a constant with the fuel-free reducer and log time, visits, whether the cap fired,
+`Expr.numObjs`, and the rendered result. -/
+def run2 (nm : Name) (chars : Nat := 3000) : MetaM Unit := do
+  let e ← mkConstWithLevelParams nm
+  let t0 ← IO.monoMsNow
+  let (r, st) ← (pr2 0 e).run {}
+  let t1 ← IO.monoMsNow
+  let n : Nat ← liftM (m := MetaM) r.numObjs
+  logInfo m!"=== {nm} FUEL-FREE  time={t1 - t0}ms  visits={st.visits}  \
+capAbort={st.aborted}  numObjs={n}"
+  let s := toString (← ppExpr r)
+  logInfo (m!"{s.take chars |>.toString}")
+
+/-- Reduce an already-elaborated term (not a constant) with the fuel-free reducer. -/
+def run2e (label : String) (e : Expr) (chars : Nat := 3000) : MetaM Unit := do
+  let t0 ← IO.monoMsNow
+  let (r, st) ← (pr2 0 e).run {}
+  let t1 ← IO.monoMsNow
+  let n : Nat ← liftM (m := MetaM) r.numObjs
+  logInfo m!"=== {label} FUEL-FREE  time={t1 - t0}ms  visits={st.visits}  \
+capAbort={st.aborted}  numObjs={n}"
+  let s := toString (← ppExpr r)
+  logInfo (m!"{s.take chars |>.toString}")
+
 /-- Reduce a constant at the given fuel and log the time, the `Expr.numObjs` (NEVER a tree
 traversal — the sharing ratio here is ~10^5) and the rendered result. -/
 def run (fuel : Nat) (nm : Name) (chars : Nat := 3000) : MetaM Unit := do
@@ -229,6 +322,11 @@ def run (fuel : Nat) (nm : Name) (chars : Nat := 3000) : MetaM Unit := do
 #eval show MetaM Unit from run 12 ``Metatheorems.ExprBound.tgtU1 2500
 -- Fixed point: fuel 30 agrees with fuel 12.
 #eval show MetaM Unit from run 30 ``Metatheorems.ExprBound.tgtU 2500
+
+-- The SAME two targets through the fuel-free reducer — the regression check. Expect the same
+-- two outputs as fuel 12/30 above, `maxT` present in the first and absent in the second.
+#eval show MetaM Unit from run2 ``Metatheorems.ExprBound.tgtU 2500
+#eval show MetaM Unit from run2 ``Metatheorems.ExprBound.tgtU1 2500
 
 end ExprBound
 end Metatheorems
