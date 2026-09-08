@@ -22,6 +22,7 @@ Six parts, in the order they are meant to be shown:
 | § | what is on the screen | costs |
 |---|---|---|
 | 1 | the proof mode: first contact on pure logic, then `x + y = y + x` by induction | instant |
+| 1c–1d | the two questions the mode invites: QF-ER, the deduction theorem | instant |
 | 2 | the same tactics at a **metric space**: the chained triangle inequality | ~2 s |
 | 3 | …and at a **W-hyperbolic space**: extensionality of the convex combination `W` | ~1 s |
 | 4 | the **same theorem as §1 from bare `Derivable` constructors** — the contrast | instant |
@@ -297,9 +298,10 @@ new variable. -/
 example : Derivable F al Premises (B →ᶠ Formula.all ρ (Formula.weakenBy ρ B)) :=
   .forall_rule I_comb
 
-/-- Generalising **under a hypothesis**, in the mode. The hypothesis `h` is still available
-after `pforall`; the goal display shows it weakened (`↑ᶜ`), which is the eigenvariable
-condition made visible rather than checked. -/
+/-- Generalising **under a hypothesis**, in the mode. `h` is still available after `pforall` —
+but it now sits at the *outer* context, wrapped in `Formula.weakenBy`, which is why it cannot
+mention the variable just introduced. The eigenvariable condition is structural here, not a
+check that some tactic performs. -/
 def demo_forall_under_hyp (x : Term F Γ Ty.nat) :
     Derivable F al Premises
       (x =₀ x →ᶠ Formula.all Ty.nat (x₀ +ᵗ x =₀ x₀ +ᵗ x)) := by
@@ -696,7 +698,7 @@ def linearInduction : Derivable PureWEHA.F Allowed.extended PureWEHA.Premises (�
 def linearR := monotone_soundness PureWEHA.eqxi PureWEHA.spremise PureWEHA.cm linearInduction
 
 -- Extraction at the majorants `x* = 5` and `x* = 9` — uncomment to run live
--- (measured kernel time: 2.2 s, 2.6 s, 2.5 s, instant):
+-- (measured kernel time: 2.2 s, 3.4 s, 2.8 s, instant):
 --
 -- theorem lin_V_5 : (5 : ℕ) = mfiV PureWEHA.cm linearR (5 : ℕ) := by kernel_rfl
 -- theorem lin_V_9 : (9 : ℕ) = mfiV PureWEHA.cm linearR (9 : ℕ) := by kernel_rfl
@@ -766,7 +768,7 @@ def ys (k : ℕ) : Ty.interpret PureWEHA.X (Ty.nat ×ₜ (Ty.nat →ₜ Ty.nat))
   (k, fun (n : ℕ) => n + 3)
 
 -- Extraction, the witness side — uncomment to run live
--- (measured kernel time: 0.05 s at k*=0, 1.2 s at k*=3, 4.3 s at k*=5 — the cost grows with
+-- (measured kernel time: 0.06 s at k*=0, 1.3 s at k*=3, 5.5 s at k*=5 — the cost grows with
 --  the VALUE, see §6c):
 --
 -- theorem exp_V_0 : (1 : ℕ) = mfiV PureWEHA.cm doublingR (xs 0) := by kernel_rfl
@@ -776,7 +778,7 @@ def ys (k : ℕ) : Ty.interpret PureWEHA.X (Ty.nat ×ₜ (Ty.nat →ₜ Ty.nat))
 --
 --   ⟹ V(k*, f*) = 2^{k*} · f*(0). Exponential — and it is *tight*: 2^k·f(0) is exactly f k.
 
--- …and it tracks the function majorant, not only the index (0.06 s, 0.8 s):
+-- …and it tracks the function majorant, not only the index (0.05 s, 0.7 s):
 --
 -- theorem exp_V_ys_0 : (3 : ℕ) = mfiV PureWEHA.cm doublingR (ys 0) := by kernel_rfl
 -- theorem exp_V_ys_2 : (12 : ℕ) = mfiV PureWEHA.cm doublingR (ys 2) := by kernel_rfl
@@ -784,7 +786,7 @@ def ys (k : ℕ) : Ty.interpret PureWEHA.X (Ty.nat ×ₜ (Ty.nat →ₜ Ty.nat))
 --   ⟹ f*(0) = 3 triples every value: 2^2 · 3 = 12, not the 4 that f*(0) = 1 would give.
 
 -- The premise side — U is NOT a copy of V, and it is sharp
--- (0.06 s, 0.9 s, 1.5 s, 5.5 s):
+-- (0.05 s, 0.8 s, 1.6 s, 5.6 s):
 --
 -- theorem exp_U_0 : (0 : ℕ) = mfiU PureWEHA.cm doublingR (xs 0) := by kernel_rfl
 -- theorem exp_U_2 : (1 : ℕ) = mfiU PureWEHA.cm doublingR (xs 2) := by kernel_rfl
@@ -813,9 +815,9 @@ On this **same** 145-constructor derivation, with nothing else changed:
 
 | `k*` | `V` | outcome |
 |---|---|---|
-| 3 | 8 | 1.2 s |
-| 5 | 32 | 4.3 s |
-| **7** | **128** | kernel-checked, **9–30 s depending on machine load** |
+| 3 | 8 | 1.3 s |
+| 5 | 32 | 5.5 s |
+| **7** | **128** | kernel-checked, **9–30 s depending on machine load** (18 s when last run) |
 | **8** | 256 | **`INTERNAL PANIC: out of memory` at the 12 GB cap** |
 
 The ceiling is the **value**, not the derivation and not the proof: the majorant of the
@@ -873,6 +875,10 @@ in the project; `Probes/DemoChecks.lean` does it for the §6 numerals.)
 #print axioms compose_pm
 #print axioms compose_raw
 #print axioms demo_add_comm
+#print axioms demo_qfer_ok
+#print axioms demo_rewrite_under_forall
+#print axioms demo_rewrite_from_forall
+#print axioms demo_forall_under_hyp
 #print axioms demo_dist_tri_chain
 #print axioms demo_dist_rev_tri
 #print axioms demo_W_ext

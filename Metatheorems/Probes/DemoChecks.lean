@@ -39,19 +39,31 @@ presenter knows which cell is slow:
 
 | theorem | time |
 |---|---|
-| `lin_V_5` / `lin_V_9` / `lin_U_5` | 2.2 / 2.6 / 2.5 s |
-| `exp_V_0` / `exp_V_3` / `exp_V_5` | 0.05 / 1.2 / 4.3 s |
-| `exp_V_ys_0` / `exp_V_ys_2` | 0.06 / 0.8 s |
-| `exp_U_0` / `_2` / `_3` / `_5` | 0.06 / 0.9 / 1.5 / 5.5 s |
-| `exp_Phi_3` / `exp_Phi_5` | 2.3 / 10.5 s |
-| **`exp_V_7`** | **30 s** |
-| every `_ne_` refutation control | under 0.1 s |
+| `lin_V_5` / `lin_V_9` / `lin_U_5` | 2.2 / 3.4 / 2.8 s |
+| `exp_V_0` / `exp_V_3` / `exp_V_5` | 0.06 / 1.3 / 5.5 s |
+| `exp_V_ys_0` / `exp_V_ys_2` | 0.05 / 0.7 s |
+| `exp_U_0` / `_2` / `_3` / `_5` | 0.05 / 0.8 / 1.6 / 5.6 s |
+| `exp_Phi_3` / `exp_Phi_5` | 2.3 / 9.9 s |
+| **`exp_V_7`** | **18 s** |
+| every `_ne_` refutation control | under 20 ms |
+
+(Re-measured 2026-09-08 with `-D profiler=true -D profiler.threshold=20`, on a machine running
+three other Lean builds; the earlier column read 2.6/2.5, 1.2/4.3, 0.9/1.5/5.5, 10.5 and 30 s,
+so load noise here is tens of percent and the *shape* is what matters, not the digits.)
 
 `exp_V_7` and `exp_Phi_5` are over the ten-second line and are guarded anyway: the ceiling is
 the single claim in §6 most worth having checked mechanically, and `Φ` at `k* = 5` is the only
 numeral that comes out of the metatheorem's own entry point rather than its two components.
-Together they are most of this file's ≈58 s. Everything here is a *value*-driven cost —
+Together they are most of this file's ≈62 s. Everything here is a *value*-driven cost —
 `recMaj` iterating with no sharing — not a derivation-size cost.
+
+## Where the derivations live
+
+`linearInduction` is written in the Walkthrough itself (proof mode, `pinduction`). `doubling`
+is an alias for `Metatheorems.Examples.Doubling.derivation` — the raw-constructor derivation
+was moved out of the Walkthrough on 2026-09-08, because its de Bruijn bookkeeping is a page of
+`abbrev`s that says nothing about proof mining. Nothing about the extraction changed: the
+alias is definitionally the same term, and every numeral below is unchanged.
 
 ## Instrument
 
