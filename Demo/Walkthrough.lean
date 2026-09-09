@@ -613,8 +613,9 @@ relative to the process's working directory, which is not this file's.
 
 ## Presenter's note — say these out loud; the screen cannot show them
 
-* Both derivations below use the **same** rule, `Derivable.induction`. The two growth rates
-  come from what the *witnesses* are, not from different logic.
+* Both derivations below start from the **same** premise. The two growth rates come from the
+  *proofs* — one instantiates it once, one inducts and builds each witness from the last — not
+  from different logic.
 * The numerals are **magnitudes**. At `ι = Empty` nothing routes through the ℚ/ℝ Cantor-pairing
   encoding, so `32` means thirty-two and not a code for a rational.
 * `real_mct_p2` (§6e) proves the **metastable** statement — a bare `∃v`, with no bound inside
