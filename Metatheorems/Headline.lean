@@ -59,6 +59,7 @@ namespace Metatheorems
 #print axioms ProofMode.mct_p2
 #print axioms ProofMode.real_mct_p2
 #print axioms ProofMode.real_mct_bound_p2
+#print axioms ProofMode.real_mct_p1
 #print axioms RealMCT.real_mct_of_bound
 #print axioms dist_tri_chain
 #print axioms dist_rev_tri
