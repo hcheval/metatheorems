@@ -618,8 +618,9 @@ relative to the process's working directory, which is not this file's.
   from different logic.
 * The numerals are **magnitudes**. At `ι = Empty` nothing routes through the ℚ/ℝ Cantor-pairing
   encoding, so `32` means thirty-two and not a code for a rational.
-* `real_mct_p2` (§6e) proves the **metastable** statement — a bare `∃v`, with no bound inside
-  it — and *that statement* needs no classical logic. It is not the claim "MCT needs none".
+* `real_mct_p1` (§6e) proves the **metastable** statement — a bare `∃v`, with no bound inside
+  it — and its only non-constructive step is Markov's principle. That is not the claim "MCT
+  needs classical logic": the *convergence* form does; the metastable form needs only Markov.
 
 ## What the metatheorem says
 
@@ -868,10 +869,10 @@ statement, one of which is constructive and one of which must be hand-translated
 
 ## 6e. Where this stops, stated plainly
 
-The derivations with real mathematical content — `ProofMode.real_mct_p2` (ℝ-MCT in metastable
-form, 655 lines), `dist_tri_chain` of §2, `mct_p2` — have their `Φ` **named and type-checked,
-never evaluated**. Their *shape* prints all the same (`#bound … depth 2` below, in 74 ms), which
-is exactly the line between what this project can and cannot do. Two blockers, both measured,
+The derivations with real mathematical content — `ProofMode.real_mct_p1` (ℝ-MCT in metastable
+form, the lazy proof, 359 lines), `dist_tri_chain` of §2, `mct_p2` — have their `Φ` **named and
+type-checked, never evaluated**. Their *shape* prints all the same (`#bound … depth 6` below, in
+5 ms), which is exactly the line between what this project can and cannot do. Two blockers, both measured,
 both in `ARCHITECTURE.md` §14.7, and neither of them the monotone interpretation, the proof
 mode, induction, or formula size (each of those was tested and cleared):
 
@@ -884,33 +885,28 @@ mode, induction, or formula size (each of those was tested and cleared):
    depth 8. That is the Dialectica exponential in its last hiding place, and it applies to
    every route equally, classical and intuitionistic alike.
 
-Accuracy notes for anyone quoting this on a slide: `real_mct_p2` proves the **metastable**
-statement, a bare `∃v` with no bound in it; and *the metastable form* needs no classical logic
-(it holds at every `Allowed`) — which is not the same claim as "MCT needs no classical logic".
+Accuracy notes for anyone quoting this on a slide: `real_mct_p1` proves the **metastable**
+statement, a bare `∃v` with no bound in it, and uses Markov's principle and nothing else
+classical — which is not the same claim as "MCT needs classical logic": the *convergence* form
+does; the metastable form needs only Markov.
 ============================================================================ -/
 
--- ℝ-MCT, twice. `real_mct_p2` is the descent proof — among `2^{k+1}` windows one is good —
--- and holds at EVERY `Allowed`. `real_mct_p1` is the lazy proof — assume every window is bad,
--- chain `2^{k+1}` drops below `0`, contradiction — and needs exactly Markov's principle
--- (`hmk : al.markov = true`): its one non-constructive step is `¬¬∃v C → ∃v C` for the
--- quantifier-free `C`, which is `Derivable.markov`, and `pby_contra` refuses any other shape.
--- Same statement, same encoding, same entry point; both bounds named and type-checked.
-#check @ProofMode.real_mct_p2
+-- ℝ-MCT: `real_mct_p1` is the lazy proof — assume every window is bad, chain `2^{k+1}` drops
+-- below `0`, contradiction — and needs exactly Markov's principle (`hmk : al.markov = true`):
+-- its one non-constructive step is `¬¬∃v C → ∃v C` for the quantifier-free `C`, which is
+-- `Derivable.markov`, and `pby_contra` refuses any other shape. Its bound is named and
+-- type-checked.
 #check @ProofMode.real_mct_p1
-#check @ProofMode.real_mct_bound_p2
 #check @ProofMode.real_mct_bound_p1
 #check @RealMCT.real_mct_of_bound
 
 -- What DOES print for ℝ-MCT: the SHAPE of its extracted functional, two inference rules deep,
 -- and the majorants those rules build — nothing evaluated, so this is safe at any depth on any
--- proof (the node cap is the only limit). Its VALUE is what does not compute: `eval` on either
--- realizer is the 12 GB `bad_alloc` of blocker 2 above. At depth 2 the two trees are
--- identical — the proof-mode entry is the same; `p1` is printed at depth 6 (31 nodes, 5 ms),
--- the first depth at which its Markov step appears as a leaf,
+-- proof (the node cap is the only limit). Its VALUE is what does not compute: `eval` on this
+-- realizer is the 12 GB `bad_alloc` of blocker 2 above. Printed at depth 6 (31 nodes, 5 ms),
+-- the first depth at which the Markov step appears as a leaf,
 -- `MRealizer.ofSRealizer cm (sMarkov hqf hvf)`: the one ineffective step, located in the
 -- realizer.
-#bound ProofMode.real_mct_p2 depth 2
-#bound ProofMode.real_mct_p2 depth 2 unfold
 #bound ProofMode.real_mct_p1 depth 6
 #bound ProofMode.real_mct_p1 depth 3 unfold
 
@@ -935,7 +931,6 @@ in the project; `Probes/DemoChecks.lean` does it for the §6 numerals.)
 #print axioms demo_W_ext
 #print axioms stepOnce
 #print axioms doubling
-#print axioms ProofMode.real_mct_p2
 #print axioms ProofMode.real_mct_p1
 
 end Demo
