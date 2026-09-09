@@ -905,9 +905,16 @@ premise's three inequalities share their index `u`, which is why they are not th
 local notation:50 f:51 " ≤ℝ[" m "] " g:51 => RealMCT.leIdx f g m
 
 /-- **ℝ-MCT, metastable form, written out** — `:= real_mct_p1`, so Lean checks that this
-*is* `RealMCT.rmStatement`. `x = (a, (g, k))` is `x₀`; under `∀u`, `u` is `x₁`; under `∀n`,
-`n` is `x₂`; under `∃v`, `v` is `x₁`. In words: for every `a` antitone in `[0,1]`, every `g`
-and `k`, some `v` has `|a v − a (v + g v)| < 2^{-k}` — and the `∃v` carries no bound. -/
+*is* `RealMCT.rmStatement`. On paper, with `[ f ≤ g ]ₘ :≡ f̂(m+1) −ℚ ĝ(m+1) <ℚ 2^{-m}`
+("`f ≤ℝ g`, read at Cauchy index `m`"):
+
+    ∀ a : ℕ → ℝ,  g : ℕ → ℕ,  k : ℕ .
+        ∀u ∀n ( [ a(n+1) ≤ a(n) ]ᵤ  ∧  [ 0 ≤ a(n) ]ᵤ  ∧  [ a(n) ≤ 1 ]ᵤ )
+      → ∃v  [ |a(v) − a(v + g(v))| ≤ 2^{-(k+1)} ]ₖ₊₂
+
+i.e. `a` antitone in `[0,1]` → `∃v |a(v) − a(v + g(v))| < 2^{-k}` in every model. The premise
+is uniform in its Cauchy index `u`, and the `∃v` carries no bound. Below, `x = (a, (g, k))` is
+`x₀`; under `∀u`, `u` is `x₁`; under `∀n`, `n` is `x₂`; under `∃v`, `v` is `x₁`. -/
 def realMCT (hmk : al.markov = true) :
     Derivable F al Premises (Γ := [])
       (Formula.all ((Ty.nat →ₜ realTy ι) ×ₜ ((Ty.nat →ₜ Ty.nat) ×ₜ Ty.nat))
