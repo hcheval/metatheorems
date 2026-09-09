@@ -871,8 +871,8 @@ statement, one of which is constructive and one of which must be hand-translated
 
 The derivations with real mathematical content — `ProofMode.real_mct_p1` (ℝ-MCT in metastable
 form, the lazy proof, 359 lines), `dist_tri_chain` of §2, `mct_p2` — have their `Φ` **named and
-type-checked, never evaluated**. Their *shape* prints all the same (`#bound … depth 6` below, in
-5 ms), which is exactly the line between what this project can and cannot do. Two blockers, both measured,
+type-checked, never evaluated**. Their *shape* prints all the same (`#bound … depth 6` below,
+in 5 ms), which is exactly the line between what this project can and cannot do. Two blockers, both measured,
 both in `ARCHITECTURE.md` §14.7, and neither of them the monotone interpretation, the proof
 mode, induction, or formula size (each of those was tested and cleared):
 
