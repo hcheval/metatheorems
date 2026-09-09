@@ -896,7 +896,37 @@ does; the metastable form needs only Markov.
 -- its one non-constructive step is `¬¬∃v C → ∃v C` for the quantifier-free `C`, which is
 -- `Derivable.markov`, and `pby_contra` refuses any other shape. Its bound is named and
 -- type-checked.
-#check @ProofMode.real_mct_p1
+section RealMCTWritten
+
+variable {ι κ : Type} {F : κ → Ty ι} {al : Allowed} {Premises : PremiseSet F}
+
+/-- `f ≤ℝ g`, read at the single Cauchy index `m`: `f̂(m+1) −ℚ ĝ(m+1) <ℚ 2^{-m}`. The
+premise's three inequalities share their index `u`, which is why they are not three `≤ℝ`s. -/
+local notation:50 f:51 " ≤ℝ[" m "] " g:51 => RealMCT.leIdx f g m
+
+/-- **ℝ-MCT, metastable form, written out** — `:= real_mct_p1`, so Lean checks that this
+*is* `RealMCT.rmStatement`. `x = (a, (g, k))` is `x₀`; under `∀u`, `u` is `x₁`; under `∀n`,
+`n` is `x₂`; under `∃v`, `v` is `x₁`. In words: for every `a` antitone in `[0,1]`, every `g`
+and `k`, some `v` has `|a v − a (v + g v)| < 2^{-k}` — and the `∃v` carries no bound. -/
+def realMCT (hmk : al.markov = true) :
+    Derivable F al Premises (Γ := [])
+      (Formula.all ((Ty.nat →ₜ realTy ι) ×ₜ ((Ty.nat →ₜ Ty.nat) ×ₜ Ty.nat))
+        (Formula.all Ty.nat
+            (Formula.all Ty.nat
+              (   Term.fst x₀ ⬝ S x₂ ≤ℝ[x₁] Term.fst x₀ ⬝ x₂        -- a (n+1) ≤ a n
+               ∧ᶠ Term.zero_R          ≤ℝ[x₁] Term.fst x₀ ⬝ x₂        -- 0 ≤ a n
+               ∧ᶠ Term.fst x₀ ⬝ x₂     ≤ℝ[x₁] Term.one_R))            -- a n ≤ 1
+          →ᶠ Formula.ex Ty.nat
+              (Term.app Term.abs_R
+                  (Term.app2 Term.sub_R
+                    (Term.fst x₀ ⬝ x₁)                                   -- |a v −
+                    (Term.fst x₀ ⬝ (x₁ +ᵗ Term.fst (Term.snd x₀) ⬝ x₁)))  --   a (v + g v)|
+                ≤ℝ[S (S (Term.snd (Term.snd x₀)))]                       -- at index k+2
+               const_R (Term.app Term.pow2neg_Q (S (Term.snd (Term.snd x₀))))))) := -- ≤ 2^{-(k+1)}
+  ProofMode.real_mct_p1 hmk
+
+end RealMCTWritten
+
 #check @ProofMode.real_mct_bound_p1
 #check @RealMCT.real_mct_of_bound
 
@@ -907,8 +937,8 @@ does; the metastable form needs only Markov.
 -- the first depth at which the Markov step appears as a leaf,
 -- `MRealizer.ofSRealizer cm (sMarkov hqf hvf)`: the one ineffective step, located in the
 -- realizer.
-#bound ProofMode.real_mct_p1 depth 6
-#bound ProofMode.real_mct_p1 depth 3 unfold
+#bound realMCT depth 6
+#bound realMCT depth 3 unfold
 
 /-! ============================================================================
 # Axiom hygiene — the claims, checked
@@ -931,7 +961,7 @@ in the project; `Probes/DemoChecks.lean` does it for the §6 numerals.)
 #print axioms demo_W_ext
 #print axioms stepOnce
 #print axioms doubling
-#print axioms ProofMode.real_mct_p1
+#print axioms realMCT
 
 end Demo
 end Metatheorems
