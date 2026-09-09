@@ -905,8 +905,22 @@ premise's three inequalities share their index `u`, which is why they are not th
 local notation:50 f:51 " ≤ℝ[" m "] " g:51 => RealMCT.leIdx f g m
 
 /-- **ℝ-MCT, metastable form, written out** — `:= real_mct_p1`, so Lean checks that this
-*is* `RealMCT.rmStatement`. On paper, with `[ f ≤ g ]ₘ :≡ f̂(m+1) −ℚ ĝ(m+1) <ℚ 2^{-m}`
-("`f ≤ℝ g`, read at Cauchy index `m`"):
+*is* `RealMCT.rmStatement`.
+
+The standard statement, for `a` antitone in `[0,1]`, is monotone convergence:
+
+    (MCT)     ∀k ∃N ∀i,j ≥ N .  |a(i) − a(j)| < 2^{-k}                — Cauchy; no computable N
+
+Its metastable form (Kohlenbach; Tao's "finite convergence") is classically equivalent:
+
+    (MCT*)    ∀k ∀g : ℕ → ℕ  ∃v  ∀i,j ∈ [v, v + g(v)] .  |a(i) − a(j)| < 2^{-k}
+
+and since `a` is antitone the window is controlled by its endpoints, so what is proved is
+
+    (MCT*ₑ)   ∀k ∀g  ∃v .  |a(v) − a(v + g(v))| < 2^{-k}
+
+On paper, in the metatheorem's shape `∀x (∀u B → ∃v C)`, with
+`[ f ≤ g ]ₘ :≡ f̂(m+1) −ℚ ĝ(m+1) <ℚ 2^{-m}` ("`f ≤ℝ g`, read at Cauchy index `m`"):
 
     ∀ a : ℕ → ℝ,  g : ℕ → ℕ,  k : ℕ .
         ∀u ∀n ( [ a(n+1) ≤ a(n) ]ᵤ  ∧  [ 0 ≤ a(n) ]ᵤ  ∧  [ a(n) ≤ 1 ]ᵤ )
