@@ -613,8 +613,9 @@ relative to the process's working directory, which is not this file's.
 
 ## Presenter's note — say these out loud; the screen cannot show them
 
-* Both derivations below use the **same** rule, `Derivable.induction`. The two growth rates
-  come from what the *witnesses* are, not from different logic.
+* Both derivations below start from the **same** premise. The two growth rates come from the
+  *proofs* — one instantiates it once, one inducts and builds each witness from the last — not
+  from different logic.
 * The numerals are **magnitudes**. At `ι = Empty` nothing routes through the ℚ/ℝ Cantor-pairing
   encoding, so `32` means thirty-two and not a code for a rational.
 * `real_mct_p2` (§6e) proves the **metastable** statement — a bare `∃v`, with no bound inside
@@ -710,6 +711,7 @@ def ys (k : ℕ) : Ty.interpret PureWEHA.X (Ty.nat ×ₜ (Ty.nat →ₜ Ty.nat))
 -- one level down the derivation. Symbolic: the functional itself, reduced by the kernel with
 -- the majorant left as a variable (`#bound … eval`, capped; ≈0.7 s, converges).
 #bound stepOnce depth 1
+#bound stepOnce depth 1 unfold     -- the same, each combinator opened to the majorant it builds
 def stepOnceV := mfiV PureWEHA.cm stepOnceR
 #bound stepOnceV eval
 --   ⟹ `fun xs => xs.2 xs.1`, i.e. `V(k*, f*) = f*(k*)`. That is the bound, as a term.
@@ -739,8 +741,8 @@ Statement (`ρ := nat ×ₜ (nat →ₜ nat)`, `x = (k, f)`):
 *If `f` doubles at every step, then `f k` is bounded* — and the metatheorem's `v ≤ Φ x*` is
 that bound.
 
-Same induction rule. But now the step case takes the witness `w` the induction hypothesis
-supplies and returns `w +ᵗ w`:
+Same premise. Now the closed form `f k` itself, by induction on `k`, and the step case takes
+the witness `w` the induction hypothesis supplies and returns `w +ᵗ w`:
 
 ```lean
     -- Examples/Doubling.lean, the step under the ∃: from `f k =₀ v` and the premise
@@ -781,12 +783,17 @@ def doubling : Derivable PureWEHA.F Allowed.extended PureWEHA.Premises (Γ := []
 /-- Its monotone realizer — an ordinary `def`, elaborates instantly. -/
 def doublingR := monotone_soundness PureWEHA.eqxi PureWEHA.spremise PureWEHA.cm doubling
 
-/-- The majorant `x* = (k*, λn. n+1)`, so `f*(0) = 1`. -/
-def xs (k : ℕ) : Ty.interpret PureWEHA.X (Ty.nat ×ₜ (Ty.nat →ₜ Ty.nat)).hat :=
-  (k, fun (n : ℕ) => n + 1)
-/-- `x* = (k*, λn. n+3)` — the *other* component of the majorant, so `f*(0) = 3`. -/
-def ys (k : ℕ) : Ty.interpret PureWEHA.X (Ty.nat ×ₜ (Ty.nat →ₜ Ty.nat)).hat :=
-  (k, fun (n : ℕ) => n + 3)
+-- The bound, PRINTED. Structurally the realizer is the induction, two levels down; symbolically,
+-- at `k* = 1` with `f*` left as a variable, the kernel reduces it to the first unrolling of the
+-- closed form (≈2 s, converges).
+#bound doubling depth 2
+#bound doubling depth 2 unfold     -- `induction` opens to the recursor `R[…]` under `termMajorizer`
+def doublingV1 := fun (g : ℕ → ℕ) => mfiV PureWEHA.cm doublingR ((1 : ℕ), g)
+#bound doublingV1 eval
+--   ⟹ `fun g ↦ Decidable.rec (fun _ ↦ Nat.rec (g 0) (fun k ih ↦ maxT nat (S ih) ih) (g 0)) …`
+--     — a `Nat.rec` driven by `g 0`: `recMaj` iterating *value*-many times (the §6c ceiling,
+--     visible), which evaluates to `2·f*(0)`, the `k* = 1` case of `2^{k*}·f*(0)`.
+--     Against §6a's `xs.2 xs.1`, this is the whole thesis in two printed terms.
 
 -- Extraction, the witness side — uncomment to run live
 -- (measured kernel time: 0.06 s at k*=0, 1.3 s at k*=3, 5.5 s at k*=5 — the cost grows with
@@ -853,8 +860,9 @@ there is time.
 
 ## 6d. What the two together show
 
-Same rule, two proofs, two growth rates — and the growth rate is read off the *proof*, not the
-theorem. That is the whole content of "a bound is a property of a proof". `ProofMode/MCT.lean`
+Same premise, two proofs, two growth rates — read off the *proof*, not the theorem, and now
+printed from it: `xs.2 xs.1` against a `Nat.rec` driven by `g 0`. That is the whole content of
+"a bound is a property of a proof". `ProofMode/MCT.lean`
 and `ProofMode/MCTLazy.lean` are the same contrast at scale: two derivations of one ℕ-MCT
 statement, one of which is constructive and one of which must be hand-translated.
 
@@ -862,9 +870,10 @@ statement, one of which is constructive and one of which must be hand-translated
 
 The derivations with real mathematical content — `ProofMode.real_mct_p2` (ℝ-MCT in metastable
 form, 655 lines), `dist_tri_chain` of §2, `mct_p2` — have their `Φ` **named and type-checked,
-never evaluated**. Two blockers, both measured, both in `ARCHITECTURE.md` §14.7, and neither of
-them the monotone interpretation, the proof mode, induction, or formula size (each of those was
-tested and cleared):
+never evaluated**. Their *shape* prints all the same (`#bound … depth 2` below, in 74 ms), which
+is exactly the line between what this project can and cannot do. Two blockers, both measured,
+both in `ARCHITECTURE.md` §14.7, and neither of them the monotone interpretation, the proof
+mode, induction, or formula size (each of those was tested and cleared):
 
 1. **`Eq.mpr` casts buried under the proof-mode layer.** A `closed_subst`-style normalisation
    lemma proves a formula equation *without* computing it; the kernel's K-rule reduction of the
@@ -883,6 +892,13 @@ statement, a bare `∃v` with no bound in it; and *the metastable form* needs no
 #check @ProofMode.real_mct_p2
 #check @ProofMode.real_mct_bound_p2
 #check @RealMCT.real_mct_of_bound
+
+-- What DOES print for ℝ-MCT: the SHAPE of its extracted functional, two inference rules deep,
+-- and the majorants those rules build — nothing evaluated, so this is safe at any depth on any
+-- proof (the node cap is the only limit). Its VALUE is what does not compute: `eval` on this
+-- realizer is the 12 GB `bad_alloc` of blocker 2 above.
+#bound ProofMode.real_mct_p2 depth 2
+#bound ProofMode.real_mct_p2 depth 2 unfold
 
 /-! ============================================================================
 # Axiom hygiene — the claims, checked
@@ -903,7 +919,7 @@ in the project; `Probes/DemoChecks.lean` does it for the §6 numerals.)
 #print axioms demo_dist_tri_chain
 #print axioms demo_dist_rev_tri
 #print axioms demo_W_ext
-#print axioms linearInduction
+#print axioms stepOnce
 #print axioms doubling
 #print axioms ProofMode.real_mct_p2
 
