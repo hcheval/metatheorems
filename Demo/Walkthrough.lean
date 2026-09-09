@@ -613,9 +613,8 @@ relative to the process's working directory, which is not this file's.
 
 ## Presenter's note — say these out loud; the screen cannot show them
 
-* Both derivations below start from the **same** premise. The two growth rates come from the
-  *proofs* — one instantiates it once, one inducts and builds each witness from the last — not
-  from different logic.
+* Both derivations below use the **same** rule, `Derivable.induction`. The two growth rates
+  come from what the *witnesses* are, not from different logic.
 * The numerals are **magnitudes**. At `ι = Empty` nothing routes through the ℚ/ℝ Cantor-pairing
   encoding, so `32` means thirty-two and not a code for a rational.
 * `real_mct_p2` (§6e) proves the **metastable** statement — a bare `∃v`, with no bound inside
@@ -740,8 +739,8 @@ Statement (`ρ := nat ×ₜ (nat →ₜ nat)`, `x = (k, f)`):
 *If `f` doubles at every step, then `f k` is bounded* — and the metatheorem's `v ≤ Φ x*` is
 that bound.
 
-Same premise. Now the closed form `f k` itself, by induction on `k`, and the step case takes
-the witness `w` the induction hypothesis supplies and returns `w +ᵗ w`:
+Same induction rule. But now the step case takes the witness `w` the induction hypothesis
+supplies and returns `w +ᵗ w`:
 
 ```lean
     -- Examples/Doubling.lean, the step under the ∃: from `f k =₀ v` and the premise
@@ -782,16 +781,12 @@ def doubling : Derivable PureWEHA.F Allowed.extended PureWEHA.Premises (Γ := []
 /-- Its monotone realizer — an ordinary `def`, elaborates instantly. -/
 def doublingR := monotone_soundness PureWEHA.eqxi PureWEHA.spremise PureWEHA.cm doubling
 
--- The bound, PRINTED. Structurally the realizer is the induction, two levels down; symbolically,
--- at `k* = 1` with `f*` left as a variable, the kernel reduces it to the first unrolling of the
--- closed form (≈2 s, converges).
-#bound doubling depth 2
-def doublingV1 := fun (g : ℕ → ℕ) => mfiV PureWEHA.cm doublingR ((1 : ℕ), g)
-#bound doublingV1 eval
---   ⟹ `fun g ↦ Decidable.rec (fun _ ↦ Nat.rec (g 0) (fun k ih ↦ maxT nat (S ih) ih) (g 0)) …`
---     — a `Nat.rec` driven by `g 0`: `recMaj` iterating *value*-many times (the §6c ceiling,
---     visible), which evaluates to `2·f*(0)`, the `k* = 1` case of `2^{k*}·f*(0)`.
---     Against §6a's `xs.2 xs.1`, this is the whole thesis in two printed terms.
+/-- The majorant `x* = (k*, λn. n+1)`, so `f*(0) = 1`. -/
+def xs (k : ℕ) : Ty.interpret PureWEHA.X (Ty.nat ×ₜ (Ty.nat →ₜ Ty.nat)).hat :=
+  (k, fun (n : ℕ) => n + 1)
+/-- `x* = (k*, λn. n+3)` — the *other* component of the majorant, so `f*(0) = 3`. -/
+def ys (k : ℕ) : Ty.interpret PureWEHA.X (Ty.nat ×ₜ (Ty.nat →ₜ Ty.nat)).hat :=
+  (k, fun (n : ℕ) => n + 3)
 
 -- Extraction, the witness side — uncomment to run live
 -- (measured kernel time: 0.06 s at k*=0, 1.3 s at k*=3, 5.5 s at k*=5 — the cost grows with
@@ -858,9 +853,8 @@ there is time.
 
 ## 6d. What the two together show
 
-Same premise, two proofs, two growth rates — read off the *proof*, not the theorem, and now
-printed from it: `xs.2 xs.1` against a `Nat.rec` driven by `g 0`. That is the whole content of
-"a bound is a property of a proof". `ProofMode/MCT.lean`
+Same rule, two proofs, two growth rates — and the growth rate is read off the *proof*, not the
+theorem. That is the whole content of "a bound is a property of a proof". `ProofMode/MCT.lean`
 and `ProofMode/MCTLazy.lean` are the same contrast at scale: two derivations of one ℕ-MCT
 statement, one of which is constructive and one of which must be hand-translated.
 
@@ -909,7 +903,7 @@ in the project; `Probes/DemoChecks.lean` does it for the §6 numerals.)
 #print axioms demo_dist_tri_chain
 #print axioms demo_dist_rev_tri
 #print axioms demo_W_ext
-#print axioms stepOnce
+#print axioms linearInduction
 #print axioms doubling
 #print axioms ProofMode.real_mct_p2
 
