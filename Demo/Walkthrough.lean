@@ -889,16 +889,27 @@ statement, a bare `∃v` with no bound in it; and *the metastable form* needs no
 (it holds at every `Allowed`) — which is not the same claim as "MCT needs no classical logic".
 ============================================================================ -/
 
+-- ℝ-MCT, twice. `real_mct_p2` is the descent proof — among `2^{k+1}` windows one is good —
+-- and holds at EVERY `Allowed`. `real_mct_p1` is the lazy proof — assume every window is bad,
+-- chain `2^{k+1}` drops below `0`, contradiction — and needs exactly Markov's principle
+-- (`hmk : al.markov = true`): its one non-constructive step is `¬¬∃v C → ∃v C` for the
+-- quantifier-free `C`, which is `Derivable.markov`, and `pby_contra` refuses any other shape.
+-- Same statement, same encoding, same entry point; both bounds named and type-checked.
 #check @ProofMode.real_mct_p2
+#check @ProofMode.real_mct_p1
 #check @ProofMode.real_mct_bound_p2
+#check @ProofMode.real_mct_bound_p1
 #check @RealMCT.real_mct_of_bound
 
 -- What DOES print for ℝ-MCT: the SHAPE of its extracted functional, two inference rules deep,
 -- and the majorants those rules build — nothing evaluated, so this is safe at any depth on any
--- proof (the node cap is the only limit). Its VALUE is what does not compute: `eval` on this
--- realizer is the 12 GB `bad_alloc` of blocker 2 above.
+-- proof (the node cap is the only limit). Its VALUE is what does not compute: `eval` on either
+-- realizer is the 12 GB `bad_alloc` of blocker 2 above. In `p1`'s tree the Markov step is a
+-- leaf, `MRealizer.ofSRealizer cm (sMarkov …)`: the ineffective step, located in the realizer.
 #bound ProofMode.real_mct_p2 depth 2
 #bound ProofMode.real_mct_p2 depth 2 unfold
+#bound ProofMode.real_mct_p1 depth 2
+#bound ProofMode.real_mct_p1 depth 3 unfold
 
 /-! ============================================================================
 # Axiom hygiene — the claims, checked
@@ -922,6 +933,7 @@ in the project; `Probes/DemoChecks.lean` does it for the §6 numerals.)
 #print axioms stepOnce
 #print axioms doubling
 #print axioms ProofMode.real_mct_p2
+#print axioms ProofMode.real_mct_p1
 
 end Demo
 end Metatheorems
