@@ -904,11 +904,14 @@ statement, a bare `∃v` with no bound in it; and *the metastable form* needs no
 -- What DOES print for ℝ-MCT: the SHAPE of its extracted functional, two inference rules deep,
 -- and the majorants those rules build — nothing evaluated, so this is safe at any depth on any
 -- proof (the node cap is the only limit). Its VALUE is what does not compute: `eval` on either
--- realizer is the 12 GB `bad_alloc` of blocker 2 above. In `p1`'s tree the Markov step is a
--- leaf, `MRealizer.ofSRealizer cm (sMarkov …)`: the ineffective step, located in the realizer.
+-- realizer is the 12 GB `bad_alloc` of blocker 2 above. At depth 2 the two trees are
+-- identical — the proof-mode entry is the same; `p1` is printed at depth 6 (31 nodes, 5 ms),
+-- the first depth at which its Markov step appears as a leaf,
+-- `MRealizer.ofSRealizer cm (sMarkov hqf hvf)`: the one ineffective step, located in the
+-- realizer.
 #bound ProofMode.real_mct_p2 depth 2
 #bound ProofMode.real_mct_p2 depth 2 unfold
-#bound ProofMode.real_mct_p1 depth 2
+#bound ProofMode.real_mct_p1 depth 6
 #bound ProofMode.real_mct_p1 depth 3 unfold
 
 /-! ============================================================================
