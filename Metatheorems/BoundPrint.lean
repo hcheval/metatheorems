@@ -9,9 +9,9 @@ import Metatheorems.Rounding
 /-!
 # `#bound` — printing the extracted functional of a proof
 
-    #bound <ident> [depth <n>] [eval] [cap <n>] [to "<path>"]
+    #bound <ident> [depth <n>] [unfold] [eval] [cap <n>] [to "<path>"]
 
-Two modes, and they answer different questions.
+Two modes, and they answer different questions; `unfold` is a variant of the first.
 
 **Structural (the default).** `depth n` counts **reduction steps along the derivation**:
 `monotone_soundness … prf` is unfolded through `n` levels of the derivation tree, each
@@ -21,6 +21,14 @@ deeper left as `monotone_soundness … <name>` — the subproof's name when it h
 otherwise. `depth 0` prints the root node only. Nothing is ever evaluated, so the output is
 linear in the part of the derivation visited and the mode is safe on any proof; the `maxNodes`
 cap bounds it absolutely.
+
+**Structural with `unfold`.** The same walk, but each visited combinator is opened to the
+majorant it builds — `MRealizer.mp` to `fun n e => (↑hAB n e).1 (↑hA n e)`, `andContract` to
+its `maxT`, `induction` to `termMajorizer cm (λᶠ …, R[…] ⬝ ⟨base⟩ ⬝ ⟨step⟩ ⬝ …)` — printed in
+terms of the combinator's own binder names, and each sub-realizer listed under its name. Still
+nothing is evaluated: the display is the definition's `Subtype.mk` value after β/ζ/projections,
+with only the `MRealizer.*` plumbing and the `mt*` object terms δ-opened (`unfoldable`), so
+`maxT`, `cm.precM` and `termMajorizer` are where it stops. Safe wherever the plain walk is.
 
 **Evaluative (`eval`).** The capped kernel reducer of `Probes/ExprBound.lean` — repeated
 `Lean.Kernel.whnf` under a visit cap, with an arithmetic blocklist so the result reads as
@@ -91,6 +99,25 @@ def ctorMRealizer : Name → Option String
   | ``Derivable.lem          => some "⟨LEM: not available at Allowed.extended⟩"
   | _ => none
 
+/-- The combinator *constant* a rule maps to, for the rules whose combinator has a definition
+worth opening: `unfold` mode prints its majorant (`.val`) with the sub-realizers as the
+combinator's own binder names. Leaves (`ofSRealizer …`) are not opened. -/
+def ctorMRealizerName : Name → Option Name
+  | ``Derivable.mp           => some ``MRealizer.mp
+  | ``Derivable.syllogism    => some ``MRealizer.syllogism
+  | ``Derivable.exportation  => some ``MRealizer.exportation
+  | ``Derivable.importation  => some ``MRealizer.importation
+  | ``Derivable.expansion    => some ``MRealizer.expansion
+  | ``Derivable.forall_rule  => some ``MRealizer.forallRule
+  | ``Derivable.exist_rule   => some ``MRealizer.existRule
+  | ``Derivable.univ_gen     => some ``MRealizer.univGen
+  | ``Derivable.induction    => some ``MRealizer.induction
+  | ``Derivable.qfer         => some ``MRealizer.qfer
+  | ``Derivable.and_contract => some ``MRealizer.andContract
+  | ``Derivable.or_contract  => some ``MRealizer.orContract
+  | ``Derivable.or_perm      => some ``MRealizer.orPerm
+  | _ => none
+
 /-- Constants that are pure re-typings: walked through, never given a node of their own. Same
 list as `Hilbert.isTransparentWrapper`. -/
 def isTransparentWrapper : Name → Bool
@@ -136,6 +163,8 @@ cap that makes the mode safe on any proof. -/
 structure Cfg where
   depth : Nat := 0
   maxNodes : Nat := 20000
+  /-- Open each visited combinator to its majorant, printed in terms of its sub-realizers. -/
+  unfold : Bool := false
 
 /-- The rendered listing so far, as `(indentation, text)` pairs. -/
 structure St where
@@ -156,6 +185,62 @@ def leaf (ind : Nat) (e : Expr) : M Unit := do
     match e.getAppFn with
     | .const c _ => emit ind s!"monotone_soundness … {shortName c}"
     | _ => emit ind "monotone_soundness … …"
+
+/-- Names the `unfold` display may δ-reduce inside a combinator's majorant: the `MRealizer.*`
+plumbing (`plug1`/`plug2`/`plugAll`, through which `induction` and `qfer` are built) and the
+object-level terms those plug in (`mtInduction`, …). `termMajorizer` itself is deliberately
+NOT opened — its δ-expansion is the `brecOn` compilation of a structural recursion, not a
+display — so a plugged term shows as `termMajorizer cm ⟨the term, with R[…] visible⟩`. -/
+def unfoldable (n : Name) : Bool :=
+  (`Metatheorems.MRealizer).isPrefixOf n ||
+    (match n with
+      | .str `Metatheorems s => s.startsWith "mt"
+      | _ => false)
+
+/-- A few bottom-up passes of "δ-reduce an `unfoldable` head, then `whnfCore`" — bounded by
+`fuel`, so this is a display normalisation and not a reducer. -/
+partial def openTerms (fuel : Nat) (e : Expr) : MetaM Expr := do
+  if fuel = 0 then return e
+  let e' ← Meta.transform e (post := fun t => do
+    match t.getAppFn with
+    | .const n _ =>
+      if unfoldable n then
+        match ← forceDelta t with
+        | some u => return .done (← whnfCore u)
+        | none => return .done t
+      else return .done t
+    | _ => return .done t)
+  if e' == e then return e else openTerms (fuel - 1) e'
+
+/-- The majorant a combinator builds, as text, with its sub-realizer parameters left as the
+binder names of the definition (`hA`, `hAB`, …), plus those names in order. `MRealizer` is a
+`Subtype`, so the majorant is the first argument of the `Subtype.mk` the definition reduces to
+under `whnfCore` (β, ζ, projections) after the `MRealizer.*` plumbing is opened; inside it
+only `unfoldable` names are δ-reduced, so `maxT`, `recMaj`, `cm.precM` and the sub-realizers'
+`.val` stay as written. `none` when the body is not in that shape. -/
+def combinatorVal (c : Name) : MetaM (Option (Array Name × String)) := do
+  let some (.defnInfo di) := (← getEnv).find? c | return none
+  lambdaTelescope di.value fun xs body => do
+    let mut body ← whnfCore body
+    -- `induction`/`qfer` are `plug2 …`/`plug1 …` applications: open the plumbing first.
+    for _ in [:6] do
+      if body.isAppOfArity ``Subtype.mk 4 then break
+      match body.getAppFn with
+      | .const n _ =>
+        if (`Metatheorems.MRealizer).isPrefixOf n then
+          match ← forceDelta body with
+          | some u => body ← whnfCore u
+          | none => break
+        else break
+      | _ => break
+    unless body.isAppOfArity ``Subtype.mk 4 do return none
+    let v ← Core.betaReduce (← openTerms 8 body.getAppArgs[2]!)
+    let mut names : Array Name := #[]
+    for x in xs do
+      if (← inferType x).getAppFn.isConstOf ``MRealizer then
+        names := names.push (← x.fvarId!.getUserName)
+    let s ← withOptions (fun o => o.setBool `pp.funBinderTypes false) (ppExpr v)
+    return some (names, toString s)
 
 /-- How many consecutive definitional unfoldings one node may cost before it is cited instead.
 Reaching a `Derivable` constructor from a named lemma or a `pm_*` tactic takes a handful; the
@@ -201,8 +286,20 @@ partial def walk (d : Nat) (u : Nat) (ind : Nat) (e₀ : Expr) : M Unit := do
           | _   => leaf ind e
         else if let some s := ctorMRealizer c then
           emit ind s
-          for a in ← derivArgs e.getAppArgs do
-            if d = 0 then leaf (ind + 1) a else walk (d - 1) unfoldFuel (ind + 1) a
+          let subs ← derivArgs e.getAppArgs
+          let mut labels : Array Name := #[]
+          if (← read).unfold then
+            if let some cn := ctorMRealizerName c then
+              if let some (names, txt) ← combinatorVal cn then
+                labels := names
+                let ls := txt.splitOn "\n"
+                emit (ind + 1) s!"val = {ls.headD ""}"
+                for l in ls.drop 1 do emit (ind + 1) s!"      {l}"
+          for h : i in [:subs.size] do
+            let a := subs[i]
+            if let some nm := labels[i]? then emit (ind + 1) s!"{nm} :="
+            let ind' := if labels.size > 0 then ind + 2 else ind + 1
+            if d = 0 then leaf ind' a else walk (d - 1) unfoldFuel ind' a
         else if u > 0 then
           match ← unfoldDefinition? e with
           | some v => walk d (u - 1) ind v
@@ -330,8 +427,9 @@ def evalBound (name : Name) (cap : Nat) : MetaM (String × Nat × Nat × Bool ×
 
 /-- The structural listing at depth `d`. A wrapper, because the `#bound` syntax below makes
 `depth` a keyword and `{ depth := d }` then no longer parses. -/
-def structuralAt (name : Name) (d : Nat) : MetaM (Array (Nat × String) × Bool) :=
-  structuralLines name { depth := d }
+def structuralAt (name : Name) (d : Nat) (unf : Bool := false) :
+    MetaM (Array (Nat × String) × Bool) :=
+  structuralLines name { depth := d, unfold := unf }
 
 end BoundPrint
 
@@ -346,23 +444,26 @@ open Lean Lean.Elab Lean.Elab.Command
 levels of the derivation; `eval` reduces the bound with the capped kernel reducer instead;
 `cap n` sets that cap; `to "path"` also writes the output to `path.md`.
 
-The four modifier words become reserved tokens for every module that imports this one, as
-`#hilbert`'s do; they are deliberately spelled as whole words that nothing in the project uses
-as an identifier. -/
+The modifier words are **non-reserved** keywords (`&"…"`, as Lean's own `induction …
+generalizing` is written), so importing this module reserves no token: `depth`, `unfold`,
+`eval`, `cap`, `to` stay usable as identifiers — `Hilbert.Config.unfold` is one. (A reserved
+`" unfold"` broke `Hilbert.lean` the first time, which is how this was found.) -/
 syntax (name := boundCmd)
-  "#bound " ident (" depth " num)? (" eval")? (" cap " num)? (" to " str)? : command
+  "#bound " ident (&" depth " num)? (&" unfold")? (&" eval")? (&" cap " num)? (&" to " str)? :
+  command
 
 @[command_elab boundCmd]
 def elabBound : CommandElab := fun stx => do
-  -- The children are read positionally — `#bound `, the ident, then the four optional
+  -- The children are read positionally — `#bound `, the ident, then the five optional
   -- groups — because a quotation pattern for a bare optional atom does not parse here.
   liftTermElabM do
     let name ← Lean.Elab.realizeGlobalConstNoOverloadWithInfo stx[1]
     let d := if stx[2].getNumArgs > 0 then (stx[2][1].isNatLit?).getD 0 else 0
-    let isEval := stx[3].getNumArgs > 0
-    let visitCap := if stx[4].getNumArgs > 0 then (stx[4][1].isNatLit?).getD 4000 else 4000
+    let unf := stx[3].getNumArgs > 0
+    let isEval := stx[4].getNumArgs > 0
+    let visitCap := if stx[5].getNumArgs > 0 then (stx[5][1].isNatLit?).getD 4000 else 4000
     let out? : Option String :=
-      if stx[5].getNumArgs > 0 then stx[5][1].isStrLit? else none
+      if stx[6].getNumArgs > 0 then stx[6][1].isStrLit? else none
     let text ←
       if isEval then do
         let (s, ms, visits, aborted, objs) ← evalBound name visitCap
@@ -377,11 +478,12 @@ capAbort={aborted} numObjs={objs}"
         pure (hdr ++ "\n\n```\n" ++ s ++ "\n```\n")
       else do
         let t0 ← IO.monoMsNow
-        let (lines, aborted) ← structuralAt name d
+        let (lines, aborted) ← structuralAt name d unf
         let t1 ← IO.monoMsNow
         let body := render lines
         let capNote := if aborted then " (NODE CAP REACHED)" else ""
-        let hdr := s!"#bound {name} depth={d}: {lines.size} nodes in {t1 - t0}ms{capNote}"
+        let unfNote := if unf then " unfold" else ""
+        let hdr := s!"#bound {name} depth={d}{unfNote}: {lines.size} nodes in {t1 - t0}ms{capNote}"
         logInfo m!"{hdr}\n{body}"
         pure (hdr ++ "\n\n```\n" ++ body ++ "\n```\n")
     if let some base := out? then

@@ -137,6 +137,12 @@ namespace BoundPrintDemo
 -- The realizer names the same target as its derivation.
 #bound Demo.stepOnceR depth 3
 
+-- `unfold` (added 2026-09-09): each combinator opened to the majorant it builds; nothing
+-- evaluated. `induction` shows the recursor `R[…]` under `termMajorizer`.
+#bound Demo.stepOnce depth 1 unfold
+#bound Demo.doubling depth 2 unfold
+#bound ProofMode.real_mct_p2 depth 2 unfold
+
 -- The large derivation, to the point where the listing stops being a display.
 #bound ProofMode.real_mct_p2
 #bound ProofMode.real_mct_p2 depth 1
