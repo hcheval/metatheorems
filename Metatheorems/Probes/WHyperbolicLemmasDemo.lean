@@ -17,24 +17,14 @@ for the reverse triangle inequality: instantiate each at an **arbitrary** `WHype
 through `WHyperbolicModel.soundness` and read the conclusion back as a statement about
 Mathlib `ℝ` and the model's own `W` and `d`.
 
-Nothing here consults `M.W1`–`M.W4` directly. The route is always
-
-    object derivation  →  WHyperbolicModel.soundness  →  codeReal bridge  →  Mathlib ℝ
-
-so a wrong object-level statement would surface here as a type error, and the model facts
-enter only inside `WHyperbolicModel.axiomsHold`, which `soundness` already used.
+Nothing here consults `M.W1`–`M.W4` directly: the route is object derivation →
+`WHyperbolicModel.soundness` → `codeReal` bridge → Mathlib ℝ.
 
 The `≤ℝ` read-out is `RevTriangleDemo.codeReal_le_of_interpret_le_R_pu` (imported, not
 duplicated); the `=_X` read-out is `MetricModel.eq_of_eqAtType_base_gen` — separation, i.e.
 `M.d_eq_zero`, which is exactly what turns object-level `d(s,t) =ℝ 0ℝ` into `s = t` on the
-carrier.
-
-**The parameter.** Every object statement is at `clamp01 λ` for a free code `λ`, and the
-model interprets `W(x,y,r)` as `M.W x y (clampReal (codeReal r))`. So the model-side
-parameter is `t := clampReal (codeReal r)`, an arbitrary element of `[0,1]` — and for
-`W_zero`/`W_one` the code is the closed `0ℝ`/`1ℝ`, whose `codeReal` is `0`/`1` and whose
-clamp is therefore the identity. That is the `[0,1]`-retraction doing its job: the object
-theory quantifies over *all* codes, the model sees only `[0,1]`.
+carrier. The parameter `λ` is a free code and the model sees `clampReal (codeReal r)`; the
+discussion of that is in the notes.
 
 Concrete instance: the last section runs the same statements at `WHyperbolicModel.ofNormed ℝ`
 — Mathlib's real line as a W-hyperbolic space, with `W x y λ = (1−λ)x + λy`.

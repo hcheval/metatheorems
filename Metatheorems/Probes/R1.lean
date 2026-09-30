@@ -166,16 +166,8 @@ challenge.  The soundness property of `w` then only says the resulting `Wnt` ans
 one junk challenge.  The junk challenge's `Wnt → Cnt` component picks a *fixed* `h`
 (`Ty.interpret_default`), not the `h` the theorem is being proved for.
 
-So the `sorry` at `Metatheorem.lean:340` is not a missing lemma; it is a place where the
-proof needs a challenge depending on `x`, and none is available from `dialecticaDefaultWitness`.
-
-*Historical, and both halves of that citation are now stale — read it as a diagnosis, not as
-a location.* The `sorry` is gone: the declaration holding it, `general_metatheorem_classical`,
-was deleted on 2026-09-07 with the uninhabitable `Majorizability` it took, and the classical
-route that landed instead prenexifies first (`classical_to_prenex_extended`), which is exactly
-the fix this probe's diagnosis calls for — the prenexified matrix is QF and ∨-free, so
-`dialecticaMatrix_iff_interpFormula` reduces it at *every* counter and the junk challenge
-stops mattering. The file itself is now `MetatheoremPrereqs.lean` and has no sorries.
+Historical note on which proof step needed a challenge depending on `x`, and how the classical
+route that landed avoids it (`classical_to_prenex_extended` prenexifies first): see the notes.
 -/
 
 /-- The default challenge really does ignore its argument: it is `fun _ => (default h, …)`. -/

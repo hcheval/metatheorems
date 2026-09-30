@@ -43,39 +43,11 @@ computed from it.
 
 ## Why the real parameter is `Term.snd p` and not a free `Term F [] rTy`
 
-The task this file answers asked for `f` as a **free Lean-level variable** of type
-`Term WHyperbolic.F [] rTy`, so that independence of `f` is visible. That does not typecheck,
-and the reason is worth recording rather than working around silently.
-
-`Derivable.exist_ax t C₀ : Derivable (C₀.subst0 t →ᶠ Formula.ex ρ C₀)`, so the derivation
-needs `Derivable (C₀.subst0 wit)`, closed by `refl0` — which requires `C₀.subst0 wit` to be
-**definitionally** `wit =₀ wit`. With `f` free, `C₀` must contain `Term.weaken f`, and
-`Term.subst` is defined by structural recursion on constructors (`Subst.lean:47`): at an
-opaque variable `f` it is stuck. The identity it needs, `Term.weaken_subst0`
-(`Subst.lean:195`), is a *propositional* lemma proved by `simp`, not `rfl`. Measured, not
-guessed: with `f : Term WHyperbolic.F [] rTy` a section variable and `C₀` built with
-`Term.weaken f`, the goal `(C0B f).subst0 (witB f) = (witB f =₀ witB f)` fails with
-
-    Tactic `rfl` failed: The left-hand side
-      (C0B f).subst0 (witB f)
-    is not definitionally equal to the right-hand side
-      witB f =₀ witB f
-
-whereas the `Term.snd (Term.var vz)` form below closes the corresponding goal (`wC0_subst0`)
-by `rfl` with no axioms at all.
-
-Discharging it would put an `Eq.mpr`/`Eq.rec` cast **inside** a `Type`-valued `Derivable`,
-and `syntactic_soundness` pattern-matches on `Derivable`'s constructors, so the extraction
-would then be stuck one layer higher (the `Eq.mpr` problem `CombinatorLemmas.lean` meets for
-`anorm`). So the free-variable form is not merely inconvenient here; it moves the obstruction
-into the pipeline.
-
-Making the real parameter the **second component of the universally quantified `p`** removes
-the problem outright — `Term.snd (Term.var vz)` is a constructor tree, so `subst0` computes —
-and it is *strictly stronger* than what was asked for: the parameter is now universally
-quantified inside the theorem rather than fixed outside it, and `Φ` is shown below to be
-`901` for **every** second-component majorant `g`, not merely for each fixed `f`. Nothing is
-weakened; the quantifier moved inward.
+A free `f : Term WHyperbolic.F [] rTy` does not typecheck: `C₀.subst0 wit` would have to be
+definitionally `wit =₀ wit`, but `Term.subst` is stuck at an opaque variable. Making the real
+parameter the second component of the universally quantified `p` removes the problem, and is
+strictly stronger (`Φ = 901` for every second-component majorant `g`). The measured failure and
+the argument are in the notes.
 -/
 
 namespace Metatheorems
@@ -286,112 +258,15 @@ theorem wBound_ne_902 (M : WHyperbolicModel) (h : M.d M.ref M.zeroX ≤ ((5 : �
   rw [← wBound_at_5 M h g]; decide
 
 /-!
-### Controls actually run, and how they failed
+### Controls, provenance and cost
 
-Both were run as edits to this file and then reverted; the failure text is recorded because a
-control that is not run is not a control.
-
-* Claiming `902 = (wBound M h).val ((5 : ℕ), g)`. The `have hval … := rfl` step still
-  succeeds — the pipeline does reduce — and then `decide` reports
-
-      Tactic `decide` proved that the proposition
-        902 = Nat.max 0 (Rounding.pairN (2 * ((5 + 5) * 2 ^ (0 + 1))) (2 ^ (0 + 1) - 1))
-      is false
-
-  This is the strongest available form: not "the proof did not go through" but "the claim is
-  refuted". `wBound_ne_902` above is the same fact in positive, permanently-checked form.
-* Claiming `901 = (wBound M h).val ((7 : ℕ), g)` — likewise refuted, against
-  `Nat.max 0 (Rounding.pairN (2 * ((7 + 5) * 2 ^ (0 + 1))) (2 ^ (0 + 1) - 1))` = `1273`.
-  So the bound is not constant in `x_star`.
-
-### That `Φ` came from *this* derivation
-
-`wBound` is `syntactic_general_metatheorem_at … wFinal` with no other input, and `wFinal`'s
-type is the statement spelled out at the top of this file — so there is no path by which a
-default or trivial `Φ` could be substituted. Two further checks that the *derivation* is the
-source of the number rather than the model constants:
-
-* `wUt_is_zero` and `wVt_is_901` differ, and they differ in the way the two matrices differ:
-  `B₀` does not mention `p`, so `U` is `0`; `C₀`'s witness is the distance term, so `V` is
-  `901`. A `Φ` insensitive to the derivation could not separate them.
-* `wBound_at_7` tracks `x_star` through `WMajorant`'s `max`, which only the extracted witness
-  term reaches.
-
-### Cost, measured
-
-Goal `numObjs` at the point of reduction (DAG size, never `sizeWithoutSharing` — the sharing
-ratio in this pipeline is ≈10⁵):
-
-| goal | numObjs | approxDepth |
-|---|---|---|
-| `wUt_is_zero` | 71 | 12 |
-| `wVt_is_901`  | 71 | 12 |
-| `wBound_at_5` | 157 | 23 |
-
-These are the goals as stated, before reduction; the reduction itself is `rfl`, so nothing
-intermediate is ever materialised as an `Expr`. Two things were learned getting there, and
-both are reusable.
-
-**1. `simp only` cannot reduce this pipeline; `rfl` can.** The first version of this file used
-the `ComputesDemo` simp set widened by `syntactic_soundness`, the `s*` combinators,
-`extractUTerm`/`extractVTerm`, `SRealizer.imp` and `Term.rename`/`Renaming.ext`/`shift`. It
-**stalled** — goal `numObjs` 860 → 4522 → 2462 across three widenings — ending stuck on
-`Ctx.lookupHat` applied to a dependent `match` on `Var`, generated by the renamings *inside
-the extracted realizer*, with `M` and `g` still free (so `decide` reported *"Expected type
-must not contain free variables"*). `simp` does not reduce those dependent matches; the
-kernel's `whnf` walks straight through them. `WHyperbolic.lean`'s `ComputesDemo` gets away
-with `simp only` only because its terms are hand-written and contain no renamings at all —
-which is exactly the difference between starting from a term and starting from a derivation.
-So: **reduce with `rfl`, and spend the effort on making every constant reachable by `whnf`**
-— here that meant one thing, `wCm`.
-
-**2. Split the structural reduction from the arithmetic.** A single `rfl` on the `901` goals
-fails with `maximum recursion depth has been reached`, and `maxRecDepth` must not be raised.
-The cause is not the pipeline but the *last* step: evaluating `Rounding.triagN 41` inside
-`isDefEq` costs elaborator recursion depth, while the same evaluation in the kernel via
-`decide` is free. Hence the shape used throughout:
-
-    have hval : <pipeline expression> = <closed ℕ expression> := rfl
-    rw [hval]; decide
-
-`rfl` does the structural half (through `syntactic_soundness`, the extraction and
-`termMajorizer`) and stops at a closed ℕ expression it never evaluates; `decide` does the
-arithmetic. Note `wUt_is_zero` needs no split — its value is `0`, so no `triagN` is reached.
-That asymmetry is the diagnostic: **a `rfl` that dies of recursion depth here is doing
-arithmetic, not traversal.** This is worth knowing because the obvious reading — "the
-extraction is too big" — is wrong, and would send someone to unfold the wrong layer.
-
-**Does `ι = Unit` with the `W` constant cost more than `TinyBoundDemo`'s `ι = Empty`?** Yes —
-about 5× at this size — but the factor splits in two, and neither half is a blow-up.
-Wall-clock, `lake env lean <file>` with dependencies already built:
-
-| file | setting | witness term | wall |
-|---|---|---|---|
-| `TinyBoundDemo` | `ι = Empty` | `Term.var vz` | 4.4 s |
-| (control, since deleted) | `ι = Unit`, `W` in signature | `Term.zero` | 9.5 s |
-| `WBoundDemo` | `ι = Unit`, `W` in signature | `d ⬝ (W ⬝ p₁ ⬝ p₁ ⬝ p₂) ⬝ 0_X ⬝ 0` | 23.3 s |
-
-The control is this file with the existential witness replaced by `Term.zero` and everything
-else — model, `wCm`, premise set, the 12-constructor derivation shape — held fixed. So:
-
-* **`ι = Empty` → a space, at equal witness: ~2×**, of which 2.7 s is `import` of the
-  `WHyperbolic`/Mathlib-`ℝ` stack, i.e. not elaboration at all.
-* **Trivial witness → the real distance witness: a further ~2.5×**, and this is a property of
-  the *term*, not of `ι`: the witness is a four-node application spine, so `syntactic_soundness`
-  and `termMajorizer` each traverse correspondingly more. It would cost the same at
-  `ι = Empty` with a term of the same size.
-
-Profiling puts essentially all of it in the `rfl` steps (two `refine`s at ~17 s cumulative,
-one `eqRefl` at 2.5 s) — i.e. in pushing `whnf` through the extracted realizer, exactly where
-the work is. Note the count of numeral theorems matters: each one re-traverses the whole
-pipeline independently, and this file has five.
-
-The cost that is *qualitatively* new at a space is not time but **computability**, and it is
-paid once per model rather than once per proof. At `ι = Empty` every majorant is ℕ-valued
-outright and a bare `rfl` closes the goal; at a metric model `distM` routes through
-`Rounding.roundR` on Mathlib `ℝ`, which is `noncomputable`, so **nothing downstream of it
-reduces until it is brought back to ℕ by hand** (`wCm`). That is the single substantive
-difference between `ι = Empty` and a space.
+Two controls were run and reverted (`902` and `901` at `x_star = 7` are both refuted by
+`decide`), `wUt_is_zero`/`wVt_is_901` differ as the two matrices do, and the goals are 71 to 157
+objects. Two reusable findings: `simp only` cannot reduce this pipeline but `rfl` can, and a
+`rfl` that dies of recursion depth is doing arithmetic, not traversal (hence
+`have hval : … := rfl; rw [hval]; decide`). At a space the cost that is new is computability:
+`distM` routes through `noncomputable` `Rounding.roundR`, so `wCm` brings it back to ℕ by hand.
+Details, the wall-clock table and the failing controls are in the notes.
 -/
 
 -- Axiom hygiene — verify by name, after a completed `lake build`
