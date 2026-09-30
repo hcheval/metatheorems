@@ -26,17 +26,9 @@ Rational numbers are encoded as natural numbers via Cantor pairing of
 
 open Formula
 
--- `realTy` moved to `TypeSystem.lean` — `Term.dist` mentions it, and `Term` is below here.
-
 variable {ι κ : Type} {F : κ → Ty ι}
 
--- ============================================================================
--- Sections 1-8: term definitions — MOVED to Metatheorems/Terms/Rational.lean
--- ============================================================================
--- The `Term`-level ℚ encoding now lives below `eqAtType` and `Derivable` in the import
--- order, because `eqAtType` at a base type is `eq_R (dist i s t) 0ℝ` and so depends on it.
--- Only the definitions moved; every proof about them, including the `closed_subst`
--- lemmas below, stays here. See ARCHITECTURE.md.
+-- The `Term`-level ℚ encoding (sections 1-8) lives in `Metatheorems/Terms/Rational.lean`.
 
 namespace Term
 
@@ -49,30 +41,13 @@ def eq_Q {Γ : Ctx ι} (a b : Term F Γ Ty.nat) : Formula F Γ :=
 /-- `eq_Q` is quantifier-free. -/
 theorem eq_Q_isQF (a b : Term F Γ Ty.nat) : (eq_Q a b).isQF = true := by rfl
 
--- ============================================================================
--- Closed term substitution lemmas — MOVED
--- ============================================================================
---
--- The whole `ClosedSubst` section now lives in `Metatheorems/Terms/ClosedSubst.lean`, below
--- `eqAtType` in the import order. It had to move because `eqAtType` at a base type is
--- `eq_R (dist i s t) 0ℝ`, so `eqAtType_substF`'s base case is `eq_R_substF` — and that is
--- proved in `Arithmetic.lean`, which sits below this file. Nothing was restated: the same
--- declarations, verbatim, at a lower point. They reach here through the import chain, so
--- every use below is unchanged. See ARCHITECTURE.md §7.
+-- The closed-term substitution lemmas live in `Metatheorems/Terms/ClosedSubst.lean`.
 
--- ============================================================================
 -- Section 9: Rational Ordered Field Axioms (as Derivable terms)
--- ============================================================================
-
--- These are number-theoretic facts provable in WE-HA^ω from the primitive
--- arithmetic operations (rec, succ, etc.) and the rational encoding.
 
 variable {al : Allowed} {Premises : PremiseSet F}
 
 -- ── Congruence helpers (outside section to avoid Γ capture) ──────────────
-
--- `mul_congr_l` / `mul_congr_r` now live in `Arithmetic.lean` (non-private); the local
--- duplicates that used to sit here were removed to avoid the name clash.
 
 /-- s =₀ t → sg(s) =₀ sg(t) -/
 private def sg_congr {Γ : Ctx ι} {s t : Term F Γ Ty.nat}
@@ -1145,9 +1120,7 @@ private def rat_encode_congr {s s' n n' d d' : Term F Γ Ty.nat}
       (Formula.eq0 (Term.app3 Term.rat_encode s n d) (Term.app3 Term.rat_encode s' n' d')) :=
   app3_congr_closed Term.rat_encode hs hn hd
 
--- ============================================================================
 -- Cantor pair projection lemmas
--- ============================================================================
 
 /-- `x ≤ x + y`, i.e., `monus x (add x y) =₀ 0`.
     By induction on `y`. Base: `monus x (x+0) =₀ monus x x =₀ 0`.
@@ -2678,9 +2651,7 @@ def snd_pair_pair (x y : Term F Γ Ty.nat) :
   let step_a := .mp (.mp h_m (.mp h_unfold and_intro)) .trans0
   .mp (.mp h_cancel (.mp step_a and_intro)) .trans0
 
--- ============================================================================
 -- rat_encode roundtrip lemmas
--- ============================================================================
 
 /-- `rat_den(rat_encode(s, n, d)) =₀ succ(d)`.
 
@@ -3766,8 +3737,6 @@ def eq_Q_from_components {a b : Term F Γ Ty.nat}
     (.mp (add_eq_zero_iff _ _) (.syllogism .and_perm .and_weak))
   .mp (.mp h_sum (.mp unfold and_intro)) .trans0
 
--- Distributivity of ∧ over ∨ (`and_or_dist`) now lives in `PropositionalLemmas`.
-
 /-- From `sg_bar(x) =₀ S0`, derive `x =₀ 0`. -/
 def sg_bar_eq_S0_implies_zero (x : Term F Γ Ty.nat) :
     Derivable F al Premises
@@ -3784,9 +3753,6 @@ def sg_bar_eq_S0_implies_zero (x : Term F Γ Ty.nat) :
   .syllogism (pair_h I_comb (weaken_intro h_disj)) (
     .syllogism and_or_dist
       (or_elim_rule and_proj2 (.syllogism h_contra .exfalso)))
-
--- `add_cancel_r` (right additive cancellation) is a ℕ fact and now lives in `Arithmetic.lean`,
--- next to the `monus_cancel` it is proved from.
 
 -- Helpers for doubly-weakened terms under substitution
 private theorem dw_subst0 {Γ : Ctx ι} {F : κ → Ty ι} (t : Term F Γ Ty.nat) (s : Term F Γ Ty.nat) :
@@ -4110,10 +4076,7 @@ private def sg_zero_fwd (n : Term F Γ Ty.nat) :
 
 -- ── Implication-form congruences ───────────────────────────────────────────
 --
--- The kernel has no deduction theorem, so a congruence that has to be applied *under* a
--- hypothesis cannot be got from the closed version. These say `s =₀ t →ᶠ r[s] =₀ r[t]` for
--- each context `r` the `add_Q` congruence proof needs, so that a hypothesis-carrying equation
--- composes with them by plain `.syllogism`.
+-- These say `s =₀ t →ᶠ r[s] =₀ r[t]` for each context `r` the `add_Q` congruence proof needs.
 
 /-- Transitivity of `=₀` under a common hypothesis. -/
 private def htrans {H : Formula F Γ} {x y z : Term F Γ Ty.nat}
@@ -5162,9 +5125,6 @@ def add_Q_comm_inst (x y : Term F Γ Ty.nat) :
     (.forall_ax y)
   q_norm using h
 
--- `add_Q_assoc` needs the signed-numerator machinery, so it is proved further down, in the
--- "Associativity" block after `addQ_signed`.
-
 /-- ⊢ ∀a. eq_Q(add_Q(a, zero_Q), a) -/
 def add_Q_zero :
     Derivable F al Premises (Γ := Γ)
@@ -6109,9 +6069,6 @@ def mul_Q_comm_inst (x y : Term F Γ Ty.nat) :
     (.forall_ax y)
   q_norm using h
 
--- `mul_Q_assoc` needs the signed-numerator machinery, so it is proved further down, in the
--- "Signed parts of a product" block.
-
 /-- ⊢ ∀a. eq_Q(mul_Q(a, one_Q), a) -/
 def mul_Q_one :
     Derivable F al Premises (Γ := Γ)
@@ -6591,15 +6548,9 @@ def mul_Q_one :
     .mp (.mp h_reduced (.mp h_mul_red and_intro)) .trans0
   univ_gen (eq_Q_from_components h_cross h_sign)
 
--- `distrib_Q` needs the signed-numerator machinery and `eq_Q_of_signed_cross`, so it is
--- proved at the end of the file, in the "Distributivity" block.
-
 -- ── `eq_Q` elimination ─────────────────────────────────────────────────────
 --
--- `eq_Q_from_components` builds an `eq_Q` out of its two halves. These go the other way:
--- they take one apart. The two consequences that matter downstream are that "the numerator
--- vanishes" is an `eq_Q`-invariant, and that once the numerators are nonzero the sign bits
--- have to agree — the argument the sign half of `mul_Q_right_congr` makes inline.
+-- `eq_Q_from_components` builds an `eq_Q` out of its two halves; these take one apart.
 
 /-- The body `eq_Q_dec` compiles to, in the two-variable context. -/
 private def eq_Q_dec_body {Γ : Ctx ι} : Term F (Ty.nat :: Ty.nat :: Γ) Ty.nat :=
@@ -7139,10 +7090,6 @@ def lt_Q_irrefl :
       (Formula.eq0 (Term.app2 Term.lt_Q_dec a a) Term.zero →ᶠ ⊥ᶠ) :=
     .syllogism (pair_h (weaken_intro_h h_succ_sym) I_comb) (.syllogism .trans0 h_ne)
   univ_gen step
-
--- `lt_Q_trans`, `lt_Q_trichotomy`, `lt_Q_add` and `lt_Q_mul_pos` all need the additive-group
--- laws and the signed-numerator machinery, so they are proved further down, in the "Order"
--- block after `neg_Q_add_Q`.
 
 /-- neg_Q(zero_Q) =₀ zero_Q -/
 private def neg_Q_zero_Q :
@@ -7751,13 +7698,7 @@ private def succ_pd_den_mul (a c : Term F Γ Ty.nat) :
 
 -- ── `add_Q` component lemmas ───────────────────────────────────────────────
 --
--- The `body`/`body_eq`/`nf`/`lam2_correct_nf` unfolding is rebuilt inline sixteen times in
--- this file, once per proof that needs it. These name it once for `add_Q`, the way
--- `mul_Q_body`/`mul_Q_unfold`/`rat_*_mul_Q` below do for `mul_Q`.
---
--- `add_Q` is the harder of the two: both its numerator and its sign are `ite_nat`s over the
--- "do the two arguments have the same sign bit" test, so the components are *conditional*.
--- The unconditional lemmas below state them with the `ite_nat` still in place; the four
+-- The components of `add_Q` are *conditional* (`ite_nat` over the same-sign test); the four
 -- `addQ_num_*`/`addQ_sign_*` lemmas discharge it once the test's value is known.
 
 /-- The cross product `rat_num x · rat_den y` — the numerator of `x` once both arguments are
@@ -7946,15 +7887,9 @@ private def addQ_sign_diff_imp (a c : Term F Γ Ty.nat) :
 
 -- ── Signed numerators ──────────────────────────────────────────────────────
 --
--- The encoding stores a magnitude and a sign bit, which makes addition a three-way case
--- analysis and associativity a nightmare of nested comparisons. Splitting the numerator into
--- a *positive part* and a *negative part* removes the cases: a rational's value is
--- `(posN − negN) / den`, addition adds the parts componentwise, and componentwise addition of
--- pairs of naturals is associative for free.
---
--- Nothing below ever subtracts. `u` and `v` have the same value exactly when
--- `posN u · den v + negN v · den u =₀ posN v · den u + negN u · den v`, and that is an
--- identity in `+` and `·` alone.
+-- Splitting the numerator into a *positive part* and a *negative part* removes the sign
+-- cases: a rational's value is `(posN − negN) / den`, and addition adds the parts
+-- componentwise. Nothing below ever subtracts.
 
 /-- The positive part of `x`'s numerator: `rat_num x` when the sign bit is `1`, else `0`. -/
 def posN (x : Term F Γ Ty.nat) : Term F Γ Ty.nat :=
@@ -9096,13 +9031,8 @@ def add_Q_assoc :
 
 -- ── `add_Q` under `eq_Q` in the second argument ────────────────────────────
 --
--- The pieces of `add_Q_right_congr`. Everything is stated at the level of the components, so
--- that the final assembly is just `eq_Q_from_components`.
---
--- Write `P = na·dc`, `Q = nc·da` for the two cross products of `add_Q a c`, and `P' = na·dd`,
--- `Q' = nd·da` for those of `add_Q a d`. The two identities `P·dd =₀ P'·dc` and
--- `Q·dd =₀ Q'·dc` are what `eq_Q c d` buys, and everything below is those two pushed through
--- whichever branch of `add_Q` is live.
+-- The pieces of `add_Q_right_congr`, stated at the level of the components, so that the
+-- final assembly is `eq_Q_from_components`.
 
 /-- `P·dd =₀ P'·dc`: the first cross product scaled by the other denominator. Unconditional —
 it is `(na·dc)·dd` against `(na·dd)·dc`. -/
@@ -11408,15 +11338,7 @@ def distrib_Q :
   univ_gen (univ_gen (univ_gen (distrib_Q_inst
     (.var (.vs (.vs .vz))) (.var (.vs .vz)) (.var .vz))))
 
--- ══════════════════════════════════════════════════════════════════════════
--- `abs_Q`, and `eq_Q`-congruence for the order relations
--- ══════════════════════════════════════════════════════════════════════════
---
--- Everything above this line is what the ℚ layer needed for its own sake. What follows is
--- what the *real* layer needs and ℚ did not: `abs_Q` had no lemmas at all (`eq_R` is stated
--- through `|·|_ℚ`), and neither `<_ℚ` nor `≤_ℚ` had a congruence rule under `eq_Q` — the
--- order proofs above all went through `lt_Q_of_eq_Q_diff` on the *difference*, which is not
--- the shape a real-number proof arrives in.
+-- `abs_Q`, and `eq_Q`-congruence for the order relations (what the real layer needs)
 
 /-- `abs_Q z` in its `rat_encode` form: sign forced to `1`, numerator and denominator kept. -/
 private def abs_Q_unfold (z : Term F Γ Ty.nat) :
@@ -11692,12 +11614,8 @@ def lt_Q_le_Q_absurd (x y : Term F Γ Ty.nat) :
 
 -- ── The `≤_ℚ` toolkit ───────────────────────────────────────────────────────
 --
--- `le_Q` had only `le_Q_refl`, `le_Q_cases`, `le_Q_of_sign`/`le_Q_of_num_zero` and the
--- `eq_Q`-congruence. Everything below mirrors the `<_ℚ` development one lemma at a time:
--- positivity in terms of the signed parts, the additive facts, transitivity. The one place
--- the mirror is *not* mechanical is `addQ_negN_zero` — for `<_ℚ` the corresponding step is
--- buried inside `lt_Q_zero_add`, and it is factored out here because the mixed `<`/`≤`
--- addition lemma needs exactly that half of it and none of the rest.
+-- Everything below mirrors the `<_ℚ` development one lemma at a time: positivity in terms of
+-- the signed parts, the additive facts, transitivity.
 
 /-- `0_ℚ ≤_ℚ p` forces `p`'s negative part to vanish. -/
 def le_Q_zero_parts (p : Term F Γ Ty.nat) :
@@ -12047,15 +11965,8 @@ def le_lt_Q_trans (a b c : Term F Γ Ty.nat) :
 
 -- ── ℕ order in `monus` form ────────────────────────────────────────────────
 --
--- `a ≤ b` at ℕ is `a ∸ b =₀ 0`. `Arithmetic.lean` has the `monus` calculus but no order
--- *relation* facts — no transitivity, no monotonicity. By subject these four belong there;
--- they are here because `Arithmetic.lean` sits below `ProofMode` in the import graph and
--- these are a few lines in proof mode against a page each in Hilbert style.
---
--- Note the shape of the two `_aux` lemmas: the reasoning is done over *fresh* variables and
--- instantiated afterwards. A rewrite hits every occurrence of its pattern, so rewriting `b`
--- by `(b ∸ a) + a` in a goal that also mentions `c ∸ b` corrupts the other occurrence. Stating
--- the step generically, where the five terms are opaque, is what makes the rewrites safe.
+-- `a ≤ b` at ℕ is `a ∸ b =₀ 0`. The two `_aux` lemmas reason over *fresh* variables and are
+-- instantiated afterwards, so that rewrites cannot corrupt other occurrences of a pattern.
 
 /-- `x ≤ u + x`. -/
 def monus_add_self (x u : Term F Γ Ty.nat) :
@@ -12464,10 +12375,7 @@ def abs_Q_triangle (a b : Term F Γ Ty.nat) :
 
 -- ── Additions for the real-number layer (Class C) ──────────────────────────
 --
--- Everything below was forced by `eq_R_trans`. The two that are not bookkeeping are
--- `eq_Q_imp_le_Q` — the middle case of `lt_Q_trichotomy`, without which the trichotomy
--- cannot be used to *prove* a `≤_ℚ` — and `pow2neg_Q_le_add`, the dyadic monotonicity
--- that turns `pow2neg_rat_den_le`'s index into a usable one.
+-- Everything below is used by the real-number layer (`eq_R_trans`).
 
 /-- `a <_ℚ b → a +_ℚ c <_ℚ b +_ℚ c`, at explicit terms. -/
 def lt_Q_add_inst (a b c : Term F Γ Ty.nat) :
