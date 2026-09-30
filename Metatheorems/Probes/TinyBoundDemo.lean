@@ -52,10 +52,8 @@ namespace TinyBoundDemo
 
 open Formula
 
--- ============================================================================
 -- The `ι = Empty` model — same recipe as `BoundProbe`, distinct names to avoid any
 -- cross-lane collision (this file does not import `BoundProbe.lean`).
--- ============================================================================
 
 /-- The carrier family for pure `WE-HA^ω`: no base types. -/
 def tXE : Empty → Type := fun i => i.elim
@@ -79,9 +77,7 @@ def tPremE : PremiseSet tFE := fun _ => False
 def tSpremiseE : ∀ (Γ' : Ctx Empty) (B : Formula tFE Γ'), tPremE ⟨Γ', B⟩ → SRealizer tSiE B :=
   fun _ _ h => h.elim
 
--- ============================================================================
 -- The statement: ∀x:nat (∀u:nat (u = u) → ∃v:nat (v = x))
--- ============================================================================
 
 /-- `B₀ := u =₀ u`, in context `[u:nat, x:nat]`. Doesn't depend on `x` at all. -/
 def tB0 : Formula tFE [Ty.nat, Ty.nat] := Formula.eq0 (.var .vz) (.var .vz)
@@ -97,9 +93,7 @@ theorem tC0_vf : tC0.isVFree = true := rfl
 /-- The unconditional dummy premise `0 =₀ 0`, used only to feed `forall_rule`. -/
 def tDummyOuter : Formula tFE ([] : Ctx Empty) := Formula.eq0 Term.zero Term.zero
 
--- ============================================================================
 -- The derivation, by hand, raw `Derivable` constructors only
--- ============================================================================
 
 /-- Step 1: `∃v C₀` is derivable unconditionally in context `[x:nat]`. -/
 def tExDerivation :
@@ -128,9 +122,7 @@ def tFinal :
       (Formula.all Ty.nat (Formula.all Ty.nat tB0 →ᶠ Formula.ex Ty.nat tC0)) :=
   Derivable.mp Derivable.refl0 (Derivable.forall_rule tInnerWeakened)
 
--- ============================================================================
 -- Through the metatheorem
--- ============================================================================
 
 /-- The bound extraction theorem, applied to `tFinal`. Purely a sanity check that everything
 above really does have the shape the metatheorem wants; not used for the numeral computation
@@ -144,9 +136,7 @@ theorem tinyBound :
   syntactic_general_metatheorem tEqxiE tSpremiseE (bezemAbstractEmpty tSiE)
     tB0_qf tB0_vf tC0_qf tC0_vf tFinal
 
--- ============================================================================
 -- The realizer and the two extracted functionals, as closed terms
--- ============================================================================
 
 /-- The syntactic realizer of `tFinal`. Per `BoundProbe`'s finding, this `def` elaborates and
 type-checks instantly — the cost is specific to forcing full evaluation, not to naming it. -/
@@ -162,9 +152,7 @@ def tUt : Term tFE ([] : Ctx Empty) (Ty.nat →ₜ Ty.nat) :=
 def tVt : Term tFE ([] : Ctx Empty) (Ty.nat →ₜ Ty.nat) :=
   extractVTerm (ρ := Ty.nat) (B₀ := tB0) (C₀ := tC0) tRealizer.val
 
--- ============================================================================
 -- The majorant, as data — and the literal numeral, kernel-checked
--- ============================================================================
 
 /-- The constant majorants at `ι = Empty` (`bezemConstMajorantsEmpty`), instantiated at
 `tSiE`. This is what makes `closedMajorizer` compute at all. -/

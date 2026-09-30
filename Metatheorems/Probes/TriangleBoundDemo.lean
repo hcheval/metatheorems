@@ -81,9 +81,7 @@ namespace TriangleBoundDemo
 
 open Formula
 
--- ============================================================================
 -- The statement
--- ============================================================================
 
 /-- The quantified type: an ordered **pair of space points**. `x := fst p`, `z := snd p`. -/
 abbrev pTy : Ty MetricSpace.ι := xTy ×ₜ xTy
@@ -152,9 +150,7 @@ def trivB : Formula WHyperbolic.F [Ty.nat, pTy] :=
 theorem trivB_pu : trivB.isPurelyUniversal = true := rfl
 theorem trivB_vf : trivB.isVFree = true := rfl
 
--- ============================================================================
 -- The derivation — raw `Derivable` constructors only, no proof mode
--- ============================================================================
 
 /-- Step 1: **instantiate the premise** at `s`. `(∀n triB) →ᶠ triB[s]`. -/
 def triInst :
@@ -204,9 +200,7 @@ example :
       (Formula.all pTy (le_R_pu dxz dsum →ᶠ Formula.ex Ty.nat triB)) :=
   triFinal
 
--- ============================================================================
 -- The unconditional version — the first use of a SPACE AXIOM in a derivation
--- ============================================================================
 
 /-- **The triangle inequality itself**, at `x := fst p`, `y := 0_X`, `z := snd p`, in context
 `[p]`. This is `Derivable.dist_tri`, a *free constructor* of `Derivable` — a genuine axiom of
@@ -263,9 +257,7 @@ def triUncondFinal :
       (Formula.all pTy (Formula.all Ty.nat trivB →ᶠ Formula.ex Ty.nat triB)) :=
   Derivable.mp Derivable.refl0 (Derivable.forall_rule triUncInnerWeakened)
 
--- ============================================================================
 -- Through the metatheorem, at a W-hyperbolic model
--- ============================================================================
 
 /-- `M.constMajorants 5 h` with `distM` in kernel-computable form — verbatim
 `UPremiseDemo.uCm` / `WBoundDemo.wCm`, repeated so the numbers below are produced by a
@@ -321,9 +313,7 @@ noncomputable def triUncVt (M : WHyperbolicModel) :
     Term WHyperbolic.F ([] : Ctx MetricSpace.ι) (pTy →ₜ Ty.nat) :=
   extractedVTerm M.eqXInterp M.spremise (B₀ := trivB) (C₀ := triB) triUncondFinal
 
--- ============================================================================
 -- The numerals
--- ============================================================================
 
 -- DAG measurement only (`numObjs`, never `sizeWithoutSharing`: the sharing ratio in this
 -- pipeline is ≈10⁵). Fresh token, so it does not clash with `WBoundDemo.goal_size` or
@@ -371,9 +361,7 @@ theorem triBound_at_5 (M : WHyperbolicModel) (h : M.d M.ref M.zeroX ≤ ((5 : �
   rw [hval]
   decide
 
--- ============================================================================
 -- Non-vacuity
--- ============================================================================
 
 /-- **`U` tracks `x_star`**, so it is read off the derivation and not supplied by a default
 path: at `(7,5)` the premise bound moves to `1273`. -/
@@ -437,9 +425,7 @@ theorem triUncVt_is_901 (M : WHyperbolicModel) (h : M.d M.ref M.zeroX ≤ ((5 : 
   rw [hval]
   decide
 
--- ============================================================================
 -- The controlled contrast: same premise formula, only the proof varies
--- ============================================================================
 
 /-! `triUncondFinal` fills the metatheorem's premise slot with the tautology `trivB`, so its
 `U = 0` is not comparable with `triUt_is_901` — the two bound different formulas. The three
@@ -611,9 +597,7 @@ numeral theorems (against six) plus the second derivation; per numeral the cost 
 **So a real space-axiom premise costs nothing measurable over a tautologous one.**
 -/
 
--- ============================================================================
 -- Axiom hygiene — verify by name, after a completed `lake build`
--- ============================================================================
 
 #print axioms triAll_eq
 #print axioms triFinal

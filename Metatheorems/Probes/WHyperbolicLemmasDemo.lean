@@ -47,9 +47,7 @@ namespace WHyperbolicLemmasDemo
 
 open Formula
 
--- ============================================================================
 -- The object-level derivations, at four free variables
--- ============================================================================
 
 /-- Three free points and one free real code. De Bruijn: `x = x₃`, `y = x₂`, `z = x₁`,
 `λ = x₀`. -/
@@ -106,9 +104,7 @@ def w2ge : Derivable WHyperbolic.F Allowed.extended WHyperbolic.Premises
   Derivable.mp (Derivable.mp (WHyperbolic.W2_at qx qy ql qm) (eq_R_sym_core _ _))
     (le_R_of_eq_R_core _ _)
 
--- ============================================================================
 -- The model side
--- ============================================================================
 
 section Model
 
@@ -324,9 +320,7 @@ theorem W2_in_model (a b : M.carrier) (r r' : ℕ → ℕ) :
 
 end Model
 
--- ============================================================================
 -- The concrete instance: Mathlib's real line
--- ============================================================================
 
 section RealLine
 

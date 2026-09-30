@@ -91,9 +91,7 @@ noncomputable def cV (xs : Ty.interpret lXE Ty.nat.hat) : ℕ :=
 #print axioms cDerivNoLem
 #print axioms crNoLem
 
--- ============================================================================
 -- The FUSED classical route (Lane C): `monotone_nd_soundness`, no `negTrans_sound`
--- ============================================================================
 
 /-!
 ## STATUS (Lane C, second pass — hand-written leaves) and NEXT STEP, for whoever continues

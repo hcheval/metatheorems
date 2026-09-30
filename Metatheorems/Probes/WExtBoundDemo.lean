@@ -155,9 +155,7 @@ open Formula ProofMode
 open TriangleBoundDemo (triCm)
 open MonotoneLaneA (derivSizeA)
 
--- ============================================================================
 -- Types, context, projections
--- ============================================================================
 
 /-- `q = ((x, x'), (y, λ))`. -/
 abbrev qTy : Ty MetricSpace.ι := (xTy ×ₜ xTy) ×ₜ (xTy ×ₜ rTy)
@@ -185,9 +183,7 @@ abbrev cl0 : Term WHyperbolic.F K0 (realTy MetricSpace.ι) := .app Term.clamp01 
 abbrev W0 : Term WHyperbolic.F K0 xTy := Term.app3 (Term.func ()) x0 y0 cl0
 abbrev W1' : Term WHyperbolic.F K0 xTy := Term.app3 (Term.func ()) x1 y0 cl0
 
--- ============================================================================
 -- The quantifier-free bodies
--- ============================================================================
 
 /-- **The quantifier-free body of `f =ℝ g` at the bound index `x₀`.** `eq_R f g` is
 `Formula.all Ty.nat (eqBody f g)` by construction, so `Formula.all Ty.nat (eqBody f g)` and
@@ -223,9 +219,7 @@ theorem extB_all : Formula.all Ty.nat (eqBody dXX Term.zero_R) = eqAtType xTy x0
 /-- `∀v (conclusion body) = W(x,y,λ̃) =_X W(x',y,λ̃)`, on the nose. -/
 theorem extC_all : Formula.all Ty.nat (eqBody dWW Term.zero_R) = eqAtType xTy W0 W1' := rfl
 
--- ============================================================================
 -- Rung 1: assume the conclusion, exhibit it — the plumbing, with a `W` matrix
--- ============================================================================
 
 /-- The witness: the space's own number `⌈d(x,x')⌉₀`, as in `ContentExampleSpace.D0`. Its
 majorant is what `U` and `V` report — `distMajorant nx nx' 0 = pairN (2·((nx+nx')·2), 1)`,
@@ -238,9 +232,7 @@ def dirInner : DS K0 (Formula.all Ty.nat (eqBody dWW Term.zero_R) →ᶠ
   Derivable.syllogism (Derivable.forall_ax (A := eqBody dWW Term.zero_R) D0)
     (Derivable.exist_ax D0 (eqBody dWW Term.zero_R))
 
--- ============================================================================
 -- Rung 2: the conclusion is (W2) at abstract terms — a proof-mode axiom instance
--- ============================================================================
 
 /-- (W2)'s right-hand side at `μ := λ`: `|λ̃ −ℝ λ̃|ℝ ·ℝ d(x,y)`. -/
 def w2rhs : Term WHyperbolic.F K0 (realTy MetricSpace.ι) :=
@@ -264,9 +256,7 @@ def axInner : DS K0 (Formula.all Ty.nat (eqBody dWW Term.zero_R) →ᶠ
       (Derivable.exist_ax D0 (eqBody w2lhs w2rhs)))
     K_comb
 
--- ============================================================================
 -- Rung 3: `W_ext_left` — the premise is `x =_X x'`, the conclusion is about `W`
--- ============================================================================
 
 /-- **The rung with content.** `W_ext_left` turns the premise `x =_X x'` — which *is*
 `∀u B₀` — into `W(x,y,λ̃) =_X W(x',y,λ̃)`, of which the conclusion asks for one index. So `U`
@@ -286,9 +276,7 @@ def extInnerD : DS K0 (Formula.all Ty.nat (eqBody dXX Term.zero_R) →ᶠ
     (Derivable.syllogism (Derivable.forall_ax (A := eqBody dWW Term.zero_R) D0)
       (Derivable.exist_ax D0 (eqBody dWW Term.zero_R)))
 
--- ============================================================================
 -- Rung 4: `W_ext_param` — the premise is `λ =ℝ μ`
--- ============================================================================
 
 def dWWp : Term WHyperbolic.F K0 (realTy MetricSpace.ι) :=
   Term.app2 (Term.dist ())
@@ -310,9 +298,7 @@ def parInnerD : DS K0 (Formula.all Ty.nat (eqBody l0 m0) →ᶠ
     (Derivable.syllogism (Derivable.forall_ax (A := eqBody dWWp Term.zero_R) D0)
       (Derivable.exist_ax D0 (eqBody dWWp Term.zero_R)))
 
--- ============================================================================
 -- Metatheorem shape
--- ============================================================================
 
 def wDummy : Formula WHyperbolic.F ([] : Ctx MetricSpace.ι) := Formula.eq0 Term.zero Term.zero
 
@@ -334,9 +320,7 @@ def wExtD := wrap extInnerD
 def wExtP := wrap parInner
 def wExtPD := wrap parInnerD
 
--- ============================================================================
 -- The numerals, at an arbitrary W-hyperbolic model with `d(a, 0_X) ≤ 5`
--- ============================================================================
 
 section Model
 variable (M : WHyperbolicModel) (h : M.d M.ref M.zeroX ≤ ((5 : ℕ) : ℝ))
@@ -473,9 +457,7 @@ theorem VextPD_ne_900 : (900 : ℕ) ≠ mfiV (triCm M h) (rExtPD M h) (qs M 5 5 
 
 end Model
 
--- ============================================================================
 -- Depth measurements — the predictor for the rungs that do not reduce
--- ============================================================================
 
 #eval derivSizeA wDir
 
@@ -495,9 +477,7 @@ end Model
 #eval show Lean.MetaM Unit from NestingDepth.report ``Metatheorems.clamp01_congr_R
 #eval show Lean.MetaM Unit from NestingDepth.report ``Metatheorems.abs_sub_eq_zero_R
 
--- ============================================================================
 -- Axiom hygiene
--- ============================================================================
 
 #print axioms extB_all
 #print axioms extC_all

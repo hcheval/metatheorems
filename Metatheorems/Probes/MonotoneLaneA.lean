@@ -88,9 +88,7 @@ open Formula
 open TriangleBoundDemo (pTy triCm)
 open ConjBoundDemo (tB acFinal tFinalTwice)
 
--- ============================================================================
 -- Tools: constructor count and the arithmetic normal-form read-out
--- ============================================================================
 
 /-- Constructor count, copied from `SizeProbe.derivSize` (that file pulls in `LemBoundDemo`;
 not imported here). -/
@@ -151,9 +149,7 @@ elab "arith_nf_rhs" : tactic => do
 
 set_option linter.unusedTactic false
 
--- ============================================================================
 -- The monotone realizers
--- ============================================================================
 
 /-- The monotone realizer of `tFinalTwice`, at the W-hyperbolic model with `d(a, 0_X) ≤ 5`,
 through the library's full recursion. -/
@@ -168,9 +164,7 @@ noncomputable def acM (M : WHyperbolicModel) (h : M.d M.ref M.zeroX ≤ ((5 : �
       (Formula.all pTy (Formula.imp (Formula.all Ty.nat tB) (Formula.ex Ty.nat tB))) :=
   monotone_soundness M.eqXInterp M.spremise (triCm M h) acFinal
 
--- ============================================================================
 -- GATE G1
--- ============================================================================
 
 /-- **THE GATE.** `U` of the two-instantiation derivation at `x* = (5,9)`: the `max` of the
 two instantiation majorants, won by `s₁`'s `1709`. -/
@@ -221,9 +215,7 @@ theorem g1_acFinal_U_at_5_9 (M : WHyperbolicModel) (h : M.d M.ref M.zeroX ≤ ((
   rw [hval]
   decide
 
--- ============================================================================
 -- Refutation controls
--- ============================================================================
 
 theorem g1_U_at_5_9_ne_1708 (M : WHyperbolicModel) (h : M.d M.ref M.zeroX ≤ ((5 : ℕ) : ℝ)) :
     (1708 : ℕ) ≠ mfiU (triCm M h) (twiceM M h) ((5 : ℕ), (9 : ℕ)) := by
@@ -245,9 +237,7 @@ theorem g1_U_at_5_1_ne_1709 (M : WHyperbolicModel) (h : M.d M.ref M.zeroX ≤ ((
     (1709 : ℕ) ≠ mfiU (triCm M h) (twiceM M h) ((5 : ℕ), (1 : ℕ)) := by
   rw [← g1_U_at_5_1 M h]; decide
 
--- ============================================================================
 -- Axiom hygiene — verify by name, after a completed `lake build`
--- ============================================================================
 
 #print axioms derivSize_tFinalTwice
 #print axioms g1_U_at_5_9

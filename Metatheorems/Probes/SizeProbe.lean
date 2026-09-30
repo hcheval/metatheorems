@@ -110,9 +110,7 @@ namespace SizeProbe
 
 open Formula
 
--- ============================================================================
 -- 1. Pointer-identity size
--- ============================================================================
 
 abbrev M := StateT (Std.HashMap USize Nat) IO
 
@@ -145,9 +143,7 @@ unsafe def report {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι} {τ : Ty ι}
 #eval report "lUtExt (intuitionistic control)" LemBoundDemo.lUtExt
 -- #eval report "lUtNoLem" LemBoundDemo.lUtNoLem   -- INTERNAL PANIC: out of memory at 12 GB, while building
 
--- ============================================================================
 -- 2. Derivation size
--- ============================================================================
 
 /-- Constructor count of a `Derivable`. Rules with sub-derivations recurse; everything else
 is a leaf. -/

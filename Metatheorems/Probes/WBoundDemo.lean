@@ -83,9 +83,7 @@ namespace WBoundDemo
 
 open Formula
 
--- ============================================================================
 -- The statement
--- ============================================================================
 
 /-- The quantified type: a space point paired with a real parameter. -/
 abbrev pTy : Ty MetricSpace.ι := xTy ×ₜ realTy MetricSpace.ι
@@ -132,9 +130,7 @@ theorem wC0_subst0 : wC0.subst0 wWit = Formula.eq0 wWit wWit := rfl
 def wDummyOuter : Formula WHyperbolic.F ([] : Ctx MetricSpace.ι) :=
   Formula.eq0 Term.zero Term.zero
 
--- ============================================================================
 -- The derivation — raw `Derivable` constructors only, no proof mode
--- ============================================================================
 
 /-- Step 1: `∃v C₀` in context `[p]`. `exist_ax wWit wC0` gives
 `C₀[wWit/v] →ᶠ ∃v C₀`, and `C₀[wWit/v]` is `wWit =₀ wWit` (`wC0_subst0`), i.e. `refl0`. -/
@@ -166,9 +162,7 @@ def wFinal :
       (Formula.all pTy (Formula.all Ty.nat wB0 →ᶠ Formula.ex Ty.nat wC0)) :=
   Derivable.mp Derivable.refl0 (Derivable.forall_rule wInnerWeakened)
 
--- ============================================================================
 -- Through the metatheorem, at a W-hyperbolic model
--- ============================================================================
 
 /-- **`M.constMajorants 5 h` with `distM` in computable form.**
 
@@ -220,9 +214,7 @@ noncomputable def wVt (M : WHyperbolicModel) :
     Term WHyperbolic.F ([] : Ctx MetricSpace.ι) (pTy →ₜ Ty.nat) :=
   extractedVTerm M.eqXInterp M.spremise (B₀ := wB0) (C₀ := wC0) wFinal
 
--- ============================================================================
 -- The numerals
--- ============================================================================
 
 -- Measure the goal as a DAG (heap objects) and by depth. Meta-level only — nothing
 -- object-level is evaluated. Never use `sizeWithoutSharing` here: the measured sharing ratio
@@ -270,9 +262,7 @@ theorem wBound_at_5 (M : WHyperbolicModel) (h : M.d M.ref M.zeroX ≤ ((5 : ℕ)
   rw [hval]
   decide
 
--- ============================================================================
 -- Non-vacuity
--- ============================================================================
 
 /-- **`Φ` is a genuine function of the majorant of `x`, not a constant fallback.** At
 `x_star = (7, g)` the bound is `1273`, not `901`: `W ⬝ p₁ ⬝ p₁ ⬝ p₂` majorizes to
@@ -404,9 +394,7 @@ reduces until it is brought back to ℕ by hand** (`wCm`). That is the single su
 difference between `ι = Empty` and a space.
 -/
 
--- ============================================================================
 -- Axiom hygiene — verify by name, after a completed `lake build`
--- ============================================================================
 
 #print axioms wFinal
 #print axioms wC0_subst0

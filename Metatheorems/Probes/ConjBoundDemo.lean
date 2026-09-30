@@ -138,9 +138,7 @@ namespace ConjBoundDemo
 open Formula
 open TriangleBoundDemo (pTy xL zL yL dxz dsum triB triCm)
 
--- ============================================================================
 -- The second conjunct: a second, degenerate triangle inequality
--- ============================================================================
 
 /-- `d(x,0_X)`. -/
 def dx0 : Term WHyperbolic.F [pTy] (realTy MetricSpace.ι) :=
@@ -186,9 +184,7 @@ theorem cB_pe : cB.isPurelyExistential = true := rfl
 theorem cB_vf : cB.isVFree = true := rfl
 theorem cB_qf : cB.isQF = true := rfl
 
--- ============================================================================
 -- The two instantiation terms
--- ============================================================================
 
 /-- `s₁ := (d ⬝ x ⬝ z) ⬝ 0`. Its majorant grows with **both** components of `x_star`. -/
 def wit1 : Term WHyperbolic.F [pTy] Ty.nat := Term.app dxz Term.zero
@@ -207,9 +203,7 @@ def witF2 : Term WHyperbolic.F ([] : Ctx MetricSpace.ι) (pTy →ₜ Ty.nat) := 
 def cDummy : Formula WHyperbolic.F ([] : Ctx MetricSpace.ι) :=
   Formula.eq0 Term.zero Term.zero
 
--- ============================================================================
 -- The derivations — raw `Derivable` constructors only, no proof mode
--- ============================================================================
 
 /-- Instantiate the premise at `s₁`. -/
 def inst1 :
@@ -301,9 +295,7 @@ example :
       (Formula.all pTy (Formula.imp (Formula.all Ty.nat cB) (Formula.ex Ty.nat cB))) :=
   cFinalTwice
 
--- ============================================================================
 -- Through the metatheorem
--- ============================================================================
 
 /-- The extracted `U` of the two-instantiation derivation. **It elaborates**; what fails is
 evaluating its majorant (see the negative section). -/
@@ -351,9 +343,7 @@ noncomputable def cBoundOnce (M : WHyperbolicModel)
   syntactic_general_metatheorem_at_gen M.eqXInterp M.spremise (triCm M h)
     cB_pu cB_vf cB_pe cB_vf cFinalOnce
 
--- ============================================================================
 -- The numerals that DO reduce
--- ============================================================================
 
 -- DAG measurement only (`numObjs`, never `sizeWithoutSharing`). Fresh token, so it clashes
 -- with neither `WBoundDemo.goal_size`, `UPremiseDemo.goal_size'` nor
@@ -468,9 +458,7 @@ theorem cVtTwice_at_5_9 (M : WHyperbolicModel) (h : M.d M.ref M.zeroX ≤ ((5 : 
   rw [hval]
   decide
 
--- ============================================================================
 -- Non-vacuity: permanent refutation theorems
--- ============================================================================
 
 /-- The one-instantiation `U` is not `0` — the derivation really consults the premise. -/
 theorem cUtOnce_ne_zero (M : WHyperbolicModel) (h : M.d M.ref M.zeroX ≤ ((5 : ℕ) : ℝ)) :
@@ -519,9 +507,7 @@ example (M : WHyperbolicModel) (h : M.d M.ref M.zeroX ≤ ((5 : ℕ) : ℝ))
   rw [hxs, ← cBoundOnce_at_5_9 M h] at hb
   exact hb hprem
 
--- ============================================================================
 -- The controls that isolate the stall — their DERIVATIONS, which all elaborate
--- ============================================================================
 
 /-! Each of the three definitions below is a variant of `cFinalTwice` with one ingredient
 removed. Their `U` terms extract; none of their `U` *majorants* evaluate. Keeping the
@@ -737,9 +723,7 @@ a full 200,000-heartbeat budget before failing, so a file that *keeps* them cost
 (the exploratory version with four of them took 40 s and produced no theorems).
 -/
 
--- ============================================================================
 -- Axiom hygiene — verify by name, after a completed `lake build`
--- ============================================================================
 
 #print axioms triB0_all_eq
 #print axioms triB0_derivable

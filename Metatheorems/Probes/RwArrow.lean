@@ -15,11 +15,6 @@ layer needs the other untested case: a pattern at `nat →ₜ nat`, because `eq_
 `eqAtType (nat →ₜ nat) f g` unfolds to `∀x. f x =₀ g x`, so pointwise equality of two
 sequences is literally the arrow-type instance of QF-ER. This file checks that `prw` can
 actually consume such a rule.
-
-**Result: `prw` works; `prwby` cannot and never will.** `prwby` instantiates QF-ER's premise
-`A₀` with the hypothesis's own formula and discharges `A₀.isQF = true` by `rfl`; at an arrow
-type that formula is a `Formula.all`, so it is not quantifier-free. Function-typed rewriting
-is therefore available only from *closed* rules (`prw`), never from a hypothesis.
 -/
 
 namespace Metatheorems

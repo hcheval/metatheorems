@@ -8,9 +8,7 @@ import Metatheorems.ProofMode.Rewrite
 /-!
 # Probe RwBase: rewriting at a base type
 
-`prw` used to hardcode the *pattern's* type to `nat` — `let ρ := Ty.nat` in `prwCore` — even
-though `Derivable.qfer` was always general in it. This is the case that hardcoding excluded,
-and it is the one metric spaces need: the points live in `X`, the distances in `ℕ`, so a
+`prw` at a pattern of base type: the points live in `X`, the distances in `ℕ`, so a
 rewrite `s ↦ s'` has a base-typed pattern inside a numeric goal.
 
 One base type and one function symbol `f : X → ℕ`, which is the shape of a metric `d` with
@@ -33,10 +31,7 @@ private abbrev fX {Γ : Ctx ιX} : Term FX Γ (Ty.base () →ₜ Ty.nat) := Term
 variable
   {al : Allowed} {Premises : PremiseSet FX} {Γ : Ctx ιX}
 
-/-- The pattern is at `Ty.base ()`, the goal at `nat`. Equality at a base type used to be the
-abstract `EqX () s s'`, identified by comparing the head against the goal's own `EqX`
-parameter; with `EqX` gone it is a genuine `eqAtType` application, and the folded match in
-`eqView?` covers it. -/
+/-- The pattern is at `Ty.base ()`, the goal at `nat`. -/
 example (s s' : Term FX Γ (Ty.base ()))
     (h : Derivable FX al Premises (eqAtType (Ty.base ()) s s')) :
     Derivable FX al Premises

@@ -80,9 +80,7 @@ open TinyBoundDemo (tXE tFE tSiE tEqxiE tPremE tSpremiseE)
 open MonotoneMCT (cmE)
 open MonotoneLaneA (derivSizeA)
 
--- ============================================================================
 -- The types and the three contexts
--- ============================================================================
 
 /-- The function parameter's type. -/
 abbrev fTy : Ty Empty := Ty.nat →ₜ Ty.nat
@@ -103,9 +101,7 @@ abbrev k1 : Term tFE G1 Ty.nat := .var .vz
 abbrev k2 : Term tFE G2 Ty.nat := .var (.vs .vz)
 abbrev v2 : Term tFE G2 Ty.nat := .var .vz
 
--- ============================================================================
 -- The formulas
--- ============================================================================
 
 /-- `f (S u) =₀ f u +ᵗ f u` — the premise matrix, `u` the bound variable. -/
 def B2 : Formula tFE G2 :=
@@ -137,9 +133,7 @@ def E2f : Formula tFE G2 :=
 
 theorem E2f_eq : Formula.weakenBy Ty.nat E1f = E2f := rfl
 
--- ============================================================================
 -- The derivation — raw `Derivable` constructors, 145 of them
--- ============================================================================
 
 /-- **The premise is consumed**, at `u := k`: `(∀u B₀) →ᶠ f (S k) =₀ f k + f k`. -/
 def hi : D G1 (P1 →ᶠ E1f) := Derivable.forall_ax (A := B2) k1
@@ -202,9 +196,7 @@ def baseD : D G0 (A1.subst0 Term.zero) :=
 /-- `⊢ ∀k ( ∀u (f (S u) =₀ f u + f u) → ∃v (f k =₀ v) )`, in context `[x]`. -/
 def Lraw : D G0 (Formula.all Ty.nat A1) := Derivable.induction baseD stepD
 
--- ============================================================================
 -- The metatheorem-shaped statement
--- ============================================================================
 
 /-- `B₀ := f (S u) =₀ f u +ᵗ f u`, `f := snd x`, in `[u, x]`. -/
 def eB : Formula tFE [Ty.nat, sTy] :=
@@ -239,9 +231,7 @@ def eFinal : D [] (Formula.all sTy (Formula.all Ty.nat eB →ᶠ Formula.ex Ty.n
 -- 145 raw constructors.
 #eval derivSizeA eFinal
 
--- ============================================================================
 -- The numerals, through the monotone functional interpretation
--- ============================================================================
 
 def rE : MRealizer cmE (Formula.all sTy (Formula.all Ty.nat eB →ᶠ Formula.ex Ty.nat eC)) :=
   monotone_soundness tEqxiE tSpremiseE cmE eFinal
@@ -279,9 +269,7 @@ theorem Phi_at_3 : (8 : ℕ) = (monotone_general_metatheorem_at tEqxiE tSpremise
 theorem Phi_at_5 : (32 : ℕ) = (monotone_general_metatheorem_at tEqxiE tSpremiseE cmE
     eB_qf eB_vf eC_qf eC_vf eFinal).val (xs 5) := by kernel_rfl
 
--- ============================================================================
 -- The term route, for comparison — the witness side agrees, the counter side OOMs
--- ============================================================================
 
 noncomputable def vT : Term tFE ([] : Ctx Empty) (sTy →ₜ Ty.nat) :=
   extractedVTerm tEqxiE tSpremiseE (B₀ := eB) (C₀ := eC) eFinal
@@ -291,9 +279,7 @@ noncomputable def vT : Term tFE ([] : Ctx Empty) (sTy →ₜ Ty.nat) :=
 measured, and therefore not a declaration here. -/
 theorem V_term_route_at_3 : (8 : ℕ) = closedMajorizer cmE vT (xs 3) := by kernel_rfl
 
--- ============================================================================
 -- Refutation controls — the `rfl`s reduce, they do not stick
--- ============================================================================
 
 theorem V_at_3_ne_7 : (7 : ℕ) ≠ mfiV cmE rE (xs 3) := by rw [← V_at_3]; decide
 theorem V_at_3_ne_9 : (9 : ℕ) ≠ mfiV cmE rE (xs 3) := by rw [← V_at_3]; decide
@@ -306,9 +292,7 @@ theorem U_at_3_ne_3 : (3 : ℕ) ≠ mfiU cmE rE (xs 3) := by rw [← U_at_3]; de
 theorem Phi_at_3_ne_16 : (16 : ℕ) ≠ (monotone_general_metatheorem_at tEqxiE tSpremiseE cmE
     eB_qf eB_vf eC_qf eC_vf eFinal).val (xs 3) := by rw [← Phi_at_3]; decide
 
--- ============================================================================
 -- The same theorem, proved in the proof mode — 42,747 constructors, and it does not reduce
--- ============================================================================
 
 /-- The *same* argument written with the proof-mode tactics: `pinduction` at `Δ = []`, the
 induction hypothesis applied to the premise, its witness obtained with `pobtain`, the new
@@ -340,9 +324,7 @@ def Lpm : D G0 (Formula.all Ty.nat A1) := by
 
 #eval derivSizeA Lpm
 
--- ============================================================================
 -- Axiom hygiene — verify by name, after a completed `lake build`
--- ============================================================================
 
 #print axioms eFinal
 #print axioms Lpm

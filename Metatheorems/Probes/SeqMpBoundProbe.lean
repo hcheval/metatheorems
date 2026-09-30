@@ -56,9 +56,7 @@ namespace SeqMpBoundProbe
 
 open ProofMode BoundProbe BoundLemmasP2 Formula
 
--- ============================================================================
 -- Part 1: measurement — how big is what `seq_mp` produces?
--- ============================================================================
 
 /-- Structural node count of a derivation: the ten constructors with sub-derivations are
 counted recursively, every other constructor is one node. Companion to `BoundProbe.termSize`;
@@ -204,9 +202,7 @@ variable sub-realizers). The hypothesis that `S_comb` is "not transparent" to `t
 the way `weaken` is was wrong in an instructive way: transparency was never the problem, the
 count of sites was. -/
 
--- ============================================================================
 -- Part 2: the witness side commutes — three lemmas, one per primitive
--- ============================================================================
 
 /-! ### The idea
 

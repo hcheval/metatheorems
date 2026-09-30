@@ -144,9 +144,7 @@ open TriangleBoundDemo (pTy triCm triB triFinal triWit)
 open ConjBoundDemo (tB)
 open MonotoneLaneA (derivSizeA)
 
--- ============================================================================
 -- Tools
--- ============================================================================
 
 -- `kernel_rfl` was defined here until 2026-09-08. It is `Metatheorems/KernelRfl.lean` now
 -- (imported above), so that `Demo/` and the library can use it without importing a probe.
@@ -220,9 +218,7 @@ unsafe def reportD {ι κ : Type} {F : κ → Ty ι} {al : Allowed} {P : Premise
   let (tree, memo) ← (visitD d).run {}
   IO.println s!"{name}: dag={memo.size} tree={tree}"
 
--- ============================================================================
 -- The statement — four points and a real, `q = ((x,y),((z,w),T))`
--- ============================================================================
 
 abbrev rT : Ty MetricSpace.ι := realTy MetricSpace.ι
 abbrev qTy : Ty MetricSpace.ι := pTy ×ₜ (pTy ×ₜ rT)
@@ -279,9 +275,7 @@ def sq : Term QF [qTy] Ty.nat := Term.app dxw Term.zero
 abbrev D (Γ : Ctx MetricSpace.ι) (A : Formula QF Γ) :=
   @Derivable MetricSpace.ι WHyperbolic.κ WHyperbolic.F Allowed.extended WHyperbolic.Premises Γ A
 
--- ============================================================================
 -- (a) The literal design: the chained inequality DERIVED, in the premise slot, weakened away
--- ============================================================================
 
 /-- **`dist_tri_chain`**, at the four components of `q`. Its realizer is `unit`-valued
 throughout (finding 2). -/
@@ -304,9 +298,7 @@ consulted. -/
 def finalA : D [] (Formula.all qTy (Formula.all Ty.nat chainL →ᶠ Formula.ex Ty.nat chainL)) :=
   .mp .refl0 (.forall_rule innerBW)
 
--- ============================================================================
 -- (b) The transitivity design: `U` routed THROUGH `le_R_trans_core` and `dist_tri_chain`
--- ============================================================================
 
 def d1 : D [qTy] (le_R_pu lassoc Tq →ᶠ le_R lassoc Tq) := le_R_of_le_R_pu lassoc Tq
 def tr : D [qTy] (le_R dxw lassoc ∧ᶠ le_R lassoc Tq →ᶠ le_R dxw Tq) :=
@@ -326,9 +318,7 @@ does not reduce (finding 3). -/
 def final : D [] (Formula.all qTy (Formula.all Ty.nat chainT →ᶠ Formula.ex Ty.nat concT)) :=
   .mp .refl0 (.forall_rule innerW)
 
--- ============================================================================
 -- (E1, E3) Proof-mode derivations, small and large matrix, premise consumed
--- ============================================================================
 
 /-- E1: the proof mode over the tautologous matrix `u =₀ u` (`ConjBoundDemo.tB`). -/
 def pmFinal : D [] (Formula.all pTy (Formula.all Ty.nat tB →ᶠ Formula.ex Ty.nat tB)) := by
@@ -348,9 +338,7 @@ def pmFinalBig : D [] (Formula.all pTy (Formula.all Ty.nat triB →ᶠ Formula.e
   pexists triWit
   pexact h1
 
--- ============================================================================
 -- Measurements
--- ============================================================================
 
 #eval derivSizeA pmFinal        -- 449
 #eval derivSizeA pmFinalBig     -- 449
@@ -368,9 +356,7 @@ open Lean Meta in
 open Lean Meta in
 #eval show MetaM Unit from walk ``Metatheorems.MonotoneLaneB.final
 
--- ============================================================================
 -- The numerals
--- ============================================================================
 
 section Model
 variable (M : WHyperbolicModel) (h : M.d M.ref M.zeroX ≤ ((5 : ℕ) : ℝ))
@@ -432,9 +418,7 @@ theorem e3_U : (901 : ℕ) = mfiU (triCm M h) (mr M h pmFinalBig) ((5 : ℕ), (5
 theorem e3_V : (901 : ℕ) = mfiV (triCm M h) (mr M h pmFinalBig) ((5 : ℕ), (5 : ℕ)) := by
   kernel_rfl
 
--- ============================================================================
 -- Refutation controls
--- ============================================================================
 
 theorem e1_U_ne_900 : (900 : ℕ) ≠ mfiU (triCm M h) (mr M h pmFinal) ((5 : ℕ), (5 : ℕ)) := by
   rw [← e1_U M h]; decide
@@ -470,9 +454,7 @@ side and compared. -/
 
 end Model
 
--- ============================================================================
 -- Axiom hygiene — verify by name, after a completed `lake build`
--- ============================================================================
 
 #print axioms chainL_eq
 #print axioms finalA

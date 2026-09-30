@@ -174,9 +174,7 @@ open Formula ProofMode
 open MonotoneLaneB (D qTy rT dxw Tq mr xs XM concT concT_pe concT_vf sq tail d2 dummy)
 open TriangleBoundDemo (triCm)
 
--- ============================================================================
 -- Tools
--- ============================================================================
 
 /-- The discharger for the `Eq.mpr` side conditions `pack Δ B = pack Δ' B'`: the normaliser
 that produced the cast (`canorm`), each stage under its own `try` on its own line — `try a;
@@ -240,9 +238,7 @@ elab "mfi_report" : tactic => do
 
 set_option linter.unusedTactic false
 
--- ============================================================================
 -- G-D1 (a): the read-out that stalled Lane B — the counter transformer of `le_R_pu_of_le_R`
--- ============================================================================
 
 section Model
 variable (M : WHyperbolicModel) (h : M.d M.ref M.zeroX ≤ ((5 : ℕ) : ℝ))
@@ -270,9 +266,7 @@ theorem d2c_ne_4 : (4 : ℕ) ≠ d2c M h := by
 
 end Model
 
--- ============================================================================
 -- G-D1 (b): `le_R_of_le_R_pu` — the other conversion, `pobtain`/`pinst`, 4 `Eq.mpr`
--- ============================================================================
 
 theorem concT_pu : concT.isPurelyUniversal = true := rfl
 
@@ -312,9 +306,7 @@ theorem d1c_ne_4 : (4 : ℕ) ≠ d1c M h := by
 
 end Model
 
--- ============================================================================
 -- G-D1 (b), the whole statement — NOT reducing (12 GB), kept out of the build
--- ============================================================================
 
 /-- `∀n [d(x,w) ≤ T]ₙ → ∃v [d(x,w) ≤ T]ᵥ`, the premise consumed through `le_R_of_le_R_pu`,
 `le_R_pu_of_le_R`, then instantiated at `sq` and generalised. -/
@@ -379,9 +371,7 @@ theorem pu_U_7_5_ne_901 : (901 : ℕ) ≠ mfiU (triCm M h) (mr M h puFinal) (xs7
 
 end Model
 
--- ============================================================================
 -- Axiom hygiene — verify by name, after a completed `lake build`
--- ============================================================================
 
 #print axioms d2c_is_3
 #print axioms d2c_ne_4

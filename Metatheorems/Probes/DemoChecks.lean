@@ -31,43 +31,6 @@ sweep. If a commented line in §6 stops working, `scripts/build.sh Probes` says 
 
 Everything else in §6 appears below.
 
-## Measured cost, per declaration
-
-Kernel type-checking wall clock, `set_option profiler true` on this file, on a loaded 15 GB
-machine. These are the numbers quoted beside the Walkthrough's commented commands, so a
-presenter knows which cell is slow:
-
-| theorem | time |
-|---|---|
-| `once_V_3` / `once_V_5` / `once_V_ys_3` | 0.8 / 0.7 / 0.7 s |
-| `once_U_3` / `once_U_5` / `once_Phi_3` | 1.3 / 1.3 / 1.7 s |
-| `exp_V_0` / `exp_V_3` / `exp_V_5` | 0.06 / 1.3 / 5.5 s |
-| `exp_V_ys_0` / `exp_V_ys_2` | 0.05 / 0.7 s |
-| `exp_U_0` / `_2` / `_3` / `_5` | 0.05 / 0.8 / 1.6 / 5.6 s |
-| `exp_Phi_3` / `exp_Phi_5` | 2.3 / 9.9 s |
-| **`exp_V_7`** | **18 s** |
-| every `_ne_` refutation control | under 20 ms |
-
-(Re-measured 2026-09-08 with `-D profiler=true -D profiler.threshold=20`, on a machine running
-three other Lean builds; the earlier column read 2.6/2.5, 1.2/4.3, 0.9/1.5/5.5, 10.5 and 30 s,
-so load noise here is tens of percent and the *shape* is what matters, not the digits.)
-
-`exp_V_7` and `exp_Phi_5` are over the ten-second line and are guarded anyway: the ceiling is
-the single claim in §6 most worth having checked mechanically, and `Φ` at `k* = 5` is the only
-numeral that comes out of the metatheorem's own entry point rather than its two components.
-Together they are most of this file's ≈62 s. Everything here is a *value*-driven cost —
-`recMaj` iterating with no sharing — not a derivation-size cost.
-
-## Where the derivations live
-
-`stepOnce` is written in the Walkthrough itself (proof mode, six lines; it replaced
-`linearInduction` on 2026-09-09, whose premise `∀u (u =₀ u)` was never consulted, so its
-`U = 0` measured nothing). `doubling` is an alias for
-`Metatheorems.Examples.Doubling.derivation` — the raw-constructor derivation was moved out of
-the Walkthrough on 2026-09-08, because its de Bruijn bookkeeping is a page of `abbrev`s that
-says nothing about proof mining. Nothing about the extraction changed: the alias is
-definitionally the same term, and every numeral below is unchanged.
-
 ## Instrument
 
 `kernel_rfl` (`Metatheorems/KernelRfl.lean`) assigns `Eq.refl` and lets the kernel decide the
@@ -89,9 +52,7 @@ namespace DemoChecks
 open Metatheorems.Demo (stepOnce stepOnceR doublingR xs ys doubling)
 open PureWEHA (cm eqxi spremise)
 
--- ============================================================================
 -- §6a — the LINEAR bound: the premise instantiated once, the witness a projection
--- ============================================================================
 
 theorem once_V_3 : (4 : ℕ) = mfiV cm stepOnceR (xs 3) := by kernel_rfl
 theorem once_V_5 : (6 : ℕ) = mfiV cm stepOnceR (xs 5) := by kernel_rfl
@@ -106,9 +67,7 @@ theorem once_U_5_ne_4 : (4 : ℕ) ≠ mfiU cm stepOnceR (xs 5) := by rw [← onc
 theorem once_Phi_3 : (4 : ℕ) = (monotone_general_metatheorem_at eqxi spremise cm
     rfl rfl rfl rfl stepOnce).val (xs 3) := by kernel_rfl
 
--- ============================================================================
 -- §6b — the EXPONENTIAL bound: witness built from the previous witness
--- ============================================================================
 
 theorem exp_V_0 : (1 : ℕ) = mfiV cm doublingR (xs 0) := by kernel_rfl
 theorem exp_V_3 : (8 : ℕ) = mfiV cm doublingR (xs 3) := by kernel_rfl
@@ -144,9 +103,7 @@ theorem exp_Phi_3_ne_16 : (16 : ℕ) ≠ (monotone_general_metatheorem_at eqxi s
     rfl rfl rfl rfl doubling).val (xs 3) := by
   rw [← exp_Phi_3]; decide
 
--- ============================================================================
 -- §6c — the ceiling, at the last value that still finishes
--- ============================================================================
 
 /-- `k* = 7` is the largest input this derivation's bound reduces at: `2^7 = 128`, ≈9 s of
 kernel time. At `k* = 8` the same `kernel_rfl` is out of memory at the 12 GB cap — which is
@@ -156,9 +113,7 @@ theorem exp_V_7 : (128 : ℕ) = mfiV cm doublingR (xs 7) := by kernel_rfl
 
 theorem exp_V_7_ne_127 : (127 : ℕ) ≠ mfiV cm doublingR (xs 7) := by rw [← exp_V_7]; decide
 
--- ============================================================================
 -- Axiom hygiene — verify by name, after a completed `lake build`
--- ============================================================================
 
 #print axioms once_V_3
 #print axioms once_V_5

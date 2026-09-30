@@ -13,11 +13,8 @@ import Metatheorems.Probes.UPremiseDemo
 `si`; only the property does. `Dialectica/Syntactic.lean`'s `extractTerm` is that recursion
 with the model deleted, and `extractTerm_eq` proves the two agree.
 
-**Why it could not be demonstrated before.** Every model in the project — metric,
-W-hyperbolic, CAT(0), normed — is built over Mathlib `ℝ`, so `si` is `noncomputable` and any
-`#eval` mentioning it is impossible. `UPremiseDemo.uUt` is `noncomputable def` for exactly
-that reason. `extractTerm` takes no `si`, so the realizer of a derivation **at a space** is
-now an ordinary computable `Term`, and `#eval` on it works.
+`extractTerm` takes no `si`, so the realizer of a derivation **at a space** is an ordinary
+computable `Term`, and `#eval` on it works.
 
 What is measured here is `UPremiseDemo.uFinal` — the 12-constructor derivation over
 `WHyperbolic.Premises` that consumes its premise via `forall_ax`/`exist_ax`. Small by
@@ -50,9 +47,7 @@ def tSize {ι κ : Type} {F : κ → Ty ι} :
   | _, _, .fst p      => 1 + tSize p
   | _, _, .snd p      => 1 + tSize p
 
--- ============================================================================
 -- The premise realizer, syntactically
--- ============================================================================
 
 /-- **The W-hyperbolic premise realizers as bare terms.** `WHyperbolicModel.spremise` is
 `srealizer_of_pu` applied to `axiomsHold`, and `srealizer_of_pu_val` says its payload is
@@ -68,9 +63,7 @@ theorem wSp_eq (M : WHyperbolicModel) :
   funext Γ' B hp
   exact srealizer_of_pu_val B _ _ _
 
--- ============================================================================
 -- The realizer of `uFinal`, computed
--- ============================================================================
 
 /-- **The extracted realizing term of `UPremiseDemo.uFinal` — no model, no `si`, no
 `noncomputable`.** Compare `UPremiseDemo.uUt`, which needs `M.eqXInterp` and `M.spremise`
@@ -99,9 +92,7 @@ def uInnerRealizer := extractTerm wSp UPremiseDemo.uInner
 
 theorem uInnerRealizer_size : tSize uInnerRealizer = 186 := by rfl
 
--- ============================================================================
 -- Does Markov's principle obstruct evaluation? No.
--- ============================================================================
 
 /-! `Classical.choice` reaches the syntactic route from exactly two places, `sMarkov` and
 `matrixTerm_correct`. The second is a `Prop`-level correctness theorem and cannot obstruct

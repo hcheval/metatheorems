@@ -70,9 +70,7 @@ open TermPretty
 /-- One base type `X`, one function constant (`W`). -/
 def N : Names MetricSpace.ι WHyperbolic.κ := Names.simple
 
--- ============================================================================
 -- The three realizers, erased
--- ============================================================================
 
 /-- `UPremiseDemo.uFinal`'s realizer — the same term `ExtractTermDemo.uRealizer` names. -/
 def rU : RTerm := erase N ExtractTermDemo.uRealizer
@@ -93,9 +91,7 @@ def rUInner : RTerm := erase N ExtractTermDemo.uInnerRealizer
 /-- `TriangleBoundDemo.triUncondFinal`'s realizer — the large end of what is cheap here. -/
 def rTriUF : RTerm := erase N (extractTerm ExtractTermDemo.wSp TriangleBoundDemo.triUncondFinal)
 
--- ============================================================================
 -- Check 1 — the printed form has the node count `tSize` reports
--- ============================================================================
 
 /-! `TermPretty.size_erase` is the general half (`(erase N t).size = Term.nodeCount t`, by
 induction on `t`). These three close the gap to `ExtractTermDemo.tSize`, which is the function
@@ -128,9 +124,7 @@ theorem rTriU_size : rTriU.size = 431 := by
 /-- Non-degeneracy: the reduction really runs. -/
 theorem rU_size_ne : rU.size ≠ 532 := by decide
 
--- ============================================================================
 -- Check 3 — the negative control
--- ============================================================================
 
 /-! A printer that maps distinct terms to the same string is broken in a way no size check
 can see. Both control pairs below have **identical node counts**, so they are exactly the
@@ -167,9 +161,7 @@ theorem ctl_var_distinct : erase N ctlV0 ≠ erase N ctlV1 := by decide
        render (erase N ctlV0) != render (erase N ctlV1))
 -- ("x₀", "x₁", true)
 
--- ============================================================================
 -- Check 2 — round-trip, and the measurement
--- ============================================================================
 
 /-! `summary` prints, for each term: tree size; DAG size (distinct subterms, scope ignored) and
 its ratio; the number of distinct *closed* subterms; the `let`-bindings emitted; the **written
@@ -190,9 +182,7 @@ this, `round-trip ok` would be evidence only that `expand` and `share` agree on 
 #eval summary "triUncond" rTriU
 #eval summary "triUncondFinal" rTriUF
 
--- ============================================================================
 -- The artifact
--- ============================================================================
 
 /-! Write the rendered terms to `term-print-out/realizers.md`, the way `#hilbert` writes its
 listings. Re-run by rebuilding this file. -/

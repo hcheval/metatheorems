@@ -223,10 +223,8 @@ where
       if e'' == e' then return e' else pr fuel e''
     | _ => return e
 
--- ============================================================================
 -- The FUEL-FREE reducer (2026-09-08) — the experiment this file's header named,
 -- ⚠ RUN AND **REFUTED**. Kept as the record of the measurement. Use `knf`/`runK` below.
--- ============================================================================
 
 /-!
 ## The hypothesis, and why it was wrong
@@ -449,9 +447,7 @@ capAbort={st.aborted}  hbAbort={st.hbAborted}  numObjs={n}"
   let s := toString (← ppExpr r)
   logInfo (m!"{s.take chars |>.toString}")
 
--- ============================================================================
 -- The KERNEL-driven reducer (2026-09-08) — `Kernel.whnf` in place of `Meta.whnfCore`
--- ============================================================================
 
 /-- **Normalise by repeated `Lean.Kernel.whnf`.**
 

@@ -210,9 +210,7 @@ theorem mfi_acFinal_U_ne_zero (M : WHyperbolicModel) (h : M.d M.ref M.zeroX ≤ 
     (0 : ℕ) ≠ mfiU (triCm M h) (acSpike M h) ((5 : ℕ), (9 : ℕ)) := by
   rw [← mfi_acFinal_U_at_5_9 M h]; decide
 
--- ============================================================================
 -- Axiom hygiene — verify by name, after a completed `lake build`
--- ============================================================================
 
 #print axioms derivSize_acFinal
 #print axioms mfi_acFinal_U_at_5_9

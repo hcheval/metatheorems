@@ -173,9 +173,7 @@ namespace LemBoundDemo
 
 open Formula
 
--- ============================================================================
 -- The `ι = Empty` model — same recipe as `TinyBoundDemo`, distinct names
--- ============================================================================
 
 /-- The carrier family for pure `WE-HA^ω`: no base types. -/
 def lXE : Empty → Type := fun i => i.elim
@@ -203,9 +201,7 @@ def lSpremiseE : ∀ (Γ' : Ctx Empty) (B : Formula lFE Γ'), lPremE ⟨Γ', B�
 imply its own negative translation, and there are no premises. -/
 def lNts : NTStableD lPremE := fun _ _ h => h.elim
 
--- ============================================================================
 -- The statement
--- ============================================================================
 
 /-- `B₀ := u =₀ u`, in context `[u:nat, x:nat]`. -/
 def lB0 : Formula lFE [Ty.nat, Ty.nat] := Formula.eq0 (.var .vz) (.var .vz)
@@ -229,9 +225,7 @@ abbrev lE : Formula lFE [Ty.nat] := Formula.ex Ty.nat lC0
 /-- The unconditional dummy premise `0 =₀ 0`, used only to feed `forall_rule`. -/
 def lDummyOuter : Formula lFE ([] : Ctx Empty) := Formula.eq0 Term.zero Term.zero
 
--- ============================================================================
 -- The shared, LEM-free core
--- ============================================================================
 
 /-- `∃v C₀` is derivable unconditionally in context `[x:nat]`: instantiate `v := x` and the
 matrix becomes `x =₀ x`.
@@ -246,9 +240,7 @@ def lExD {al : Allowed} : @Derivable Empty Empty lFE al lPremE [Ty.nat] lE :=
 def lInner {al : Allowed} : @Derivable Empty Empty lFE al lPremE [Ty.nat] (lA →ᶠ lE) :=
   Derivable.mp lExD (Derivable.exportation Derivable.and_weak)
 
--- ============================================================================
 -- The LEM step
--- ============================================================================
 
 /-- **The excluded middle instance.** `Derivable.lem` is guarded by `allowed.lem = true`,
 which `Allowed.classical` supplies and `Allowed.extended` does not — so this declaration is
@@ -278,9 +270,7 @@ def lCaseR : @Derivable Empty Empty lFE Allowed.classical lPremE [Ty.nat]
 def lInnerLem : @Derivable Empty Empty lFE Allowed.classical lPremE [Ty.nat] (lA →ᶠ lE) :=
   Derivable.mp lLem (or_elim_rule lCaseL lCaseR)
 
--- ============================================================================
 -- The two final derivations of the SAME formula
--- ============================================================================
 
 /-- Weaken by the dummy premise so `forall_rule` can generalize over `x`. Generic in `al`. -/
 private def close {al : Allowed}
@@ -309,9 +299,7 @@ def lFinalLem : @Derivable Empty Empty lFE Allowed.classical lPremE []
     (Formula.all Ty.nat (Formula.all Ty.nat lB0 →ᶠ Formula.ex Ty.nat lC0)) :=
   close lInnerLem
 
--- ============================================================================
 -- Through the CLASSICAL metatheorem
--- ============================================================================
 
 /-- The constant majorants at `ι = Empty`. -/
 def lCmE := bezemConstMajorantsEmpty lSiE
@@ -327,9 +315,7 @@ def lemBound :
   syntactic_general_metatheorem_classical_at lEqxiE lNts lSpremiseE lCmE
     lB0_qf lB0_vf lC0_qf lC0_vf lFinalLem
 
--- ============================================================================
 -- The extracted functionals, as closed terms
--- ============================================================================
 
 /-- `U` for the LEM-using proof. -/
 def lUtLem : Term lFE ([] : Ctx Empty) (Ty.nat →ₜ Ty.nat) :=
@@ -347,9 +333,7 @@ def lUtNoLem : Term lFE ([] : Ctx Empty) (Ty.nat →ₜ Ty.nat) :=
 def lVtNoLem : Term lFE ([] : Ctx Empty) (Ty.nat →ₜ Ty.nat) :=
   extractedVTermP lEqxiE lNts lSpremiseE lB0_qf lB0_vf lC0_qf lC0_vf lFinalNoLem
 
--- ============================================================================
 -- The control: the SAME derivation term through the INTUITIONISTIC route
--- ============================================================================
 
 /-- `U` for the control — the same derivation, at `Allowed.extended`. -/
 def lUtExt : Term lFE ([] : Ctx Empty) (Ty.nat →ₜ Ty.nat) :=

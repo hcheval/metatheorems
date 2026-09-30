@@ -37,9 +37,7 @@ import Metatheorems.MetricSpaces
 namespace Metatheorems
 namespace SoundnessProbe
 
--- ============================================================================
 -- Step 2a. The congruence question.
--- ============================================================================
 
 /-- **The congruence lemma.** `eq_R f g` mentions `f`, `g` only as `f.weaken`, `g.weaken`
 under a single `∀n`, so its interpretation factors through the interpreted values. -/
@@ -72,11 +70,9 @@ theorem le_R_pu_interp_congr {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     intro n; rw [Term.interpret_weaken, Term.interpret_weaken]; exact hg
   simp only [le_R_pu, Formula.interpret, Term.app2, Term.interpret, hfw, hgw]
 
--- ============================================================================
 -- A lemma the project does NOT have, and which any soundness theorem needs
 -- (`forall_ax`, `exist_ax`, `qfer`, `induction`, `ac`, `qfac` all use it).
 -- Mirrors `Term.interpret_substF`, which does exist.
--- ============================================================================
 
 theorem Formula.interpret_substF {ι : Type} {X : ι → Type} {F : ι → Ty ι}
     (si : SpaceInterp X F) {Γ Δ : Ctx ι} (A : Formula F Γ) (σ : Term.Subst F Γ Δ)
@@ -101,9 +97,7 @@ theorem Formula.interpret_subst0 {ι : Type} {X : ι → Type} {F : ι → Ty ι
       = Formula.interpret si A (Term.interpret si u env, env) := by
   simp only [Formula.subst0, Formula.interpret_substF, Ctx.interpretSubst_subst0_map]
 
--- ============================================================================
 -- Steps 2b / 3. Assume soundness; see which fields fall out.
--- ============================================================================
 
 section Assumed
 
@@ -173,9 +167,7 @@ theorem probe_dist_comm (i : MetricSpace.ι) {Γ : Ctx MetricSpace.ι}
 
 end Assumed
 
--- ============================================================================
 -- THE OBSTRUCTION. Soundness cannot be proved without `realize`'s own content.
--- ============================================================================
 
 section Obstruction
 

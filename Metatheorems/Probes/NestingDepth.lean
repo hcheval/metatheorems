@@ -229,9 +229,7 @@ def report (nm : Name) (budget : Nat := 250000) : MetaM Unit := do
   logInfo m!"{nm}\n  {head}\n  exprNodes {st.visits}, unfolds {st.unfolds}, \
     caught {st.caught}, budgetHit {st.aborted}\n  hist: {body}"
 
--- ============================================================================
 -- `prenexify` as `classical_to_prenex_extended` applies it (at `LemBoundDemo`'s matrices)
--- ============================================================================
 
 open LemBoundDemo (lFE lPremE lB0 lC0 lB0_qf lB0_vf lC0_qf lC0_vf)
 
@@ -246,9 +244,7 @@ def lPren : @Derivable Empty Empty lFE Allowed.classical lPremE [Ty.nat]
             (Term.Renaming.shift (σ := Ty.nat)))))))) :=
   prenexify lB0_qf lB0_vf lC0_qf lC0_vf
 
--- ============================================================================
 -- The table
--- ============================================================================
 
 open Lean Meta in
 #eval show MetaM Unit from report ``Metatheorems.LemBoundDemo.lFinalNoLem

@@ -90,9 +90,7 @@ open Formula ProofMode
 open TriangleBoundDemo (pTy triCm)
 open MonotoneLaneA (derivSizeA)
 
--- ============================================================================
 -- Types and contexts
--- ============================================================================
 
 abbrev fTy : Ty MetricSpace.ι := Ty.nat →ₜ Ty.nat
 /-- `q = ((x, z), (k, f))`. -/
@@ -120,9 +118,7 @@ abbrev f2 : Term WHyperbolic.F K2 fTy := Term.snd (Term.snd (.var (.vs (.vs .vz)
 abbrev ik2 : Term WHyperbolic.F K2 Ty.nat := .var (.vs .vz)
 abbrev v2 : Term WHyperbolic.F K2 Ty.nat := .var .vz
 
--- ============================================================================
 -- The statement
--- ============================================================================
 
 def dxz : Term WHyperbolic.F K0 (realTy MetricSpace.ι) := Term.app2 (Term.dist ()) x0 z0
 def dsum : Term WHyperbolic.F K0 (realTy MetricSpace.ι) :=
@@ -157,9 +153,7 @@ theorem bigB_vf : bigB.isVFree = true := rfl
 theorem spB_qf : spB.isQF = true := rfl
 theorem spB_vf : spB.isVFree = true := rfl
 
--- ============================================================================
 -- The ℕ half: the doubling induction (`ContentExampleNat`'s, at `f := snd (snd q)`)
--- ============================================================================
 
 def nB2 : Formula WHyperbolic.F K2 :=
   Formula.eq0 (Term.app f2 (Term.app Term.succ v2))
@@ -239,9 +233,7 @@ def projN : DS K0 (Formula.all Ty.nat bigB →ᶠ Formula.all Ty.nat natB) :=
 def projS : DS K0 (Formula.all Ty.nat bigB →ᶠ Formula.all Ty.nat spB) :=
   forall_map and_proj1
 
--- ============================================================================
 -- Proof (b): the index is the recursion's output
--- ============================================================================
 
 def innerSp : DS K1 (nCk ∧ᶠ Formula.weakenBy Ty.nat (Formula.all Ty.nat spB) →ᶠ
     Formula.weakenBy Ty.nat (Formula.ex Ty.nat spB)) :=
@@ -255,9 +247,7 @@ def exStep : DS K0 (Formula.ex Ty.nat nCk ∧ᶠ Formula.all Ty.nat spB →ᶠ F
 def innerRec : DS K0 (Formula.all Ty.nat bigB →ᶠ Formula.ex Ty.nat spB) :=
   Derivable.syllogism (pair_h (Derivable.syllogism projN lnk) projS) exStep
 
--- ============================================================================
 -- Proof (a): the index is the space's own number `⌈d(x,z)⌉₀`
--- ============================================================================
 
 abbrev D0 : Term WHyperbolic.F K0 Ty.nat := Term.app dxz Term.zero
 
@@ -266,9 +256,7 @@ def innerDir : DS K0 (Formula.all Ty.nat bigB →ᶠ Formula.ex Ty.nat spB) :=
   Derivable.syllogism (Derivable.syllogism (Derivable.forall_ax (A := bigB) D0) and_proj1)
     (Derivable.exist_ax D0 spB)
 
--- ============================================================================
 -- Both, in metatheorem shape
--- ============================================================================
 
 def eDummy : Formula WHyperbolic.F ([] : Ctx MetricSpace.ι) := Formula.eq0 Term.zero Term.zero
 
@@ -290,9 +278,7 @@ def eDir : DS [] (Formula.all qTy (Formula.all Ty.nat bigB →ᶠ Formula.ex Ty.
 #eval derivSizeA eRec
 #eval derivSizeA eDir
 
--- ============================================================================
 -- The numerals, at an arbitrary W-hyperbolic model with `d(a, 0_X) ≤ 5`
--- ============================================================================
 
 section Model
 variable (M : WHyperbolicModel) (h : M.d M.ref M.zeroX ≤ ((5 : ℕ) : ℝ))
@@ -421,9 +407,7 @@ theorem Udir_ne_900 : (900 : ℕ) ≠ mfiU (triCm M h) (rDir M h) (qs M 5 5 0) :
 
 end Model
 
--- ============================================================================
 -- Axiom hygiene — verify by name, after a completed `lake build`
--- ============================================================================
 
 #print axioms spAll_eq
 #print axioms eRec

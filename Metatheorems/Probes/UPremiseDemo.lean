@@ -56,9 +56,7 @@ namespace UPremiseDemo
 
 open Formula
 
--- ============================================================================
 -- The statement
--- ============================================================================
 
 /-- The quantified type: a space point paired with a real parameter. Same as `WBoundDemo`. -/
 abbrev pTy : Ty MetricSpace.ι := xTy ×ₜ realTy MetricSpace.ι
@@ -92,9 +90,7 @@ theorem uP_subst0 : uP.subst0 uWit = Formula.eq0 uWit uWit := rfl
 def uDummyOuter : Formula WHyperbolic.F ([] : Ctx MetricSpace.ι) :=
   Formula.eq0 Term.zero Term.zero
 
--- ============================================================================
 -- The derivation — raw `Derivable` constructors only, no proof mode
--- ============================================================================
 
 /-- Step 1: **instantiate the premise.** `(∀u P) →ᶠ P[s]`. -/
 def uInst :
@@ -134,9 +130,7 @@ def uFinal :
       (Formula.all pTy (Formula.all Ty.nat uP →ᶠ Formula.ex Ty.nat uP)) :=
   Derivable.mp Derivable.refl0 (Derivable.forall_rule uInnerWeakened)
 
--- ============================================================================
 -- Through the metatheorem, at a W-hyperbolic model
--- ============================================================================
 
 /-- `M.constMajorants 5 h` with `distM` in kernel-computable form — verbatim
 `WBoundDemo.wCm`, repeated here so this file stands alone (`WBoundDemo` is not imported).
@@ -179,9 +173,7 @@ noncomputable def uVt (M : WHyperbolicModel) :
     Term WHyperbolic.F ([] : Ctx MetricSpace.ι) (pTy →ₜ Ty.nat) :=
   extractedVTerm M.eqXInterp M.spremise (B₀ := uP) (C₀ := uP) uFinal
 
--- ============================================================================
 -- The numerals
--- ============================================================================
 
 -- DAG measurement only (`numObjs`, never `sizeWithoutSharing`: the sharing ratio here is
 -- ≈10⁵). Named `goal_size'` so it does not collide with `WBoundDemo`'s `goal_size` token.
@@ -230,9 +222,7 @@ theorem uBound_at_5 (M : WHyperbolicModel) (h : M.d M.ref M.zeroX ≤ ((5 : ℕ)
   rw [hval]
   decide
 
--- ============================================================================
 -- Non-vacuity
--- ============================================================================
 
 /-- **`U` genuinely tracks the derivation, not a default path.** At `x_star = (7, g)` the
 *premise* bound moves to `1273`, exactly as `WBoundDemo`'s *witness* bound does: `W` majorizes
@@ -376,9 +366,7 @@ built: **17 s** for this module — the same order as `WBoundDemo`'s 23 s, so ro
 Probes` is green at 8111 jobs.
 -/
 
--- ============================================================================
 -- Axiom hygiene — verify by name, after a completed `lake build`
--- ============================================================================
 
 #print axioms uFinal
 #print axioms uP_subst0

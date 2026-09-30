@@ -66,9 +66,7 @@ open ExprBound (run run2 run2p run2e blocked pr pr2 prCap)
 open MonotoneMCT (cmE)
 open Lean Lean.Meta Lean.Elab
 
--- ============================================================================
 -- Target 1 — the proof-mode `pinduction`, symbolic in the point
--- ============================================================================
 
 /-- `MonotoneMCT.rI`'s witness bound, left symbolic in the point `n`. Kernel-checked at
 `n = 5, 9` in `MonotoneMCT` (`ind_V_5`, `ind_V_9`), giving `5` and `9`. -/
@@ -83,9 +81,7 @@ def tgtIU (n : ℕ) : ℕ := mfiU cmE MonotoneMCT.rI n
 #eval show MetaM Unit from run2p ``Metatheorems.SymbolicBound.tgtI 1200 2000
 #eval show MetaM Unit from run2p ``Metatheorems.SymbolicBound.tgtI 1200 8000
 
--- ============================================================================
 -- Target 2 — the raw `Derivable.induction` whose bound is exponential
--- ============================================================================
 
 /-- **The Gate-2 target.** `ContentExampleNat.rE`'s witness bound, symbolic in BOTH components
 of the point: `k` the induction variable and `g` the majorant of the function parameter.
@@ -118,9 +114,7 @@ def tgtE3 (g : ℕ → ℕ) : ℕ := tgtE 3 g
 #eval show MetaM Unit from run2p ``Metatheorems.SymbolicBound.tgtI 2500 prCap
   [``Metatheorems.termMajorizer]
 
--- ============================================================================
 -- Gate 3 — the closed form as a THEOREM, universally quantified in the majorant
--- ============================================================================
 
 /-- **`V(0, f*) = f*(0)`, for EVERY `f*`** — not a numeral at a point but a closed form in the
 input majorant. This is the base of the recursion the display above shows as `(g 0, ⋆)`. -/

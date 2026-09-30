@@ -38,9 +38,7 @@ namespace GeneralMatricesDemo
 
 open Formula
 
--- ============================================================================
 -- The `ι = Empty` model (same recipe as `TinyBoundDemo`, distinct names)
--- ============================================================================
 
 def gXE : Empty → Type := fun i => i.elim
 def gFE : Empty → Ty Empty := fun i => i.elim
@@ -63,9 +61,7 @@ def gSpremiseE : ∀ (Γ' : Ctx Empty) (B : Formula gFE Γ'), gPremE ⟨Γ', B�
 
 def gNtsE : NTStableD gPremE := fun _ _ h => h.elim
 
--- ============================================================================
 -- The statement
--- ============================================================================
 
 /-- `x : ℕ → ℕ`, a real-number code. -/
 abbrev gR : Ty Empty := realTy Empty
@@ -95,9 +91,7 @@ theorem demoB_vf : demoB.isVFree = true := rfl
 theorem demoC_pe : demoC.isPurelyExistential = true := rfl
 theorem demoC_vf : demoC.isVFree = true := rfl
 
--- ============================================================================
 -- The derivation, raw `Derivable` constructors only
--- ============================================================================
 
 /-! The derivation uses only base constructors, so it is stated for every `a : Allowed` and
 instantiated at `Allowed.extended` and `Allowed.classical` below. (`castAllowed` cannot go
@@ -153,9 +147,7 @@ def gFinalC :
     @Derivable Empty Empty gFE Allowed.classical gPremE []
       (Formula.all gR (Formula.all Ty.nat demoB →ᶠ Formula.ex Ty.nat demoC)) := gFinalA
 
--- ============================================================================
 -- Through the general-matrix metatheorem
--- ============================================================================
 
 /-- **Extended input.** The conclusion is 17.52's, with the ∀-premise intact:
 `∀u ≤ Φ(x*) (⟨u⟩ℝ ≤ℝ x) → ∃v ≤ Φ(x*) ∃c (c = x(v))`. -/

@@ -75,9 +75,7 @@ namespace ProductRulesDemo
 
 open Formula
 
--- ============================================================================
 -- Pure `WE-HA^ω`: no base types, no constants. Same recipe as `TinyBoundDemo`, own names.
--- ============================================================================
 
 /-- The carrier family: no base types. -/
 def pXE : Empty → Type := fun i => i.elim
@@ -89,9 +87,7 @@ def pSiE : SpaceInterp pXE pFE where
   zeroInterp i := i.elim
   distInterp i := i.elim
 
--- ============================================================================
 -- The statement
--- ============================================================================
 
 /-- The pair type `nat ×ₜ nat`. -/
 abbrev pairTy : Ty Empty := Ty.nat ×ₜ Ty.nat
@@ -114,9 +110,7 @@ theorem C_subst0 :
       = (Formula.eq0 (Term.fst pairTerm) Term.zero
           ∧ᶠ Formula.eq0 (Term.snd pairTerm) (Term.app Term.succ Term.zero)) := rfl
 
--- ============================================================================
 -- The derivation — generic in `Allowed` and in the premise set
--- ============================================================================
 
 section
 variable {al : Allowed} {P : PremiseSet pFE}
@@ -158,10 +152,8 @@ theorem eta_shape :
 
 end
 
--- ============================================================================
 -- The derivation is sound: the target is true in the model — and the extraction pipeline
 -- accepts it unchanged
--- ============================================================================
 
 /-- Semantic soundness at `ι = Empty` — all five model facts are vacuous. -/
 theorem target_true : Formula.interpret pSiE target () :=

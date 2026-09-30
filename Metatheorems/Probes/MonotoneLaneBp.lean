@@ -93,9 +93,7 @@ open UPremiseDemo (pTy uWit uCm uDummyOuter)
 open MetricSpace (ι)
 -- `kernel_rfl` is a tactic from `Probes.MonotoneLaneB`, available globally via the import.
 
--- ============================================================================
 -- G-B'1: a directly-reachable heavy ℚ cast on the premise-consuming counter path
--- ============================================================================
 
 /-- Matrix carrying the heaviest ℚ constant: `u =₀ mul_Q(u,u)`. QF and ∨-free, so `wTy` is
 `unit` — the cast on it is invisible to `U`, which is the whole point. -/
@@ -173,9 +171,7 @@ theorem castU_at_7_ne_901 (g : ℕ → ℕ) :
 
 end Model
 
--- ============================================================================
 -- Axiom hygiene
--- ============================================================================
 
 #print axioms castU
 #print axioms castU_at_7

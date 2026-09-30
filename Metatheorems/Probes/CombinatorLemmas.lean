@@ -170,9 +170,7 @@ variable (e : Ctx.interpret X (Γ.map Ty.hat))
 
 end Proj
 
--- ============================================================================
 -- The four combinators
--- ============================================================================
 
 section Combinators
 variable {ι : Type} {X : ι → Type} {F : ι → Ty ι} {si : SpaceInterp X F}
@@ -275,9 +273,7 @@ theorem capp_sQfer {A₀ : Formula F Γ} {ρ σ : Ty ι} {s t : Term F Γ ρ} {r
 
 end Combinators
 
--- ============================================================================
 -- Casts on derivations: what `anorm` leaves behind
--- ============================================================================
 
 section Casts
 variable {ι : Type} {X : ι → Type} {F : ι → Ty ι} {si : SpaceInterp X F}
@@ -312,9 +308,7 @@ theorem syntactic_soundness_subst {B B' : Formula F Γ} (hB : B = B')
 
 end Casts
 
--- ============================================================================
 -- The `pm_*` layer, unfolded to the three primitives
--- ============================================================================
 
 section PM
 variable {ι : Type} {F : ι → Ty ι} {a : Allowed} {P : PremiseSet F} {Γ : Ctx ι}
@@ -481,9 +475,7 @@ theorem seq_allI_cons_eq {ρ : Ty ι} {A₀ : Formula F Γ} {Δ : HCtx F Γ} {A 
 
 end PM
 
--- ============================================================================
 -- `seq_allI` is Δ-generic too: `wit_seq_allI`
--- ============================================================================
 
 section AllI
 variable {ι : Type} {X : ι → Type} {F : ι → Ty ι} {si : SpaceInterp X F}

@@ -36,9 +36,7 @@ namespace RevTriangleDemo
 
 open MetricSpace
 
--- ============================================================================
 -- 1. Sizes
--- ============================================================================
 
 /-- Three free points of the space. -/
 abbrev Γ3 : Ctx MetricSpace.ι := [xTy, xTy, xTy]
@@ -92,9 +90,7 @@ count can reach. `derivSize` is a ruler for raw-constructor derivations (`LemBou
 `ConjBoundDemo`); on anything that goes through the ℚ/ℝ tower it is the
 `sizeWithoutSharing` CLAUDE.md bans, one layer down. -/
 
--- ============================================================================
 -- 2. The converse bridge: `≤ℝ` true in a model ⇒ `≤` on `codeReal`
--- ============================================================================
 
 section Bridge
 
@@ -131,9 +127,7 @@ theorem codeReal_le_of_interpret_le_R_pu (f g : Term F Γ (realTy ι))
 
 end Bridge
 
--- ============================================================================
 -- 3. The theorem, read in an arbitrary metric model
--- ============================================================================
 
 section Model
 
