@@ -7,10 +7,7 @@ import Metatheorems.Derivable
 import Metatheorems.PropositionalLemmas
 import Metatheorems.PureFOLLemmas
 import Metatheorems.Arithmetic
--- `negTrans_iff_imp_pu` below is proved as a proof-mode script. That is the only reason this
--- file depends on the tactic layer; `ProofMode.Tactics` sits over `PureFOLLemmas` only, so
--- the dependency is acyclic (`ProofMode.MCT` reaches `NegTrans` through `MCTStatement`, but
--- `ProofMode.Tactics` reaches nothing here).
+-- `negTrans_iff_imp_pu` below is proved as a proof-mode script, hence the tactic layer.
 import Metatheorems.ProofMode.Tactics
 
 
@@ -37,9 +34,7 @@ Combined with Dialectica soundness, this yields the ND interpretation (Thm 10.7)
 
 open Formula
 
--- ============================================================================
 -- Kuroda Inner Translation (nt)
--- ============================================================================
 
 /-- The inner Kuroda translation `nt(A)`. Only `∀` is modified:
     `∀x.A ↦ ∀x.¬¬nt(A)`.  All other connectives are structural. -/
@@ -61,9 +56,7 @@ def Formula.negTrans {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι}
 postfix:max "ᴺᵀ" => Formula.negTrans
 postfix:max "ₙₜ" => Formula.kurodaInner
 
--- ============================================================================
 -- kurodaInner commutes with renaming and substitution
--- ============================================================================
 
 /-- `nt` commutes with formula renaming. -/
 theorem kurodaInner_renameF {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι}
@@ -139,9 +132,7 @@ theorem negTrans_weaken {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι} {ρ : Ty
   rw [kurodaInner_weaken]
 
 
--- ============================================================================
 -- kurodaInner is identity on QF formulas; purely universal ↔ negTrans
--- ============================================================================
 
 /-- `kurodaInner` is the identity on quantifier-free formulas. -/
 theorem kurodaInner_qf {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι}
@@ -182,9 +173,7 @@ theorem kurodaInner_pe {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι}
   | all _ _ _ => exact absurd hpe (by simp [Formula.isPurelyExistential, Formula.isQF])
   | ex _ _ ih => simp [Formula.kurodaInner, ih hpe]
 
--- ============================================================================
 -- Hilbert-system building blocks (in Derivable)
--- ============================================================================
 
 section HilbertExtras
 
@@ -244,16 +233,8 @@ private def not_not_or_intro {Γ : Ctx ι} {A B : Formula F Γ} :
     Derivable F a Premises ((¬ᶠ¬ᶠA ∨ᶠ ¬ᶠ¬ᶠB) →ᶠ ¬ᶠ¬ᶠ(A ∨ᶠ B)) :=
   neg_neg_or_intro
 
-/-- ¬¬(∀x^ρ.¬¬Q) → ∀x^ρ.¬¬Q  — provable intuitionistically.
-
-Proof: apply `forall_rule` with the derivation (in context ρ :: Γ):
-  `(¬¬(∀x.¬¬Q)).weaken → ¬¬Q`
-obtained via `forall_ax (.var .vz)` (using `substF_renameF_id` to simplify the
-substituted formula to `¬¬Q`) composed with `neg_neg_imp_rev + neg_neg_mp`.
-
-Public, rather than `private` as it once was: `classical_to_prenex_extended` uses it as step
-3, pushing the outer `¬¬` of `NT(∀x A)` inside the `∀`. That is decision D-1 of
-`ARCHITECTURE.md` §12, and the only place the prenexified route needs it. -/
+/-- ¬¬(∀x^ρ.¬¬Q) → ∀x^ρ.¬¬Q  — provable intuitionistically. Used by
+`classical_to_prenex_extended` to push the outer `¬¬` of `NT(∀x A)` inside the `∀`. -/
 def nn_all_nn {Γ : Ctx ι} {ρ : Ty ι} {Q : Formula F (ρ :: Γ)} :
     Derivable F a Premises (¬ᶠ¬ᶠ(Formula.all ρ (¬ᶠ¬ᶠQ)) →ᶠ Formula.all ρ (¬ᶠ¬ᶠQ)) :=
   -- Use forall_rule: suffices to derive (¬¬(∀x.¬¬Q)).weaken →ᶠ ¬¬Q in context ρ :: Γ.
@@ -287,9 +268,7 @@ private def nn_imp_extract {Γ : Ctx ι} {A B : Formula F Γ} :
 
 end HilbertExtras
 
--- ============================================================================
 -- Lift Derivable lemmas to DerivableExt
--- ============================================================================
 
 /-- Wrap a derivation in ¬¬. -/
 private def wrap_dnn {ι κ : Type} {F : κ → Ty ι}
@@ -304,9 +283,7 @@ private abbrev lift {ι κ : Type} {F : κ → Ty ι}
     {a : Allowed} {Premises : PremiseSet F} {Γ : Ctx ι} {A : Formula F Γ}
     (h : Derivable F a Premises A) : Derivable F a Premises A := h
 
--- ============================================================================
 -- lem:negative-forall-equiv: purely universal A ↔ NT(A)
--- ============================================================================
 
 /-- For purely universal A, ⊢ A → NT(A) and ⊢ NT(A) → A.
     Base (QF): kurodaInner_qf gives A.kurodaInner = A, so NT(A) = ¬¬A, and
@@ -444,9 +421,7 @@ def negTrans_iff_imp_pu {ι κ : Type} {F : κ → Ty ι}
 
 end ImpPU
 
--- ============================================================================
 -- Per-axiom/rule soundness definitions
--- ============================================================================
 
 section NegTransCases
 
@@ -951,15 +926,8 @@ def negTrans_qfer {a : Allowed} {Premises : PremiseSet F} {Γ : Ctx ι} {ρ σ :
   -- Step 2: compose with forward direction of negTrans_iff_pu on the conclusion
   let fwd := (negTrans_iff_pu (eqAtType σ (r.subst0 s) (r.subst0 t))
     (eqAtType_isPU σ _ _)).1
-  -- step1 gives A₀ → result. fwd gives result → NT(result) = ¬¬result.kurodaInner.
-  -- So: A₀ → ¬¬result.kurodaInner. Then dnn_intro: ¬¬(A₀ → result.kurodaInner).
-  -- But we need A₀ → result.kurodaInner first, then wrap in ¬¬.
-  -- Actually: A₀ → result → result.kurodaInner (via negTrans_iff_pu backward... no, forward gives result → ¬¬result.ki)
-  -- Hmm. fwd : result → ¬¬result.ki. So A₀ → ¬¬result.ki. Then neg_neg_imp_rev2: ¬¬(A₀ → result.ki).
-  -- NT(A₀ → result) = ¬¬(A₀.ki → result.ki) = ¬¬(A₀ → result.ki) (since A₀ is QF).
-  -- NT(A₀ → result) = ¬¬(A₀.ki → result.ki) = ¬¬(A₀ → result.ki) since A₀ is QF
-  -- fwd : result → NT(result) = ¬¬result.ki
-  -- So: A₀ → result → ¬¬result.ki. By neg_neg_imp_rev2: ¬¬(A₀ → result.ki).
+  -- So `A₀ → ¬¬result.ki`, and `neg_neg_imp_rev` gives `¬¬(A₀ → result.ki)`, which is
+  -- `NT(A₀ → result)` since `A₀` is QF.
   have ki_imp : (A₀ →ᶠ eqAtType σ (r.subst0 s) (r.subst0 t)).kurodaInner =
       (A₀ →ᶠ (eqAtType σ (r.subst0 s) (r.subst0 t)).kurodaInner) := by
     simp [Formula.kurodaInner, kurodaInner_qf A₀ hqf]
@@ -1020,9 +988,7 @@ def negTrans_qfac
 
 end NegTransCases
 
--- ============================================================================
 -- Soundness of Kuroda's negative translation
--- ============================================================================
 
 section NegTransSound
 
@@ -1033,10 +999,9 @@ variable {ι κ : Type} {F : κ → Ty ι}
 
 /-- **NT-stability of a premise set**: every premise implies its own negative translation.
 
-This is the condition `negTrans_sound` actually needs, and the *only* thing anything ever
-needed `isPurelyUniversal` on `Derivable.premise` for. It is strictly weaker than "every
-premise is purely universal" — `negTrans_iff_imp_pu` shows an implication between two PU
-formulas is NT-stable while not itself being PU. -/
+This is the condition `negTrans_sound` needs. It is strictly weaker than "every premise is
+purely universal" — `negTrans_iff_imp_pu` shows an implication between two PU formulas is
+NT-stable while not itself being PU. -/
 abbrev NTStable {ι κ : Type} {F : κ → Ty ι}
     (Premises : PremiseSet F) : Prop :=
   ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
@@ -1049,8 +1014,7 @@ abbrev NTStableD {ι κ : Type} {F : κ → Ty ι}
   ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
     Derivable F Allowed.nt_target Premises (B →ᶠ Bᴺᵀ)
 
-/-- A purely-universal premise set is NT-stable — the old hypothesis, recovered as a lemma
-rather than baked into the kernel. -/
+/-- A purely-universal premise set is NT-stable. -/
 def ntStable_of_pu {Premises : PremiseSet F} 
     (pu : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → B.isPurelyUniversal = true) :
     NTStableD Premises :=
@@ -1071,8 +1035,7 @@ variable (nts : NTStableD Premises)
 def negTrans_sound {Γ : Ctx ι} {A : Formula F Γ}
     (h : Derivable F Allowed.classical Premises A) : Derivable F Allowed.nt_target Premises Aᴺᵀ :=
   match h with
-  -- Premises: NT-stability is exactly what this case needs, and it is now supplied by the
-  -- caller instead of being carried on the constructor.
+  -- Premises: NT-stability, supplied by the caller.
   | .premise hp => Derivable.mp (.premise hp) (nts _ _ hp)
   -- Simple propositional axioms: wrap in ¬¬ via dnn_intro
   | .or_contract  => .mp .or_contract  dnn_intro

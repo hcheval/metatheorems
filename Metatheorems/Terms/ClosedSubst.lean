@@ -13,21 +13,12 @@ namespace Metatheorems
 
 Every constant in `Terms/Arith.lean`, `Terms/Rational.lean` and `Terms/Real.lean` is a
 closed term, so `subst σ` leaves it alone. These lemmas say so, and they seed the
-`closed_subst` simp set.
+`closed_subst` simp set. Also `eq_R_substF` / `le_R_pu_substF` and the two purely-universal
+facts, which `eqAtType_substF` (`Arithmetic.lean`) needs below the ℚ/ℝ proof layer.
 
-**Why they live here and not next to their proofs.** `eqAtType` at a base type is
-`eq_R (dist i s t) 0ℝ`, so `eqAtType_substF`'s base case is `eq_R_substF` — and
-`eqAtType_substF` is proved in `Arithmetic.lean`, *below* `RationalNumbers.lean` and
-`RealNumbers.lean` where these used to live. So the whole block moved down, together with
-`eq_R_substF` / `le_R_pu_substF` and the two purely-universal facts. Nothing was restated:
-these are the same declarations, verbatim, at a lower point in the import order. See
-ARCHITECTURE.md §7, which predicted exactly this move.
-
-**Do not prove `subst σ X = X` by `rfl` for a nested closed constant.** `rfl` forces the
-constant's whole delta-expansion — `Term.lt_Q_dec` that way costs 28 s. The proofs below are
-compositional: unfold one level, push `subst` through the application spine, stop at the
-constants already known closed. That needs the `closed_subst` set built up *as the proofs
-go*, hence the `attribute` lines interleaved with the proofs rather than collected at the end.
+Do not prove `subst σ X = X` by `rfl` for a nested closed constant: that forces its whole
+delta-expansion. The proofs below unfold one level and stop at constants already known
+closed, so the `closed_subst` set is built up as the proofs go.
 -/
 
 open Formula
@@ -37,9 +28,7 @@ variable {ι κ : Type} {F : κ → Ty ι}
 section ClosedSubst
 variable {Γ Δ : Ctx ι} (σ : Term.Subst F Γ Δ)
 
--- ============================================================================
 -- Arithmetic constants
--- ============================================================================
 
 /-- `Term.pd` is closed. Public: proof scripts need it in the goal-normalising simp set. -/
 theorem pd_closed_subst :
@@ -67,9 +56,7 @@ theorem add_closed_subst :
 attribute [closed_subst] pd_closed_subst mul_closed_subst monus_closed_subst
   abs_diff_closed_subst sg_bar_closed_subst add_closed_subst
 
--- ============================================================================
 -- Rational constants
--- ============================================================================
 
 attribute [simp] add_closed_subst mul_closed_subst monus_closed_subst abs_diff_closed_subst
   pd_closed_subst sg_bar_closed_subst
@@ -100,12 +87,8 @@ attribute [simp] add_closed_subst mul_closed_subst monus_closed_subst abs_diff_c
 @[simp] theorem snd_pair_closed_subst :
     (Term.snd_pair : Term F Γ _).subst σ = Term.snd_pair := by rfl
 
--- Everything above is small enough that `rfl` is cheap; from here the definitions nest, and
--- `rfl` has to delta-expand the whole tree. `Term.lt_Q_dec` that way costs 28 s — 14 s in the
--- tactic and 14 s again in the kernel — because its expansion runs to millions of nodes.
---
--- So from here the proofs are *compositional*: unfold one level, push `subst` through the
--- application spine, and stop at the constants already known closed.
+-- From here the definitions nest, so the proofs are compositional: unfold one level, push
+-- `subst` through the application spine, and stop at the constants already known closed.
 attribute [closed_subst] sg_closed_subst isEven_closed_subst isOdd_closed_subst
   triag_closed_subst exp2_closed_subst ite_nat_closed_subst geq_closed_subst
   max_closed_subst min_closed_subst pair_closed_subst inv_triag_closed_subst
@@ -182,8 +165,7 @@ attribute [closed_subst] sub_Q_closed_subst mul_Q_closed_subst abs_Q_closed_subs
 @[simp] theorem one_Q_closed_subst :
     (Term.one_Q : Term F Γ _).subst σ = Term.one_Q := by rfl
 
-/-- Numerals are closed. Proved by induction rather than `rfl` so the cost is linear in the
-numeral rather than a delta-expansion of the whole `succ` tower. -/
+/-- Numerals are closed. -/
 @[simp] theorem ofNat_closed_subst (n : Nat) :
     (Term.ofNat n : Term F Γ Ty.nat).subst σ = Term.ofNat n := by
   induction n with
@@ -194,9 +176,7 @@ attribute [closed_subst] lt_Q_dec_closed_subst le_Q_dec_closed_subst eq_Q_dec_cl
   encode_nat_Q_closed_subst pow2neg_Q_closed_subst zero_Q_closed_subst one_Q_closed_subst
   ofNat_closed_subst
 
--- ============================================================================
 -- Real constants
--- ============================================================================
 
 @[simp] theorem cauchyfy_closed_subst :
     (Term.cauchyfy : Term F Γ _).subst σ = Term.cauchyfy := by
@@ -214,9 +194,7 @@ attribute [closed_subst] cauchyfy_closed_subst
 
 end ClosedSubst
 
--- ============================================================================
 -- Naturality of the ℝ formulas
--- ============================================================================
 
 /-- `eq_R` is quantifier-free under the ∀n wrapper, so the whole formula
     is purely universal (Π₁⁰). -/

@@ -59,9 +59,7 @@ def eval_h {H : Formula F Γ}
     .importation (.syllogism .and_contract .and_weak)
   .syllogism (pair_h f x) eval_AB
 
--- ============================================================================
 -- Tier 1 — Implication combinators
--- ============================================================================
 
 /-- Identity: `A → A`. -/
 def I_comb : Derivable F a Premises (A →ᶠ A) :=
@@ -90,25 +88,7 @@ def flip_comb : Derivable F a Premises ((A →ᶠ B →ᶠ C) →ᶠ B →ᶠ A 
   let get_c := eval_h get_bc get_b
   Derivable.exportation (Derivable.exportation get_c)
 
-/-- Contraction / W-combinator: `(A → A → B) → A → B`.
-
-Derivation (C abbreviates `(A →ᶠ A →ᶠ B) ∧ᶠ A`):
-| #  | Formula                   | Justification                       |
-|----|---------------------------|-------------------------------------|
-| 1  | (A→A→B) → (A→A→B)        | I_comb at A→A→B                     |
-| 2  | (A→A→B)∧A → (A→B)        | importation 1                       |
-| 3  | C∧A → B                   | importation 2                       |
-| 4  | C → A                     | syllogism and_perm and_weak         |
-| 5  | A∧C → A∧C                 | I_comb at A∧C                       |
-| 6  | A → C → A∧C               | exportation 5                       |
-| 7  | C → C → A∧C               | syllogism 4 6                       |
-| 8  | C∧C → A∧C                 | importation 7                       |
-| 9  | C∧C → C∧A                 | syllogism 8 and_perm                |
-| 10 | C → C∧C                   | and_contract                        |
-| 11 | C → C∧A                   | syllogism 10 9                      |
-| 12 | C → B                     | syllogism 11 3                      |
-| 13 | (A→A→B) → A → B           | exportation 12                      |
--/
+/-- Contraction / W-combinator: `(A → A → B) → A → B`. -/
 def contract : Derivable F a Premises ((A →ᶠ A →ᶠ B) →ᶠ A →ᶠ B) :=
   let h1 := @I_comb ι κ F a Premises Γ (A →ᶠ A →ᶠ B)
   let h2 := Derivable.importation h1
@@ -130,9 +110,7 @@ def contract : Derivable F a Premises ((A →ᶠ A →ᶠ B) →ᶠ A →ᶠ B) 
 def mp_form : Derivable F a Premises ((A →ᶠ B) →ᶠ A →ᶠ B) :=
   I_comb
 
--- ============================================================================
 -- Tier 2 — Conjunction
--- ============================================================================
 
 /-- Conjunction introduction: `A → B → A ∧ B`. -/
 def and_intro : Derivable F a Premises (A →ᶠ B →ᶠ A ∧ᶠ B) :=
@@ -146,15 +124,7 @@ def and_proj1 : Derivable F a Premises (A ∧ᶠ B →ᶠ A) :=
 def and_proj2 : Derivable F a Premises (A ∧ᶠ B →ᶠ B) :=
   .syllogism .and_perm .and_weak
 
-/-- Left associativity: `A ∧ (B ∧ C) → (A ∧ B) ∧ C`.
-
-Pairing trick: to build `H → X∧Y` from `H→X` and `H→Y`:
-  1. syllogism(H→Y)(and_intro[Y,H]) : H → H → Y∧H
-  2. importation → H∧H → Y∧H; compose with and_contract: H → Y∧H
-  3. and_perm → H → H∧Y
-  4. syllogism(H→X)(and_intro[X,Y]) : H → Y → X∧Y; importation → H∧Y → X∧Y
-  5. compose 3 and 4: H → X∧Y
--/
+/-- Left associativity: `A ∧ (B ∧ C) → (A ∧ B) ∧ C`. -/
 def and_assocl : Derivable F a Premises (A ∧ᶠ (B ∧ᶠ C) →ᶠ (A ∧ᶠ B) ∧ᶠ C) :=
   let get_B : Derivable F a Premises (A ∧ᶠ (B ∧ᶠ C) →ᶠ B) := .syllogism and_proj2 .and_weak
   let get_C : Derivable F a Premises (A ∧ᶠ (B ∧ᶠ C) →ᶠ C) := .syllogism and_proj2 and_proj2
@@ -197,19 +167,13 @@ def and_assocr : Derivable F a Premises ((A ∧ᶠ B) ∧ᶠ C →ᶠ A ∧ᶠ (
   let t6 := Derivable.syllogism t5 .and_perm
   Derivable.syllogism t6 t2
 
--- ============================================================================
 -- Tier 3 — Disjunction
--- ============================================================================
 
 /-- Right injection: `B → A ∨ B`. -/
 def or_inr : Derivable F a Premises (B →ᶠ A ∨ᶠ B) :=
   .syllogism .or_weak .or_perm
 
-/-- Disjunction elimination as a rule: `(A → C) → (B → C) → (A ∨ B → C)`.
-
-Note: `or_elim` as a *formula* `(A→C)→(B→C)→A∨B→C` is not derivable from the given
-primitives because `expansion` requires a closed proof, not a formula hypothesis.
-This meta-level function is used instead for building further results. -/
+/-- Disjunction elimination as a rule: `(A → C) → (B → C) → (A ∨ B → C)`. -/
 def or_elim_rule (f : Derivable F a Premises (A →ᶠ C)) (g : Derivable F a Premises (B →ᶠ C)) :
     Derivable F a Premises (A ∨ᶠ B →ᶠ C) :=
   -- A∨B → B∨A → B∨C → C∨B → C∨C → C
@@ -242,9 +206,7 @@ def or_assocr : Derivable F a Premises ((A ∨ᶠ B) ∨ᶠ C →ᶠ A ∨ᶠ (B
   -- (A∨B)∨C → A∨(B∨C)
   or_elim_rule step_AB step_C
 
--- ============================================================================
 -- Tier 4 — Negation and double negation
--- ============================================================================
 
 /-- Double-negation introduction: `A → ¬¬A`. -/
 def dnn_intro : Derivable F a Premises (A →ᶠ ¬ᶠ¬ᶠA) :=

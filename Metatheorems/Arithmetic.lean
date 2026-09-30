@@ -74,24 +74,13 @@ def forall_ax_inst {Γ : Ctx ι} {ρ : Ty ι} (P : Formula F (ρ :: Γ)) :
   let ant := Formula.all ρ (Formula.renameF (Renaming.ext Renaming.shift) P)
   Eq.mp (congrArg (fun Y => Derivable F al Premises (ant →ᶠ Y)) heq) h
 
--- ============================================================================
--- Section 1: Arithmetic Term Definitions — MOVED
--- ============================================================================
--- `Term.sg_bar`, `pd`, `add`, `mul`, `monus`, `abs_diff` now live in
--- `Metatheorems/Terms/Arith.lean`, which sits BELOW `eqAtType` and `Derivable`
--- in the import order.
---
--- Reason: `eqAtType` at a base type is `eq_R (dist i s t) 0ℝ`, so it depends on the ℚ/ℝ
--- term layer, which depends on these. Only the *definitions* moved; every proof about
--- them stays in this file. See ARCHITECTURE.md.
+-- The arithmetic term definitions live in `Metatheorems/Terms/Arith.lean`.
 
 namespace Term
 
 end Term
 
--- ============================================================================
 -- Section 2: Higher-type equality
--- ============================================================================
 -- Reflexivity, symmetry, transitivity of eqAtType at all types.
 -- These are needed for lambda correctness (Section 3) and arithmetic proofs.
 
@@ -190,9 +179,7 @@ def eqAtType_trans {Γ : Ctx ι} {ρ : Ty ι} {s t u : Term F Γ ρ}
 
 end EqAtType
 
--- ============================================================================
 -- Section 2b: Infrastructure for lambda correctness
--- ============================================================================
 -- eqAtType commutes with substitution, and qfer without QF premise.
 
 private theorem weaken_subst_ext_h {Γ Δ : Ctx ι} {σ_ty : Ty ι} {τ : Ty ι}
@@ -270,9 +257,7 @@ def qfer_no_premise_nat_nf {Γ : Ctx ι}
   Eq.mp (congrArg (Derivable F al Premises ·) (by rw [show r.subst0 s = rs from hs,
     show r.subst0 t = rt from ht])) q
 
--- ============================================================================
 -- Section 3: Lambda correctness
--- ============================================================================
 -- With primitive λ, beta reduction is an axiom (beta_eq constructor of Derivable).
 
 /-- Lambda correctness: applying (lam t) to s equals t with s substituted for x.
@@ -283,9 +268,7 @@ def Term.lam_correct {ρ τ : Ty ι} {Γ : Ctx ι}
     Derivable F al Premises (eqAtType τ (Term.app (Term.lam t) s) (t.subst0 s)) :=
   .beta_eq t s
 
--- ============================================================================
 -- Section 3b: Universal generalization and lam2_correct
--- ============================================================================
 
 /-- Universal generalization: from ⊢ A in context ρ :: Γ, derive ⊢ ∀x:ρ. A in context Γ. -/
 def univ_gen {Γ : Ctx ι} {ρ : Ty ι} {A : Formula F (ρ :: Γ)}
@@ -444,9 +427,7 @@ def lam_correct_nf {ρ τ : Ty ι} {Γ : Ctx ι}
     (congrArg (eqAtType τ (Term.app (Term.lam body) s)) hnf))
     (Term.lam_correct body s)
 
--- ============================================================================
 -- Section 4: Arithmetic term correctness
--- ============================================================================
 -- Each arithmetic function unfolds correctly via rec_zero/rec_succ + lam_correct.
 -- Substitution normal-form lemmas are isolated to avoid defeq abuse.
 
@@ -472,9 +453,8 @@ private theorem add_body_nf (x s : Term F Γ Ty.nat) :
   simp [Term.subst0, Term.subst, Term.subst0_map, Term.app3]
   exact weaken_subst0_h s x
 
--- `pd_closed_subst` and the other arithmetic `closed_subst` lemmas MOVED to
--- `Metatheorems/Terms/ClosedSubst.lean`, which sits below `eqAtType`: `eqAtType_substF`'s
--- base case is `eq_R_substF`, which needs the whole ℚ/ℝ `closed_subst` set. See that file.
+-- `pd_closed_subst` and the other arithmetic `closed_subst` lemmas are in
+-- `Metatheorems/Terms/ClosedSubst.lean`.
 
 private theorem monus_body_nf (x s : Term F Γ Ty.nat) :
     ((Term.app3 (.prec Ty.nat) (.var (.vs .vz))
@@ -779,19 +759,15 @@ end ArithCorr
 
 -- ── Isolated nf lemmas for Term.add under subst0 (avoiding deep defeq) ───
 
-/-- Weakened terms are invariant under substVar0.
-
-Public: this is one of the rewrites a proof script needs to see through the goals that
-`induction` leaves behind — see `ProofMode/Arith.lean`. -/
+/-- Weakened terms are invariant under substVar0. -/
 theorem weaken_substVar0 {ρ : Ty ι} (t : Term F Γ τ) (u : Term F (ρ :: Γ) ρ) :
     t.weaken.subst (Term.substVar0_map u) = t.weaken := by
   simp only [Term.weaken]
   rw [Term.rename_subst, Term.rename_eq_subst]; rfl
 
 -- `mul_closed_subst`, `monus_closed_subst`, `abs_diff_closed_subst`, `sg_bar_closed_subst`
--- and `add_closed_subst` MOVED to `Metatheorems/Terms/ClosedSubst.lean`, together with the
--- `attribute [closed_subst]` line that tags them. The primed private variants above are the
--- same statements and stay here because they are used earlier in this file.
+-- and `add_closed_subst` are in `Metatheorems/Terms/ClosedSubst.lean`; the primed private
+-- variants in this file are the same statements.
 
 /-- The eta-expanded form of `Term.weaken_subst0`. `simp` leaves the substitution as
 `fun {τ} => …`, which the plain lemma does not match, so the normalising set needs this
@@ -800,13 +776,9 @@ theorem Term.weaken_subst0_eta {Γ : Ctx ι} {τ ρ : Ty ι} (t : Term F Γ τ) 
     Term.subst (fun {_τ} => Term.subst0_map s) (Term.weaken t) = t :=
   Term.weaken_subst0 t s
 
--- `qnorm` is the substitution-normalising `simp only` that this development writes out by
--- hand roughly 300 times: push `subst`/`subst0` through the application spine, and leave the
--- closed constants alone. The explicit lists it replaces had to name every closed constant
--- appearing in the goal, and omitting one *fails* the call rather than weakening it.
---
--- `qnorm [h₁, h₂]` adds lemmas to the front — in practice the local `let` abbreviations a
--- goal is stated in terms of, which have to be zeta-unfolded in the same pass.
+-- `qnorm` is the substitution-normalising `simp only`: push `subst`/`subst0` through the
+-- application spine, and leave the closed constants alone. `qnorm [h₁, h₂]` adds lemmas to
+-- the front (e.g. the local `let` abbreviations a goal is stated in terms of).
 open Lean.Parser.Tactic in
 syntax "qnorm" (" [" (simpErase <|> simpLemma),* "]")? : tactic
 
@@ -829,9 +801,7 @@ private theorem add_qfer_r_nf {Γ : Ctx ι} (x y s : Term F Γ Ty.nat) :
   simp only [Term.subst0, Term.app2, Term.subst, add_closed_subst, Term.subst0_map]
   exact congrArg (fun z => Term.app (Term.app Term.add z) s) (weaken_subst0_h x s)
 
--- ============================================================================
 -- Section 5a: eq0 decidability (needed by ArithProps)
--- ============================================================================
 
 /-- For any natural number n, either n = 0 or n ≠ 0.
     Proved by induction: the step case follows directly from succ_ne_zero,
@@ -912,9 +882,7 @@ def add_succ_l {Γ : Ctx ι} (x y : Term F Γ Ty.nat) :
       add_closed_subst, xw_subst0]
   inst_nf ▸ .mp (Derivable.induction base (univ_gen step_body)) (.forall_ax y)
 
--- ============================================================================
 -- Section 5b: Basic arithmetic properties
--- ============================================================================
 -- From arithmetic.tex Prop prop:basic-arithmetic-properties.
 -- These are the algebraic facts needed to prove qf_equiv_term.
 
@@ -2318,15 +2286,10 @@ def mul_assoc (x y z : Term F Γ Ty.nat) :
 
 -- ── Truncated subtraction against multiplication, and `geq` ────────────────
 --
--- `monus` had a theory of its own — `monus_zero/succ/cancel/self/zero_l/succ_l`,
--- `monus_eq_zero_antisym`, `monus_disjunct` — but nothing relating it to `mul`, and `geq` had
--- no theory at all. These five are what the ℚ order theory needs: `add_Q`'s opposite-sign
--- branch takes an `abs_diff` of two cross products and compares them with `geq`, and both
--- have to survive being scaled by a denominator.
+-- What the ℚ order theory needs: `add_Q`'s opposite-sign branch takes an `abs_diff` of two
+-- cross products and compares them with `geq`, and both have to survive scaling.
 
-/-- Transitivity of `=₀` in the shape the equational chains are actually written in. The
-development spells this out as `.mp (.mp h₂ (.mp h₁ and_intro)) .trans0` several hundred
-times. -/
+/-- Transitivity of `=₀` in the shape the equational chains are actually written in. -/
 def qtrans {a b c : Term F Γ Ty.nat}
     (h₁ : Derivable F al Premises (Formula.eq0 a b))
     (h₂ : Derivable F al Premises (Formula.eq0 b c)) :
@@ -2547,9 +2510,7 @@ def sg_bar_monus_mul_succ (u v j : Term F Γ Ty.nat) :
     (r := .app Term.sg_bar (.var .vz)) rfl rfl
   qtrans h (sg_bar_mul_succ (Term.app2 Term.monus v u) j)
 
-/-- `|x − y| =₀ (x ∸ y) + (y ∸ x)` — the definition of `abs_diff`, as a derivation. It was
-built inline inside `abs_diff_eq_zero_iff`; named here because the distributivity below needs
-it. -/
+/-- `|x − y| =₀ (x ∸ y) + (y ∸ x)` — the definition of `abs_diff`, as a derivation. -/
 def abs_diff_unfold (x y : Term F Γ Ty.nat) :
     Derivable F al Premises (Formula.eq0 (Term.app2 Term.abs_diff x y)
       (Term.app2 Term.add (Term.app2 Term.monus x y) (Term.app2 Term.monus y x))) :=
@@ -2611,13 +2572,7 @@ def mul_assoc_comm (m x y : Term F Γ Ty.nat) :
 
 -- ── `(x ∸ y) + y =₀ (y ∸ x) + x` ───────────────────────────────────────────
 --
--- Both sides are `max x y`, written without a `max`. This is the fact that *recovers* a
--- truncated difference: specialised with `y ∸ x =₀ 0` it says `(x ∸ y) + y =₀ x`, which is
--- what the signed-value identity for `add_Q` needs in its opposite-sign branch.
---
--- Proved by induction on `x` with `∀y` bundled, in the shape `monus_eq_zero_antisym` uses:
--- the base needs no inner split, and the successor step splits on `y` because `S x ∸ y` only
--- reduces once `y` is exposed as a successor.
+-- Both sides are `max x y`. By induction on `x` with `∀y` bundled.
 
 private def monus_add_comm_case_y0 {Γ : Ctx ι} :
     Derivable F al Premises
@@ -2845,9 +2800,8 @@ def add_cancel_r (x y k : Term F Γ Ty.nat) :
 
 -- ── Associativity/commutativity shuffles for `+` ───────────────────────────
 --
--- There is no AC normaliser for the object language, and the signed-value bookkeeping in
--- `RationalNumbers.lean` needs a handful of fixed rearrangements. Each is a short chain of
--- `add_assoc`/`add_comm`; naming them keeps the call sites to one rewrite apiece.
+-- Fixed rearrangements for `RationalNumbers.lean`, each a short chain of
+-- `add_assoc`/`add_comm`.
 
 /-- `p + (q + r) =₀ q + (p + r)`. -/
 def add_left_comm (p q r : Term F Γ Ty.nat) :
@@ -2917,9 +2871,7 @@ def add_rot3 (p q r : Term F Γ Ty.nat) :
 
 end ArithProps
 
--- ============================================================================
 -- Section 6: eq0 decidability
--- ============================================================================
 -- From arithmetic.tex Prop prop:eq0-decidable.
 -- This is proved by induction and does NOT require the arithmetic infrastructure.
 
@@ -2929,9 +2881,7 @@ def eq0_decidable {Γ : Ctx ι} :
        ¬ᶠFormula.eq0 (.var .vz) Term.zero)) :=
   eq0_decidable'
 
--- ============================================================================
 -- Section 7: QF decision function (prop:qf-equiv-term from wehax.tex)
--- ============================================================================
 -- For each QF formula A₀, we construct a term qf_term A₀ such that
 -- qf_term A₀ x̄ =₀ 0 ↔ A₀(x̄) in WE-HA^ω.
 
@@ -3048,9 +2998,7 @@ def qf_term_correct {Γ : Ctx ι} {A : Formula F Γ} (hqf : A.isQF = true) :
   | .ex  _ _ => by simp [Formula.isQF] at hqf
 end QFDecision
 
--- ============================================================================
 -- Section 8: QF-LEM and double-negation elimination
--- ============================================================================
 -- From wehax.tex Prop prop:qf-lem and Cor cor:qf-double-neg-elim.
 
 section QFLEM

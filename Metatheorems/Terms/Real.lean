@@ -11,14 +11,9 @@ namespace Metatheorems
 /-!
 # Real term and formula definitions
 
-The `Term`- and `Formula`-level encoding of ℝ, split out of `RealNumbers.lean` so that it
-sits **below** `eqAtType` and `Derivable` in the import order.
-
-This is the file the whole layering exists for: `eqAtType` at a base type is
-`eq_R (dist i s t) 0ℝ`, so `eqAtType` must be able to see `eq_R`, which is defined here.
-
-Only definitions live here. Every proof — the `closed_subst` lemmas, the `cauchyfy` theory,
-the ordered-field axioms — stays in `RealNumbers.lean`, above `Derivable`.
+The `Term`- and `Formula`-level encoding of ℝ: definitions only, below `eqAtType` and
+`Derivable` in the import order (`eqAtType` at a base type is `eq_R (dist i s t) 0ℝ`). The
+proofs about them are in `RealNumbers.lean`.
 -/
 
 open Formula
@@ -27,9 +22,7 @@ variable {ι κ : Type} {F : κ → Ty ι}
 
 namespace Term
 
--- ============================================================================
 -- Cauchyfication
--- ============================================================================
 
 /-- The Cauchy condition check at step k for sequence f:
     returns 0 if |f(k) -_Q f(k+1)|_Q <_Q ⟨2^{-k-1}⟩_Q, nonzero otherwise.
@@ -81,9 +74,7 @@ def cauchyfy {Γ : Ctx ι} : Term F Γ ((Ty.nat →ₜ Ty.nat) →ₜ (Ty.nat �
                (Term.app2 Term.pair val (.app .succ .zero))))))
         (.var .vz))))                                -- n
 
--- ============================================================================
 -- Real Number Operations
--- ============================================================================
 
 /-- The real number zero: constant sequence 0_ℚ. -/
 def zero_R {Γ : Ctx ι} : Term F Γ (realTy ι) :=
@@ -160,9 +151,7 @@ def round_nat {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ realTy ι) :=
 
 end Term
 
--- ============================================================================
 -- Real Number Formulas
--- ============================================================================
 
 /-- Real equality: f₁ =_ℝ f₂ :≡ ∀n. |f̂₁(n+1) -_ℚ f̂₂(n+1)|_ℚ <_ℚ ⟨2^{-n}⟩_ℚ.
     This is a Π₁⁰ formula (∀ over nat, QF body). -/
@@ -198,17 +187,8 @@ def le_R {Γ : Ctx ι} (f g : Term F Γ (realTy ι)) : Formula F Γ :=
 
 /-- Alternative formulation of `≤ℝ` as a syntactically purely universal formula:
     `f ≤ℝ g :≡ ∀n. ¬(f̂(n+1) −ℚ ĝ(n+1) ≥ℚ ⟨2^{-n}⟩ℚ)`, i.e. `¬(g <ℝ f)` spelled out.
-
-**A bug worth remembering, because of how long it survived.** This once negated the body of
-`lt_R f g` rather than of `lt_R g f`, so `le_R_pu f g` meant `g ≤ℝ f` — the opposite of
-`le_R f g`, and the opposite of what its own docstring claimed. Definition and docstring
-agreed with each other and with nothing else, and no consumer cared about the direction until
-`Derivable.dist_tri` began asserting the triangle inequality with it. At that point the
-constructor was asserting `d(x,y) +ℝ d(y,z) ≤ℝ d(x,z)` — the *reverse* triangle inequality,
-satisfied by no metric.
-
-It is now definitionally aligned with `le_R`: `le_R_pu f g` and `le_R f g` unfold to the
-same statement, the first as `∀n. ¬…` and the second as `¬∃n. …`. -/
+    `le_R_pu f g` and `le_R f g` unfold to the same statement, the first as `∀n. ¬…` and the
+    second as `¬∃n. …`. -/
 def le_R_pu {Γ : Ctx ι} (f g : Term F Γ (realTy ι)) : Formula F Γ :=
   Formula.all Ty.nat
     (Formula.imp

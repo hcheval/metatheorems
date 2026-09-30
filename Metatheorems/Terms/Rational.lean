@@ -10,11 +10,8 @@ namespace Metatheorems
 /-!
 # Rational term definitions
 
-The `Term`-level encoding of ℚ, split out of `RationalNumbers.lean` so that it sits **below**
-`eqAtType` and `Derivable` in the import order. See `Metatheorems/Terms/Arith.lean` for why.
-
-Only the definitions moved. Every proof about them — including the `closed_subst` lemmas,
-which need `Subst` — stays in `RationalNumbers.lean`, above `Derivable`.
+The `Term`-level encoding of ℚ: definitions only, below `eqAtType` and `Derivable` in the
+import order. The proofs about them are in `RationalNumbers.lean`.
 
 Rational numbers are encoded as natural numbers via Cantor pairing of
 (sign-adjusted numerator, denominator - 1).
@@ -24,9 +21,7 @@ variable {ι κ : Type} {F : κ → Ty ι}
 
 namespace Term
 
--- ============================================================================
 -- Section 1: Auxiliary Arithmetic Terms
--- ============================================================================
 
 /-- Maximum: max(x, y) = x + (y ∸ x). -/
 def max {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat →ₜ Ty.nat) :=
@@ -106,9 +101,7 @@ def geq {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat →ₜ Ty.nat) :=
     (.app Term.sg_bar
       (Term.app2 Term.monus (.var .vz) (.var (.vs .vz)))))
 
--- ============================================================================
 -- Section 2: Cantor Pairing
--- ============================================================================
 
 /-- Cantor pairing: pair(a, b) = triag(a + b) + a. -/
 def pair {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat →ₜ Ty.nat) :=
@@ -150,24 +143,14 @@ def snd_pair {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat) :=
       (.app Term.inv_triag (.var .vz))
       (.app Term.fst_pair (.var .vz)))
 
--- ============================================================================
 -- Section 3: Division by 2
--- ============================================================================
 
-/-- Division by 2, **rounding UP**: `div2 n = ⌈n/2⌉ = (n+1)/2`, via state-pair recursion.
+/-- Division by 2, **rounding up**: `div2 n = ⌈n/2⌉ = (n+1)/2` (so `div2 1 = 1`), via
+    state-pair recursion.
 
     state(0) = pair(0, 1)
     state(Sk) = pair(fst(state(k)) + snd(state(k)), sg_bar(snd(state(k))))
-    div2(n) = fst_pair(state(n)).
-
-    **The name says `⌊n/2⌋`; that is wrong — this computes `⌈n/2⌉`.**
-    `QValBridge.rec_div2_state` proves the true invariant,
-    `state k = pairN ((k+1)/2) (1 - k%2)`. The step adds `snd` *before* flipping the
-    parity flag, so the values run 0,1,1,2,2,… — `div2 1 = 1`, while `⌊1/2⌋ = 0`.
-
-    Nothing downstream is affected. `rat_num = div2 (j + isOdd j)` is `⌈j/2⌉` for both
-    parities, which is what the encoding wants, and `div2_zero` / `div2_double` hold of floor
-    and ceiling alike. The name is kept only because renaming it would churn every use. -/
+    div2(n) = fst_pair(state(n)). -/
 def div2 {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat) :=
   Term.lam
     (.app Term.fst_pair
@@ -182,9 +165,7 @@ def div2 {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat) :=
               (.app Term.snd_pair (.var (.vs .vz)))))))
         (.var .vz)))
 
--- ============================================================================
 -- Section 4: Rational Number Encoding
--- ============================================================================
 
 -- A natural number n encodes the rational:
 --   j₁(n) even:  +(j₁(n)/2)     / (j₂(n) + 1)
@@ -222,9 +203,7 @@ def rat_encode {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat →ₜ Ty.nat →
         (.app Term.isEven (.var (.vs (.vs .vz)))))             -- - isEven(sign)
       (.var .vz))))                                            -- den_m1
 
--- ============================================================================
 -- Section 5: Rational Arithmetic
--- ============================================================================
 
 -- All rational operations take natural-number encodings and return encodings.
 
@@ -304,9 +283,7 @@ def abs_Q {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat) :=
       (.app Term.rat_num (.var .vz))                 -- num(n)
       (.app Term.snd_pair (.var .vz)))               -- j₂(n) = den - 1
 
--- ============================================================================
 -- Section 6: Rational Comparison (Decision Terms)
--- ============================================================================
 
 -- Convention: decision terms return 0 when the predicate holds (matching qf_term).
 
@@ -332,9 +309,7 @@ def le_Q_dec {Γ : Ctx ι} : Term F Γ (Ty.nat →ₜ Ty.nat →ₜ Ty.nat) :=
        (Term.app2 Term.abs_diff (.app Term.rat_sign diff) (.app .succ .zero))
        (.app Term.rat_num diff)))
 
--- ============================================================================
 -- Section 7: Rational Constants
--- ============================================================================
 
 /-- Encode the natural number n as a (non-negative) rational: n/1.
     encode_nat_Q(n) = pair(2·n, 0). -/
@@ -360,9 +335,7 @@ def zero_Q {Γ : Ctx ι} : Term F Γ Ty.nat :=
 def one_Q {Γ : Ctx ι} : Term F Γ Ty.nat :=
   Term.app2 Term.pair (Term.ofNat 2) .zero
 
--- ============================================================================
 -- Section 8: Rational Equality (Decision Term)
--- ============================================================================
 
 /-- Decision term for rational equality: returns 0 iff a =_ℚ b.
     eq_Q_dec(a, b) = |num(a)·den(b) - num(b)·den(a)| + |sign(a) - sign(b)| · sg(num(a) + num(b))
