@@ -12,9 +12,7 @@ open Formula
 
 variable {ι κ : Type} {F : κ → Ty ι} {X : ι → Type}
 
--- ============================================================================
 -- The metatheorem, with majorants supplied by the syntax
--- ============================================================================
 
 section Metatheorem
 
@@ -74,20 +72,7 @@ theorem syntactic_extraction
 
 Identical in content to `syntactic_general_metatheorem` below, but the conclusion is a
 `Subtype` rather than an `∃`, so `Φ` is *available* — `(… ).val` is a function that computes.
-This is the same `Prop`→`Type` move the design table records for the Dialectica realizer
-("Subtype, not `∃` — lives in `Type`, witness extractable via `.val`"), and that
-`ConstMajorants`/`termMajorizer`/`closedMajorizer` made for majorizability.
-
-**Why the extra hypothesis.** It takes a `ConstMajorants am`, where the `∃` version needs only
-`AbstractMajorizability`. That is forced, not stylistic: `majorant_of_closed_term` returns a
-`Prop`-existential, which cannot be eliminated into a `Type`-valued goal, so the majorants must
-come from `closedMajorizer` instead. `ConstMajorants` is inhabited where it matters —
-`bezemConstMajorantsEmpty` at `ι = Empty`, `MetricModel.constMajorants n₀` for metric spaces.
-
-**What it does not do.** It does not make Φ *reduce*; the bound is only as computable as
-`syntactic_soundness` is reducible on the given derivation, which for a proof-mode derivation
-is what the `Probes/SeqMpBoundProbe.lean` line of work is about. What it provides is a
-statement in which a computed bound can be *put*. -/
+Takes a `ConstMajorants am` where the `∃` version needs only `AbstractMajorizability`. -/
 def syntactic_general_metatheorem_at
     (eqxi : EqXInterp X F si)
     (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B)
@@ -112,17 +97,10 @@ def syntactic_general_metatheorem_at
      (closedMajorizer_maj cm (extractedVTerm eqxi spremise prf))
      (syntactic_extraction eqxi spremise hB_qf hB_vf hC_qf hC_vf prf)⟩
 
-/-- **The point of the whole branch.**
-
-From a derivation of `∀x (∀u B₀ → ∃v C₀)` we obtain a bound `Φ` depending only on a
+/-- From a derivation of `∀x (∀u B₀ → ∃v C₀)` we obtain a bound `Φ` depending only on a
 majorant of `x` — with *no* majorizability hypotheses beyond `AbstractMajorizability`
 itself. The `U_star` / `V_star` that `metatheorem_core_of_majorants` asks for are produced
-by `all_closed_terms_majorizable`, because the extracted functionals are closed terms.
-
-This is what replaced the document's Def. 6.0.1 route, which assumed a *total* majorizer on
-every semantic value — an assumption that is not satisfiable (`MajorizabilityRel.lean`'s
-closing section). Getting the majorants from the syntax instead is the whole content of the
-`syntactic-witnesses` design. -/
+by `all_closed_terms_majorizable`, because the extracted functionals are closed terms. -/
 theorem syntactic_general_metatheorem
     (eqxi : EqXInterp X F si)
     (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B)
@@ -149,10 +127,7 @@ theorem syntactic_general_metatheorem
 
 Same conclusion as `syntactic_general_metatheorem`, but the input derivation may use LEM and
 QF-AC (`Allowed.classical`), and — as there — the only majorizability hypothesis is
-`AbstractMajorizability`. The total-majorizer version of this statement was not merely
-harder to apply but impossible: that field is unsatisfiable over the full set-theoretic type
-structure, which is why the metric model could never have used it
-(`MajorizabilityRel.lean`'s closing section).
+`AbstractMajorizability`.
 
 The route:
 
@@ -163,12 +138,7 @@ The route:
    (the semantic version strips it with `Classical.not_not` instead), challenging it with the
    default `¬E`-witness.
 4. `majorant_of_closed_term` twice — majorants, free, because the extractors are closed.
-5. `metatheorem_core_of_majorants`.
-
-The default challenge in step 3 is legitimate for the same reason the semantic version's is:
-`B₀' →ᶠ C₀'` is quantifier-free and ∨-free, so `dialecticaMatrix_iff_interpFormula` reduces
-its matrix to the formula's interpretation **for every** counter. That is precisely the
-property the unprenexified route lacks. -/
+5. `metatheorem_core_of_majorants`. -/
 theorem syntactic_general_metatheorem_classical
     (eqxi : EqXInterp X F si)
     (nts : NTStableD Premises)
@@ -239,17 +209,10 @@ theorem syntactic_general_metatheorem_classical
     (fun x v => Formula.interpret si C₀ (v, (x, ())))
     (Term.interpret si Ut ()) (Term.interpret si Vt ()) U_star V_star hU hV hUV
 
--- ============================================================================
--- The classical metatheorem with the bound as DATA
--- ============================================================================
+-- The classical metatheorem with the bound as data
 
 /-- The realizing term for the prenexified, negatively translated statement — the classical
-route's analogue of `syntactic_soundness … prf`.
-
-It exists as a `def` rather than as a `let` inside a proof for two reasons. First, CLAUDE.md
-hard rule 4: as a `let`-value an enormous realizer makes every later defeq check try to
-`whnf` it. Second, `syntactic_general_metatheorem_classical_at` below must mention the
-extracted terms in its *value* component, which a tactic-mode `obtain` cannot reach. -/
+route's analogue of `syntactic_soundness … prf`. -/
 def prenexRealizer
     (eqxi : EqXInterp X F si)
     (nts : NTStableD Premises)
@@ -298,16 +261,8 @@ def extractedVTermP
 
 /-- **The extraction half of the classical metatheorem**, over an *abstract* realizer of the
 prenexified, negatively translated statement: challenged at `U`, the premise yields the
-conclusion at `V`. No majorizability in sight.
-
-**`w` must be a variable, not the applied `prenexRealizer`.** This is the whole reason the
-lemma is stated separately rather than inlined into `syntactic_extraction_classical` below.
-`syntactic_general_metatheorem_classical` gets its realizer from `obtain ⟨w, hw⟩`, so `w` is
-an opaque local and `Term.interpret si w` is stuck; written directly against
-`(prenexRealizer …).val` the `simp only [dialecticaMatrix]` step tries to reduce the realizer
-itself and the elaboration dies at a `whnf` heartbeat timeout with no error to point at. This
-is the same failure mode as binding a large realizer with `let` instead of `obtain`: an
-enormous term in a position where every later defeq check tries to reduce it. -/
+conclusion at `V`. No majorizability in sight. `w` is a variable, not the applied
+`prenexRealizer`. -/
 theorem extraction_of_prenex_realizer
     {ρ : Ty ι} {B₀ C₀ : Formula F [Ty.nat, ρ]}
     (hB_qf : B₀.isQF = true) (hB_vf : B₀.isVFree = true)
@@ -398,15 +353,9 @@ theorem syntactic_extraction_classical
 
 `syntactic_general_metatheorem_classical` with a `Subtype` in place of the `∃`, so `Φ` is
 *available* rather than merely known to exist. Stands to it exactly as
-`syntactic_general_metatheorem_at` stands to `syntactic_general_metatheorem`, and for the
-same reason takes a `ConstMajorants`: `majorant_of_closed_term` returns a `Prop`-existential,
-which cannot be eliminated into a `Type`-valued goal, so the majorants must come from
-`closedMajorizer`.
-
-This is the entry point a *classical* derivation needs in order to produce a numeral.
-CLAUDE.md's Track D1 recorded it as the missing half of the `_at` work; `Probes/LemBoundDemo.lean`
-is its first client, and the first extraction in the project from a derivation containing
-`Derivable.lem`. -/
+`syntactic_general_metatheorem_at` stands to `syntactic_general_metatheorem`, and takes a
+`ConstMajorants` for the same reason. This is the entry point a *classical* derivation needs
+in order to produce a numeral. -/
 def syntactic_general_metatheorem_classical_at
     (eqxi : EqXInterp X F si)
     (nts : NTStableD Premises)
@@ -437,51 +386,15 @@ def syntactic_general_metatheorem_classical_at
 
 end Metatheorem
 
--- ============================================================================
--- General matrices: a ∀-formula premise and an ∃-formula conclusion (Kohlenbach 17.52)
--- ============================================================================
-
 /-!
 ## The metatheorem with general matrices — Kohlenbach, Theorem 17.52
 
-Kohlenbach's statement (Applied Proof Theory, Thm. 17.52, p. 403) reads: *let `B∀(x,u)`,
-resp. `C∃(x,v)`, be ∀- resp. ∃-formulas … from a proof of `∀x^ρ (∀u⁰ B∀(x,u) → ∃v⁰ C∃(x,v))`
-one can extract `Φ` such that `∀u ≤ Φ(x*) B∀(x,u) → ∃v ≤ Φ(x*) C∃(x,v)`.* The reference
-document transcribes `B∀` as `∀b̲ B₀` and `C∃` as `∃c̲ C₀` with `B₀`, `C₀` quantifier-free.
-
-`syntactic_general_metatheorem` above demands `B₀.isQF` and `C₀.isQF` — i.e. `b̲`, `c̲`
-empty — which is a genuine restriction against both sources (`ARCHITECTURE.md` §13). The
-theorems in this section remove it: the premise matrix may be any **purely universal**
+The theorems in this section relax the quantifier-free restriction of
+`syntactic_general_metatheorem`: the premise matrix may be any **purely universal**
 formula (`isPurelyUniversal`) and the conclusion matrix any **purely existential** one
 (`isPurelyExistential`), both ∨-free. The QF versions are the instances
-`Formula.isPurelyUniversal_of_qf` / `Formula.isPurelyExistential_of_qf`.
-
-**Single quantifier block = the book's tuple, because `Ty` has products.** Kohlenbach needs
-a tuple `b̲ = b₁,…,bₙ` only because his type system has no product types. Ours does (`Ty.prod`,
-since the `syntactic-witnesses` merge), and `Formula.all` binds a variable of *any*
-`ρ : Ty ι`, so `∀b₁^ρ₁ … ∀bₙ^ρₙ B₀` is `∀b^(ρ₁ ×ₜ … ×ₜ ρₙ) B₀[fst/snd projections]`. So a
-`∀b^σ B₀` with `σ` arbitrary — `syntactic_general_metatheorem_block` below — is *equivalent
-to* 17.52's `∀b̲ B₀`, not a weaker special case; and `isPurelyUniversal` allows any nesting
-anyway. `degree (.prod ρ τ) = max ρ.degree τ.degree`, so products never raise the type
-degree. Only `u` and `v` stay at `Ty.nat`: `Φ` bounds them numerically, exactly as in 17.52.
-
-**What replaced `dialecticaMatrix_iff_interpFormula`.** That lemma says a QF ∨-free matrix
-equals its interpretation *at every witness and counter*; it is what let the old extraction
-ignore the realizer's challenge. For a ∀-formula that is false — the matrix at counter
-`(b, …)` is the *instance* at `b`, not the ∀ — so it is replaced by the pair
-`dialecticaMatrix_of_interp_pu` (a true ∀-formula has a true matrix at every witness and
-counter) and `interp_of_dialecticaMatrix_pe` (an ∃-formula whose matrix holds is true), in
-`Dialectica/Defs.lean`. Nothing else in the pipeline changed: `extractUTerm`/`extractVTerm`,
-`syntactic_soundness`, `closedMajorizer` and `metatheorem_core_of_majorants` never looked at
-the matrices' shape.
-
-**Prenexification was not needed for the extended route.** The book and the document expand
-`∀u∀b̲ B₀ → ∃v∃c̲ C₀` to the prenex `∃u,v,b̲,c̲ (B₀ → C₀)` because they interpret a *classical*
-proof. For an `Allowed.extended` input, Dialectica interprets `∀u B∀ → ∃v C∃` directly: the
-realizer's counter component already returns `(u, (b, …))`, and the witness component
-`(v, (c, …))`. The classical route (`syntactic_general_metatheorem_classical_gen`) does go
-through `classical_to_prenex_extended_gen`, where the only new work is restoring `B'` from
-`B'ₙₜ` after the negative translation.
+`Formula.isPurelyUniversal_of_qf` / `Formula.isPurelyExistential_of_qf`. A single quantifier
+block `∀b^σ` plays the role of the book's tuple `∀b̲`, since `Ty` has products.
 -/
 
 section GeneralMatrices

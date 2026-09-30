@@ -30,9 +30,7 @@ variable {Premises : PremiseSet F}
 variable (premise_realizer : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ →
     ∀ env : Ctx.interpret X Γ', dialecticaRealizerCtx si B env)
 
--- ============================================================================
 -- Modus ponens
--- ============================================================================
 
 def dialectica_mp {Γ : Ctx ι} {A B : Formula F Γ} (env : Ctx.interpret X Γ)
     (hA : dialecticaRealizerCtx si A env)
@@ -40,36 +38,28 @@ def dialectica_mp {Γ : Ctx ι} {A B : Formula F Γ} (env : Ctx.interpret X Γ)
     dialecticaRealizerCtx si B env :=
   ⟨hAB.val.1 hA.val, fun yB => hAB.property (hA.val, yB) (hA.property (hAB.val.2 hA.val yB))⟩
 
--- ============================================================================
 -- Ex falso quodlibet
--- ============================================================================
 
 def dialectica_exfalso {Γ : Ctx ι} {A : Formula F Γ} (env : Ctx.interpret X Γ)
     (inhW : 𝕎 X A) (inhC : ℂ X A) :
     dialecticaRealizerCtx si (⊥ᶠ →ᶠ A) env :=
   ⟨⟨fun _ => inhW, fun _ _ => ()⟩, fun ⟨(), _⟩ h => absurd h id⟩
 
--- ============================================================================
 -- ∧-weakening: A ∧ B → A
--- ============================================================================
 
 def dialectica_and_weak {Γ : Ctx ι} {A B : Formula F Γ} (env : Ctx.interpret X Γ)
     (inhC : ℂ X B) :
     dialecticaRealizerCtx si (A ∧ᶠ B →ᶠ A) env :=
   ⟨⟨fun xAB => xAB.1, fun _ yA => (yA, inhC)⟩, fun ⟨⟨_, _⟩, _⟩ h => h.1⟩
 
--- ============================================================================
 -- ∧-permutation: A ∧ B → B ∧ A
--- ============================================================================
 
 def dialectica_and_perm {Γ : Ctx ι} {A B : Formula F Γ} (env : Ctx.interpret X Γ) :
     dialecticaRealizerCtx si (A ∧ᶠ B →ᶠ B ∧ᶠ A) env :=
   ⟨⟨fun xAB => (xAB.2, xAB.1), fun _ yBA => (yBA.2, yBA.1)⟩,
    fun ⟨⟨_, _⟩, ⟨_, _⟩⟩ h => ⟨h.2, h.1⟩⟩
 
--- ============================================================================
 -- ∨-weakening: A → A ∨ B
--- ============================================================================
 
 def dialectica_or_weak {Γ : Ctx ι} {A B : Formula F Γ} (env : Ctx.interpret X Γ)
     (inhW : 𝕎 X B) :
@@ -77,9 +67,7 @@ def dialectica_or_weak {Γ : Ctx ι} {A B : Formula F Γ} (env : Ctx.interpret X
   ⟨⟨fun xA => (0, xA, inhW), fun _ yAB => yAB.1⟩,
    fun ⟨_, ⟨yA, _⟩⟩ h => ⟨fun _ => h, fun hf => absurd rfl hf⟩⟩
 
--- ============================================================================
 -- ∨-permutation: A ∨ B → B ∨ A
--- ============================================================================
 
 def dialectica_or_perm {Γ : Ctx ι} {A B : Formula F Γ} (env : Ctx.interpret X Γ) :
     dialecticaRealizerCtx si (A ∨ᶠ B →ᶠ B ∨ᶠ A) env :=
@@ -92,9 +80,7 @@ def dialectica_or_perm {Γ : Ctx ι} {A B : Formula F Γ} (env : Ctx.interpret X
        exact absurd h one_ne_zero
      · exact ⟨fun _ => hF hz, fun h => absurd (by simp [hz]) h⟩⟩
 
--- ============================================================================
 -- ∨-contraction: A ∨ A → A
--- ============================================================================
 
 def dialectica_or_contract {Γ : Ctx ι} {A : Formula F Γ} (env : Ctx.interpret X Γ) :
     dialecticaRealizerCtx si (A ∨ᶠ A →ᶠ A) env :=
@@ -105,9 +91,7 @@ def dialectica_or_contract {Γ : Ctx ι} {A : Formula F Γ} (env : Ctx.interpret
      · simpa [hz] using h.1 hz
      · simpa [hz] using h.2 hz⟩
 
--- ============================================================================
 -- ∧-contraction: A → A ∧ A
--- ============================================================================
 
 def dialectica_and_contract {Γ : Ctx ι} {A : Formula F Γ} (env : Ctx.interpret X Γ) :
     dialecticaRealizerCtx si (A →ᶠ A ∧ᶠ A) env :=
@@ -122,9 +106,7 @@ def dialectica_and_contract {Γ : Ctx ι} {A : Formula F Γ} (env : Ctx.interpre
      · simp only [if_pos hd] at hm; exact ⟨hd, hm⟩
      · simp only [if_neg hd] at hm; exact absurd hm hd⟩
 
--- ============================================================================
 -- Syllogism
--- ============================================================================
 
 def dialectica_syllogism {Γ : Ctx ι} {A B C : Formula F Γ} (env : Ctx.interpret X Γ)
     (hAB : dialecticaRealizerCtx si (A →ᶠ B) env)
@@ -135,9 +117,7 @@ def dialectica_syllogism {Γ : Ctx ι} {A B C : Formula F Γ} (env : Ctx.interpr
   ⟨⟨fun xA => U_BC (U_AB xA), fun xA yC => Y_AB xA (Y_BC (U_AB xA) yC)⟩,
    fun ⟨xA, yC⟩ hA => h_BC (U_AB xA, yC) (h_AB (xA, Y_BC (U_AB xA) yC) hA)⟩
 
--- ============================================================================
 -- Exportation: A ∧ B → C implies A → (B → C)
--- ============================================================================
 
 def dialectica_exportation {Γ : Ctx ι} {A B C : Formula F Γ} (env : Ctx.interpret X Γ)
     (h : dialecticaRealizerCtx si (A ∧ᶠ B →ᶠ C) env) :
@@ -147,9 +127,7 @@ def dialectica_exportation {Γ : Ctx ι} {A B C : Formula F Γ} (env : Ctx.inter
     fun xA ⟨xB, yC⟩ => (Z (xA, xB) yC).1⟩,
    fun ⟨xA, xB, yC⟩ hA hB => hV ⟨(xA, xB), yC⟩ ⟨hA, hB⟩⟩
 
--- ============================================================================
 -- Importation: A → (B → C) implies A ∧ B → C
--- ============================================================================
 
 def dialectica_importation {Γ : Ctx ι} {A B C : Formula F Γ} (env : Ctx.interpret X Γ)
     (h : dialecticaRealizerCtx si (A →ᶠ B →ᶠ C) env) :
@@ -158,9 +136,7 @@ def dialectica_importation {Γ : Ctx ι} {A B C : Formula F Γ} (env : Ctx.inter
   ⟨⟨fun xAB => (U xAB.1).1 xAB.2, fun xAB yC => (Y xAB.1 (xAB.2, yC), (U xAB.1).2 xAB.2 yC)⟩,
    fun ⟨⟨xA, xB⟩, yC⟩ ⟨hA, hB⟩ => hU (xA, (xB, yC)) hA hB⟩
 
--- ============================================================================
 -- Expansion: A → B implies C ∨ A → C ∨ B
--- ============================================================================
 
 def dialectica_expansion {Γ : Ctx ι} {A B C : Formula F Γ} (env : Ctx.interpret X Γ)
     (h : dialecticaRealizerCtx si (A →ᶠ B) env) :
@@ -170,9 +146,7 @@ def dialectica_expansion {Γ : Ctx ι} {A B C : Formula F Γ} (env : Ctx.interpr
     fun xCA yCB => (yCB.1, Y_AB xCA.2.2 yCB.2)⟩,
    fun ⟨⟨z, xC, xA⟩, ⟨yC, yB⟩⟩ ⟨hC, hA⟩ => ⟨hC, fun hz => h_AB (xA, yB) (hA hz)⟩⟩
 
--- ============================================================================
 -- Equality axioms
--- ============================================================================
 
 def dialectica_refl0 {Γ : Ctx ι} {t : Term F Γ Ty.nat} (env : Ctx.interpret X Γ) :
     dialecticaRealizerCtx si (.eq0 t t) env :=
@@ -186,9 +160,7 @@ def dialectica_trans0 {Γ : Ctx ι} {s t u : Term F Γ Ty.nat} (env : Ctx.interp
     dialecticaRealizerCtx si (.eq0 s t ∧ᶠ .eq0 t u →ᶠ .eq0 s u) env :=
   ⟨⟨fun _ => (), fun _ _ => ((), ())⟩, fun ⟨((), ()), ()⟩ ⟨h1, h2⟩ => h1.trans h2⟩
 
--- ============================================================================
 -- QF-ER (qfer): A₀ →ᶠ eqAtType ρ s t  implies  A₀ →ᶠ eqAtType σ (r.subst0 s) (r.subst0 t)
--- ============================================================================
 
 /-- A canonical element of `Ty.interpret X ρ`, using `si.zeroInterp` at base types. -/
 private def Ty.interpret_default' {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
@@ -341,9 +313,7 @@ def dialectica_qfer {Γ : Ctx ι} {A₀ : Formula F Γ} {ρ σ : Ty ι}
   rw [← hwW]
   exact hrσ.property yEqσ
 
--- ============================================================================
 -- ∀-axiom: ∀x^ρ A → A[t/x]
--- ============================================================================
 
 def dialectica_forall_ax {Γ : Ctx ι} {ρ : Ty ι} {A : Formula F (ρ :: Γ)}
     (env : Ctx.interpret X Γ) (t : Term F Γ ρ) :
@@ -357,9 +327,7 @@ def dialectica_forall_ax {Γ : Ctx ι} {ρ : Ty ι} {A : Formula F (ρ :: Γ)}
        (f (Term.interpret si t env)) (cast hC zc)).mpr hyp
      rwa [cast_cancel hC] at key⟩
 
--- ============================================================================
 -- ∃-axiom: A[t/x] → ∃x^ρ A
--- ============================================================================
 
 def dialectica_exist_ax {Γ : Ctx ι} {ρ : Ty ι} {A : Formula F (ρ :: Γ)}
     (env : Ctx.interpret X Γ) (t : Term F Γ ρ) :
@@ -372,9 +340,7 @@ def dialectica_exist_ax {Γ : Ctx ι} {ρ : Ty ι} {A : Formula F (ρ :: Γ)}
      rw [cast_cancel hW w] at key
      exact key hyp⟩
 
--- ============================================================================
 -- ∀-rule: (B.weakenBy ρ → A) implies B → ∀x A
--- ============================================================================
 
 def dialectica_forall_rule
     {Γ : Ctx ι} {ρ : Ty ι} {B : Formula F Γ} {A : Formula F (ρ :: Γ)}
@@ -395,9 +361,7 @@ def dialectica_forall_rule
             eq_of_heq ((cast_heq _ _).trans (cast_heq _ _))
           rw [hcc]; exact hprem))
 
--- ============================================================================
 -- ∃-rule: (A → B.weakenBy ρ) implies ∃x A → B
--- ============================================================================
 
 def dialectica_exist_rule
     {Γ : Ctx ι} {ρ : Ty ι} {B : Formula F Γ} {A : Formula F (ρ :: Γ)}
@@ -419,9 +383,7 @@ def dialectica_exist_rule
     eq_of_heq ((cast_heq _ _).trans (cast_heq _ _))
   rw [hcc] at hfwd; exact hfwd
 
--- ============================================================================
 -- Universal generalization
--- ============================================================================
 
 def dialectica_univ_gen {Γ : Ctx ι} {ρ : Ty ι} {A : Formula F Γ}
     (env : Ctx.interpret X Γ)
@@ -433,9 +395,7 @@ def dialectica_univ_gen {Γ : Ctx ι} {ρ : Ty ι} {A : Formula F Γ}
     (dialecticaMatrix_weaken si A env z (cast hW.symm hA.val) yA).mpr
       ((cast_cancel hW.symm hA.val).symm ▸ hA.property (cast hC yA))⟩
 
--- ============================================================================
 -- Induction
--- ============================================================================
 
 def dialectica_induction {Γ : Ctx ι} {A : Formula F (Ty.nat :: Γ)} (env : Ctx.interpret X Γ)
     (hbase : dialecticaRealizerCtx si (A.subst0 Term.zero) env)
@@ -491,9 +451,7 @@ def dialectica_induction {Γ : Ctx ι} {A : Formula F (Ty.nat :: Γ)} (env : Ctx
       exact h
     exact iff_step.mp hconc
 
--- ============================================================================
 -- Nonemptiness helpers (needed for exfalso / and_weak / or_weak)
--- ============================================================================
 
 /-- `Ty.interpret X ρ` is always nonempty given a `SpaceInterp`. -/
 private lemma Ty.interpret_nonempty {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
@@ -523,9 +481,7 @@ private lemma dialectica_nonempty {ι κ : Type} {X : ι → Type} {F : κ → T
   | ex  ρ _ ihA =>
     exact ⟨⟨(Ty.interpret_nonempty si ρ).some, ihA.1.some⟩, ⟨ihA.2.some⟩⟩
 
--- ============================================================================
 -- Markov's principle
--- ============================================================================
 
 def dialectica_markov {Γ : Ctx ι} {ρ : Ty ι} {A₀ : Formula F (ρ :: Γ)}
     (hqf : A₀.isQF = true) (hvf : A₀.isVFree = true)
@@ -547,9 +503,7 @@ def dialectica_markov {Γ : Ctx ι} {ρ : Ty ι} {A₀ : Formula F (ρ :: Γ)}
   rw [hyQ, ← hW]
   exact Classical.not_not.mp hprem'
 
--- ============================================================================
 -- Independence of premise
--- ============================================================================
 
 def dialectica_ip {Γ : Ctx ι} {ρ σ : Ty ι}
     {A₀ : Formula F (σ :: Γ)} {B : Formula F (ρ :: Γ)}
@@ -593,9 +547,7 @@ def dialectica_ip {Γ : Ctx ι} {ρ σ : Ty ι}
   rw [hcc] at key
   exact key
 
--- ============================================================================
 -- Axiom of choice
--- ============================================================================
 
 def dialectica_ac {Γ : Ctx ι} {ρ τ : Ty ι} {A : Formula F (τ :: ρ :: Γ)}
     (env : Ctx.interpret X Γ) :
@@ -633,13 +585,9 @@ def dialectica_ac {Γ : Ctx ι} {ρ τ : Ty ι} {A : Formula F (τ :: ρ :: Γ)}
     rw [acSubst_env x (fun z => (fp z).1)]
     exact h⟩
 
--- ============================================================================
 -- Soundness for the base Derivable proof system
--- ============================================================================
 
--- ============================================================================
 -- Main soundness theorem (Theorem 3.0.7) — proved here to avoid circular import
--- ============================================================================
 
 /-- Generalized Dialectica realizer for any context and environment.
     Returns a realizer for all environments; structural recursion on the derivation. -/

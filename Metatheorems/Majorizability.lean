@@ -21,9 +21,7 @@ is an abstract majorizability if:
 3. All constants are majorizable (with a uniform threshold N).
 -/
 
--- ============================================================================
 -- Abstract Majorizability
--- ============================================================================
 
 /-- Abstract majorizability (Definition 6.0.1).
 
@@ -42,22 +40,8 @@ structure AbstractMajorizability {ι κ : Type} {X : ι → Type} {F : κ → Ty
     (x_star : Ty.interpret X ρ.hat) (x : Ty.interpret X ρ),
     maj (ρ →ₜ τ) f_star f → maj ρ x_star x → maj τ (f_star x_star) (f x)
   /-- **Self-majorization** (`≽ᵃ_ρ̂`), the second conjunct of Bezem's definition. Both
-      arguments are at the hat type; `bezemMaj`'s instance of this is `hatMaj`.
-
-      Introduced with the two-clause widening of `bezemMaj`: with two clauses a majorization at
-      an arrow type carries strictly more information than the pointwise statement, so
-      `arrow_intro` is no longer simply the converse of `app_compat`.
-
-      **Why this is a field and not a definition.** It is *not* that the notion cannot be
-      recovered — `Ty.hat` is idempotent and sends every base type to `.nat`, so
-      `maj ρ.hat` has exactly this type, and for `bezemMaj` it *is* this relation (the
-      `base i` clause is unreachable at a hat type, leaving `hatMaj`). What blocks defining
-      `selfMaj ρ := maj ρ.hat` is that `ρ.hat.hat = ρ.hat` holds only *propositionally* for a
-      variable `ρ`, so the definition would carry a transport and every use site would carry an
-      `Eq.rec`. Dependent-cast traffic is this project's measured pathology — `Eq.rec ↦ 60474`
-      in a stalling profile — so the notion is carried rather than derived. An earlier version
-      of this docstring said "there is no way to recover it", which is true of `maj` at `ρ` and
-      false at `ρ.hat`. -/
+      arguments are at the hat type; `bezemMaj`'s instance of this is `hatMaj`. A field rather
+      than `maj ρ.hat`, because `ρ.hat.hat = ρ.hat` holds only propositionally. -/
   selfMaj : (ρ : Ty ι) → Ty.interpret X ρ.hat → Ty.interpret X ρ.hat → Prop
   /-- A majorant majorizes itself. -/
   maj_selfMaj : ∀ {ρ : Ty ι} {x_star : Ty.interpret X ρ.hat} {x : Ty.interpret X ρ},
@@ -69,10 +53,8 @@ structure AbstractMajorizability {ι κ : Type} {X : ι → Type} {F : κ → Ty
     {x y : Ty.interpret X ρ.hat},
     selfMaj (ρ →ₜ τ) f g → selfMaj ρ x y → selfMaj τ (f x) (g y)
   /-- Property 2': arrow introduction (converse of app_compat).
-      Needed for primitive lambda abstractions.
-
-      The second hypothesis is the self-majorization obligation; it is what the widening
-      costs, and it is what `all_terms_majorizable` has to thread through the `lam` case. -/
+      Needed for primitive lambda abstractions. The second hypothesis is the
+      self-majorization obligation. -/
   arrow_intro : ∀ {ρ τ : Ty ι}
     (f_star : Ty.interpret X (ρ →ₜ τ).hat) (f : Ty.interpret X (ρ →ₜ τ)),
     (∀ (x_star : Ty.interpret X ρ.hat) (x : Ty.interpret X ρ),
@@ -109,15 +91,9 @@ structure AbstractMajorizability {ι κ : Type} {X : ι → Type} {F : κ → Ty
   /-- The unit type is a singleton, so it is majorized outright. -/
   unit_maj : maj .unit () ()
   /-- **`maxT` compatibility, left** — a pointwise maximum majorizes whatever its left
-      argument majorizes, provided the right argument majorizes itself.
-
-      Forced by `and_contract`'s monotone majorant (Kohlenbach Thm 9.1, p. 143 case 1:
-      `t*_Y := λx y' y''. max(y', y'')`): the monotone functional interpretation replaces the
-      matrix-branching counter of contraction by a `max`, and "a `max` of majorants majorizes"
-      is not derivable from the other fields — the abstract relation has no `max`. The book
-      has it free because its `maj` is Howard's concrete relation; our abstraction must
-      state it. True of every `bezem*` instance (`maxT_bezemMaj_left`); promoted here from
-      `Probes/MonotoneSpike.lean`'s `MaxCompat`. -/
+      argument majorizes, provided the right argument majorizes itself. Needed by
+      `and_contract`'s monotone majorant; true of every `bezem*` instance
+      (`maxT_bezemMaj_left`). -/
   maxT_maj_left : ∀ {ρ : Ty ι} {a b : Ty.interpret X ρ.hat} {c : Ty.interpret X ρ},
     maj ρ a c → selfMaj ρ b b → maj ρ (maxT ρ a b) c
   /-- **`maxT` compatibility, right** — the mirror image of `maxT_maj_left`. -/
@@ -156,9 +132,7 @@ structure AbstractMajorizability {ι κ : Type} {X : ι → Type} {F : κ → Ty
     ∃ d_star : ℕ → Ty.interpret X (Ty.base i →ₜ Ty.base i →ₜ realTy ι).hat,
     ∀ n ≥ N, maj (Ty.base i →ₜ Ty.base i →ₜ realTy ι) (d_star n) (si.distInterp i)
 
--- ============================================================================
 -- Hat-context lookup and majorizable environments
--- ============================================================================
 
 /-- Look up a variable in an interpreted hat-context. -/
 def Ctx.lookupHat {ι : Type} {X : ι → Type} :
@@ -219,9 +193,7 @@ lemma MajEnv.toSelfMajEnv {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
   | [],     _, _, _ => trivial
   | _ :: Γ, _, _, h => ⟨am.maj_selfMaj h.1, MajEnv.toSelfMajEnv Γ h.2⟩
 
--- ============================================================================
 -- All terms are majorizable (generalized Lemma 6.0.2)
--- ============================================================================
 
 /-- A closed term `t : Term F [] ρ` is majorizable if there exists
     `t* : ℕ → Ty.interpret X ρ̂` such that `t*(n) ≥*_ρ t` for all `n ≥ N`. -/
@@ -238,41 +210,7 @@ def IsMajorizable {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     - Variables: use `MajEnv.lookup`
     - Application: combine majorants via `app_compat`
     - Lambda: use IH on body + `arrow_intro`
-    - Constants: use the corresponding field of `AbstractMajorizability`
-
-    ## Why this does not contradict `Majorizability` being uninhabitable
-
-    This is the question the whole architecture turns on, so it is recorded here rather than
-    left to be rediscovered.
-
-    `Majorizability.majorizer` asks for a majorant of **every semantic value** `x : ⟦ρ⟧`, and
-    provably cannot exist: fix `f* = id` at `(ℕ→ℕ)→ℕ`; the functions it majorizes are
-    `S = {f | ∀n, f n ≤ n}`, and a single number `Φ* id` would have to bound `Φ` on all of `S`.
-    Take `Φ f :=` the least `n ≥ 1` with `f n = 0`, else `0`, and `f_k :=` the identity with a
-    zero planted at `k`: every `f_k ∈ S`, and `Φ (f_k) = k` is unbounded. So no majorant.
-
-    This lemma looks stronger — it even handles open terms — but it quantifies over a
-    **different domain**. `⟦ρ⟧` is the full set-theoretic type structure, uncountable, and
-    contains functionals like `Φ` above, which is discontinuous (hence not computable, hence
-    certainly not System T definable) and lives in Lean only via `Classical.dec`. `Term F Γ ρ`
-    is countable syntax, every member of which is a System T term. **Majorizability holds on
-    the definable part and fails on the whole**, and the environment generalisation does not
-    bridge that: "given majorants for the free variables, produce one for the term" is the
-    fundamental lemma of a logical relation over *syntax*, extending the induction through
-    binders, not the domain from syntax to semantics. Closed terms are the empty-environment
-    case, which is `all_closed_terms_majorizable`.
-
-    Stated pen-and-paper, with no de Bruijn indices: *for all valuations `σ*`, `σ` with
-    `σ*(x) ≽ σ(x)` at every free variable `x` of `t`, we have `⟦t⟧σ* ≽ ⟦t⟧σ`.* Kohlenbach
-    needs only the closed case because a combinatory language has no free variables; binders
-    force the generalisation, exactly as they do in any Tait/Girard-style argument.
-
-    **The consequence for the design**: a Dialectica realizer built by recursion on a
-    derivation *is* definable — but once its type is a Lean `Type`, that fact is erased, and
-    majorization needs it. Making the witness type an object-level `Ty ι`, so that realizers
-    are `Term`s, is exactly the act of keeping it. Note the converse fails — there are
-    majorizable functionals no term denotes — so the syntactic route preserves something
-    strictly stronger than needed; it is simply the property that survives by construction. -/
+    - Constants: use the corresponding field of `AbstractMajorizability` -/
 theorem all_terms_majorizable {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     {si : SpaceInterp X F} (am : AbstractMajorizability si)
     {Γ : Ctx ι} {ρ : Ty ι} (t : Term F Γ ρ) :
@@ -365,24 +303,12 @@ theorem all_closed_terms_majorizable {ι κ : Type} {X : ι → Type} {F : κ �
   obtain ⟨t_star, ht⟩ := all_terms_majorizable am t
   exact ⟨fun n => t_star n (), fun n hn => (ht n hn).1 () () True.intro⟩
 
--- ============================================================================
 -- The majorant as DATA: `ConstMajorants` and `termMajorizer`
--- ============================================================================
 
-/-! `IsMajorizable` is a `Prop`, so `all_closed_terms_majorizable` proves a majorant *exists*
-and then discards it. That is the wrong side of the `Prop`/`Type` line for this project: the
-Dialectica layer deliberately uses `Subtype` rather than `∃` precisely because "`∃` in `Prop`
-prevents computational extraction", and the majorizability layer then undoes that at the last
-step — the bound `Φ` a metatheorem produces is provably there but cannot be computed.
-
-Nothing about the mathematics forces this. `all_terms_majorizable`'s proof is structural on the
-term and entirely constructive; the only genuinely `∃`-shaped inputs are
-`AbstractMajorizability`'s six per-constant majorant fields. `ConstMajorants` is exactly those
-six, as **data**, and `termMajorizer` is the same recursion written as a function.
-
-The existing `Prop` API is untouched — `all_terms_majorizable` and `majorant_of_closed_term`
-still say what they said, and the metatheorems still call them. This is an additional, sharper
-route for callers who need the number rather than its existence. -/
+/-! `IsMajorizable` is a `Prop`, so `all_closed_terms_majorizable` proves that a majorant exists.
+`ConstMajorants` is `AbstractMajorizability`'s six per-constant majorant fields as **data**, and
+`termMajorizer` is `all_terms_majorizable`'s recursion written as a function — for callers who
+need the number rather than its existence. -/
 
 /-- The six per-constant majorants of an `AbstractMajorizability`, as data rather than as
 existential statements. Everything else in the structure is already `Prop`-valued and stays
@@ -514,24 +440,12 @@ theorem closedMajorizer_maj {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     am.maj ρ (closedMajorizer cm t) (Term.interpret si t ()) :=
   (termMajorizer_maj cm t am.N (Nat.le_refl _)).1 () () trivial
 
--- ============================================================================
 -- `termMajorizer` commutes with renaming, weakening, casting and substitution
--- ============================================================================
 
 /-! These mirror `Term.interpret_rename_gen` / `interpret_weaken` / `interpret_subst0` in
-`Semantics.lean` exactly, and they are what makes bound extraction *possible* rather than
-merely well-defined.
-
-Every `SRealizer` combinator in `Dialectica/Syntactic.lean` builds its `.val` by
-`.app`/`.lam`/`Term.weaken`/`Term.castTy`-wrapping of its sub-realizers' `.val`s, never by
-unfolding them. So with these lemmas `simp` pushes `termMajorizer` straight through the
-wrapping to the sub-realizer's own majorant — `O(1)` per use-site, and in particular **never
-forcing the wrapped term to whnf**. Without them the only route is delta-expansion, which is
-the pathology in this file's sibling note and in "Build cost": a single `S_comb` is 82
-derivation nodes but ≈4×10⁷ leaf-realizer copies.
-
-Promoted from `Probes/BoundLemmasP2.lean` and `Probes/CounterSideProbe.lean`, where they were
-written; they are general facts about `termMajorizer`, not probe scaffolding. -/
+`Semantics.lean`. With them `simp` pushes `termMajorizer` through the `Term.weaken` /
+`Term.castTy` wrapping of a sub-realizer to its own majorant, without forcing the wrapped term
+to whnf. -/
 
 section Structural
 
@@ -623,9 +537,7 @@ theorem termMajorizer_subst_gen (cm : ConstMajorants am) :
 
 end Structural
 
--- ============================================================================
 -- Bridge to `MajorizabilityRel` (what the metatheorem consumes)
--- ============================================================================
 
 /-- `AbstractMajorizability` contains `MajorizabilityRel`: same `maj`, and `nat_order` /
 `app_compat` are `maj_le` / `maj_app` with explicit arguments. -/
@@ -646,9 +558,7 @@ theorem majorant_of_closed_term {ι κ : Type} {X : ι → Type} {F : κ → Ty 
   obtain ⟨t_star, ht⟩ := all_closed_terms_majorizable am t
   exact ⟨t_star am.N, ht am.N (Nat.le_refl _)⟩
 
--- ============================================================================
 -- Building an `AbstractMajorizability` from a base-type relation
--- ============================================================================
 
 /-! The document's route (`particular-cases-metric-spaces.tex`, and Kohlenbach's Proposition
 in §17) fixes the relation only at the base types and then discharges *two structural
@@ -668,12 +578,8 @@ variable {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
 concrete space supplies only the per-constant obligations.
 
 `N` is the uniform threshold; the five majorant arguments are the document's per-constant
-conditions, stated against `bezemMaj base`.
-
-`hbase : BaseMono base` is what the three `maxT_*` fields cost at a base
-type: `maxT (.base i) a b = max a b`, and `base i (max a b) c` follows from `base i a c` only
-if the relation is upward closed in its numeric argument. Every instance in the tree already
-had it (`MetricModel.base_mono`), because `bezem_prec_maj` needed it for the same reason. -/
+conditions, stated against `bezemMaj base`. `hbase : BaseMono base` is what the three
+`maxT_*` fields need at a base type. -/
 def bezemAbstract (si : SpaceInterp X F) (base : (i : ι) → Nat → X i → Prop)
     (hbase : BaseMono base) (N : ℕ)
     (zero_maj : ∃ z_star : ℕ → Nat, ∀ n ≥ N, bezemMaj base .nat (z_star n) (0 : Nat))
@@ -742,13 +648,8 @@ theorem bezem_succ_maj (base : (i : ι) → Nat → X i → Prop) (N : ℕ) :
 
 /-! ### The recursor
 
-`R` is the constant the two-clause relation was widened for. The document's induction
-(`particular-cases-metric-spaces.tex:82–96`) gives the mixed statement at *equal* `n`; the
-formal obligation is at `n* ≥ n`, and the gap is closed by `recMaj_hatMaj` (the majorant is
-`hatMaj`-monotone in its numeric argument) composed with `bezemMaj_of_hatMaj`. Neither is
-available from the one-clause relation.
-
-The majorant is the recursion with a running `maxT`, so it is monotone by construction. -/
+The majorant is the recursion with a running `maxT`, so it is monotone by construction. The
+obligation at `n* ≥ n` is closed by `recMaj_hatMaj` composed with `bezemMaj_of_hatMaj`. -/
 
 /-- The recursor's semantic value, spelled as `Nat.rec` so it matches
 `AbstractMajorizability.prec_maj`'s statement definitionally. -/
@@ -829,9 +730,8 @@ theorem recMaj_bezemMaj {base : (i : ι) → Nat → X i → Prop} (hbase : Base
 /-- **`R` is majorizable**, for any base relation that is monotone in its numeric argument,
 with the majorant `recMaj` **named** rather than existentially bound.
 
-This is the obligation `METRIC_PLAN.md` §2.5 identified as unreachable with the one-clause
-relation; with the self-majorization conjunct it goes through. `bezem_prec_maj` below is the
-`∃` form; `ConstMajorants` needs this one, since it carries the majorant as data. -/
+`bezem_prec_maj` below is the `∃` form; `ConstMajorants` needs this one, since it carries the
+majorant as data. -/
 theorem bezem_prec_maj_at {base : (i : ι) → Nat → X i → Prop} (hbase : BaseMono base) (N : ℕ)
     (ρ : Ty ι) :
     ∀ n ≥ N, bezemMaj base (recTy ρ)
@@ -873,17 +773,11 @@ theorem bezem_prec_maj {base : (i : ι) → Nat → X i → Prop} (hbase : BaseM
              (n : Nat) => Nat.rec y (fun n ih => z ih n) n) :=
   ⟨fun _ => fun y_star z_star n => recMaj ρ y_star z_star n, bezem_prec_maj_at hbase N ρ⟩
 
--- ============================================================================
 -- Pure WE-HA^ω (`ι = Empty`): the majorizability structure, with its data
--- ============================================================================
 
 /-! With no base types every space-dependent obligation is vacuous, so the structure is
 determined outright — and, unlike the metric case, **everything here computes**: `Ty.interpret`
-is built from `ℕ` alone, so `closedMajorizer` at `ι = Empty` produces an actual number.
-
-That is the setting the MCT bounds live in, and the reason `ι = Empty` rather than `ι = Unit`
-is the right first target for evaluating an extracted bound: at `ι = Unit` the carrier is an
-abstract metric space and no majorant can be computed even in principle. -/
+is built from `ℕ` alone, so `closedMajorizer` at `ι = Empty` produces an actual number. -/
 
 /-- The majorizability structure for pure `WE-HA^ω`. -/
 def bezemAbstractEmpty {X : Empty → Type} {F : Empty → Ty Empty} (si : SpaceInterp X F) :
@@ -913,16 +807,9 @@ def bezemConstMajorantsEmpty {X : Empty → Type} {F : Empty → Ty Empty}
 
 /-! ### The majorant computes
 
-These are the point of the whole `ConstMajorants` layer: before it, the majorant of a closed
-term was `∃`-bound in a `Prop`, and the numbers below could not be written down at all. They
-are kernel-checked, not `#eval`ed — the project bans `#eval` on composed interpretations.
-
-`rfl` alone does **not** close them, and the reason is worth knowing: the goal has to unfold
-`closedMajorizer → termMajorizer` *and* the projection chain
-`(bezemAbstractEmpty si).N → (bezemAbstract …).N`, and bare `rfl` gets stuck on the latter.
-`simp` with those four definitions named succeeds, because it uses `termMajorizer`'s equation
-lemmas rather than raw whnf. So the recursion really does compute; it is the structure
-projections that are opaque, which is the ordinary `Ty.interpret`-reducibility story again. -/
+Kernel-checked examples. Bare `rfl` gets stuck on the projection chain
+`(bezemAbstractEmpty si).N → (bezemAbstract …).N`; `simp` naming the four definitions closes
+them. -/
 
 section ComputesDemo
 
@@ -931,16 +818,8 @@ def XEmpty : Empty → Type := fun i => i.elim
 /-- The function-constant signature for pure `WE-HA^ω`: none. -/
 def FEmpty : Empty → Ty Empty := fun i => i.elim
 
-/-- The numeral `3` majorizes itself: `S(S(S 0)) ↦ Nat.succ (Nat.succ (Nat.succ 0))`.
-
-The interpretation `si` is left as a variable — the majorant does not depend on it, which is
-the point: `termMajorizer` consumes only `ConstMajorants`, so it reduces without knowing
-anything about the model.
-
-Stated with `ℕ` on the **left**, deliberately: `Ty.interpret X Ty.nat` is only *reducibly* `ℕ`,
-so a numeral on the right has no `OfNat` instance to synthesise against and fails to elaborate.
-Putting the numeral first fixes its type before unification reaches the stuck side. Same
-reducibility trap as the `qval` bridge; see CLAUDE.md. -/
+/-- The numeral `3` majorizes itself: `S(S(S 0)) ↦ Nat.succ (Nat.succ (Nat.succ 0))`. The
+interpretation `si` is a variable: the majorant does not depend on it. -/
 example (si : SpaceInterp XEmpty FEmpty) : (3 : ℕ) =
     closedMajorizer (bezemConstMajorantsEmpty si)
       (Term.app Term.succ (Term.app Term.succ
@@ -965,9 +844,7 @@ theorem bezemAbstract_toRel_maj (si : SpaceInterp X F) (base : (i : ι) → Nat 
 
 end BezemAbstract
 
--- ============================================================================
 -- Axiom hygiene (CLAUDE.md note 5)
--- ============================================================================
 
 #print axioms all_terms_majorizable
 #print axioms all_closed_terms_majorizable

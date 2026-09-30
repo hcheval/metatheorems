@@ -8,10 +8,6 @@ import Lean
 /-!
 # The `mfi_memo` simp set
 
-An attribute cannot be used in the module that declares it (see `SimpSets.lean`), and
-`SimpSets.lean` sits below everything — touching it rebuilds the whole tree — so this one
-lives in its own module.
-
 `mfi_memo` holds the commutation lemmas that push `monotone_soundness` (the monotone
 functional interpretation, `Dialectica/Monotone.lean`) through the proof-mode packaging layer
 (`ProofMode/Packing.lean`'s `seq_*`, `Tactics.lean`'s `pm_*`) and through the casts that

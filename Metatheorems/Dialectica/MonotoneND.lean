@@ -14,52 +14,11 @@ import Metatheorems.NegTrans
 recursion on `Derivable F Allowed.classical Premises A` it produces a monotone realizer
 (`MRealizer`) of the negative translation `Aᴺᵀ = ¬¬Aₙₜ`, without ever building the translated
 derivation. This is the book's "ND-interpretation" — negative translation followed by the
-(monotone) functional interpretation — done as one recursion.
-
-## Why a fused recursion, and the strategy per case
-
-`negTrans_sound` (`NegTrans.lean`) is a derivation-to-derivation translation: at every node it
-applies a fixed closed Hilbert combinator (`neg_neg_mp`, `neg_neg_imp_rev`, …, each ~50–200
-constructors) and `dnn_intro`, so a 12-constructor classical derivation becomes 85,180
-constructors and reducing `monotone_soundness` through that output is a 12 GB `std::bad_alloc`
-in the kernel (measured in `Probes/ClassicalMfiProbe.lean`). The fix is to never build that
-derivation: interpret the CLASSICAL derivation directly.
-
-The recursion mirrors `negTrans_sound`'s match arm for arm. Per node:
-
-* the **recursive calls** produce `MRealizer cm (subᴺᵀ)`;
-* they are combined with the *composition* cases of `Dialectica/Monotone.lean` — `MRealizer.mp`,
-  `.syllogism`, `.forallRule`, `.existRule`, `.univGen`, `.induction`, `.qfer` — which compute
-  the majorant *semantically* and never build a term;
-* the fixed `¬¬`-combinators `negTrans_sound` applies at every node — `dnn_intro`,
-  `neg_neg_mp`, `neg_neg_imp_rev`, `neg_neg_imp_rev2`, `nn_all_nn`, the exportation /
-  importation / expansion forms and `dnn_lem` — are **hand-written monotone realizers**
-  (`Dialectica/MonotoneNDLeaves.lean`: `dnnIntroF`, `nnMpF`, `nnImpRevF`, `expF`, `impF`,
-  `expansionF`, `dnnLemF`; `neg_neg_imp_rev2` and `K`/`S` are eliminated — `syllogism`
-  composes `MRealizer.syllogism` with `dnnIntroF` and `nnImpRevF` — and `nn_all_nn` is
-  assembled from them as `nnAllNnF`). Their majorants are hat-level λ-terms, so per node the
-  kernel β-reduces a few small closures instead of running `termMajorizer` over a
-  `syntactic_soundness` term of a 100–200-node Hilbert derivation several times per node —
-  which is what the first version of this file did (`leafM` on every combinator) and what made
-  the classical bound's kernel reduction a 12 GB `std::bad_alloc`: `prenexify`'s 347 nodes are
-  134 `syllogism`s (5 leaves each), 34 exportations, 30 importations, 11 `forall_rule`s.
-* **`leafM` (`ofSRealizer ∘ syntactic_soundness`, the term route on one closed derivation)
-  survives only for**: the propositional axioms' own terms (`sAndWeak`, … — fixed tiny
-  combinators, the same as `monotone_soundness` uses; wrapped in `dnnIntroF`), the
-  `forall_ax`/`exist_ax` terms (`sForallAx t`/`sExistAx t` — one `lam` around `t`), and the
-  cases NOT on the classical gate route: `succ_ne_zero`, `succ_inj`, the equational axioms
-  (`rec_*`, `beta_eq`, `pair_*`), the pseudometric axioms, `qfac`, and the two
-  `negTrans_iff_pu` legs of `qfer`. Those are left as leaves deliberately and are listed here
-  so nobody mistakes them for hand-written ones.
-
-## NT-stability is gone
-
-`negTrans_sound` needs `nts : NTStableD Premises` — every premise must imply its own negative
-translation — because its premise case is `.mp (.premise hp) (nts _ _ hp)`. Here the premise
-case takes an `MRealizer cm Bᴺᵀ` **directly** (`spremise_nd`), so no condition on the premise
-set is needed at all. For purely universal premises — every space axiom in the tree —
-`spremise_nd_of_pu` supplies it from the existing syntactic premise realizer through
-`negTrans_iff_pu` (interpreted as a leaf), so the space models need nothing new.
+(monotone) functional interpretation — done as one recursion, mirroring `negTrans_sound`'s
+match arm for arm. The fixed `¬¬`-combinators are the hand-written monotone realizers of
+`Dialectica/MonotoneNDLeaves.lean`; `leafM` is used only for axiom terms. The premise case
+takes an `MRealizer cm Bᴺᵀ` directly (`spremise_nd`), so no NT-stability condition is needed;
+`spremise_nd_of_pu` supplies it for purely universal premises.
 -/
 
 namespace Metatheorems
@@ -89,9 +48,7 @@ def leafM (eqxi : EqXInterp X F si)
   MRealizer.ofSRealizer cm (syntactic_soundness (Premises := Premises) eqxi spremise
     (d.castAllowed (by constructor <;> decide)))
 
--- ----------------------------------------------------------------------------
 -- The `¬¬`-combinators as transformations (one `MRealizer.mp` each)
--- ----------------------------------------------------------------------------
 
 /-- `A ⊢ ¬¬A`. -/
 def MRealizer.dnn (cm : ConstMajorants am) {Γ : Ctx ι} {A : Formula F Γ}
@@ -122,8 +79,7 @@ theorem renameF_ext_shift_subst0_vz {Γ : Ctx ι} {ρ : Ty ι} (Q : Formula F (�
       | .vs _ => by simp [Term.Renaming.ext, Term.subst0_map, Term.Renaming.shift]) Q
 
 /-- **`nn_all_nn` as a formula**: `¬¬(∀x ¬¬Q) → ∀x ¬¬Q`, assembled from `nnImpRev`, `nnMp` and
-`MRealizer.forallRule` around one `sForallAx` leaf — the object-level `nn_all_nn` is 274
-constructors, almost all of them `neg_neg_imp_rev` and `neg_neg_mp`. -/
+`MRealizer.forallRule` around one `sForallAx` leaf. -/
 def MRealizer.nnAllNnF (cm : ConstMajorants am) {Γ : Ctx ι} {ρ : Ty ι}
     (Q : Formula F (ρ :: Γ)) :
     MRealizer cm (¬ᶠ¬ᶠ(Formula.all ρ (¬ᶠ¬ᶠQ)) →ᶠ Formula.all ρ (¬ᶠ¬ᶠQ)) :=
@@ -139,9 +95,7 @@ def MRealizer.nnAllNnF (cm : ConstMajorants am) {Γ : Ctx ι} {ρ : Ty ι}
     MRealizer.nnMp cm (MRealizer.nnImpRev cm inst)
   MRealizer.forallRule cm step
 
--- ----------------------------------------------------------------------------
 -- The rule cases with an open sub-derivation, mirrored at the MRealizer level
--- ----------------------------------------------------------------------------
 
 /-- `eqAtType` is purely universal — a local copy of `NegTrans`'s private `eqAtType_isPU`. -/
 private theorem eqAtType_isPU (ρ : Ty ι) {Γ : Ctx ι} (s t : Term F Γ ρ) :
@@ -286,9 +240,7 @@ def ndInduction (cm : ConstMajorants am)
 
 end FusedRecursion
 
--- ============================================================================
 -- The recursion over the classical derivation
--- ============================================================================
 
 section Soundness
 
@@ -401,9 +353,7 @@ def spremise_nd_of_pu (eqxi : EqXInterp X F si)
 
 end Soundness
 
--- ============================================================================
 -- Axiom hygiene — verify by name, after a completed `lake build`
--- ============================================================================
 
 #print axioms leafM
 #print axioms MRealizer.nnAllNnF

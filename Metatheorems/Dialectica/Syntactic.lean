@@ -15,20 +15,13 @@ open Formula
 /-!
 # Syntactic Dialectica witnesses
 
-`dialecticaWitness`/`dialecticaCounter` produce Lean *types*, so realizers are Lean values
-with no syntax attached. That is what severs the bounding half of the metatheorem: the
-majorization lemma (`all_closed_terms_majorizable`) applies to closed `Term`s, and a Lean
-function is not one.
-
-Here we mirror those definitions at the object level:
+Dialectica realizers as `Term`s, so that `all_closed_terms_majorizable` applies to them:
 
 * `wTy A`, `cTy A` — the witness and counter types **as `Ty ι`**;
 * `interpret_wTy`, `interpret_cTy` — their interpretations are *definitionally* the
   original Lean types, so nothing downstream needs a cast;
 * `SRealizer A` — a realizer is a `Term` whose interpretation satisfies the (unchanged,
-  semantic) Dialectica matrix **at every environment**. The uniformity is the point: a
-  per-environment version does not survive the `forall_rule` case, which needs one term that
-  works at every extension of the environment.
+  semantic) Dialectica matrix **at every environment**.
 
 This is the "syntactic witness, semantic soundness" split: the witness carries syntax, so
 it can be majorized; the correctness statement stays where it already is.
@@ -36,13 +29,9 @@ it can be majorized; the correctness statement stays where it already is.
 
 variable {ι κ : Type} {F : κ → Ty ι}
 
--- ============================================================================
 -- Witness and counter types, object-level
--- ============================================================================
 
--- ============================================================================
 -- Syntactic defaults
--- ============================================================================
 
 /-- A canonical closed inhabitant of every type, at the term level. -/
 def Term.defaultOf : (ρ : Ty ι) → Term F Γ ρ
@@ -72,16 +61,9 @@ def defaultWTerm (A : Formula F Γ) : Term F Γ (wTy A) := Term.defaultOf _
 /-- Syntactic counterpart of `dialecticaDefaultCounter`. -/
 def defaultCTerm (A : Formula F Γ) : Term F Γ (cTy A) := Term.defaultOf _
 
--- Realizers as terms: see `SRealizer` below. A per-environment variant
--- (`syntacticRealizerCtx`, taking `env` as a parameter and quantifying only over counters)
--- existed here and was deleted unused — nothing ever constructed or consumed
--- it. `SRealizer` quantifies over environments *inside* the subtype, which is what the
--- `forall_rule` case needs; the weaker form has no use site. The same asymmetry appears at
--- `realizer_of_pu` vs `realizer_of_pu_at`, where both forms are genuinely used.
+-- Realizers as terms: see `SRealizer` below.
 
--- ============================================================================
 -- The point: the extracted functionals are closed terms
--- ============================================================================
 
 section Extract
 
@@ -103,10 +85,9 @@ def extractUTerm (w : Term F ([] : Ctx ι) (wTy (stmt (ρ := ρ) (B₀ := B₀) 
   .lam (.fst (.app (.app (.snd (.app (Term.weaken w) (.var .vz))) (defaultWTerm _))
     (defaultCTerm _)))
 
-/-- **The root cause, fixed.** Both extracted functionals are closed terms, so
-`all_closed_terms_majorizable` supplies their majorants outright — no per-derivation
-obligation, and no total majorizer. Compare `metatheorem_core_of_majorants`, whose
-`U_star`/`V_star` arguments these discharge. -/
+/-- Both extracted functionals are closed terms, so `all_closed_terms_majorizable` supplies
+their majorants outright. These are the `U_star`/`V_star` arguments of
+`metatheorem_core_of_majorants`. -/
 theorem extract_majorants {X : ι → Type} {si : SpaceInterp X F}
     (am : AbstractMajorizability si)
     (w : Term F ([] : Ctx ι) (wTy (stmt (ρ := ρ) (B₀ := B₀) (C₀ := C₀)))) :
@@ -195,9 +176,7 @@ theorem extract_majorants_prenex {X : ι → Type} {si : SpaceInterp X F}
 
 end ExtractPrenex
 
--- ============================================================================
 -- The matrix, on object-level witness/counter types
--- ============================================================================
 
 /-- A Dialectica realizer whose witness is a **closed-over term**: one `Term`, valid in
 every environment. -/
@@ -206,9 +185,7 @@ def SRealizer {X : ι → Type} (si : SpaceInterp X F) {Γ : Ctx ι} (A : Formul
       ∀ (env : Ctx.interpret X Γ) (y : Ty.interpret X (cTy A)),
         dialecticaMatrix si A env (Term.interpret si t env) y }
 
--- ============================================================================
 -- A minimal object-level conditional, and the two evaluation lemmas it needs
--- ============================================================================
 
 variable {X : ι → Type}
 
@@ -253,9 +230,7 @@ theorem interpret_monus_app {si : SpaceInterp X F} (s t : Term F Γ Ty.nat)
   simp only [Term.app2, Term.monus, Term.app3, Term.interpret, Ctx.lookup, interpret_pd_fun]
   exact rec_pred_eq_sub _ _
 
--- ============================================================================
 -- The matrix as a term (needed only for contraction)
--- ============================================================================
 
 /-- A term computing the characteristic function of `dialecticaMatrix`: it evaluates to `0`
 exactly when the matrix holds.
@@ -397,8 +372,7 @@ theorem interpret_castTy {si : SpaceInterp X F} {ρ σ : Ty ι} (h : ρ = σ)
 
 /-- The majorant counterpart of `interpret_castTy`, and the last member of the structural
 family whose other four (`termMajorizer_rename_gen`/`_weaken`/`_subst_gen`/`_subst0`) live in
-`Majorizability.lean`. It sits here rather than there only because `Term.castTy` is defined in
-this file, downstream of that one. Trivial, since `castTy` is a bare `cast`. -/
+`Majorizability.lean`. -/
 @[simp] theorem termMajorizer_castTy {si : SpaceInterp X F}
     {am : AbstractMajorizability si} (cm : ConstMajorants am) {ρ σ : Ty ι}
     (h : ρ = σ) (t : Term F Γ ρ) (n : ℕ) (env_star : Ctx.interpret X (Γ.map Ty.hat)) :
@@ -424,9 +398,7 @@ theorem interpretSubst_of_renaming {si : SpaceInterp X F} :
       rfl
 
 
--- ============================================================================
 -- Per-rule syntactic realizers
--- ============================================================================
 
 section Rules
 
@@ -660,11 +632,7 @@ def sSuccInj : SRealizer si (Γ := Γ)
      exact fun h => Nat.succ.inj h⟩
 
 
-/-- `∀`-rule: from `B.weakenBy ρ → A` infer `B → ∀x A`.
-
-Note the syntactic version needs no `∀ env` on the hypothesis: one term in context
-`ρ :: Γ` already works at every environment, which is what the semantic version had to
-simulate by quantifying. -/
+/-- `∀`-rule: from `B.weakenBy ρ → A` infer `B → ∀x A`. -/
 def sForallRule {ρ : Ty ι} {B : Formula F Γ} {A : Formula F (ρ :: Γ)}
     (h : SRealizer si (Formula.weakenBy ρ B →ᶠ A)) :
     SRealizer si (B →ᶠ Formula.all ρ A) :=
@@ -830,20 +798,13 @@ def sInduction {A : Formula F (Ty.nat :: Γ)}
 
 
 /-- The **term** realizing equality at a base type: `wTy (eqAtType (.base i) s t)` is
-`nat →ₜ unit`, so `λn.⋆` is the only closed inhabitant up to the interpretation.
-
-Was the `EqXInterp.realizeTerm` field. It became definable when base equality stopped being
-an abstract predicate, and the field outlived that change — one instance of a recurring
-pattern, a binder kept after a refactor made the thing it demanded constructible. -/
+`nat →ₜ unit`, so `λn.⋆` is the only closed inhabitant up to the interpretation. -/
 def eqAtTypeBaseRealizeTerm (i : ι) {Γ : Ctx ι} (s t : Term F Γ (Ty.base i)) :
     Term F Γ (wTy (eqAtType (Ty.base i) s t)) :=
   Term.lam Term.unitI
 
-/-- `eqAtTypeBaseRealizeTerm` is correct wherever the two sides are semantically equal.
-
-Was the `EqXInterp.realizeTerm_sound` field, and it **collapses into `realize`**: the witness
-type `ℕ → Unit` is a subsingleton, so the interpretation of `λn.⋆` is *forced* to equal the
-witness of the semantic realizer `realize` already provides. No new model input. -/
+/-- `eqAtTypeBaseRealizeTerm` is correct wherever the two sides are semantically equal:
+the witness type `ℕ → Unit` is a subsingleton, so this follows from `realize`. -/
 theorem eqAtTypeBase_realizeTerm_sound {si : SpaceInterp X F} (eqxi : EqXInterp X F si)
     (i : ι) {Γ : Ctx ι} (s t : Term F Γ (Ty.base i)) (env : Ctx.interpret X Γ)
     (h : Term.interpret si s env = Term.interpret si t env)
@@ -881,16 +842,7 @@ def sEqAtType {si : SpaceInterp X F} (eqxi : EqXInterp X F si) :
       ⟨.lam r.val, fun env y => r.property (y.1, env) y.2⟩
 
 /-- **A purely universal ∨-free formula is realized by a term carrying no information.**
-
-The syntactic counterpart of `realizer_of_pu` (`Dialectica/Defs.lean`), and the reason the
-`EqXInterp` interface asks only for *model facts* about the distance: `wTy` of
-`∀x₁…∀xₖ. A_qf` bottoms out in `Ty.unit` at every leaf, so the realizing term is a stack of
-`Term.lam`s (and `Term.mkPair`s, at `∧`) over `Term.unitI` — which is exactly
-`Term.defaultOf`, i.e. `defaultWTerm`. All the content is `htrue`, the formula's truth in
-the model, and `dialecticaMatrix_iff_interp_qf` turns it into the matrix *at every counter*.
-
-Three cases, mirroring `isPurelyUniversal`: `∀` (a `lam`), `∧` (a `mkPair`, the clause
-products in `Ty` make necessary), and the quantifier-free core. -/
+The syntactic counterpart of `realizer_of_pu` (`Dialectica/Defs.lean`). -/
 def srealizer_of_pu {si : SpaceInterp X F} :
     {Γ : Ctx ι} → (B : Formula F Γ) →
       B.isPurelyUniversal = true → B.isVFree = true →
@@ -1131,9 +1083,7 @@ def sAC {si : SpaceInterp X F} {ρ τ : Ty ι} {A : Formula F (τ :: ρ :: Γ)} 
 
 end Rules
 
--- ============================================================================
 -- The witness terms, with no model in sight
--- ============================================================================
 
 /-! ### `wt*` — the term half of every rule combinator, on its own
 
@@ -1146,10 +1096,7 @@ So the extracted realizer is a function of the **derivation tree alone**; the mo
 packaging. The `wt*` definitions below are exactly those payloads, taking sub-*terms* where
 the `s*` take sub-*realizers*, and `extractTerm` (below) runs `syntactic_soundness`'s
 recursion through them with no `si`, no `X`, and no `eqxi`. Each `<name>_val` lemma pins the
-correspondence, and every one of them holds by `rfl`.
-
-This is the `ConstMajorants` pattern one layer down: the `Prop`/model-parameterized API is
-untouched, the computational one is added beside it. -/
+correspondence, and every one of them holds by `rfl`. -/
 
 section WitnessTerms
 
@@ -1401,9 +1348,7 @@ def wtAC {Γ : Ctx ι} {ρ τ : Ty ι} (A : Formula F (τ :: ρ :: Γ)) :
 
 end WitnessTerms
 
--- ============================================================================
 -- The `wt*` lemmas: each `s*` combinator's payload IS its `wt*`
--- ============================================================================
 
 section WitnessTermLemmas
 
@@ -1502,11 +1447,7 @@ variable {si : SpaceInterp X F}
 @[simp] theorem sAC_val {Γ : Ctx ι} {ρ τ : Ty ι} {A : Formula F (τ :: ρ :: Γ)} :
     (sAC (si := si) (A := A)).val = wtAC A := rfl
 
-/-- **The realizing term of a purely universal ∨-free formula is the default witness term.**
-`wTy` of `∀x₁…∀xₖ.A_qf` bottoms out in `Ty.unit`, and `srealizer_of_pu`'s `lam`/`mkPair`
-stack is exactly what `Term.defaultOf` builds there. So its payload carries no information at
-all — which is why `extractTerm` needs no model input for any of `srealizer_of_pu`'s
-clients. -/
+/-- **The realizing term of a purely universal ∨-free formula is the default witness term.** -/
 theorem srealizer_of_pu_val :
     ∀ {Γ : Ctx ι} (B : Formula F Γ) (hpu : B.isPurelyUniversal = true) (hvf : B.isVFree = true)
       (htrue : ∀ env : Ctx.interpret X Γ, Formula.interpret si B env),
@@ -1558,9 +1499,7 @@ theorem sEqAtType_val (eqxi : EqXInterp X F si) :
 
 end WitnessTermLemmas
 
--- ============================================================================
 -- Syntactic Dialectica soundness
--- ============================================================================
 
 section Soundness
 
@@ -1569,8 +1508,6 @@ variable {si : SpaceInterp X F} {Premises : PremiseSet F}
 /-- **Dialectica soundness, syntactically.**
 
 Every derivation yields a *term* whose interpretation realizes the Dialectica matrix.
-Because the witness is a term, `all_closed_terms_majorizable` applies to it — which is what
-the semantic version could not offer.
 
 `spremise` is the syntactic counterpart of `premise_realizer`: a premise must come with a
 realizing term, not merely a realizing value. -/
@@ -1621,9 +1558,7 @@ def syntactic_soundness (eqxi : EqXInterp X F si)
   | _, _, .qfac _ _ _       => sAC
   | _, _, .lem h_lem        => absurd h_lem (by decide)
 
--- ============================================================================
 -- Extraction with no model
--- ============================================================================
 
 /-- **The extracted realizer, as a function of the derivation alone.**
 
@@ -1631,12 +1566,7 @@ def syntactic_soundness (eqxi : EqXInterp X F si)
 payload's *type* mentions no `si`, and — by the `wt*` lemmas above — neither does the way
 each case builds it. `extractTerm` is that recursion with the model deleted: **no `si`, no
 `X`, no `eqxi`, and nothing `noncomputable`**. `extractTerm_eq` below proves it agrees with
-`syntactic_soundness` at every derivation.
-
-Why this matters: every model in the project routes through Mathlib `ℝ`, so `si` is
-`noncomputable` and `#eval` on anything mentioning it is impossible. `extractTerm` makes the
-realizing term of a derivation **at a space** evaluable — see
-`Probes/ExtractTermDemo.lean`. -/
+`syntactic_soundness` at every derivation. -/
 def extractTerm (sp : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → Term F Γ' (wTy B)) :
     {Γ : Ctx ι} → {A : Formula F Γ} →
     @Derivable ι κ F Allowed.extended Premises Γ A → Term F Γ (wTy A)

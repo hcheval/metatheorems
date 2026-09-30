@@ -14,65 +14,16 @@ quantified — the book's
 
     (+)  ∃x (t* maj x ∧ ∀a,y A_D(x a, y, a))
 
-with `t*` the extracted datum and `x` a functional of the free variables `a`. The design and
-the measurements behind it are in `ARCHITECTURE.md` §14 and `Probes/MonotoneSpike.lean`,
-which first ran the recursion on nine constructors. This module completes it to every
-constructor of `Derivable`, with no fallback.
-
-## The statement (`MRealizer`)
-
-`termMajorizer_maj`'s statement one level up, over the derivation:
-
-* the majorant `tstar : ℕ → hat-env → hat-witness` is the data;
-* `∃ x : env → 𝕎 A` — **hoisted outside the environment quantifier**, the book's `x a`
-  exactly; the per-environment form is a corollary (`MRealizer.pointwise`) and is *not*
-  closable at `forall_rule` (see the spike's header);
-* `MajEnv` majorization of `x` by `tstar`, correctness of `x` at every counter, and
-  self-majorization of `tstar` in its hat environment (what `arrow_intro`'s second clause
-  needs).
-
-## Strategy per constructor — the book's own division of labour (p. 142–144)
-
-* **leaf** (Howard, p. 142) — `premise`, `or_weak`, `and_weak`, `and_perm`, `exfalso`,
-  `forall_ax`, `exist_ax`, `succ_ne_zero`, `succ_inj`, `beta_eq`, `pair_fst/snd/eta`,
-  `rec_zero`, `rec_succ`, `dist_self/comm/tri`, `refl0`, `sym0`, `trans0`, `markov`, `ip`,
-  `ac`, `qfac`: `termMajorizer` of the axiom's own realizing term (`ofSRealizer`) — these
-  are fixed-size combinators.
-* **max** (p. 143, cases 1–3) — `and_contract`, `or_contract`, `or_perm`: `maxT` on the
-  counter (resp. witness / flag); no matrix branching, no term.
-* **composition, hand-written** (p. 144, cases 5–6) — `mp`, `syllogism`, `exportation`,
-  `forall_rule`: the spike's, verbatim — the realizer's λ-term on the hat side, with
-  `arrow_intro` discharged from the IH.
-* **composition, via the usual λ-terms** (p. 144, case 6) — `importation`, `expansion`,
-  `exist_rule`, `univ_gen`, `qfer`, `induction`: `termMajorizer` of the usual
-  interpretation's combinator applied to a **variable** standing for the sub-realizer
-  (`plug1`/`plug2`/`plugAll`); majorization is `termMajorizer_maj` with the sub-majorant in
-  the environment.
-
-The last row is the book's *"the monotone functional interpretation of the remaining
-logical rules uses the λ-terms of the usual functional interpretation since they preserve
-majorizability"* taken literally: the combinator is a fixed-size closed-shape `Term`, and
-the sub-realizer enters it through `Ctx.lookupHat` of the environment, never as a term. So
-the composed realizer term — the object whose `Term.weaken`/`Eq.rec` traffic stalled the
-term route (`SizeProbe`) — is never built; only the per-node combinator is reduced, which is
-the same cost class as the leaf cases.
-
-**`induction`** is the book's `t^M` (p. 144 case 7): `termMajorizer` of `Term.prec` is
-`cm.precM`, which in every instance in the tree is `recMaj` — the recursion with a running
-`maxT`. It is obtained here by the last row, not by the leaf strategy on the whole
-sub-derivation; the sub-realizers of base and step are variables. What it computes is `t^M`
-already, so nothing has to be written by hand here — but note the practical ceiling this
-carries: `recMaj` iterates *value*-many times without sharing, so a bound whose value is
-large is expensive to reduce however small the derivation is (ARCHITECTURE §14.5).
+with `t*` the extracted datum and `x` a functional of the free variables `a`. `MRealizer` is
+the statement; every constructor of `Derivable` is treated, by one of four strategies
+(leaf, `max`, hand-written composition, composition through the usual λ-terms).
 -/
 
 namespace Metatheorems
 
 open Formula
 
--- ============================================================================
 -- The monotone realizer
--- ============================================================================
 
 section Generic
 
@@ -83,10 +34,8 @@ set_option linter.unusedVariables false in
 /-- **A monotone realizer** of `A` in context `Γ`: a majorant `tstar` at the hat type, together
 with a proof that *some* Dialectica realizer — one functional of the environment — is
 majorized by it wherever the environment is, and satisfies the matrix everywhere; plus
-self-majorization of `tstar`. `termMajorizer_maj`'s statement, one level up.
-
-`cm` does not occur in the body: it is there to pin `am` (the relation the statement is about)
-and because the leaf strategy reads its majorants — the same role it has in `termMajorizer`. -/
+self-majorization of `tstar`. `termMajorizer_maj`'s statement, one level up. `cm` does not
+occur in the body; it pins `am`. -/
 def MRealizer (cm : ConstMajorants am) {Γ : Ctx ι} (A : Formula F Γ) : Type :=
   { tstar : ℕ → Ctx.interpret X (Γ.map Ty.hat) → Ty.interpret X (wTy A).hat //
     ∀ n, n ≥ am.N →
@@ -111,9 +60,7 @@ theorem MRealizer.pointwise {cm : ConstMajorants am} {Γ : Ctx ι} {A : Formula 
   obtain ⟨⟨x, hx, hm⟩, _⟩ := r.property n hn
   exact ⟨x env, hx envstar env henv, hm env⟩
 
--- ----------------------------------------------------------------------------
 -- Short names for the structure's fields, all arguments implicit
--- ----------------------------------------------------------------------------
 
 private theorem mapp {ρ τ : Ty ι} {f_star : Ty.interpret X (ρ →ₜ τ).hat}
     {f : Ty.interpret X (ρ →ₜ τ)} {x_star : Ty.interpret X ρ.hat} {x : Ty.interpret X ρ}
@@ -191,9 +138,7 @@ theorem selfMaj_cast {σ τ : Ty ι} (h : σ = τ)
     am.selfMaj τ (cast hh a) (cast hh b) := by
   subst h; exact hm
 
--- ----------------------------------------------------------------------------
 -- The leaf strategy: Howard's construction on a syntactic realizer (book p. 142)
--- ----------------------------------------------------------------------------
 
 /-- **Leaf strategy**: a syntactic realizer's term is majorized by its `termMajorizer`. Used
 for every axiom, whose realizing term is a fixed-size combinator. -/
@@ -205,9 +150,7 @@ def MRealizer.ofSRealizer (cm : ConstMajorants am) {Γ : Ctx ι} {A : Formula F 
       fun env y => r.property env y⟩,
      fun e₁ e₂ he => (termMajorizer_maj cm r.val n hn).2 e₁ e₂ he⟩⟩
 
--- ----------------------------------------------------------------------------
 -- Composition through the usual interpretation's λ-terms (book p. 144, case 6)
--- ----------------------------------------------------------------------------
 
 /-! A rule with one sub-derivation of `P` and conclusion `Q` whose usual realizer is
 `t[h]` for a combinator `t` and the sub-realizer `h`: plug the sub-realizer in **as a
@@ -280,9 +223,7 @@ def MRealizer.plugAll (cm : ConstMajorants am) {Γ : Ctx ι} {ρ : Ty ι}
 
 end Generic
 
--- ============================================================================
 -- The combinators, with the formula context decoupled from the term context
--- ============================================================================
 
 /-! These are the `wt*` payloads of `Dialectica/Syntactic.lean` with one change: the
 formulas live in a context `Δ` **unrelated** to the term's context `Γ`. `wTy`/`cTy` ignore
@@ -448,18 +389,14 @@ theorem mtInduction_correct {A : Formula F (Ty.nat :: Δ)}
 
 end Combinators
 
--- ============================================================================
 -- The composition cases
--- ============================================================================
 
 section Composition
 
 variable {ι κ : Type} {X : ι → Type} {F : κ → Ty ι} {si : SpaceInterp X F}
     {am : AbstractMajorizability si}
 
--- ----------------------------------------------------------------------------
 -- Modus ponens (book p. 144, case 5) — from the spike
--- ----------------------------------------------------------------------------
 
 def MRealizer.mp (cm : ConstMajorants am) {Γ : Ctx ι} {A B : Formula F Γ}
     (hA : MRealizer cm A) (hAB : MRealizer cm (A →ᶠ B)) : MRealizer cm B :=
@@ -474,9 +411,7 @@ def MRealizer.mp (cm : ConstMajorants am) {Γ : Ctx ι} {A B : Formula F Γ}
     · intro e₁ e₂ he
       exact sapp (sfst (hsAB e₁ e₂ he)) (hsA e₁ e₂ he)⟩
 
--- ----------------------------------------------------------------------------
 -- Syllogism (book p. 144, case 5, "the rule … is treated similarly") — from the spike
--- ----------------------------------------------------------------------------
 
 def MRealizer.syllogism (cm : ConstMajorants am) {Γ : Ctx ι} {A B C : Formula F Γ}
     (hAB : MRealizer cm (A →ᶠ B)) (hBC : MRealizer cm (B →ᶠ C)) : MRealizer cm (A →ᶠ C) :=
@@ -545,9 +480,7 @@ def MRealizer.syllogism (cm : ConstMajorants am) {Γ : Ctx ι} {A B C : Formula 
           exact sapp (sapp (ssnd ab11) (sself hxy))
             (sapp (sapp (ssnd bc11) (sapp (sfst ab11) (sself hxy))) hy)⟩
 
--- ----------------------------------------------------------------------------
 -- Exportation — from the spike
--- ----------------------------------------------------------------------------
 
 def MRealizer.exportation (cm : ConstMajorants am) {Γ : Ctx ι} {A B C : Formula F Γ}
     (h : MRealizer cm (A ∧ᶠ B →ᶠ C)) : MRealizer cm (A →ᶠ B →ᶠ C) :=
@@ -668,9 +601,7 @@ def MRealizer.exportation (cm : ConstMajorants am) {Γ : Ctx ι} {A B C : Formul
         · intro p₁ p₂ hp
           exact sfst (sapp (sapp (ssnd h11) (spair (sself hA) (sfst hp))) (ssnd hp))⟩
 
--- ----------------------------------------------------------------------------
 -- The ∀-rule (book p. 144, case 6) — from the spike
--- ----------------------------------------------------------------------------
 
 /-- The realizer is `dialectica_forall_rule`'s, written out; the majorant is the same
 λ-term on the hat side, and `arrow_intro`'s two clauses are discharged from the IH at
@@ -781,10 +712,8 @@ def MRealizer.forallRule (cm : ConstMajorants am) {Γ : Ctx ι} {ρ : Ty ι} {B 
             (sapp (sapp (ssnd (hsh (p₁.1, e₁) (p₂.1, e₁) ⟨sfst hp, selfE1⟩))
               (selfMaj_cast hw.symm _ (sself hs))) (ssnd hp))⟩
 
--- ----------------------------------------------------------------------------
 -- Importation, expansion, universal generalisation, QF-ER, ∃-rule, induction
 -- (book p. 144, case 6: "the λ-terms of the usual functional interpretation")
--- ----------------------------------------------------------------------------
 
 /-- Importation. The correctness proof is `sImportation`'s with the sub-realizer term
 replaced by the variable. -/
@@ -868,9 +797,7 @@ def MRealizer.induction (cm : ConstMajorants am) {Γ : Ctx ι} {A : Formula F (T
 
 end Composition
 
--- ============================================================================
 -- The `max` cases (book p. 143, cases 1–3)
--- ============================================================================
 
 section Max
 
@@ -880,7 +807,7 @@ variable {ι κ : Type} {X : ι → Type} {F : κ → Ty ι} {si : SpaceInterp X
 /-- **`A → A ∧ A`, monotone (case 1)**: the witness majorant is `λx.(x,x)`, the counter
 majorant is `λx y. max(y', y'')` at the hat type. The realizer is `dialectica_and_contract`'s,
 which branches on the (decidable) matrix; the majorant does not branch, and mentions no
-term. This is the case that stalls the term route (`sAndContract`'s `matrixTerm`). -/
+term. -/
 def MRealizer.andContract (cm : ConstMajorants am) {Γ : Ctx ι} (A : Formula F Γ) :
     MRealizer cm (A →ᶠ A ∧ᶠ A) :=
   ⟨fun _ _ => (fun x => (x, x), fun _ y => maxT (cTy A) y.1 y.2),
@@ -1042,9 +969,7 @@ def MRealizer.orPerm (cm : ConstMajorants am) {Γ : Ctx ι} (A B : Formula F Γ)
 
 end Max
 
--- ============================================================================
 -- The recursion over the derivation
--- ============================================================================
 
 section Soundness
 
@@ -1113,9 +1038,7 @@ def monotone_soundness (eqxi : EqXInterp X F si)
   | _, _, .qfac _ _ _       => .ofSRealizer cm sAC
   | _, _, .lem h_lem        => absurd h_lem (by decide)
 
--- ----------------------------------------------------------------------------
 -- Reading `U` and `V` off a monotone realizer — `extractUTerm`/`extractVTerm`, semantically
--- ----------------------------------------------------------------------------
 
 /-- The `U`-majorant of a monotone realizer of `∀x(∀u B₀ → ∃v C₀)`, read off exactly as
 `extractUTerm` reads it off the realizing term: the `.snd` of the implication's majorant,
@@ -1139,9 +1062,7 @@ def mfiV {ρ : Ty ι} {B₀ C₀ : Formula F [Ty.nat, ρ]} (cm : ConstMajorants 
 
 end Soundness
 
--- ============================================================================
 -- Axiom hygiene — verify by name, after a completed `lake build`
--- ============================================================================
 
 #print axioms MRealizer.pointwise
 #print axioms MRealizer.ofSRealizer

@@ -12,10 +12,8 @@ namespace Metatheorems
 /-!
 # Prerequisites of the general logical metatheorem (Theorem 6.1)
 
-**This file is a library of shared parts, not a metatheorem.** It is named for what it
-contains rather than for what it once contained: the three components below, out of which
-every live entry point is assembled. Nothing here is an entry point, and nothing here is
-dead — 16 of its 17 declarations are cited from other modules.
+The shared parts out of which every metatheorem entry point is assembled; nothing here is an
+entry point itself.
 
 The metatheorem those parts serve: from a classical proof of
 `∀x^ρ (∀u⁰ B(x,u) → ∃v⁰ C(x,v))`, extract a computable bound Φ such that
@@ -30,17 +28,9 @@ It factors into:
 3. **The classical reduction** (`prenexify`, `classical_to_prenex_extended{,_gen}`): the
    proof-theoretic half, shared by every classical entry point.
 
-The live entry points are `syntactic_general_metatheorem{,_classical,_at,_gen}`
+The entry points are `syntactic_general_metatheorem{,_classical,_at,_gen}`
 (`SyntacticMetatheorem.lean`) and `monotone_general_metatheorem{_at,_classical_at}`
-(`MonotoneMetatheorem.lean`, `MonotoneMetatheoremClassical.lean`); both are built from the
-three parts above. Delete this file and every metatheorem in the project stops compiling.
-
-*Named `Metatheorem.lean` until 2026-09-08. It did hold `general_metatheorem`,
-`general_metatheorem_classical` and `metatheorem_core` — the transcription of the reference
-document's Def. 6.0.1 with a total majorizer — and all three were deleted on 2026-09-07 with
-the `Majorizability` structure they took, which is uninhabitable (`MajorizabilityRel.lean`).
-Do not re-add them. What the old name then advertised was a metatheorem that was no longer
-here, which reads as a vestigial file; the rename says what survived instead.*
+(`MonotoneMetatheorem.lean`, `MonotoneMetatheoremClassical.lean`).
 -/
 
 open Formula
@@ -201,13 +191,7 @@ theorem Formula.interpret_renameF_gen {ι κ : Type} {X : ι → Type} {F : κ �
       LEM on P: B₀ holds for all u (→ ∃v C₀ from hypothesis) and ¬C₀ holds
       for all v (→ contradiction).
 
-    **`prenexify_gen` is the general form: no hypothesis on `B₀`, `C₀` at all.**
-    The argument is pure classical predicate logic — `Derivable.lem` on arbitrary formulas —
-    and never inspected the matrices; `prenexify`'s four QF/∨-free hypotheses were always
-    unused, and it is now a wrapper. This is what lets the general-matrix metatheorem
-    (Kohlenbach 17.52: `B∀` a ∀-formula, `C∃` an ∃-formula) reuse the classical route:
-    with `B₀ := ∀b̲ B₀₀` and `C₀ := ∃c̲ C₀₀` the prenexified body `B₀' →ᶠ C₀'` is not
-    quantifier-free, and that is fine here. -/
+    No hypothesis on `B₀`, `C₀`: the argument is pure classical predicate logic. -/
 def prenexify_gen
     {ι κ : Type} {F : κ → Ty ι}
     {Premises : PremiseSet F}

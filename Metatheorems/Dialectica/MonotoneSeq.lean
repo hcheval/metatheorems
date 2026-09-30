@@ -11,22 +11,16 @@ import Metatheorems.ProofMode.Rewrite
 /-!
 # `monotone_soundness` through the proof-mode packaging layer
 
-`Dialectica/MonotoneMemo.lean` gives the `Eq.mpr` entry for `monotone_soundness`; it fires
-only where the recursion meets a cast *directly*. In a proof-mode-written derivation the casts
-sit under `ProofMode/Packing.lean`'s `seq_*` combinators and `Tactics.lean`'s `pm_*` wrappers,
-and unfolding that layer by `simp` is what explodes (`Probes/MonotoneLaneBp.lean`). This module
-is the MFI analogue of `Probes/CombinatorLemmas.lean`'s `wit_seq_*` programme: for each
-packaging combinator, a lemma
+For each packaging combinator of `ProofMode/Packing.lean` (`seq_*`) and `Tactics.lean`
+(`pm_*`), a lemma
 
     monotone_soundness … (seq_mp hAB hA) = MRealizer.seqMp … Δ (ms hAB) (ms hA)
 
-whose right-hand side is an explicit `MRealizer` combinator, **Δ-generic** (proved by
-structural recursion on the hypothesis context `Δ`, exactly as `wit_seq_mp` is), and never
-mentioning the sub-derivation. Applied as rewrite rules (the `mfi_memo` simp set, declared in
-`Dialectica/MfiMemoAttr.lean`), they carry `monotone_soundness` through the layer *without
-unfolding it* until it meets a raw constructor (where its own equations fire) or a cast (where the
-`MonotoneMemo` entry fires). The kernel then reduces the semantic combinators, which are
-recursions on `Δ` over the hand-written hat-side λ-terms of `Monotone.lean`.
+whose right-hand side is an explicit `MRealizer` combinator, **Δ-generic**, and never
+mentioning the sub-derivation. Applied as rewrite rules (the `mfi_memo` simp set,
+`Dialectica/MfiMemoAttr.lean`), they carry `monotone_soundness` through the layer without
+unfolding it, until it meets a raw constructor or a cast. The `Eq.mpr` casts of
+`anorm`/`canorm` need the equation discharged: `simp (disch := canorm) only [mfi_memo, …]`.
 
 ## What is here
 
@@ -44,30 +38,6 @@ recursions on `Δ` over the hand-written hat-side λ-terms of `Monotone.lean`.
   `Eq.mp (congrArg (Derivable F al P ·) hB) d` that `qfer_*_nf`, `lam*_correct_nf`,
   `forall_ax_vz`, `forall_ax_inst` leave — the formula equation is *in the term*, so nothing
   has to be supplied; and the three `MonotoneMemo` lemmas are tagged in.
-
-## `seq_induction` — why it is not the obstacle it was on the term side
-
-`seq_induction` changes the formula it inducts on with depth (`A' := A₀↑ →ᶠ A`), which is what
-stopped `sInduction` on the term route: the *witness type* changes, so no fixed type carries a
-Δ-generic statement. Here the statement is about `MRealizer cm (pack Δ (∀n A))` for **every**
-`A`, and `MRealizer.induction` is already generic in `A` — so `seqInduction` is the same
-recursion on `Δ` with `A` generalised, and `ms_seq_induction` is proved by that recursion. The
-two `seq_cast`s become `transport`s along `congrArg (pack Δ) _`, whose type sides are
-definitionally equal (`wTy` ignores terms), so they cost nothing in the kernel.
-
-## What the `Eq.mpr` of `anorm`/`canorm` still needs
-
-Those casts are `Eq.mpr (le_R_pu_of_le_R._proof_i …) d` with the equation abstracted into an
-auxiliary theorem of type `SeqD … B = SeqD … B'`: the formula equation is **not** in the term,
-and `Derivable`'s type-constructor injectivity is not available. `monotone_soundness_eqmpr`
-takes `hB` as a hypothesis, so it is applied with a discharger — the same normaliser that
-produced the cast: `simp (disch := canorm) only [mfi_memo, …]`. See `Probes/MonotoneMemoGates.lean`.
-
-NB. Every lemma's right-hand side elaborates `monotone_soundness … h` with the implicit
-formula read off `h`'s own type (`pack Δ B`), which is also what the next lemma's left-hand
-side expects; the residual spelling differences (`le_R_pu f g` against its unfolded
-`Formula.all …`, from the way `refine pm_allI ?_` unifies) are absorbed because `isDefEq`
-checks *implicit* arguments at default transparency after the explicit ones.
 -/
 
 namespace Metatheorems
@@ -84,9 +54,7 @@ variable {ι κ : Type} {X : ι → Type} {F : κ → Ty ι} {si : SpaceInterp X
 
 local notation "ms" => monotone_soundness eqxi spremise cm
 
--- ============================================================================
 -- Leaf combinators: the packaging layer's closed kernel theorems, as monotone realizers
--- ============================================================================
 
 /-- `monotone_soundness K_comb`, spelled out: `.exportation cm (ofSRealizer sAndWeak)`. -/
 def MRealizer.kComb (A B : Formula F Γ) : MRealizer cm (A →ᶠ B →ᶠ A) :=
@@ -123,9 +91,7 @@ def MRealizer.fmSComb (ρ : Ty ι) (A B C : Formula F (ρ :: Γ)) :
   ms (forall_mono (a := Allowed.extended) (Premises := P)
     (S_comb (a := Allowed.extended) (Premises := P) (A := A) (B := B) (C := C)))
 
--- ============================================================================
 -- The Δ-recursive combinators, mirroring `Packing.lean` / `Induction.lean`
--- ============================================================================
 
 /-- `seq_of_thm`, semantically: one `K` per hypothesis. -/
 def MRealizer.seqOfThm : (Δ : HCtx F Γ) → {B : Formula F Γ} →
@@ -189,9 +155,7 @@ def MRealizer.seqInduction : (Δ : HCtx F Γ) → {A : Formula F (Ty.nat :: Γ)}
       seqMp eqxi spremise cm Δ (seqOfThm cm Δ (fipComb eqxi spremise cm Ty.nat A₀ A))
         (seqInduction Δ (A := A') base' step')
 
--- ============================================================================
 -- The entries, Δ-generic
--- ============================================================================
 
 /-- **`seq_of_thm` commutes.** -/
 @[mfi_memo] theorem ms_seq_of_thm : ∀ (Δ : HCtx F Γ) {B : Formula F Γ}
@@ -283,9 +247,7 @@ at `S_comb`; nothing is unfolded below the combinators. -/
       simp only [ms_seq_mono eqxi spremise cm, ms_seq_cast eqxi spremise cm, ms_seq_induction Δ]
       rfl
 
--- ============================================================================
 -- The cast entry for `Eq.mp (congrArg (Derivable F al P ·) hB) d`
--- ============================================================================
 
 /-- The shape `qfer_at_nf`/`qfer_nat_nf`/`qfer_no_premise_*_nf`/`lam*_correct_nf`/
 `forall_ax_vz`/`forall_ax_inst` leave: the formula equation is *in* the term, so this fires
@@ -303,9 +265,7 @@ with nothing supplied. -/
       = MRealizer.transport hB.symm (ms d) := by
   subst hB; rfl
 
--- ============================================================================
 -- The derived `seq_*` and the `pm_*` layer: `rfl` restatements
--- ============================================================================
 
 /-! Each of these is definitional; they are stated so that `simp only [mfi_memo]` rewrites a
 tactic-written term to the primitives above in one pass. `SeqD` is reducible, so a `pm_*`
@@ -658,9 +618,7 @@ end Derived
 
 end Seq
 
--- ============================================================================
 -- Transport through the REDUCED hat type — what the kernel needs
--- ============================================================================
 
 /-! `MRealizer.transport hB r` casts the majorant along
 `Ty.interpret X (wTy B).hat = Ty.interpret X (wTy B').hat`. To reduce that cast the kernel
@@ -737,9 +695,7 @@ simproc mfiTransportNF (MRealizer.transport _ _) := fun e => do
 
 attribute [mfi_memo] mfiTransportNF
 
--- ============================================================================
 -- Casts INSIDE the closed kernel theorems — expose them to the rewrite
--- ============================================================================
 
 /-! The packaging layer's kernel theorems are not cast-free: `forall_ax_vz` is an `Eq.mp`
 around `Derivable.forall_ax`, along `(A.renameF (ext shift)).subst0 (var vz) = A`, and
@@ -907,9 +863,7 @@ condition with `substF_subst0map_weakenUnder`. -/
 
 end ExAndLeft
 
--- ============================================================================
 -- Axiom hygiene — verify by name, after a completed `lake build`
--- ============================================================================
 
 #print axioms MRealizer.seqOfThm
 #print axioms MRealizer.seqMp

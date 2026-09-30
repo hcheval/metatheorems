@@ -12,11 +12,8 @@ namespace Metatheorems
 # Majorizability, as a relation on semantic values
 
 The majorization relation `≽ᵃ` on the semantic type structure, and the structural lemmas
-about it. **Nothing here mentions `Term`** — that is the boundary against
-`Majorizability.lean`, which holds the recursion over terms (`termMajorizer`,
-`all_terms_majorizable`, `closedMajorizer`) and the per-constant data
-(`AbstractMajorizability`, `ConstMajorants`). This file is what that one is stated in
-terms of; it imports `Semantics` and nothing else.
+about it. Nothing here mentions `Term`; the recursion over terms and the per-constant data are
+in `Majorizability.lean`.
 
 ## Main definitions
 
@@ -26,23 +23,12 @@ terms of; it imports `Semantics` and nothing else.
 * `bezemMaj` — Bezem's `≽ᵃ`, the concrete relation the whole space tower rests on
 * `maxT` — pointwise maximum at hat types, with its `hatMaj`/`bezemMaj` compatibility
   lemmas; this is what `MaxCompat` and the MFI normal forms are built from
-
-## History, at the bottom of this file
-
-The file was `StrongMajorizability.lean` and held a `Majorizability` structure — the
-total majorizer of the document's Def. 6.0.1, which is **uninhabitable**. Both the name and
-the structure are gone; the closing section records why, since the argument is a finding
-about that presentation and is worth more than the dead code was.
 -/
 
--- ============================================================================
 -- The majorizability relation
--- ============================================================================
 
-/-- The majorizability *relation* and the two properties the metatheorem uses.
-
-This is everything `metatheorem_core_of_majorants` needs apart from the majorants
-themselves, and unlike `Majorizability` at the bottom of this file it is inhabited — see
+/-- The majorizability *relation* and the two properties the metatheorem uses: everything
+`metatheorem_core_of_majorants` needs apart from the majorants themselves. Inhabited, see
 `bezemRel`. Conditions 1–2 of the document's Def. 6.0.1. -/
 structure MajorizabilityRel {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) where
@@ -56,18 +42,11 @@ structure MajorizabilityRel {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     {x_star : Ty.interpret X ρ.hat} {x : Ty.interpret X ρ},
     maj (ρ →ₜ τ) f_star f → maj ρ x_star x → maj τ (f_star x_star) (f x)
 
--- ============================================================================
 -- The Bezem relation: a concrete `MajorizabilityRel`
--- ============================================================================
 
 /-- The majorizability relation **restricted to hat types**: `hatMaj ρ a b` is the document's
-`a ≽ᵃ_ρ̂ b`.
-
-Both arguments live in `Ty.interpret X ρ.hat`, which is legitimate because `Ty.hat` is
-idempotent (`Ty.hat_idempotent`) — the "star side" of `≽ᵃ_ρ̂` is `ρ̂̂ = ρ̂`. Indexing by `ρ`
-rather than by `ρ̂` is what keeps the definition **cast-free**: `ρ̂.hat = ρ̂` is a propositional
-equality, not a definitional one, so a literal `bezemMaj base ρ.hat` would need a transport
-at every use.
+`a ≽ᵃ_ρ̂ b`. Both arguments live in `Ty.interpret X ρ.hat` (`Ty.hat` is idempotent); indexing
+by `ρ` keeps the definition cast-free.
 
 Note it does not mention `base` at all: at a base type `ρ̂ = nat`, so the space-specific
 clause has already disappeared. `hatMaj` is therefore a purely type-directed relation on the
@@ -95,13 +74,7 @@ At `nat` it is `≥`; at an arrow it is the document's **conjunction**
 the second conjunct being `hatMaj (ρ →ₜ τ) f_star f_star` spelled out. `Ty.hat` sends every
 base type to `nat`, so `base i` relates a natural to a point of `X i` — that is Def. 6.0.1's
 "majorized by a natural relative to a reference point", and it is exactly the
-space-specific datum.
-
-**Two clauses, not one** — it carried only the first conjunct (Howard majorizability) at
-first. The self-majorization clause is what makes `bezem_prec_maj` provable:
-the document's induction (`.tex:82–96`) gives `R n y* z* ≽ R n y z` at *equal* `n`, while
-`maj` at `nat →ₜ ρ` demands `n* ≥ n → …`, and the bridge is `hatMaj_of_bezemMaj` plus
-`bezemMaj_of_hatMaj`. -/
+space-specific datum. The self-majorization clause is what makes `bezem_prec_maj` provable. -/
 def bezemMaj {ι : Type} {X : ι → Type} (base : (i : ι) → Nat → X i → Prop) :
     (ρ : Ty ι) → Ty.interpret X ρ.hat → Ty.interpret X ρ → Prop
   | .nat,     n,       m => @GE.ge Nat _ n m
@@ -121,9 +94,7 @@ theorem bezemMaj_arr_self {ι : Type} {X : ι → Type} {base : (i : ι) → Nat
     (h : bezemMaj base (ρ →ₜ τ) f_star f) : hatMaj (ρ →ₜ τ) f_star f_star :=
   ⟨h.2, h.2⟩
 
--- ============================================================================
 -- Structural lemmas about `hatMaj` and the two-clause `bezemMaj`
--- ============================================================================
 
 section BezemLemmas
 
@@ -198,16 +169,14 @@ theorem bezemMaj_of_hatMaj {base : (i : ι) → Nat → X i → Prop} (hbase : B
 end BezemLemmas
 
 /-- `bezemMaj` satisfies the two properties the metatheorem uses. Both come from the *first*
-conjunct, which is why the widening left the vestigial `general_metatheorem` untouched. -/
+conjunct. -/
 def bezemRel {ι κ : Type} {X : ι → Type} {F : κ → Ty ι} (si : SpaceInterp X F)
     (base : (i : ι) → Nat → X i → Prop) : MajorizabilityRel si where
   maj := bezemMaj base
   maj_le h := by simpa [bezemMaj] using h
   maj_app hf hx := hf.1 _ _ hx
 
--- ============================================================================
 -- Pointwise maximum at hat types (for the recursor majorant)
--- ============================================================================
 
 section MaxT
 
@@ -224,8 +193,7 @@ def maxT : (ρ : Ty ι) → Ty.interpret X ρ.hat → Ty.interpret X ρ.hat → 
   | .prod ρ τ, p, q => (maxT ρ p.1 q.1, maxT τ p.2 q.2)
 
 /-- `maxT` is commutative at every hat type. Needed to get the right-handed
-`maxT_bezemMaj_left` from the left-handed one (`AbstractMajorizability.maxT_maj_right`).
-Promoted here from `Probes/MonotoneSpike.lean`. -/
+`maxT_bezemMaj_left` from the left-handed one (`AbstractMajorizability.maxT_maj_right`). -/
 theorem maxT_comm : ∀ (ρ : Ty ι) (a b : Ty.interpret X ρ.hat), maxT ρ a b = maxT ρ b a
   -- `omega` treats `Ty.interpret X Ty.nat.hat`-typed atoms as opaque (CLAUDE.md), so the
   -- two numeric cases go by the core lemma directly
@@ -308,47 +276,5 @@ theorem maxT_bezemMaj_left {base : (i : ι) → Nat → X i → Prop} (hbase : B
     exact ⟨ihρ _ _ _ h₁.1 h₂.1, ihτ _ _ _ h₁.2 h₂.2⟩
 
 end MaxT
-
-/-!
-## Removed: `Majorizability`, the total majorizer
-
-A `Majorizability` structure used to sit here — `MajorizabilityRel` extended with
-
-    majorizer     : {ρ : Ty ι} → Ty.interpret X ρ → Ty.interpret X ρ.hat
-    majorizer_maj : ∀ {ρ} (x : Ty.interpret X ρ), maj ρ (majorizer x) x
-
-the faithful transcription of the reference document's Def. 6.0.1, matching the Lean 3
-formalization. It was deleted along with its only consumers — `metatheorem_core`,
-`general_metatheorem`, `general_metatheorem_classical` (`MetatheoremPrereqs.lean`) and the shape
-probe in `MCTStatement.lean`. **The reason is recorded here rather than in code, because it
-is a finding about that presentation and the code could never do anything.**
-
-**It has no instances and cannot have any.** `majorizer` quantifies over
-`Ty.interpret X ρ`, the *full set-theoretic* type structure — uncountable, containing
-non-definable functionals. At `(nat →ₜ nat) →ₜ nat` take `f* = id`; the `f` that `f*`
-majorizes then range over all `f` with `f n ≤ n`, and on that set
-
-    Φ f := the least n ≥ 1 with f n = 0, else 0
-
-is unbounded, witnessed by `fₖ n := if n = k then 0 else n`. So no single `Φ*` majorizes
-`Φ`. Degenerate choices (`maj := Eq` where `ρ.hat = ρ`) do satisfy the field, but then the
-bound depends on `x` itself and carries no uniformity — which is the entire point of a
-metatheorem. Turning this argument into a `no_total_majorizer` theorem is about 30 lines and
-has not been done.
-
-**This is not a defect of the semantic route as such, and that contrast is the resolution.**
-`all_terms_majorizable` quantifies over `Term F Γ ρ` — countable syntax, every element
-definable — and goes through. Its docstring writes this out. The monotone functional
-interpretation reaches the same place a third way: it carries no witness at all, only a
-majorant with its condition.
-
-**What replaced it.** The Dialectica witness/counter *types* are object-level `Ty ι`, so
-realizers are closed `Term`s and
-`all_closed_terms_majorizable` produces their majorants outright. That needs only
-`AbstractMajorizability` (inhabited by `bezemAbstract`) and no total majorizer at all. The
-live entry points are `syntactic_general_metatheorem{,_classical,_at,_gen}` and the MFI
-`monotone_general_metatheorem{_at,_classical_at}`; every bound in the project comes through
-`MajorizabilityRel` plus explicit majorants, via `metatheorem_core_of_majorants_at`.
--/
 
 end Metatheorems

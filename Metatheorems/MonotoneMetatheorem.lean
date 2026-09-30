@@ -18,23 +18,9 @@ same shape, `Φ = coreBound U* V*`; what changes is where `U*`/`V*` come from:
 | term (`syntactic_general_metatheorem_at`) | `closedMajorizer cm (extractedUTerm …)` — the majorant of an extracted realizer **term** | `closedMajorizer_maj` |
 | monotone (this file) | `mfiU cm r`, `mfiV cm r` — read off the **monotone realizer** `r := monotone_soundness … prf`, a semantic value at the hat type | the `Prop` half of `MRealizer`: an existential realizer, majorized at `n = am.N`, self-majorizing |
 
-`metatheorem_core_of_majorants_at` is consumed unchanged. The existential realizer in
-`MRealizer` is eliminated into the `Prop` conclusion, which is why the `∃`-valued and the
-`_at` version collapse into one statement here: `cm` is an input, `Φ` is data, and nothing
-`Prop`-shaped has to be turned into `Type`.
-
-`general_metatheorem_extract` (`Metatheorem.lean`) is **not** reused. It builds `U`, `V` from
-`dialectica_soundness_ctx'` — a *specific* realizer — whereas here the realizer is whatever the
-monotone realizer's existential provides, and the majorization fact is about *that* realizer.
-Reusing the semantic extraction half would mean proving that the two realizers coincide, which
-is neither true nor needed. What is reused is its *shape*: `mfi_extract_core` below is
-`general_metatheorem_extract` stated over an abstract realizer, plus the two majorization
-facts.
-
-**Statement over an abstract realizer first, then applied** (`mfi_bound_property` is about an
-arbitrary `r : MRealizer cm _`, and `monotone_general_metatheorem_at` instantiates it). This
-is the trap `extraction_of_prenex_realizer` paid for once: a `simp only [dialecticaMatrix]`
-run against the *applied* recursion tries to reduce the realizer itself.
+`metatheorem_core_of_majorants_at` is consumed unchanged. The extraction half is
+`mfi_extract_core`, stated over an abstract `MRealizer`; `mfi_bound_property` is the bound
+property over such a realizer, and the entry points instantiate it.
 -/
 
 namespace Metatheorems
@@ -167,8 +153,7 @@ theorem mfi_bound_property_gen (cm : ConstMajorants am)
 /-- **The metatheorem, with the bound computed by the monotone functional interpretation.**
 
 Same statement as `syntactic_general_metatheorem_at`; `Φ := coreBound (mfiU cm r) (mfiV cm r)`
-with `r := monotone_soundness eqxi spremise cm prf`. No realizer term is built anywhere on the
-bound path (ARCHITECTURE.md §14.3). -/
+with `r := monotone_soundness eqxi spremise cm prf`. -/
 def monotone_general_metatheorem_at
     (eqxi : EqXInterp X F si)
     (spremise : ∀ (Γ' : Ctx ι) (B : Formula F Γ'), Premises ⟨Γ', B⟩ → SRealizer si B)

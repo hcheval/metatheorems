@@ -26,16 +26,12 @@ Definitions and structural lemmas for Gödel's Dialectica interpretation
 
 open Formula
 
--- ============================================================================
 -- Witness and Counter types (Definition 3.0.1)
--- ============================================================================
 
 mutual
 
-/-- The **object-level** type of witnesses for `A`'s Dialectica translation.
-
-Making this a `Ty ι` rather than a Lean `Type` is what lets a realizer be a `Term`, and
-hence be majorized by `all_closed_terms_majorizable`. -/
+/-- The **object-level** type of witnesses for `A`'s Dialectica translation, so that a
+realizer is a `Term`. -/
 def wTy : {Γ : Ctx ι} → Formula F Γ → Ty ι
   | _, .bot      => .unit
   | _, .eq0 _ _  => .unit
@@ -58,8 +54,7 @@ def cTy : {Γ : Ctx ι} → Formula F Γ → Ty ι
 end
 
 /-- The Lean type of witnesses: the interpretation of the object-level witness type.
-Definitionally the familiar clause-by-clause definition — `Unit`, products, function
-spaces — so nothing that used the old definition changes. -/
+Definitionally the clause-by-clause definition — `Unit`, products, function spaces. -/
 @[reducible] def dialecticaWitness {ι κ : Type} (X : ι → Type) {F : κ → Ty ι} {Γ : Ctx ι}
     (A : Formula F Γ) : Type := Ty.interpret X (wTy A)
 
@@ -70,9 +65,7 @@ spaces — so nothing that used the old definition changes. -/
 notation "𝕎" => dialecticaWitness
 notation "ℂ" => dialecticaCounter
 
--- ============================================================================
 -- Default inhabitants (computable; replace Nonempty.some)
--- ============================================================================
 
 /-- Every `Ty.interpret X ρ` has a computable default: 0 for Nat, zeroInterp for base types,
     constant function for arrow types. -/
@@ -109,9 +102,7 @@ def dialecticaDefaultCounter {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
   | .all ρ A  => (Ty.interpret_default si ρ, dialecticaDefaultCounter si A)
 end
 
--- ============================================================================
 -- The quantifier-free matrix (Definition 3.0.1)
--- ============================================================================
 
 /-- The Dialectica matrix A_D as a Lean proposition (Def. 3.0.1).
 
@@ -136,18 +127,12 @@ def dialecticaMatrix {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
   | _, .all _ A,  env, xw, yc =>
       dialecticaMatrix si A (yc.1, env) (xw yc.1) yc.2
 
--- ============================================================================
 -- Decidability of the matrix
--- ============================================================================
 
 /-- `dialecticaMatrix si A env w y` is decidable for every formula `A`.
     The only atomic case is `eq0`, which gives `ℕ`-equality (decidable);
     all connectives preserve decidability, and `all`/`ex` reduce to a
-    single-point evaluation (no quantification).
-
-    Defined by structural recursion on `A` in term mode (rather than
-    `induction A generalizing`) because the context `Γ` is indexed into
-    `A`'s type and changes in the `all`/`ex` arms. -/
+    single-point evaluation (no quantification). -/
 instance dialecticaMatrix_decidable {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) {Γ : Ctx ι} (A : Formula F Γ)
     (env : Ctx.interpret X Γ) (w : dialecticaWitness X A) (y : dialecticaCounter X A) :
@@ -185,9 +170,7 @@ instance dialecticaMatrix_decidable {ι κ : Type} {X : ι → Type} {F : κ →
   | .all _ A, env, w, y => dialecticaMatrix_decidable si A (y.1, env) (w y.1) y.2
   | .ex  _ A, env, w, y => dialecticaMatrix_decidable si A (w.1, env) w.2 y
 
--- ============================================================================
 -- Convenience
--- ============================================================================
 
 /-- The Dialectica realizer for a formula A in context Γ at environment env.
     This is a *subtype* (not a Prop): the computational witness together with
@@ -203,9 +186,7 @@ def dialecticaRealizer {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) (A : Formula F ([] : Ctx ι)) : Type :=
   dialecticaRealizerCtx si A ()
 
--- ============================================================================
 -- Subsingleton instances for QF ∨-free formulas
--- ============================================================================
 
 /-- For QF ∨-free formulas, the witness and counter types are subsingletons.
     This is needed for Markov's principle and IP. -/
@@ -276,9 +257,7 @@ def dialecticaDefault {ι κ : Type} {X : ι → Type}
   | .all .., hqf, _ => absurd hqf (by simp [Formula.isQF])
   | .ex .., hqf, _ => absurd hqf (by simp [Formula.isQF])
 
--- ============================================================================
 -- Type invariance under substitution
--- ============================================================================
 
 /-- Object-level type invariance under substF. -/
 theorem wTy_cTy_substF {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι} (A : Formula F Γ) :
@@ -327,9 +306,7 @@ theorem dialecticaCounter_subst0 {ι κ : Type} {X : ι → Type} {F : κ → Ty
     dialecticaCounter X (A.subst0 t) = dialecticaCounter X A :=
   (dialectica_types_substF A (Term.subst0_map t)).2
 
--- ============================================================================
 -- Type invariance under renaming (needed for ∀/∃-rule)
--- ============================================================================
 
 /-- Object-level type invariance under renameF. -/
 theorem wTy_cTy_renameF {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι} (A : Formula F Γ) :
@@ -377,9 +354,7 @@ theorem dialecticaCounter_weaken {ι κ : Type} {X : ι → Type} {F : κ → Ty
     dialecticaCounter X (A.weakenBy ρ) = dialecticaCounter X A :=
   (dialectica_types_renameF A Renaming.shift).2
 
--- ============================================================================
 -- Matrix commutativity under renaming
--- ============================================================================
 
 /-- Projecting from a cast product: fst. -/
 private lemma cast_prod_fst {α₁ α₂ β₁ β₂ : Type}
@@ -425,12 +400,7 @@ private lemma Ctx.interpretSubst_ext_var {ι κ : Type} {X : ι → Type} {F : �
   exact Ctx.interpretSubst_weaken_eq si (fun v => Term.var (r v)) env z
 
 /-- The Dialectica matrix commutes with formula renaming.
-    Key lemma needed for forall-rule, exists-rule, and weakening.
-
-    We prove this by mutual induction with the type invariance, avoiding
-    separate cast decomposition. The proof uses the fact that
-    `dialecticaWitness`/`dialecticaCounter`/`dialecticaMatrix` all unfold
-    structurally on `A.renameF r` and `A` in the same way. -/
+    Key lemma needed for forall-rule, exists-rule, and weakening. -/
 theorem dialecticaMatrix_renameF {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) {Γ : Ctx ι} (A : Formula F Γ) :
     ∀ {Δ : Ctx ι} (r : Renaming Γ Δ) (env : Ctx.interpret X Δ)
@@ -530,9 +500,7 @@ theorem dialecticaMatrix_renameF {ι κ : Type} {X : ι → Type} {F : κ → Ty
     rw [ihA (Renaming.ext r) (w.1, env) w.2 y]
     rw [Ctx.interpretSubst_ext_var]
 
--- ============================================================================
 -- Matrix commutativity under substitution
--- ============================================================================
 
 /-- The Dialectica matrix commutes with formula substitution.
     Key: cast witnesses/counters via the type invariance equalities. -/
@@ -659,9 +627,7 @@ theorem dialecticaMatrix_substVar0 {ι κ : Type} {X : ι → Type} {F : κ → 
   have h := dialecticaMatrix_substF si A (Term.substVar0_map t) (v, env) w y
   rwa [Ctx.interpretSubst_substVar0_map] at h
 
--- ============================================================================
 -- Matrix commutativity under weakening (needed for ∀/∃-rule)
--- ============================================================================
 
 /-- The Dialectica matrix is invariant under formula weakening.
     Witnesses/counters for A.weakenBy ρ correspond to those for A,
@@ -696,17 +662,12 @@ theorem dialecticaMatrix_weaken {ι κ : Type} {X : ι → Type} {F : κ → Ty 
   rw [henv] at key
   exact key
 
--- ============================================================================
 -- Realizers for purely universal, ∨-free formulas
--- ============================================================================
 
 /-- For a **quantifier-free ∨-free** formula, the Dialectica matrix is the formula's own
 semantic interpretation — at *every* witness and *every* counter, because both types are
-subsingletons (`dialecticaWitness_subsingleton`).
-
-This duplicates `dialecticaMatrix_iff_interpFormula` (`MetatheoremPrereqs.lean`), which cannot
-be used here: that file sits far above this one. When the two are ever unified, this is the
-one to keep — it is the lower of the two. -/
+subsingletons (`dialecticaWitness_subsingleton`). Same statement as
+`dialecticaMatrix_iff_interpFormula` (`MetatheoremPrereqs.lean`), available lower down. -/
 theorem dialecticaMatrix_iff_interp_qf {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) {Γ : Ctx ι}
     (A : Formula F Γ) (hqf : A.isQF = true) (hvf : A.isVFree = true)
@@ -733,18 +694,8 @@ theorem dialecticaMatrix_iff_interp_qf {ι κ : Type} {X : ι → Type} {F : κ 
       have := (dialecticaMatrix_iff_interp_qf si A hqf.1 hvf.1 env wA (g wA cB)).mp hM
       exact (dialecticaMatrix_iff_interp_qf si B hqf.2 hvf.2 env (f wA) cB).mpr (h this)
 
-/-- **A purely universal ∨-free formula is Dialectica-realized by its own truth.**
-
-The witness type of such a formula is a *singleton*: `wTy` of `∀x₁…∀xₖ. A_qf` is
-`ρ₁ →ₜ … →ₜ ρₖ →ₜ unit`-shaped, everything bottoming out in `Ty.unit` (or products of
-such). So a realizer carries no information, and all the content is that the formula holds
-in the model — which is exactly the hypothesis `htrue`.
-
-The recursion has three cases: `∀` (a function), `∧` (a pair — `isPurelyUniversal` is
-closed under `∧`, which is needed because `eqAtType` at a product type is a conjunction),
-and the quantifier-free core, where
-`dialecticaMatrix_iff_interp_qf` discharges the matrix *for every counter*.
-
+/-- **A purely universal ∨-free formula is Dialectica-realized by its own truth.** Its
+witness type is a singleton, so all the content is the hypothesis `htrue`.
 `srealizer_of_pu` (`Dialectica/Syntactic.lean`) is the syntactic counterpart. -/
 def realizer_of_pu {ι κ : Type} {X : ι → Type} {F : κ → Ty ι} (si : SpaceInterp X F) :
     {Γ : Ctx ι} → (B : Formula F Γ) →
@@ -785,13 +736,7 @@ def realizer_of_pu {ι κ : Type} {X : ι → Type} {F : κ → Ty ι} (si : Spa
       ⟨dialecticaDefaultWitness si _,
        fun c => (dialecticaMatrix_iff_interp_qf si _ hpu hvf env _ c).mpr (htrue env)⟩
 
-/-- `realizer_of_pu` at a **single** environment.
-
-`realizer_of_pu` asks for `∀ env, Formula.interpret si B env`, but the consumers that matter —
-`EqXInterp.realize` and `realizeTerm_sound` — have the formula only at the one `env` they were
-handed. That is enough: the `∀` case only ever needs truth at *extensions* of the given
-environment, which `htrue v` supplies, and the quantifier-free cases use `env` alone. The two
-definitions are otherwise identical. -/
+/-- `realizer_of_pu` at a **single** environment: truth at `env` suffices. -/
 def realizer_of_pu_at {ι κ : Type} {X : ι → Type} {F : κ → Ty ι} (si : SpaceInterp X F) :
     {Γ : Ctx ι} → (B : Formula F Γ) →
       B.isPurelyUniversal = true → B.isVFree = true →
@@ -832,13 +777,7 @@ def realizer_of_pu_at {ι κ : Type} {X : ι → Type} {F : κ → Ty ι} (si : 
        fun c => (dialecticaMatrix_iff_interp_qf si _ hpu hvf env _ c).mpr htrue⟩
 
 /-- The converse of `realizer_of_pu_at`: for a purely universal ∨-free formula, a realizer
-gives back the formula's truth in the model.
-
-Needed by `EqXInterp.extract`, which has to turn a realizer of `s =_X t` back into a semantic
-statement about the distance.  The `∀` case reads the realizer componentwise — the witness of
-`.all ρ A` is a function and its counter a dependent pair, so `⟨r.val v, fun y => r.property
-⟨v, y⟩⟩` realizes `A` at `(v, env)`.  The quantifier-free cases just feed the default counter
-to `dialecticaMatrix_iff_interp_qf`, which reduces the matrix *for every* counter. -/
+gives back the formula's truth in the model. -/
 def interp_of_realizer_pu {ι κ : Type} {X : ι → Type} {F : κ → Ty ι} (si : SpaceInterp X F) :
     {Γ : Ctx ι} → (B : Formula F Γ) →
       B.isPurelyUniversal = true → B.isVFree = true →
@@ -876,20 +815,10 @@ def interp_of_realizer_pu {ι κ : Type} {X : ι → Type} {F : κ → Ty ι} (s
       (dialecticaMatrix_iff_interp_qf si _ hpu hvf env _ _).mp
         (r.property (dialecticaDefaultCounter si _))
 
--- ============================================================================
 -- The matrix of a ∀-formula / an ∃-formula against its truth (Kohlenbach 17.52 shapes)
--- ============================================================================
 
 /-- **A true purely universal ∨-free formula has a true matrix at EVERY witness and every
-counter.** Sharper than `realizer_of_pu_at`, which only produces *some* witness: the witness
-type of a ∀-formula is built from `unit`, `×ₜ` and `→ₜ unit`-shaped arrows, so no witness
-carries information and the matrix at counter `(b, y)` is just the instance of the body at
-`b`, which `htrue` supplies.
-
-This is the lemma that lets the metatheorem take a premise matrix `B∀` that is a ∀-formula
-rather than quantifier-free (Kohlenbach 17.52): the realizer's `U`-component hands back a
-counter `(u, (b, …))`, and this lemma turns the *assumed* truth of `∀b B₀(x,u,b)` into the
-matrix at exactly that counter. -/
+counter.** Used for a ∀-formula premise matrix `B∀` (Kohlenbach 17.52). -/
 theorem dialecticaMatrix_of_interp_pu {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) :
     {Γ : Ctx ι} → (B : Formula F Γ) →
@@ -921,13 +850,8 @@ theorem dialecticaMatrix_of_interp_pu {ι κ : Type} {X : ι → Type} {F : κ �
       (dialecticaMatrix_iff_interp_qf si _ hpu hvf env w y).mpr htrue
 
 /-- **A purely existential ∨-free formula whose matrix holds at some witness, against ANY
-counter, is true.** The dual of `dialecticaMatrix_of_interp_pu`: the witness of an ∃-formula
-is the tuple of existential witnesses (plus `unit`-shaped padding), its counter carries no
-information, and the matrix at witness `(c, …)` is the body at `c`, which is exactly what the
-∃ asks for.
-
-This is the lemma that lets the metatheorem's conclusion matrix `C∃` be an ∃-formula rather
-than quantifier-free (Kohlenbach 17.52). -/
+counter, is true.** The dual of `dialecticaMatrix_of_interp_pu`; used for an ∃-formula
+conclusion matrix `C∃` (Kohlenbach 17.52). -/
 theorem interp_of_dialecticaMatrix_pe {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     (si : SpaceInterp X F) :
     {Γ : Ctx ι} → (C : Formula F Γ) →
@@ -958,8 +882,7 @@ theorem interp_of_dialecticaMatrix_pe {ι κ : Type} {X : ι → Type} {F : κ �
   | _, .all _ _, hpe, hvf, env, w, y, hm =>
       (dialecticaMatrix_iff_interp_qf si _ hpe hvf env w y).mp hm
 
-/-- Quantifier-free formulas are purely universal — the old `hB_qf` hypothesis is an instance
-of the new `hB_pu` one. -/
+/-- Quantifier-free formulas are purely universal. -/
 theorem Formula.isPurelyUniversal_of_qf {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι}
     (A : Formula F Γ) (hqf : A.isQF = true) : A.isPurelyUniversal = true := by
   cases A with
@@ -974,8 +897,7 @@ theorem Formula.isPurelyUniversal_of_qf {ι κ : Type} {F : κ → Ty ι} {Γ : 
   | imp _ _ => exact hqf
   | ex _ _ => exact hqf
 
-/-- Quantifier-free formulas are purely existential — the old `hC_qf` hypothesis is an instance
-of the new `hC_pe` one. -/
+/-- Quantifier-free formulas are purely existential. -/
 theorem Formula.isPurelyExistential_of_qf {ι κ : Type} {F : κ → Ty ι} {Γ : Ctx ι}
     (A : Formula F Γ) (hqf : A.isQF = true) : A.isPurelyExistential = true := by
   cases A with
@@ -990,20 +912,12 @@ theorem Formula.isPurelyExistential_of_qf {ι κ : Type} {F : κ → Ty ι} {Γ 
   | imp _ _ => exact hqf
   | all _ _ => exact hqf
 
--- ============================================================================
 -- Base-type equality is *defined*, so its Dialectica data is computable
--- ============================================================================
 
-/-! Base-type equality used to be an **abstract** predicate `EqX i s t`, and
-nothing could be said about its Dialectica witness/counter types — hence four fields of
-`EqXInterp` (`witnessSubsingleton`, `witnessDefault`, `counterDefault`, `realizeTerm`) which
-had to be *supplied* by each theory.
-
-With `eqAtType (.base i) s t ≡ eq_R (d_i s t) 0ℝ` fixed, `eq_R` is `Formula.all .nat <QF>`,
-so `wTy` of it is `nat →ₜ unit` and `cTy` is `nat ×ₜ unit` **by `rfl`** — at every `ι`, `κ`,
-`Γ`, `s`, `t`. All four are therefore outright definable, and the fields were vestigial.
-The definitions below replace them; see also `eqAtTypeBaseRealizeTerm` in
-`Dialectica/Syntactic.lean`, which needs `wTy` and so lives one module up. -/
+/-! `eqAtType (.base i) s t ≡ eq_R (d_i s t) 0ℝ` is `Formula.all .nat <QF>`, so `wTy` of it
+is `nat →ₜ unit` and `cTy` is `nat ×ₜ unit` by `rfl`. Its canonical witness, counter and the
+subsingleton fact are therefore definitions; `eqAtTypeBaseRealizeTerm` is in
+`Dialectica/Syntactic.lean`. -/
 
 theorem wTy_eqAtType_base {ι κ : Type} {F : κ → Ty ι} (i : ι) {Γ : Ctx ι}
     (s t : Term F Γ (Ty.base i)) :
@@ -1014,37 +928,29 @@ theorem cTy_eqAtType_base {ι κ : Type} {F : κ → Ty ι} (i : ι) {Γ : Ctx �
     cTy (eqAtType (Ty.base i) s t) = (Ty.nat ×ₜ Ty.unit) := rfl
 
 /-- The canonical Dialectica witness for equality at a base type: the witness type is
-`ℕ → Unit`, so `fun _ => ()` is the only inhabitant. Was `EqXInterp.witnessDefault`. -/
+`ℕ → Unit`, so `fun _ => ()` is the only inhabitant. -/
 def eqAtTypeBaseWitness {ι κ : Type} (X : ι → Type) {F : κ → Ty ι} (i : ι) {Γ : Ctx ι}
     (s t : Term F Γ (Ty.base i)) : dialecticaWitness X (eqAtType (Ty.base i) s t) :=
   fun _ => ()
 
 /-- The canonical Dialectica counter for equality at a base type: the counter type is
-`ℕ × Unit`. Was `EqXInterp.counterDefault`. -/
+`ℕ × Unit`. -/
 def eqAtTypeBaseCounter {ι κ : Type} (X : ι → Type) {F : κ → Ty ι} (i : ι) {Γ : Ctx ι}
     (s t : Term F Γ (Ty.base i)) : dialecticaCounter X (eqAtType (Ty.base i) s t) :=
   (0, ())
 
-/-- The witness type for equality at a base type is a subsingleton — it is `ℕ → Unit`.
-Was `EqXInterp.witnessSubsingleton`. -/
+/-- The witness type for equality at a base type is a subsingleton — it is `ℕ → Unit`. -/
 theorem eqAtTypeBaseWitness_subsingleton {ι κ : Type} (X : ι → Type) {F : κ → Ty ι} (i : ι)
     {Γ : Ctx ι} (s t : Term F Γ (Ty.base i)) :
     Subsingleton (dialecticaWitness X (eqAtType (Ty.base i) s t)) :=
   ⟨fun _ _ => funext fun _ => rfl⟩
 
--- ============================================================================
 -- EqX interface for the Dialectica proof (Def. of "purely universal" EqX)
--- ============================================================================
 
-/-- The Dialectica interface for base-type equality at each base type `X_i`.
+/-- The Dialectica interface for base-type equality at each base type `X_i`. It asks only for
+model facts — things true of the space and not derivable from the syntax.
 
-**What this structure is for.** It asks *only for model facts* — things that are true of the
-space and are not derivable from the syntax. Everything that the "base equality is defined"
-refactor made computable has been removed from it and lives as an ordinary definition (`eqAtTypeBaseWitness`, `eqAtTypeBaseCounter`,
-`eqAtTypeBaseWitness_subsingleton` above; `eqAtTypeBaseRealizeTerm` and
-`eqAtTypeBase_realizeTerm_sound` in `Dialectica/Syntactic.lean`).
-
-The four remaining fields:
+The four fields:
 
 1. `realize` — semantic equality gives a Dialectica realizer; needs `d(x,x) = 0`.
 2. `extract` — a realizer gives semantic equality; needs *separation*, `d(x,y) = 0 → x = y`.
@@ -1062,16 +968,9 @@ structure EqXInterp {ι κ : Type} (X : ι → Type) (F : κ → Ty ι)
   extract : ∀ (i : ι) {Γ : Ctx ι} (s t : Term F Γ (Ty.base i)) (env : Ctx.interpret X Γ),
       dialecticaRealizerCtx si (eqAtType (Ty.base i) s t) env →
       Term.interpret si s env = Term.interpret si t env
-  /-- `si.distInterp i` is symmetric, in the sense the object language asserts.
-
-      `Derivable.dist_comm` is a constructor, so Dialectica soundness owes its truth in the
-      model. It is *not* an instance of `realize`: `eq_R (d x y) (d y x)` is not of the form
-      `eqAtType (.base i) s t`, which is `eq_R (d s t) 0ℝ`. See ARCHITECTURE.md.
-
-      Only the model fact is asked for — no realizer and no realizing term. `eq_R` is purely
-      universal and ∨-free, so `realizer_of_pu` / `srealizer_of_pu` build both from this;
-      see `EqXInterp.dist_comm_realize` just below and `sDistComm` in
-      `Dialectica/Syntactic.lean`. -/
+  /-- `si.distInterp i` is symmetric, in the sense the object language asserts — the model
+      fact behind the constructor `Derivable.dist_comm`. The realizer and realizing term are
+      built from it (`EqXInterp.dist_comm_realize`, `sDistComm`). -/
   dist_comm_holds : ∀ (i : ι) {Γ : Ctx ι} (x y : Term F Γ (Ty.base i))
       (env : Ctx.interpret X Γ),
       Formula.interpret si
@@ -1085,12 +984,8 @@ structure EqXInterp {ι κ : Type} (X : ι → Type) (F : κ → Ty ι)
           (Term.app2 Term.add_R
             (Term.app2 (Term.dist i) x y) (Term.app2 (Term.dist i) y z))) env
 
-/-- Symmetry of the distance, as a Dialectica realizer.
-
-Was once a field (`dist_comm_realize`); it is now derived from the model fact
-`dist_comm_holds` by `realizer_of_pu`, since `eq_R` is purely universal and ∨-free
-(`isPurelyUniversal` and `isVFree` are both `true` by `rfl`). Its signature is unchanged,
-so call sites in `Dialectica/Lemmas.lean` are untouched. -/
+/-- Symmetry of the distance, as a Dialectica realizer, derived from the model fact
+`dist_comm_holds` by `realizer_of_pu`. -/
 def EqXInterp.dist_comm_realize {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     {si : SpaceInterp X F} (eqxi : EqXInterp X F si)
     (i : ι) {Γ : Ctx ι} (x y : Term F Γ (Ty.base i)) (env : Ctx.interpret X Γ) :
@@ -1099,8 +994,7 @@ def EqXInterp.dist_comm_realize {ι κ : Type} {X : ι → Type} {F : κ → Ty 
   realizer_of_pu si _ rfl rfl (eqxi.dist_comm_holds i x y) env
 
 /-- The triangle inequality, as a Dialectica realizer. Derived from `dist_tri_holds`
-exactly as `dist_comm_realize` is; `le_R_pu` is the ∨-free purely universal form of `≤ℝ`
-precisely so that this works. -/
+exactly as `dist_comm_realize` is. -/
 def EqXInterp.dist_tri_realize {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
     {si : SpaceInterp X F} (eqxi : EqXInterp X F si)
     (i : ι) {Γ : Ctx ι} (x y z : Term F Γ (Ty.base i)) (env : Ctx.interpret X Γ) :

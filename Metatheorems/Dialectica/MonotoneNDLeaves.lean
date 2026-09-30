@@ -8,27 +8,10 @@ import Metatheorems.Dialectica.MonotoneMemo
 /-!
 # Hand-written monotone realizers of the `¬¬`-combinators
 
-The fused recursion `monotone_nd_soundness` (`MonotoneND.lean`) applies a handful of closed
-propositional combinators at every node of a classical derivation. On a representative
-derivation (`LemBoundDemo.lFinalNoLem` prenexified, 363 constructors) the profile is: 134 `syllogism`
-(each `neg_neg_mp` ×2, `K_comb`, `S_comb`, `neg_neg_imp_rev2`), 34 `exportation`, 30
-`importation`, 11 `forall_rule` (each `neg_neg_mp`, `dnn_intro` ×2, `neg_neg_imp_rev`), 4
-`expansion`, 2 `lem`, plus ~120 propositional axioms each wrapped in `dnn_intro`. Realizing
-those combinators as leaves — `ofSRealizer ∘ syntactic_soundness`, i.e. the TERM route on a
-fixed ~100-node Hilbert derivation, several times per node — is what made the classical
-bound's kernel reduction a 12 GB `std::bad_alloc`. This module replaces them.
-
-Each combinator is an `MRealizer cm <its formula>` whose **data** is an explicit λ-term at
-the hat types and whose existential **realizer** is the same λ-term at the witness types —
-written once, polymorphically in the four Lean types `WA CA WB CB` (`Ty.interpret` of a `wTy`
-is definitionally the product/function type the clauses of `wTy` say), so the two coincide
-syntactically and the majorization proof is purely structural. `maj_auto` below discharges
-those: a *syntactic dispatcher* on the goal (`Prod.mk` → `prod_intro`, projection →
-`prod_fst/snd`, `fun` → `arrow_intro` + intro, application → `app_compat`, `()` → `unit_maj`,
-`maxT` → `maxT_selfMaj`), no search, no `isDefEq` beyond `assumption` at the leaves. The
-`if`-realizers (`nnImpRevF`, `dnnLemF`) are the two combinators whose Hilbert proof uses a
-hypothesis twice (contraction): the realizer branches on the decidable matrix, the majorant is
-the `maxT` of the two branches — `MRealizer.andContract`'s pattern.
+The closed propositional combinators the fused recursion `monotone_nd_soundness`
+(`MonotoneND.lean`) applies at every node, as `MRealizer`s whose data is an explicit λ-term at
+the hat types and whose realizer is the same λ-term at the witness types. `maj_auto` is a
+syntactic dispatcher for their structural majorization goals.
 
 | combinator | here | case split |
 |---|---|---|
@@ -47,9 +30,7 @@ namespace Metatheorems
 
 open Formula
 
--- ============================================================================
 -- Field aliases with all arguments implicit (Monotone.lean's are module-private)
--- ============================================================================
 
 section Helpers
 
@@ -128,9 +109,7 @@ theorem ndl_smax {ρ : Ty ι} {a b c d : Ty.interpret X ρ.hat}
 
 end Helpers
 
--- ============================================================================
 -- `maj_auto`: a syntactic dispatcher for structural majorization goals
--- ============================================================================
 
 /-- `maj_auto`: see `majStep`. Declared before the dispatcher so the `maxT`/`ite` step can
 recurse into it. -/
@@ -363,9 +342,7 @@ open Lean Elab Tactic in
 elab_rules : tactic
   | `(tactic| maj_auto) => majGo
 
--- ============================================================================
 -- The realizer functions, polymorphic in the witness/counter types
--- ============================================================================
 
 /-! `Ty.interpret X (wTy P)` is definitionally the type built from `Unit`, `×` and `→` by the
 clauses of `wTy`, and `Ty.interpret X (wTy P).hat` is the same shape at the hat types. The
@@ -486,9 +463,7 @@ def expansionFun {WA CA WB CB WC CC : Type} :
 
 end RealizerFunctions
 
--- ============================================================================
 -- Majorization of the helpers, once each, so the combinators need not unfold them
--- ============================================================================
 
 /-! The object-level types of the helpers' arguments, at `Ty`. `Ty.interpret X (nwT α γ).hat`
 is definitionally `NW (Ty.interpret X α.hat) (Ty.interpret X γ.hat)`, so each lemma below is
@@ -704,9 +679,7 @@ theorem lemW2_self {φ₁ φ₂ : Ty.interpret X (nwT (orNegW α γ) (orNegC α 
 
 end HelperMaj
 
--- ============================================================================
 -- The closed combinators as monotone realizers
--- ============================================================================
 
 section Combinators
 
@@ -736,9 +709,7 @@ def MRealizer.dnnIntroF (cm : ConstMajorants am) {Γ : Ctx ι} (A : Formula F Γ
     · intro _ _ _; dsimp only [dnnFun]; maj_auto⟩
 
 /-- **`¬¬(A → B) → (¬¬A → ¬¬B)`** (`neg_neg_mp`). The data is `nnMpFun`'s body written out as
-a literal lambda: checked against the expected `Ty.interpret X (wTy …)` binder by binder, where
-ascribing the polymorphic constant forces one wholesale defeq of two large types that, with
-`A B` free (no `whnf` cache), re-unfolds `wTy`'s duplicated subterms exponentially. -/
+a literal lambda. -/
 def MRealizer.nnMpF (cm : ConstMajorants am) {Γ : Ctx ι} (A B : Formula F Γ) :
     MRealizer cm (¬ᶠ¬ᶠ(A →ᶠ B) →ᶠ (¬ᶠ¬ᶠA →ᶠ ¬ᶠ¬ᶠB)) :=
   ⟨fun _ _ =>
@@ -914,9 +885,7 @@ def MRealizer.expansionF (cm : ConstMajorants am) {Γ : Ctx ι} (A B C : Formula
 
 end Combinators
 
--- ============================================================================
 -- Axiom hygiene — verify by name, after a completed `lake build`
--- ============================================================================
 
 #print axioms MRealizer.dnnIntroF
 #print axioms MRealizer.nnMpF
