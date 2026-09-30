@@ -32,12 +32,7 @@ and the four results are
 3. `clamp01_le_one : ∀f. clamp01 f ≤ℝ 1ℝ`;
 4. `clamp01_eq : ∀f. 0ℝ ≤ℝ f → f ≤ℝ 1ℝ → clamp01 f =ℝ f`.
 
-**No shift is needed anywhere.** Clamping is 1-Lipschitz, so `clamp01 f` inherits `f̂`'s own
-Cauchy rate index for index, and `cauchyfy` fixes it; and result 4 closes at `eq_R`'s own
-index with **no `cauchyfy` step spent at all** — `0ℝ ≤ℝ f` read at `n` says `−f̂(n+1) <ℚ 2^{-n}`,
-which is exactly the drift `|clamp01_Q (f̂(n+1)) −ℚ f̂(n+1)|` when the clamp bites from below,
-and symmetrically from above. So the tightness triage of CLAUDE.md lands on the cheap side:
-neither `cauchyfy_cauchy` nor the `eqR_tail` engine is touched by result 4.
+No index shift is needed anywhere.
 -/
 
 open Formula
@@ -45,9 +40,7 @@ open Formula
 variable {ι κ : Type} {F : κ → Ty ι}
 variable {al : Allowed} {Premises : PremiseSet F}
 
--- ============================================================================
 -- Definitions
--- ============================================================================
 
 namespace Term
 
@@ -75,9 +68,7 @@ def clamp01 {Γ : Ctx ι} : Term F Γ (realTy ι →ₜ realTy ι) :=
 
 end Term
 
--- ============================================================================
 -- Closed-term substitution and weakening
--- ============================================================================
 
 section ClosedSubst
 variable {Γ Δ : Ctx ι} (σ : Term.Subst F Γ Δ)
@@ -114,9 +105,7 @@ private theorem one_R_weaken' {Δ : Ctx ι} {ρ : Ty ι} :
     (Term.one_R : Term F Δ (realTy ι)).weaken (σ := ρ) = Term.one_R := by
   rw [Term.weaken, Term.rename_eq_subst]; exact one_R_closed_subst _
 
--- ============================================================================
 -- Beta lemmas
--- ============================================================================
 
 /-- `clamp01_Q a =₀ ite_nat (sg_bar (le_Q_dec a 0ℚ)) 0ℚ (ite_nat (sg_bar (le_Q_dec 1ℚ a)) 1ℚ a)`
 — the one beta step. -/
@@ -150,9 +139,7 @@ def clamp01_apply (f : Term F Γ (realTy ι)) (x : Term F Γ Ty.nat) :
       : Term F (Ty.nat :: realTy ι :: Γ) Ty.nat)
     f x (by qb_nf)
 
--- ============================================================================
 -- Evaluating `clamp01_Q` under the three order hypotheses
--- ============================================================================
 
 /-- `b <ℚ a` makes the test `a ≤ℚ b` fail: `sg_bar (le_Q_dec a b) =₀ 0`. -/
 private def sg_bar_le_dec_of_lt (a b : Term F Γ Ty.nat) :
@@ -208,9 +195,7 @@ def clamp01_Q_of_lt_one (a : Term F Γ Ty.nat) :
   prwby s1
   pthm (qtrans (ite_nat_zero _ _) (ite_nat_zero _ _))
 
--- ============================================================================
 -- `clamp01_Q` lands in `[0,1]`
--- ============================================================================
 
 /-- `0ℚ ≤ℚ 1ℚ`. -/
 private def zero_le_one_Q :
@@ -259,9 +244,7 @@ def clamp01_Q_le_one (a : Term F Γ Ty.nat) :
       papplym (lt_Q_imp_le_Q a Term.one_Q)
       pexact hb
 
--- ============================================================================
 -- The 1-Lipschitz estimate
--- ============================================================================
 
 /-- Subtraction is monotone in the first argument and antitone in the second:
 `a ≤ℚ A ∧ B ≤ℚ b → a −ℚ b ≤ℚ A −ℚ B`. -/
@@ -312,11 +295,7 @@ private def lip_case (a b ca cb : Term F Γ Ty.nat) :
 
 `clamp01_Q` is monotone and non-expansive, so with `z := clamp01_Q a −ℚ clamp01_Q b` one has
 `0 ≤ℚ z ≤ℚ a −ℚ b`, hence `|z| = z ≤ a −ℚ b ≤ |a −ℚ b|`. The two facts are established by a
-case split on where `a` and then `b` fall — `≤ 0`, `≥ 1`, or strictly between — which is
-**seven cases** (nine minus the two `b > a` shapes that `b ≤ℚ a` excludes; one of the seven
-is itself absurd). Every case is `lip_case` fed two order facts, and the only content is
-`sub_Q_mono`. The sign-magnitude encoding never surfaces: `le_Q_or_lt_Q` supplies the
-splits and `clamp01_Q_of_*` the values. -/
+case split on where `a` and then `b` fall, each case `lip_case` fed two order facts. -/
 def clamp01_Q_lip_core (a b : Term F Γ Ty.nat) :
     Derivable F al Premises
       (le_Q b a →ᶠ
@@ -470,9 +449,7 @@ def clamp01_Q_lip (a b : Term F Γ Ty.nat) :
       (abs_diff_Q_comm Cb Ca) (abs_diff_Q_comm b a))
     pexact h
 
--- ============================================================================
 -- Result 1: `clamp01 f` is Cauchy, so `cauchyfy` fixes it
--- ============================================================================
 
 /-- The Cauchy check passes for `clamp01 f` at every index, for **any** `f`: `f̂` is Cauchy
 by `cauchyfy_cauchy`, and `clamp01_Q_lip` transfers its rate verbatim. Spelled out rather
@@ -511,9 +488,7 @@ def cauchyfy_clamp01 (f : Term F Γ (realTy ι)) (s : Term F Γ Ty.nat) :
     (cauchyfy_id (.app Term.clamp01 f) (clamp01_app_weaken f ▸ clamp01_check f) s)
     (clamp01_apply f s)
 
--- ============================================================================
 -- Results 2 and 3: `0ℝ ≤ℝ clamp01 f ≤ℝ 1ℝ`
--- ============================================================================
 
 /-- `0ℝ ≤ℝ clamp01 f`, at an explicit real. The pointwise content is
 `0ℚ −ℚ clamp01_Q (f̂(n+1)) <ℚ 2^{-n}`, from `0ℚ ≤ℚ clamp01_Q (·)` and `0ℚ <ℚ 2^{-n}`. -/
@@ -555,22 +530,12 @@ def clamp01_le_one :
       (Formula.all rTy (le_R (.app Term.clamp01 (.var .vz)) Term.one_R)) :=
   univ_gen (clamp01_le_one_core (.var .vz))
 
--- ============================================================================
 -- Result 4: `clamp01` is the identity on `[0,1]`
--- ============================================================================
 
 /-- `0ℝ ≤ℝ f → f ≤ℝ 1ℝ → u =ℝ f` for any `u` whose cauchyfication is `clamp01_Q (f̂(·))`.
 
-The composed real is fed in through an abstract `u`, as `add_zero_R_gen` does, so that no
-substitution is ever pushed through `clamp01` inside the proof mode.
-
-**No estimate is spent.** At the goal's index `n`, write `a := f̂(n+1)`. The two hypotheses,
-read at `n` through `le_R_all`, are exactly `0ℚ −ℚ a <ℚ 2^{-n}` and `a −ℚ 1ℚ <ℚ 2^{-n}`, and
-the goal is `|clamp01_Q a −ℚ a| <ℚ 2^{-n}`. If `a ≤ℚ 0` the clamp is `0` and the drift is
-`0 −ℚ a`, non-negative, so its magnitude is the first hypothesis; if `1 ≤ℚ a` it is `1 −ℚ a`,
-whose magnitude `a −ℚ 1` is the second; otherwise the clamp is `a` itself and the drift is
-`|a −ℚ a|`. No `cauchyfy` step, no tightness engine — the clamp's drift is *exactly* what
-`≤ℝ` measures. -/
+The composed real is fed in through an abstract `u`, as `add_zero_R_gen` does. No estimate is
+spent: the clamp's drift is exactly what `≤ℝ` measures. -/
 private def clamp01_eq_gen (f u : Term F Γ (realTy ι))
     (hu : Derivable F al Premises (Γ := Ty.nat :: Γ)
       (Formula.eq0

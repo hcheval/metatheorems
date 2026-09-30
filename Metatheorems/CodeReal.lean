@@ -44,9 +44,7 @@ theorem clampReal_of_mem (r : ℝ) (h0 : 0 ≤ r) (h1 : r ≤ 1) : clampReal r =
   unfold clampReal
   rw [min_eq_right h1, max_eq_right h0]
 
--- ============================================================================
 -- The magnitude of a code, and of the real it denotes
--- ============================================================================
 
 /-! The one fact a majorant for a real-argument constant needs: the real a code `f` denotes is
 bounded by `f(0) + 1`. It is the semantic mirror of `cauchyfy_mag_le` (`RealNumbers/Bounds.lean`,
@@ -149,9 +147,7 @@ theorem abs_qval_cauchyfyN_le (g : ℕ → ℕ) (n : ℕ) :
     _ ≤ (1 - 1 / 2 ^ n) + (g 0 : ℚ) := add_le_add h1 h2
     _ ≤ (g 0 : ℚ) + 1 := by linarith
 
--- ============================================================================
 -- Convergence, and the bound on the limit
--- ============================================================================
 
 /-- The cauchyfied value sequence converges to `codeReal g` — for every `g`. -/
 theorem codeReal_tendsto (g : ℕ → ℕ) :
@@ -184,9 +180,7 @@ theorem abs_codeReal_le (g : ℕ → ℕ) : |codeReal g| ≤ (g 0 : ℝ) + 1 := 
     exact_mod_cast h
   simpa using h'
 
--- ============================================================================
 -- Axiom hygiene
--- ============================================================================
 
 #print axioms abs_codeReal_le
 #print axioms codeReal_tendsto

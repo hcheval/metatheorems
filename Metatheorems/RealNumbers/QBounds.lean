@@ -15,10 +15,7 @@ The ℕ and ℚ lemmas behind `abs_R_bound` (Kohlenbach p. 430: `|α|_ℝ ≤_�
 the magnitude it encodes** (`abs_Q_le_encode`): `|c|_ℚ ≤_ℚ ⟨c⟩_ℚ` for every code `c`, because
 `rat_num c = div2(j₁ c + isOdd (j₁ c)) ≤ j₁ c ≤ c ≤ c · rat_den c`.
 
-Everything here is pure ℕ/ℚ — no `cauchyfy`, no real operations — so the file sits beside
-`RealNumbers/Defs.lean` rather than above it. Several small `private` computations from
-`RationalNumbers.lean` (`isEven_zero`, `isEven_succ`, `two_mul_eq_add`, …) are re-derived
-here because that file is another workstream's and its privates are module-scoped.
+Everything here is pure ℕ/ℚ — no `cauchyfy`, no real operations.
 -/
 
 open Formula

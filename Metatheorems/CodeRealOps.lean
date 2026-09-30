@@ -37,9 +37,7 @@ Mathlib `ℝ` discharge an object-level axiom mentioning `·ℝ`, `−ℝ`, `|·
 
 open Rounding QBridge Filter Topology
 
--- ============================================================================
 -- Section 1: the `clamp01` mirror
--- ============================================================================
 
 namespace QBridge
 
@@ -108,9 +106,7 @@ theorem clampQ_lipschitz (a b : ℚ) : |clampQ a - clampQ b| ≤ |a - b| := by
 
 end QBridge
 
--- ============================================================================
 -- Section 2: codes passing every check, and `codeReal` as a limit
--- ============================================================================
 
 /-- A code passing the sharp Cauchy check at every index — exactly the hypothesis of
 `cauchyfyN_id_of_cauchy`. -/
@@ -135,9 +131,7 @@ theorem codeReal_eq_of_tendsto {g : ℕ → ℕ} (hg : IsCauchyCode g) {L : ℝ}
     (hL : Tendsto (fun n => ((qval (g n) : ℚ) : ℝ)) atTop (𝓝 L)) : codeReal g = L :=
   tendsto_nhds_unique (tendsto_qval_of_isCauchyCode hg) hL
 
--- ============================================================================
 -- Section 3: the approximation bound, for every code
--- ============================================================================
 
 theorem two_halves_Q (n : ℕ) : (1 : ℚ) / 2 ^ (n + 1) + 1 / 2 ^ (n + 1) = 1 / 2 ^ n := by
   rw [pow_succ]; field_simp; norm_num
@@ -208,9 +202,7 @@ theorem abs_qval_cauchyfyN_sub_codeReal_lt (f : ℕ → ℕ) (n : ℕ) :
     _ < 1 / 2 ^ (n + 1) + 1 / 2 ^ (n + 1) := add_lt_add_of_lt_of_le h2 h1
     _ = 1 / 2 ^ n := two_halves_R n
 
--- ============================================================================
 -- Section 4: the formula-level consequences
--- ============================================================================
 
 section Formulas
 
@@ -250,9 +242,7 @@ theorem interpret_eq_R_of_codeReal_eq (f g : Term F Γ (realTy ι))
 
 end Formulas
 
--- ============================================================================
 -- Section 5: `codeReal` of the sequences the ℝ-layer constants build
--- ============================================================================
 
 /-- A constant code passes every check. -/
 theorem isCauchyCode_const (q : ℕ) : IsCauchyCode (fun _ => q) := fun _ => by
@@ -388,9 +378,7 @@ theorem codeReal_clamp01 (f : ℕ → ℕ) :
   simp only [Function.comp_apply, clampReal, clampQ, Rat.cast_max, Rat.cast_min, Rat.cast_zero,
     Rat.cast_one]
 
--- ============================================================================
 -- Section 6: the same, on interpreted terms
--- ============================================================================
 
 section Interp
 
@@ -464,9 +452,7 @@ theorem codeReal_interp_clamp01 (r : Term F Γ (realTy ι)) (env : Ctx.interpret
 
 end Interp
 
--- ============================================================================
 -- Axiom hygiene
--- ============================================================================
 
 #print axioms QBridge.interpret_clamp01_fun
 #print axioms QBridge.qval_clamp01QN

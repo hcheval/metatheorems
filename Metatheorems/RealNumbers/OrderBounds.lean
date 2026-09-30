@@ -11,17 +11,11 @@ namespace Metatheorems
 # Order-side plumbing for the `<_ℝ` axioms
 
 The kit `Order.lean`'s four order proofs (`lt_add_R`, `lt_mul_pos_R`, `archimedean_R`,
-`lt_trans_R_core`) need and nothing else has: implication-form `≤_ℚ` transitivity,
-cancellation and subtraction monotonicity, the dyadic product `2^{-a} ·_ℚ 2^{-b} =_ℚ
-2^{-(a+b)}`, the persistence of a positive lower bound under `cauchyfy` drift, and the
-`Formula.weakenBy`/`substF` normal-form theorems that let the two nested `∃`-eliminations
-those proofs need be done **at the Lean level with `Derivable.exist_rule`** rather than with
-nested `pobtain`s (which the note at `lt_trans_R_core` records as a measured heartbeat
-timeout — exit 3 of that note is implemented here).
-
-This file imports `Mul` (for `cauchyfy_mul_R` and, transitively, `Bounds`/`QBounds`), which
-makes `Order.lean` sit above the multiplicative layer — the price of `lt_mul_pos_R` needing
-`mul_R_check`. `Order.lean` remains a leaf, so its edit cost does not cascade.
+`lt_trans_R_core`) need: implication-form `≤_ℚ` transitivity, cancellation and subtraction
+monotonicity, the dyadic product `2^{-a} ·_ℚ 2^{-b} =_ℚ 2^{-(a+b)}`, the persistence of a
+positive lower bound under `cauchyfy` drift, and the `Formula.weakenBy`/`substF` normal-form
+theorems that let the nested `∃`-eliminations be done at the Lean level with
+`Derivable.exist_rule`.
 -/
 
 open Formula
@@ -172,9 +166,8 @@ def cauchyfy_lb_imp (f : Term F Γ (realTy ι)) (n j : Term F Γ Ty.nat) :
 
 -- ── Object-level multiplication monotonicity ────────────────────────────────
 --
--- `le_Q_zero_mul` / `le_Q_mul_mono_l` (QBounds) take their order facts as *Lean-level*
--- premises, so they cannot consume a proof-mode hypothesis. `lt_mul_pos_R`'s lower bounds
--- come out of `pintro`, so it needs the same content as an object implication.
+-- `le_Q_zero_mul` / `le_Q_mul_mono_l` (QBounds) take Lean-level premises; these are the
+-- same content as object implications.
 
 /-- `0 ≤ℚ x ∧ 0 ≤ℚ y → 0 ≤ℚ x·y`, as an object formula. -/
 def le_Q_zero_mul_o (x y : Term F Γ Ty.nat) :

@@ -14,10 +14,8 @@ namespace Metatheorems
 
     n  ↦  ± ⌈j₁(n)/2⌉ / (j₂(n) + 1),   sign `+` iff `j₁(n)` is even
 
-(`Term.rat_num`, `Term.rat_den`, `Term.rat_sign`). That whole layer is object-level `Term`s,
-so there was no Lean-level function saying *which rational* a code denotes. `qval` is that
-function, and it is what the phrase "`(x)◦` is a representative of `x`" needs in order to be
-a statement at all.
+(`Term.rat_num`, `Term.rat_den`, `Term.rat_sign`). `qval` is the Lean-level function saying
+*which rational* a code denotes.
 
 This file is on the **semantic** side, like `Rounding.lean`: `ℕ`, `ℚ` and `ℝ` here are
 Mathlib's, not the encoded ones. Nothing here is a `Derivable`.
@@ -35,20 +33,13 @@ Mathlib's, not the encoded ones. Nothing here is a `Derivable`.
   `< 2^{-n}` quoted by Leuştean follows (`roundR_cauchy_weak`).
 * `roundR_tendsto` — `(x)◦` really converges to `x`.
 
-## What this does NOT do
-
-It does not connect `qval` to `Term.interpret` of `Term.rat_num`/`Term.lt_Q_dec`. That is a
-separate bridge (evaluating the object-level `prec`-recursions `div2`, `inv_triag`, … in the
-standard model) and is not attempted here. So the Cauchy condition below is stated at the
-level of *actual rationals*, which is what Leuştean's (4.2) means mathematically, not at the
-level of the object-level decision term `lt_Q_dec`.
+The Cauchy condition is stated at the level of *actual rationals*; the connection to
+`Term.interpret` is `QValBridge.lean`.
 -/
 
 namespace Rounding
 
--- ============================================================================
 -- Decoding the Cantor pairing
--- ============================================================================
 
 theorem le_triagN (n : ℕ) : n ≤ triagN n := by
   induction n with
@@ -92,9 +83,7 @@ theorem invTriagN_pairN (a b : ℕ) : invTriagN (pairN a b) = a + b := by
 @[simp] theorem sndN_pairN (a b : ℕ) : sndN (pairN a b) = b := by
   simp [sndN, invTriagN_pairN]
 
--- ============================================================================
 -- The meaning of a code
--- ============================================================================
 
 /-- The signed numerator carried by the first Cantor component: `j₁` even means the
 non-negative numerator `j₁/2`, `j₁` odd the negative numerator `−(j₁+1)/2`. This is
@@ -125,9 +114,7 @@ theorem qval_pairN_odd (a b : ℕ) :
   simp only [qnumZ, h]
   norm_num
 
--- ============================================================================
 -- Sanity: the `ℚ` constants of `RationalNumbers.lean` denote what they should
--- ============================================================================
 
 /-- `Term.zero_Q = pair 0 0` denotes `0`. -/
 @[simp] theorem qval_zero_code : qval (pairN 0 0) = 0 := by
@@ -167,9 +154,7 @@ theorem qval_Mmaj (b n : ℕ) : qval (Mmaj b n) = (b : ℚ) := by
   field_simp
   ring
 
--- ============================================================================
 -- What `(x)◦` denotes
--- ============================================================================
 
 /-- **Deliverable 2**: the rational denoted by `(x)◦(n)` is `⌊x·2^{n+1}⌋ / 2^{n+1}`. -/
 theorem qval_roundR (x : ℝ) (n : ℕ) :
@@ -215,9 +200,7 @@ theorem qval_roundR_dist_le (x : ℝ) (hx : 0 ≤ x) (n : ℕ) :
   rw [abs_le]
   constructor <;> linarith
 
--- ============================================================================
 -- Lemma 17.8(1): the Cauchy condition (4.2)
--- ============================================================================
 
 /-- **Lemma 17.8(1)**, sharp form: `(x)◦` satisfies the Cauchy condition in the shape used by
 `RealNumbers.cauchy_check_at`, namely `|f(n) −ℚ f(n+1)| <ℚ 2^{-(n+1)}`. -/

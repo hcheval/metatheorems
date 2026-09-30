@@ -12,9 +12,7 @@ open Formula
 variable {ι κ : Type} {F : κ → Ty ι}
 variable {al : Allowed} {Premises : PremiseSet F}
 
--- ============================================================================
 -- `cauchyfy` theory
--- ============================================================================
 
 section Cauchyfy
 

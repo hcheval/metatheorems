@@ -10,16 +10,13 @@ namespace Metatheorems
 /-!
 # The evaluation bridge, continued: `mul_Q` and the ℝ-layer operations
 
-`QValBridge.lean` stops at `add_R`, because the metric model needed nothing more. The
-W-hyperbolic axioms multiply (`(1−λ)·d(z,x) + λ·d(z,y)`), so this file adds
+Continuing `QValBridge.lean` past `add_R`, this file adds
 
 * `mulQN` / `interpret_mul_Q_fun` / `qval_mulQN` — the missing S2 rung;
 * the application-level evaluation of every ℝ-layer constant the axioms use:
   `mul_R`, `neg_R`, `sub_R`, `abs_R`, `one_R`, `zero_R`.
 
-Kept in its own module so that the elaboration cost of unfolding `Term.mul_Q`
-(590,955 nodes fully reduced) is isolated from `QValBridge.lean`. Method unchanged: one
-constant per unfold, S1 lemmas for the rest.
+Method unchanged: one constant per unfold, S1 lemmas for the rest.
 -/
 
 namespace QBridge
@@ -28,9 +25,7 @@ open Rounding
 
 variable {ι κ : Type} {F : κ → Ty ι} {X : ι → Type}
 
--- ============================================================================
 -- Section 1: `mul_Q`
--- ============================================================================
 
 /-- Mirror of `Term.mul_Q`, transcribed clause for clause: `sign = sg_bar |s₁ − s₂|`,
 `num = p₁·p₂`, `den−1 = d₁·d₂ − 1`. In the exact shape the interpretation residual takes,
@@ -104,7 +99,6 @@ theorem qval_interpret_mul_Q {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.int
   rw [interpret_mul_Q_fun]
   exact qval_mulQN a b
 
--- ============================================================================
 -- Section 2: the ℝ-layer constants, function-level
 --
 -- Each is a thin `lam` wrapper over ℚ constants that already have their S1/S2
@@ -112,7 +106,6 @@ theorem qval_interpret_mul_Q {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.int
 -- (like `interpret_add_Q_fun`) so that they fire on the head of an application
 -- spine; `interpret_add_R_app2` in `QValBridge.lean` is the application-level
 -- special case of `interpret_add_R_fun`.
--- ============================================================================
 
 theorem interpret_add_R_fun {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpret X Δ) :
     Term.interpret si (Term.add_R (F := F) (Γ := Δ)) env
@@ -163,9 +156,7 @@ theorem interpret_zero_R {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpr
   funext n
   simp only [Term.zero_R, Term.interpret, interpret_zero_Q]
 
--- ============================================================================
 -- Axiom hygiene
--- ============================================================================
 
 #print axioms interpret_mul_Q_fun
 #print axioms qval_mulQN

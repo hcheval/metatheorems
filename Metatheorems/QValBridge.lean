@@ -11,9 +11,8 @@ namespace Metatheorems
 /-!
 # The evaluation bridge: object-level `ℚ` terms ↦ Lean-level mirrors
 
-`QVal.lean` defines `qval : ℕ → ℚ`, the rational denoted by a code, and its header says
-explicitly that it does **not** connect `qval` to `Term.interpret` of `Term.rat_num`,
-`Term.lt_Q_dec`, … This file is that connection, bottom-up.
+This file connects `qval : ℕ → ℚ` (`QVal.lean`) to `Term.interpret` of `Term.rat_num`,
+`Term.lt_Q_dec`, …, bottom-up.
 
 ## Method
 
@@ -22,24 +21,10 @@ lemma
 
     Term.interpret si (Term.C (F := F) (Γ := Δ)) env = <Lean mirror>
 
-— not an application-level one. Three reasons:
-
-* the constants are closed, so the statement is environment-independent and is proved once;
-* each proof unfolds **exactly one** constant and cites the already-proved lemmas for the
-  rest. Never compose two unfoldings in one `simp`: `Term.add_Q` is 1,945 nodes as written
-  and 1,880,329 fully reduced, so a `simp` that unfolds two layers at once will blow
-  heartbeats;
-* they chain: a function-level lemma fires as a rewrite on the *head* of an application
-  spine, at any context and any environment, which is what lets the next stratum up unfold
-  one level and finish.
-
-The template is `interpret_pd_fun` in `Dialectica/Syntactic.lean`.
-
-## Mirrors
-
-Every mirror is chosen to be `omega`-friendly (truncated subtraction, `%`, `min`) rather
-than a Lean `if`, so that the arithmetic side conditions of the strata above are discharged
-automatically.
+— not an application-level one, and each proof unfolds **exactly one** constant, citing the
+already-proved lemmas for the rest. The template is `interpret_pd_fun` in
+`Dialectica/Syntactic.lean`. Every mirror is chosen to be `omega`-friendly (truncated
+subtraction, `%`, `min`) rather than a Lean `if`.
 
 ## Dependency order
 
@@ -60,9 +45,7 @@ open Rounding
 
 variable {ι κ : Type} {F : κ → Ty ι} {X : ι → Type}
 
--- ============================================================================
 -- Section 0: the Lean mirrors that are not already in Mathlib or `Rounding`
--- ============================================================================
 
 /-- Mirror of `Term.sg_bar`: `1` at `0`, `0` elsewhere. Written as truncated subtraction so
 that `omega` sees through it. -/
@@ -96,12 +79,10 @@ def ratSignN (n : ℕ) : ℕ := isEvenN (fstN n)
 /-- Mirror of `Term.rat_encode`. -/
 def ratEncodeN (s p d : ℕ) : ℕ := pairN (2 * p - isEvenN s) d
 
--- ============================================================================
 -- Section 1: what the object-level `prec`-recursions compute
 --
 -- Each is a plain Lean induction, stated on the `Nat.rec` that
 -- `Term.interpret si (.prec _)` unfolds to.
--- ============================================================================
 
 private theorem rec_succ_eq_add (x : ℕ) :
     ∀ n : ℕ, (Nat.rec x (fun _ ih => Nat.succ ih) n : ℕ) = x + n
@@ -161,9 +142,7 @@ private theorem rec_eq_exp2 :
             = 2 ^ (m + 1)
       rw [rec_eq_exp2 m]; ring
 
--- ============================================================================
 -- Section 2: the arithmetic constants of `Terms/Arith.lean`
--- ============================================================================
 
 theorem interpret_sg_bar_fun {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpret X Δ) :
     Term.interpret si (Term.sg_bar (F := F) (Γ := Δ)) env = sgBarN := by
@@ -208,9 +187,7 @@ theorem interpret_ofNat {si : SpaceInterp X F} {Δ : Ctx ι} (n : ℕ) (env : Ct
   | zero => rfl
   | succ m ih => simp only [Term.ofNat, Term.interpret, ih]
 
--- ============================================================================
 -- Section 3: the auxiliary constants of `Terms/Rational.lean` §1
--- ============================================================================
 
 theorem interpret_max_fun {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpret X Δ) :
     Term.interpret si (Term.max (F := F) (Γ := Δ)) env = fun x y => max x y := by
@@ -271,12 +248,10 @@ theorem interpret_exp2_fun {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.inter
   simp only [Term.exp2, Term.app3, Term.app2, Term.interpret, interpret_add_fun]
   exact rec_eq_exp2 n
 
--- ============================================================================
 -- Section 4: the Cantor pairing
 --
 -- `inv_triag` is the one step with mathematical content: the object-level
 -- recursion has to be identified with `Rounding.invTriagN`, a `Nat.findGreatest`.
--- ============================================================================
 
 theorem interpret_pair_fun {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpret X Δ) :
     Term.interpret si (Term.pair (F := F) (Γ := Δ)) env = pairN := by
@@ -352,20 +327,12 @@ theorem interpret_snd_pair_fun {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.i
     interpret_monus_fun, interpret_inv_triag_fun, interpret_fst_pair_fun]
   rfl
 
--- ============================================================================
 -- Section 5: division by two
 --
 -- `Term.div2` runs a `prec` whose state is the *code* `pair(⌈k/2⌉, isEven k)`.
 -- The content is the invariant `state k = pairN ((k + 1) / 2) (1 - k % 2)`, which
--- is where `fstN_pairN` / `sndN_pairN` earn their keep.
---
--- **`Term.div2` is misnamed**: it computes the ceiling `⌈n/2⌉ = (n+1)/2`, not the
--- floor. Its own docstring claims the state is `pair(div2 k, isEven k)`, but the
--- step adds `snd` *before* flipping the parity flag, so `div2 1 = 1`. Nothing
--- downstream is wrong — `Term.rat_num` is `div2 (j + isOdd j)`, and that is
--- `⌈j/2⌉` on the nose either way, which is what the encoding wants — but the
--- mirror below states the ceiling, because that is what the term computes.
--- ============================================================================
+-- is where `fstN_pairN` / `sndN_pairN` earn their keep. `Term.div2` computes the ceiling
+-- `⌈n/2⌉ = (n+1)/2`, and the mirror states the ceiling.
 
 private theorem rec_div2_state :
     ∀ n : ℕ,
@@ -394,12 +361,10 @@ theorem interpret_div2_fun {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.inter
       = (n + 1) / 2
   rw [rec_div2_state n, fstN_pairN]
 
--- ============================================================================
 -- Section 6: the rational accessors — the checkpoint
 --
 -- These sit on top of the whole pairing + `div2` layer, so if they compose the
 -- method scales.
--- ============================================================================
 
 theorem interpret_rat_num_fun {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpret X Δ) :
     Term.interpret si (Term.rat_num (F := F) (Γ := Δ)) env = ratNumN := by
@@ -430,12 +395,10 @@ theorem interpret_rat_encode_fun {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx
     interpret_isEven_fun, interpret_ofNat]
   rfl
 
--- ============================================================================
 -- Section 7: the accessors against `qval`
 --
 -- The point of the mirrors: they really are the sign/numerator/denominator of
 -- the rational `qval` names.
--- ============================================================================
 
 theorem qval_eq_of_parts (n : ℕ) :
     qval n = (if ratSignN n = 1 then (ratNumN n : ℚ) else -(ratNumN n)) / (ratDenN n : ℚ) := by
@@ -455,13 +418,11 @@ theorem qval_eq_of_parts (n : ℕ) :
     rw [if_neg (by omega : ¬ fstN n % 2 = 0), if_neg (by omega : ¬ 1 - fstN n % 2 = 1)]
     simp only [Int.cast_neg, Int.cast_natCast]
 
--- ============================================================================
 -- Section 8: the S1 tail — the constants that are one unfold over the above
 --
 -- `neg_Q`, `abs_Q`, `pow2neg_Q`, `zero_Q`, `one_Q` introduce no new recursion:
 -- each is `rat_encode` or `pair` applied to already-interpreted pieces. The real
 -- ℚ arithmetic — `add_Q`, `sub_Q`, `lt_Q_dec` — is *not* here; that is S2.
--- ============================================================================
 
 theorem interpret_neg_Q_fun {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpret X Δ) :
     Term.interpret si (Term.neg_Q (F := F) (Γ := Δ)) env
@@ -499,13 +460,9 @@ theorem interpret_one_Q {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpre
     Term.interpret si (Term.one_Q (F := F) (Γ := Δ)) env = pairN 2 0 := by
   simp only [Term.one_Q, Term.app2, Term.interpret, interpret_pair_fun, interpret_ofNat]
 
--- ============================================================================
 -- Section 9: the payoff — object-level constants denote the right rationals
 --
--- These are the first statements in the project relating `Term.interpret` of a
--- ℚ-constant to `qval`. They are exactly what `QVal.lean`'s header said it did
--- not do.
--- ============================================================================
+-- Object-level ℚ-constants denote the right rationals, as `Term.interpret` against `qval`.
 
 theorem qval_interpret_zero_Q {si : SpaceInterp X F} {Δ : Ctx ι} (env : Ctx.interpret X Δ) :
     qval (Term.interpret si (Term.zero_Q (F := F) (Γ := Δ)) env) = 0 := by
@@ -533,7 +490,6 @@ theorem qval_interpret_abs_Q {si : SpaceInterp X F} {Δ : Ctx ι} (n : ℕ)
   · split <;> simp
   · simp only [ratDenN]; push_cast; ring
 
--- ============================================================================
 -- Section 10: interpretation congruence for `eq_R` / `le_R_pu`
 --
 -- The eventual target of this file is `Formula.interpret` of `eq_R` and
@@ -541,11 +497,6 @@ theorem qval_interpret_abs_Q {si : SpaceInterp X F} {Δ : Ctx ι} (n : ℕ)
 -- single `∀n`. So their interpretation factors through the *values* of those
 -- terms, which is what lets a bridge lemma about the ℕ-level be transported to
 -- the formula level.
---
--- These were developed in `Probes/SoundnessProbe.lean` and are hoisted here (not
--- into `Semantics.lean`) so that the core semantics file does not have to import
--- the whole ℚ/ℝ term layer. The probe keeps its own copies; it is not built.
--- ============================================================================
 
 theorem eq_R_interp_congr (si : SpaceInterp X F) {Γ : Ctx ι}
     (f f' g g' : Term F Γ (realTy ι)) (env : Ctx.interpret X Γ)
@@ -573,14 +524,12 @@ theorem le_R_pu_interp_congr (si : SpaceInterp X F) {Γ : Ctx ι}
     intro n; rw [Term.interpret_weaken, Term.interpret_weaken]; exact hg
   simp only [le_R_pu, Formula.interpret, Term.app2, Term.interpret, hfw, hgw]
 
--- ============================================================================
 -- Section 11: S2 — the `qval` semantics of `add_Q`, `sub_Q`, `lt_Q_dec`
 --
 -- Method unchanged: one constant per unfold, S1 lemmas for the rest. The new
 -- ingredient is the round trip through `ratEncodeN`, which is where the
 -- encoding's non-injectivity (the sign bit is ignored at numerator `0`) is
 -- paid, once, in `qval_ratEncodeN`.
--- ============================================================================
 
 -- ---- Round trips through the encoder ----
 
@@ -894,10 +843,6 @@ theorem interpret_lt_Q_dec_eq_zero_iff {si : SpaceInterp X F} {Δ : Ctx ι}
 
 -- ---- `le_Q_dec`, needed by `le_R_pu` ----
 
-/-! An earlier scope note said `le_Q_dec` was not needed. That was **wrong**: `le_R_pu` — the
-formula `Derivable.dist_tri` asserts, and hence what `EqXInterp.dist_tri_holds` must discharge
-— is built on `le_Q_dec`, not `lt_Q_dec`. -/
-
 /-- Non-negativity of the denoted rational, through the parts. The `≤` counterpart of
 `qval_pos_iff`; note the disjunct for the degenerate encoding of `0`, which carries either
 sign. -/
@@ -950,7 +895,6 @@ theorem interpret_le_Q_dec_eq_zero_iff {si : SpaceInterp X F} {Δ : Ctx ι}
   rw [interpret_le_Q_dec_fun]
   exact leQdecN_eq_zero_iff m n
 
--- ============================================================================
 -- Section 12: S3 — `cauchyfy` is the identity on sequences that pass the check
 --
 -- The sidestep: no analysis of the state recursion in general, only the
@@ -959,7 +903,6 @@ theorem interpret_le_Q_dec_eq_zero_iff {si : SpaceInterp X F} {Δ : Ctx ι}
 -- `cauchyfy_id` (`RealNumbers/Cauchyfy.lean`). The hypothesis is stated as
 -- `|qval (g k) − qval (g (k+1))| < 2^{-(k+1)}`, which is exactly the sharp form
 -- `Rounding.roundR_cauchy` provides for `roundR (M.d x y)`.
--- ============================================================================
 
 /-- Mirror of `Term.abs_Q` (the RHS of `interpret_abs_Q_fun`, named). -/
 def absQN (k : ℕ) : ℕ := pairN (2 * ratNumN k) (sndN k)
@@ -1064,9 +1007,7 @@ theorem interpret_add_R_app2 {si : SpaceInterp X F} {Δ : Ctx ι}
     interpret_cauchyfy_fun]
   rfl
 
--- ============================================================================
 -- Section 13. The formula-level payoff: `=ℝ` and `≤ℝ` in the standard model
--- ============================================================================
 
 /-! Everything above evaluates *terms*. These two turn the object-level formulas `eq_R` and
 `le_R_pu` into plain statements about Mathlib rationals, which is what
@@ -1108,11 +1049,9 @@ theorem interpret_eq_R {si : SpaceInterp X F} {Γ : Ctx ι}
       Term.interpret_weaken, Term.interpret_weaken]
     exact h n
 
--- ============================================================================
 -- Axiom audit. `Classical.choice` is expected: `invTriagN` is a
 -- `Nat.findGreatest`, and `qval` lands in Mathlib's `ℚ`. What matters is the
 -- absence of `sorryAx`.
--- ============================================================================
 
 /-- `f ≤ℝ g` in its Π⁰₁ spelling, in the model.  `le_R_pu` is `∀n ¬(2^{-n} ≤ℚ f̂ −ℚ ĝ)`;
 stated positively it is the obvious bound. -/
