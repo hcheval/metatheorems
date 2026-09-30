@@ -29,26 +29,11 @@ Term F Γ τ  --erase-->  RTerm  --share-->  Shared  --renderShared-->  String
 ```
 
 `RTerm` is the **untyped** mirror of `Term`: the same seven node shapes with all the type
-indices erased to strings. Erasing first is what makes hash-consing possible at all —
-`Term F Γ τ` is indexed by its context and type, so two structurally identical subterms of one
-realizer generally live at *different* Lean types and cannot be compared, let alone put in a
-`HashMap`. `RTerm` has `DecidableEq` and `Hashable`, so they can.
+indices erased to strings, so that it has `DecidableEq` and `Hashable`. `size_erase` proves
+erasure preserves the node count.
 
-The price of erasing is that the renderer could in principle conflate two distinct terms. That
-is checked rather than assumed, in two ways: `size_erase` proves the node count is preserved
-exactly (so nothing is silently dropped), and `Probes/TermPrintDemo.lean` carries a negative
-control on a pair of terms differing in one constructor.
-
-## Sharing
-
-`share` collects every distinct subterm of the tree together with its occurrence count, binds
-the repeated ones as `let`s (smallest first, so a definition only ever refers to earlier ones),
-and rewrites the body against them. `expand` inverts that, and the demo checks
-`expand (share t) = t` — which is the statement that the shared rendering has not lost
-anything.
-
-The number reported as **DAG size** is the count of *distinct* subterms, i.e. the number of
-nodes the term has when maximally shared. Tree size is what `#eval tSize` reports.
+`share` binds the repeated closed subterms as `let`s (smallest first) and `expand` inverts it;
+the **DAG size** is the number of *distinct* subterms, the tree size what `#eval tSize` reports.
 
 ## Names
 
@@ -70,9 +55,7 @@ namespace TermPretty
 
 open Std (Format)
 
--- ============================================================================
 -- The untyped mirror
--- ============================================================================
 
 /-- An erased term: `Term F Γ τ` with every type index replaced by a string.
 
@@ -111,13 +94,7 @@ def size : RTerm → Nat
   | .snd p    => 1 + p.size
 
 /-- How many enclosing binders the term needs: `0` iff it is closed, otherwise one more than
-the largest free de Bruijn index.
-
-**This is what makes hash-consing correct.** De Bruijn indices are context-relative, so two
-*syntactically identical* subterms occurring at different binder depths do not denote the same
-thing, and an open subterm cannot be hoisted into a top-level `let` at all. `share` therefore
-binds only subterms with `openness = 0`. Dropping this check produces a `let`-listing that
-looks fine, round-trips fine as a tree, and is mathematically wrong. -/
+the largest free de Bruijn index. `share` binds only subterms with `openness = 0`. -/
 def openness : RTerm → Nat
   | .var n    => n + 1
   | .const _  => 0
@@ -134,9 +111,7 @@ def isClosed (t : RTerm) : Bool := t.openness == 0
 
 end RTerm
 
--- ============================================================================
 -- Naming
--- ============================================================================
 
 /-- How to spell the two families of indices a signature is parameterised by. -/
 structure Names (ι κ : Type) where
@@ -154,9 +129,7 @@ def Names.simple {ι κ : Type} : Names ι κ := ⟨fun _ => "X", fun _ => "c"�
 def Names.ofToString {ι κ : Type} [ToString ι] [ToString κ] : Names ι κ :=
   ⟨fun i => "X" ++ toString i, fun f => "c" ++ toString f⟩
 
--- ============================================================================
 -- Types
--- ============================================================================
 
 /-- `n` as a subscript, for de Bruijn indices and shared-binding names. -/
 def subscript (n : Nat) : String :=
@@ -173,9 +146,7 @@ def tyString {ι : Type} (nb : ι → String) : Nat → Ty ι → String
   | p, .arr a b  => parenIf (p > 25) (tyString nb 26 a ++ " → " ++ tyString nb 25 b)
   | p, .prod a b => parenIf (p > 35) (tyString nb 36 a ++ " × " ++ tyString nb 35 b)
 
--- ============================================================================
 -- Erasure
--- ============================================================================
 
 variable {ι κ : Type} {F : κ → Ty ι}
 
@@ -273,9 +244,7 @@ theorem openness_erase (N : Names ι κ) :
   | _, _, .fst p   => by simp only [erase, RTerm.openness]; exact openness_erase N p
   | _, _, .snd p   => by simp only [erase, RTerm.openness]; exact openness_erase N p
 
--- ============================================================================
 -- Layout
--- ============================================================================
 
 /-! Application spines are flattened — `f a b c`, not `((f a) b) c` — which is the single
 biggest difference between a readable realizer and an unreadable one. Everything else is
@@ -319,9 +288,7 @@ def width : Nat := 100
 /-- A term as text, spines flattened, de Bruijn variables as `xₖ`. -/
 def render (t : RTerm) : String := (fmt 0 t).pretty width
 
--- ============================================================================
 -- Hash-consing
--- ============================================================================
 
 /-- A term with its repeated subterms named. `defs[i]` may mention `.ref j` only for `j < i`,
 so the bindings can be read top to bottom. -/
@@ -429,9 +396,7 @@ one node. Compare `RTerm.size` of the original. -/
 def writtenSize (s : Shared) : Nat :=
   s.defs.foldl (fun acc d => acc + d.size) 0 + s.body.size
 
--- ============================================================================
 -- Reports
--- ============================================================================
 
 /-- The shared form, as `let`-bindings followed by the body. -/
 def renderShared (s : Shared) : String := Id.run do

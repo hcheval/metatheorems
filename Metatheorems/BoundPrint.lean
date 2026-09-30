@@ -51,9 +51,7 @@ namespace BoundPrint
 
 open Lean Lean.Meta Lean.Elab Lean.Elab.Command
 
--- ============================================================================
 -- The rule → combinator table (it mirrors `monotone_soundness`, case for case)
--- ============================================================================
 
 /-- What `monotone_soundness` builds at each `Derivable` constructor. `none` means the head is
 not a constructor of `Derivable`. Keep this in step with `monotone_soundness`. -/
@@ -154,9 +152,7 @@ def forceDelta (e : Expr) : MetaM (Option Expr) := do
   let some (.defnInfo di) := (← getEnv).find? c | return none
   return some (mkAppN (di.value.instantiateLevelParams di.levelParams us) e.getAppArgs)
 
--- ============================================================================
 -- The structural walk
--- ============================================================================
 
 /-- Structural-mode configuration: how many derivation levels to unfold, and the absolute node
 cap that makes the mode safe on any proof. -/
@@ -350,9 +346,7 @@ def structuralLines (name : Name) (cfg : Cfg) : MetaM (Array (Nat × String) × 
     let (_, st) ← ((walk cfg.depth unfoldFuel 0 prf).run cfg).run {}
     return (st.lines, st.aborted)
 
--- ============================================================================
 -- The evaluative mode — the capped kernel reducer
--- ============================================================================
 
 /-- **The output vocabulary.** These constants are never unfolded, so they survive into the
 displayed bound as arithmetic; unblock any of them and `max` becomes `Decidable.rec` and every
@@ -433,9 +427,7 @@ def structuralAt (name : Name) (d : Nat) (unf : Bool := false) :
 
 end BoundPrint
 
--- ============================================================================
 -- The command
--- ============================================================================
 
 namespace BoundPrint
 open Lean Lean.Elab Lean.Elab.Command
@@ -446,8 +438,7 @@ levels of the derivation; `eval` reduces the bound with the capped kernel reduce
 
 The modifier words are **non-reserved** keywords (`&"…"`, as Lean's own `induction …
 generalizing` is written), so importing this module reserves no token: `depth`, `unfold`,
-`eval`, `cap`, `to` stay usable as identifiers — `Hilbert.Config.unfold` is one. (A reserved
-`" unfold"` broke `Hilbert.lean` the first time, which is how this was found.) -/
+`eval`, `cap`, `to` stay usable as identifiers — `Hilbert.Config.unfold` is one. -/
 syntax (name := boundCmd)
   "#bound " ident (&" depth " num)? (&" unfold")? (&" eval")? (&" cap " num)? (&" to " str)? :
   command

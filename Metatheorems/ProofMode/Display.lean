@@ -14,17 +14,11 @@ import Metatheorems.ProofMode.Pretty
 hypotheses* rather than as a `List (Formula F Γ)` printed inline. This file adds the display
 layer: a name-carrying wrapper `SeqD` and a delaborator that renders it as a box.
 
-## Where names live
-
-`Seq` has no names — the packaging kit sees positions, and that is the right invariant for
-it (`HVar` is a de Bruijn index). Names are display data, so they are carried by a separate
-*reducible* wrapper:
+Names are display data, carried by a separate *reducible* wrapper:
 
     SeqD names F a Premises Δ B  :=  Seq F a Premises Δ B
 
-Being `@[reducible]`, every kit lemma applies through it by unification: the tactic layer
-never has to translate between the two. Its job is only to keep `names` in step with `Δ`
-when it changes one, and `names` never affects the proof term.
+so every kit lemma applies through it by unification, and `names` never affects the proof term.
 
 ## Rendering
 
@@ -34,11 +28,7 @@ when it changes one, and `names` never affects the proof term.
         ────────────────────
         A ∧ᶠ B
 
-where `[nat]` is the *term-variable* context `Γ`.
-
-Hypotheses are listed most-recent-*last*, which is the reverse of `Δ`'s own order (`Δ`'s
-head is the most recent, see `Packing.lean`). That reversal is the whole reason the display
-layer exists: it is the one place where the de Bruijn convention should not leak.
+where `[nat]` is the *term-variable* context `Γ`. Hypotheses are listed most-recent-*last*.
 
 An unnamed position — `names` shorter than `Δ`, or not a literal list — prints as `_`, so
 the renderer never fails on a goal a tactic has not yet labelled.
@@ -68,22 +58,14 @@ def SeqD.toSeq {names : List String} {Δ : HCtx F Γ} {B : Formula F Γ} :
 def SeqD.ofSeq {names : List String} {Δ : HCtx F Γ} {B : Formula F Γ} :
     Seq F a Premises Δ B → SeqD names F a Premises Δ B := id
 
--- ============================================================================
 -- Syntax
--- ============================================================================
 
-/-- A rendered proof-mode goal. Display only — this never elaborates.
-
-The hypothesis lines are a grouped repetition *inside* this rule rather than a syntax
-category of their own: a category would be run through the term parenthesizer, which cannot
-know that juxtaposed `h : A` lines are unambiguous and so brackets them. -/
+/-- A rendered proof-mode goal. Display only — this never elaborates. -/
 syntax (name := pmGoal)
   "⟪" term ("," ppSpace term " : " term)* "⟫"
     ppIndent((ppLine ident " : " term)* ppLine "────────────────────" ppLine term) : term
 
--- ============================================================================
 -- Delaborator
--- ============================================================================
 
 section Delab
 open Lean.PrettyPrinter.Delaborator

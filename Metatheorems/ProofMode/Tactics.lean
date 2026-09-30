@@ -27,16 +27,8 @@ against a lemma from this file, which is built from `Packing.lean`, which is bui
 
 ## Where side conditions go
 
-The rules of the extended system carry side conditions — an `allowed` flag, an `isQF` or
-`isVFree` check. These cannot be passed as `(by …)` arguments, because at the time such an
-argument is elaborated the matrix is still a metavariable: it is fixed only when `refine`
-unifies the lemma's conclusion with the goal. They are therefore left as *named holes* and
-discharged afterwards by `pside`, which computes when everything is concrete and otherwise
-looks in the Lean context.
-
-The one exception is a rule whose matrix comes from a *hypothesis* rather than from the
-goal — QF-AC. There the hypothesis argument must be elaborated inline, since nothing else
-determines the matrix.
+The side conditions of the extended system's rules (`allowed` flags, `isQF`/`isVFree`
+checks) are left as *named holes* and discharged afterwards by `pside`.
 -/
 
 namespace Metatheorems
@@ -47,9 +39,7 @@ open Lean Formula
 variable {ι κ : Type} {F : κ → Ty ι}
     {a : Allowed} {Premises : PremiseSet F} {Γ : Ctx ι} {ns : List String}
 
--- ============================================================================
 -- The moves, as name-aware lemmas
--- ============================================================================
 
 /-- Introduce an implication, naming the new hypothesis. -/
 def pm_intro (n : String) {Δ : HCtx F Γ} {A B : Formula F Γ}
@@ -91,11 +81,8 @@ def pm_andE₂ {Δ : HCtx F Γ} {A B : Formula F Γ}
     (h : SeqD ns F a Premises Δ (A ∧ᶠ B)) : SeqD ns F a Premises Δ B :=
   seq_andE₂ h
 
-/-- Destructure a conjunction into two named hypotheses.
-
-Stated as a *cut* rather than as an in-place rewrite of one position, so it does not care
-where the conjunction sits in `Δ`: the caller proves `A ∧ᶠ B` however it likes (typically
-`pexact`), and the two components arrive on top of the context. -/
+/-- Destructure a conjunction into two named hypotheses. Stated as a *cut*: the two
+components arrive on top of the context. -/
 def pm_andcut (n m : String) {Δ : HCtx F Γ} {A B C : Formula F Γ}
     (hAB : SeqD ns F a Premises Δ (A ∧ᶠ B))
     (k : SeqD (n :: m :: ns) F a Premises (A :: B :: Δ) C) :
@@ -205,9 +192,7 @@ def pm_cut (n : String) {Δ : HCtx F Γ} {A C : Formula F Γ}
     SeqD ns F a Premises Δ C :=
   seq_cut hA k
 
--- ============================================================================
 -- Equational reasoning
--- ============================================================================
 
 /-- Reflexivity of `=₀`. -/
 def pm_refl {Δ : HCtx F Γ} {t : Term F Γ Ty.nat} :
@@ -250,9 +235,7 @@ def pm_sym_at (n : String) {Δ : HCtx F Γ} {s t : Term F Γ Ty.nat} {C : Formul
     SeqD ns F a Premises Δ C :=
   seq_cut (pm_sym h) k
 
--- ============================================================================
 -- Moves specific to this logic
--- ============================================================================
 
 /-- Induction on `ℕ`, with the hypothesis context carried through. See
 `ProofMode/Induction.lean` for why the context is not free here. -/
@@ -298,9 +281,7 @@ def pm_qfac (n : String) {ρ τ : Ty ι} {Δ : HCtx F Γ} {A₀ : Formula F (τ 
     SeqD ns F a Premises Δ C :=
   seq_cut (seq_mono (.qfac hq hqf hvf) h) k
 
--- ============================================================================
 -- Tactics
--- ============================================================================
 
 section Tactics
 open Lean.Elab.Tactic Lean.Meta
@@ -367,12 +348,7 @@ private def evalBoolCheck (e : Expr) : TacticM (Option Bool) := do
 
 /-- The `SeqD` goal, split into its arguments: `ι, κ, names, F, a, Premises, Γ, Δ, B`.
 
-`consumeMData` is load-bearing. Lean's `have`/`obtain` leave the target wrapped in an `mdata`
-node, and without stripping it `isAppOf ``SeqD` is false — so every proof-mode tactic used
-after a plain `have` failed with "the goal is not a proof-mode sequent", even though the goal
-was displayed as a perfectly good sequent box (the delaborator looks through `mdata`, so the
-display gave no hint). Measured: `ctor=app, nargs=9` before a `have`, `ctor=mdata,
-nargs=0` after. -/
+`consumeMData` is load-bearing (Lean's `have`/`obtain` wrap the target in `mdata`). -/
 def seqDGoalArgs (who : String) : TacticM (Array Expr) := do
   let ty := (← instantiateMVars (← (← getMainGoal).getType)).consumeMData
   let args := ty.getAppArgs
@@ -396,10 +372,7 @@ private def hypFormula (who : String) (n : String) : TacticM Expr := do
 /-- Does this expression *apply the recursor itself*, as opposed to using a constant of the
 language that happens to be defined by recursion?
 
-The traversal deliberately does not unfold constants: `Term.add` is built from `Term.prec`,
-as every primitive-recursive constant must be, and `x + y` is not a smuggled bound. Only an
-occurrence the user typed is refused. See `ProofMode/Linter.lean` for why this is the right
-reading of "surface", and for the limit of it. -/
+The traversal deliberately does not unfold constants. See `ProofMode/Linter.lean`. -/
 private def mentionsPrec (e : Expr) : Bool :=
   (e.find? (·.isConstOf ``Term.prec)).isSome
 
@@ -408,10 +381,8 @@ private partial def unparen (s : Syntax) : Syntax :=
 
 /-- Elaborate a kernel theorem with its context pinned to the goal's.
 
-Pinning by the *expected type* alone does not work: Lean fixes a theorem's `Γ` from its first
-explicit argument, before unifying the result type. So the goal's context is injected as a
-named argument at the head of the application — which is what lets a theorem mention `x₀`
-next to a term from the outer context, the latter then weakening by coercion.
+The goal's context is injected as a named argument at the head of the application, which is
+what lets a theorem mention `x₀` next to a term from the outer context.
 
 Theorems that are not applications, or whose context implicit is not called `Γ`, fall back to
 plain elaboration against the expected type. -/
@@ -435,15 +406,8 @@ def derivableInGoal (args : Array Expr) : TacticM Expr := do
   return mkAppN (.const ``Derivable [])
     #[args[0]!, args[1]!, args[3]!, args[4]!, args[5]!, args[6]!, A]
 
-/-- Elaborate a term the *user wrote* at a surface position, and enforce the recursor ban.
-
-Decision D-2 (`ARCHITECTURE.md` §12) puts the ban on the surface language as a whole —
-instantiation witnesses, `pbound` instantiations, case-split precisions, induction motives —
-not only on headline `∃` witnesses. That is deliberately stronger than a headline-only check
-and is what makes the non-triviality claim a statement about *expressiveness*: the input
-language cannot write the bound, so no enumeration of smuggling routes is needed. The route
-that motivated it reached the extracted term through an *instantiation*, never touching an
-`∃`, which is exactly why the check has to live here rather than at `∃`-introduction. -/
+/-- Elaborate a term the *user wrote* at a surface position, and enforce the recursor ban
+(Decision D-2, `ARCHITECTURE.md` §12). -/
 private def elabSurfaceTerm (who : String) (ι κ F Γ ρ : Expr) (tStx : TSyntax `term) :
     TacticM Expr := withMainContext do
   let t ← elabTerm tStx (some (mkAppN (.const ``Term []) #[ι, κ, F, Γ, ρ]))
@@ -512,10 +476,7 @@ macro "pforall" : tactic => `(tactic| refine pm_allI ?_)
 
 /-- `pspecialize` instantiates a weakened `∀`-*goal* at the bound variable;
 `pspecialize h with k` instantiates a weakened `∀`-*hypothesis*, which is how a `∀`-hypothesis
-is used after `pforall`.
-
-The `colGt` matters: without it the bare form would swallow the next line's tactic name as
-its `h`. -/
+is used after `pforall`. -/
 syntax "pspecialize" (ppSpace colGt ident " with " ppSpace colGt ident)? : tactic
 
 macro_rules
@@ -544,15 +505,10 @@ The escape hatch exists so that a bypass is visible in the source and greppable,
 being the silent default. Using it at a headline `∃` invalidates the extraction claim. -/
 macro "pexists! " t:term : tactic => `(tactic| refine pm_exI $t ?_)
 
-/-- `pbound t` supplies a witness at a *headline* `∃`.
-
-This is `bound` v0: a certificate **checker**, not a prover. The user writes the bound; the
-tactic checks that it is a bound the extraction could have produced rather than one smuggled
-in by hand. It differs from `pexists` only in recording, at the call site, that this is the
-headline position — the check itself is the same, because D-2 puts the ban on the surface
-language rather than on headline positions specifically.
-
-Like `pby_contra`, the check runs *before* anything is applied to the goal. -/
+/-- `pbound t` supplies a witness at a *headline* `∃`. A certificate **checker**, not a
+prover: it differs from `pexists` only in recording, at the call site, that this is the
+headline position. Like `pby_contra`, the check runs *before* anything is applied to the
+goal. -/
 elab "pbound " tStx:term : tactic => withMainContext do
   let g ← exGoalArgs "pbound"
   let _ ← elabSurfaceTerm "pbound" g[0]! g[1]! g[2]! g[3]! g[4]! tStx
@@ -571,11 +527,7 @@ macro "pdestruct " h:ident " with " x:ident ppSpace y:ident : tactic =>
 
 The theorem is elaborated against an *open* formula and left to `exact`, which is how a
 theorem that only matches the goal up to unfolding still goes through. Only if that fails is
-it retried against the goal's own formula — which is what gives a side condition written as
-`rfl`, `qf_lem`'s quantifier-freeness say, something to check against.
-
-The order matters: pinning the formula first would force unification through the goal on
-every call, and on a large statement that is where it diverges. -/
+it retried against the goal's own formula. -/
 elab "pthm " eStx:term : tactic => withMainContext do
   let args ← seqDGoalArgs "pthm"
   let e ← try
@@ -591,10 +543,7 @@ elab "pthm " eStx:term : tactic => withMainContext do
 Rung 8 of `LADDER.md`. The rule is elaborated **once**, open, and its *conclusion* is unified
 with the goal — in the real metavariable context, so whatever that unification determines
 (implicit formula arguments, `_` placeholders) stays determined. The `pm_mp` chain is then
-built as an expression from the elaborated rule, never by re-elaborating the user's syntax.
-Before this the rule was elaborated, probed inside `withoutModifyingState` to count the
-antecedents, and then handed back as *syntax* to a `refine` that elaborated and unified it a
-second time. -/
+built as an expression from the elaborated rule, never by re-elaborating the user's syntax. -/
 
 /-- `pm.papply.trace`: log, at each `papply`, which elaboration it took (open, or pinned
 behind `j` antecedent placeholders), which transparency the conclusion matched at, and how
@@ -690,11 +639,9 @@ private def applyPlan (args : Array Expr) (goal : MVarId) (base : Expr) (plan : 
   return goals.toList
 
 /-- Elaborate a kernel theorem for `papply`. Open first — the formula a metavariable, as
-`pthm` does it; pinning the goal's formula before the open attempt is what diverged with a
-stack overflow on `mct_p1` (`LADDER.md`, "What A3 forced"). Only if the open attempt fails is
-the rule retried against the goal's formula behind 0, 1, 2 and 3 antecedent placeholders,
-which is what gives a side condition written as `rfl` something to check against. Returns the
-term and which attempt produced it. -/
+`pthm` does it. Only if the open attempt fails is the rule retried against the goal's formula
+behind 0, 1, 2 and 3 antecedent placeholders. Returns the term and which attempt produced
+it. -/
 private def elabApplyRule (args : Array Expr) (eStx : TSyntax `term) :
     TacticM (Expr × String) := do
   let Γ := args[6]!
@@ -925,16 +872,9 @@ elab "prename " h:ident " into " k:ident : tactic => do
 macro "psym " " in " h:ident " with " k:ident : tactic =>
   `(tactic| refine pm_sym_at $(Lean.quote k.getId.toString) (by pexact $h) ?_)
 
-/-- `phave h : A` proves `A` in a side goal and keeps it as the hypothesis `h`.
-
-The formula is user-written, so the recursor ban applies to the terms inside it: a cut on
-`A` contributes `A`'s witness and counter types to the interpretation, which is the same
-route to the extracted content that `pinst` has.
-
-The formula is elaborated **once**, against the goal's context, and the resulting expression
-is handed to `pm_cut` — not the surface syntax again. Re-elaborating it as a named argument
-would leave `pm_cut`'s own `Γ` a metavariable at the moment the formula is processed, and an
-`xₖ` token reads its de Bruijn index off exactly that context. -/
+/-- `phave h : A` proves `A` in a side goal and keeps it as the hypothesis `h`. The formula
+is user-written, so the recursor ban applies to the terms inside it; it is elaborated
+**once**, against the goal's context, and handed to `pm_cut` as an expression. -/
 elab "phave " h:ident " : " AStx:term : tactic => withMainContext do
   let args ← seqDGoalArgs "phave"
   let A ← instantiateMVars
@@ -962,13 +902,8 @@ elab "pfrom " h:ident " := " eStx:term : tactic => withMainContext do
 macro "pinduction" : tactic => `(tactic| refine pm_induction ?_ ?_)
 
 /-- `pby_contra h` proves an `∃` over a QF ∨-free matrix by contradiction, via Markov. The
-goal becomes `⊥ᶠ` with `h` the negated `∃`.
-
-**The shape check comes first, and the tactic is atomic.** Decision D-4
-(`ARCHITECTURE.md` §12) makes `by_contra` *be* the Markov rule, and D-1 makes "is this proof
-translated?" the question a refusal should provoke. Both require that a wrong-shaped goal be refused before anything is applied
-to it — a tactic that half-applies and then complains leaves the user reading errors about a
-goal they did not write. -/
+goal becomes `⊥ᶠ` with `h` the negated `∃`. The shape check comes first, and the tactic is
+atomic (Decisions D-4 and D-1, `ARCHITECTURE.md` §12). -/
 elab "pby_contra " h:ident : tactic => do
   let args ← seqDGoalArgs "pby_contra"
   -- `Formula.ex` : {ι} {κ} {F} {Γ} (ρ) (A)
@@ -998,11 +933,7 @@ elab "pby_contra " h:ident : tactic => do
                            pintro $h)))
 
 /-- `pinst h t with k` instantiates the `∀`-hypothesis `h` at `t`, naming the result `k`.
-
-The instantiation term is a surface term, so the recursor ban applies. This is exactly the
-route that motivates the ban: a `∀`-premise instantiated at a hand-written iterating term
-contributes that term to the Dialectica challenge side, and thence to the extracted bound,
-without ever introducing an `∃` for a headline-scoped linter to notice. -/
+The instantiation term is a surface term, so the recursor ban applies. -/
 elab "pinst " h:ident ppSpace tStx:term " with " k:ident : tactic => withMainContext do
   let A ← whnfD (← hypFormula "pinst" h.getId.toString)
   let aargs := A.getAppArgs

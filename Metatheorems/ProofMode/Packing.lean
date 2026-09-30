@@ -23,21 +23,9 @@ nested implication:
 Every lemma below is an ordinary Lean function producing a kernel derivation. The kernel is
 frozen; no tactic ever constructs kernel terms directly.
 
-## Deviation from the handoff, deliberate
-
-The handoff specifies `pack Δ B := Δ.foldr (· →ᶠ ·) B`, under which the *head* of `Δ` is
-the *outermost* antecedent. With that convention `Seq (A :: Δ) B` and `Seq Δ (A →ᶠ B)`
-differ by a permutation of antecedents, so `intro` and `revert` each cost an exchange
-lemma — contradicting the handoff's own "they are the identity".
-
-Folding the other way — the head of `Δ` is the *innermost* antecedent, i.e. the most
-recently introduced hypothesis — makes
-
-    Seq (A :: Δ) B   and   Seq Δ (A →ᶠ B)
-
-*definitionally equal*, so `seq_intro` and `seq_revert` really are `id`. That also makes
-`HVar` indexing agree with the usual de Bruijn convention (index 0 = most recent). The
-display layer reverses `Δ` for presentation; nothing else is affected.
+The head of `Δ` is the *innermost* antecedent, i.e. the most recently introduced hypothesis,
+so `Seq (A :: Δ) B` and `Seq Δ (A →ᶠ B)` are *definitionally equal* and `HVar` indexing is
+the usual de Bruijn convention (index 0 = most recent).
 
 ## Names
 
@@ -70,9 +58,7 @@ abbrev Seq (F : κ → Ty ι)
     (Δ : HCtx F Γ) (B : Formula F Γ) : Type :=
   Derivable F a Premises (pack Δ B)
 
--- ============================================================================
 -- The two primitives everything else is built from
--- ============================================================================
 
 /-- A theorem holds in any hypothesis context. -/
 def seq_of_thm : {Δ : HCtx F Γ} → {B : Formula F Γ} →
@@ -93,9 +79,7 @@ def seq_mp : {Δ : HCtx F Γ} → {A B : Formula F Γ} →
           (seq_of_thm (S_comb (A := A₀) (B := A) (C := B))) hAB)
         hA
 
--- ============================================================================
 -- Derived plumbing
--- ============================================================================
 
 /-- Weaken the goal along a theorem. -/
 def seq_mono {Δ : HCtx F Γ} {A A' : Formula F Γ}
@@ -116,9 +100,7 @@ def seq_lift₃ {Δ : HCtx F Γ} {A B C D : Formula F Γ}
     Seq F a Premises Δ C → Seq F a Premises Δ D :=
   fun hA hB hC => seq_mp (seq_mp (seq_mp (seq_of_thm h) hA) hB) hC
 
--- ============================================================================
 -- Structural rules
--- ============================================================================
 
 /-- Introduce a hypothesis. Definitionally the identity — see the note above. -/
 def seq_intro {Δ : HCtx F Γ} {A B : Formula F Γ} :
@@ -179,9 +161,7 @@ def seq_cut {Δ : HCtx F Γ} {A B : Formula F Γ}
     Seq F a Premises Δ B :=
   seq_mp (seq_intro hB) hA
 
--- ============================================================================
 -- Conjunction, disjunction, absurdity
--- ============================================================================
 
 def seq_andI {Δ : HCtx F Γ} {A B : Formula F Γ} :
     Seq F a Premises Δ A → Seq F a Premises Δ B →
@@ -230,9 +210,7 @@ def seq_exfalso {Δ : HCtx F Γ} {A : Formula F Γ} :
     Seq F a Premises Δ ⊥ᶠ → Seq F a Premises Δ A :=
   seq_mono .exfalso
 
--- ============================================================================
 -- Quantifiers
--- ============================================================================
 
 /-- Pull a `∀` out past a hypothesis that does not mention the bound variable.
 

@@ -17,16 +17,9 @@ there is instead is QF-ER, which says exactly
 
 — congruence for *terms*, which is all an equational rewrite needs. `prw` is built on that.
 
-## How the abstraction is found
-
-`Derivable.qfer` takes the abstraction `r : Term F (nat :: Γ) σ` as an argument, so the work
-is finding it: given the goal's side `L` and the pattern `s`, produce `r` with the
-occurrences of `s` replaced by the bound variable and every other leaf weakened. One
-traversal computes that and the rewritten side `L[s := t]` at once.
-
-The `subst0` round-trip proofs are not `rfl` — a weakened leaf only comes back by
-`Term.subst_subst0_map_weaken` — but they need exactly that one lemma plus the structural
-unfolding of `Term.subst`, with nothing theory-specific. `prw_norm` is that simp call.
+`Derivable.qfer` takes the abstraction `r : Term F (nat :: Γ) σ` as an argument; one traversal
+of the goal's side computes `r` and the rewritten side `L[s := t]` at once (`prw_norm` proves
+the `subst0` round-trips).
 
 ## The two cases
 
@@ -47,9 +40,7 @@ variable {ι κ : Type} {F : κ → Ty ι}
 
 /-- QF-ER at an arbitrary pair of types, with the two `subst0` round-trips given explicitly.
 
-`qfer_nat_nf` is this at `ρ = σ = nat`. The constructor was always general — `Derivable.qfer`
-is stated for `eqAtType ρ`/`eqAtType σ` — so nothing here is new metatheory; only the
-`_nf` wrappers were specialised. -/
+`qfer_nat_nf` is this at `ρ = σ = nat`. -/
 def qfer_at_nf {Γ : Ctx ι} {A₀ : Formula F Γ} {ρ σ : Ty ι}
     (hqf : A₀.isQF = true) (hvf : A₀.isVFree = true)
     {s t : Term F Γ ρ}
@@ -194,9 +185,6 @@ private def eqView? (ι : Expr) (f : Expr) : MetaM (Option EqShape) := do
       return some ⟨mkApp (.const ``Ty.nat []) ι, a[4]!, a[5]!⟩
     if e.isAppOf ``eqAtType && a.size == 7 then
       return some ⟨a[4]!, a[5]!, a[6]!⟩
-    -- The base-type case used to need a comparison against the goal's own `EqX` fvar. With
-    -- `EqX` gone, `eqAtType (.base i) s t` is a genuine application of `eqAtType`, so the
-    -- folded match above already covers it.
     return none
   if let some v ← check f then return some v
   check (← whnfD f)
@@ -215,9 +203,8 @@ private def prwCore (who : String) (occ : Occ) (ρ s t : Expr)
   let (args, goal) ← eqGoalSides who
   let (ι, κ, F, Γ) := (args[0]!, args[1]!, args[3]!, args[6]!)
   -- The *goal's* type must stay `nat`: the gluing below is `pm_trans`/`pm_sym`, and the
-  -- kernel's `.trans0`/`.sym0` are nat-only. At other types transitivity comes from
-  -- `eqAtType_trans`, which needs an `AdmissibleEqX` this tactic is not given.
-  -- The *pattern's* type `ρ` is unrestricted — QF-ER always was.
+  -- kernel's `.trans0`/`.sym0` are nat-only.
+  -- The *pattern's* type `ρ` is unrestricted.
   unless goal.ty.isAppOf ``Ty.nat do
     throwError "{who}: the goal is an equation at{indentExpr goal.ty}\nbut rewriting is \
       currently glued by `pm_trans`/`pm_sym`, which the kernel provides only at `nat`. \
