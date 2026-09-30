@@ -49,9 +49,7 @@ theory Nonexp
     eqAtType X (.app f zeroX) zeroX
 endtheory
 
--- ============================================================================
 -- What was generated
--- ============================================================================
 
 section Generated
 
@@ -97,9 +95,7 @@ example {Γ : Ctx MetricSpace.ι} {al : Allowed} :
 
 end Generated
 
--- ============================================================================
 -- The generated obligations, and what they buy
--- ============================================================================
 
 section Obligations
 
@@ -172,9 +168,7 @@ example (eqxi : EqXInterp X Nonexp.F si) (o : Nonexp.Obligations si)
 
 end Obligations
 
--- ============================================================================
 -- Generated `ι`: the other mode
--- ============================================================================
 
 /-- With no `index` clause the index type is generated too: two base types, one constant
 between them, two axioms — the second a **conjunction**, which `isPurelyUniversal` admits
@@ -207,9 +201,7 @@ example {Γ : Ctx TwoSorted.ι} {al : Allowed} :
 example : (TwoSorted.ax_g_isom (Γ := ([] : Ctx TwoSorted.ι))).isPurelyUniversal = true :=
   TwoSorted.ax_g_isom_pu
 
--- ============================================================================
 -- The degenerate corners
--- ============================================================================
 
 /-- **No function constants** — `MetricSpaces.lean`'s own shape, where the metric is
 structural.  `κ` is `Empty` and `Majorants` is `PUnit`. -/
@@ -242,9 +234,7 @@ example {X : MetricSpace.ι → Type} {si : SpaceInterp X NoAxioms.F}
       NoAxioms.Premises ⟨Γ', B⟩ → SRealizer si B :=
   NoAxioms.spremise o
 
--- ============================================================================
 -- Rejection: the admissibility check, and what it says
--- ============================================================================
 
 /-!
 The command evaluates `Formula.isPurelyUniversal` and `Formula.isVFree` on each axiom before
@@ -294,9 +284,7 @@ theory BadMode
   types X
 endtheory
 
--- ============================================================================
 -- Axiom hygiene of the generated declarations
--- ============================================================================
 
 /-!
 The command emits no `sorry` and no axiom of its own: `premises_pu` / `premises_vf` are

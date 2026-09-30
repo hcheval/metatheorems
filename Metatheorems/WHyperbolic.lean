@@ -31,35 +31,21 @@ structural `Term.dist ()`, and `dist_self`/`dist_comm`/`dist_tri` are constructo
 
 ## The `[0,1]` parameter
 
-`λ` ranges over **all** of type `1 = ℕ → ℕ`. The axioms are stated at `clamp01 λ`
-(`RealNumbers/Interval.lean`), the object-level retraction onto `[0,1]`: `∀λ ∈ [0,1] A(λ)` is
-literally `∀λ¹ A(clamp01 λ)`, so no quantifier ranges over a subset of a type. This is
-Kohlenbach's device for keeping the metatheorem applicable: every `f : ℕ → ℕ` codes an
-element of `[0,1]`, so there is no side condition to discharge, and majorization at that type
-is uniform in `λ`.
+`λ` ranges over **all** of type `1 = ℕ → ℕ`; the axioms are stated at `clamp01 λ`
+(`RealNumbers/Interval.lean`), the object-level retraction onto `[0,1]`.
 
-## The premise set
+## The premise set and the model
 
-**The project's first non-empty `Premises`.** All four axioms are purely universal
-(`le_R_pu`, `eq_R` and base-type `eqAtType` are all `∀n` over a QF body) and ∨-free, so a
-premise realizer is `srealizer_of_pu` applied to the axiom's *truth in the model* —
-`WHyperbolicModel.axiomsHold`, proved from the model's `W1`–`W4` through the `codeReal`
-homomorphism lemmas of `CodeRealOps.lean`.
-
-## The model
-
+The four axioms are purely universal and ∨-free; a premise realizer is `srealizer_of_pu`
+applied to the axiom's truth in the model, `WHyperbolicModel.axiomsHold`.
 `WHyperbolicModel extends MetricModel` with `W : carrier → carrier → ℝ → carrier` and the four
-axioms as Lean-level facts on Mathlib `ℝ`, for `λ, μ ∈ [0,1]`. The constant `W` is interpreted
-as `λx y f. W(x, y, clampReal (codeReal f))` — Kohlenbach's `W(x,y,r_λ̃)`: the code `f` is read
-as the real it denotes and clamped into `[0,1]` *in the model too*. That is what makes the
-majorant of `W` independent of its real argument (`W_maj_at`).
+axioms as Lean-level facts on Mathlib `ℝ`, for `λ, μ ∈ [0,1]`; the constant `W` is interpreted
+as `λx y f. W(x, y, clampReal (codeReal f))`.
 -/
 
 open Formula
 
--- ============================================================================
 -- Signature
--- ============================================================================
 
 /-- The function-constant index type: one constant, `W`. -/
 abbrev WHyperbolic.κ := Unit
@@ -78,9 +64,7 @@ abbrev WHyperbolic.W {Γ : Ctx MetricSpace.ι} :
     Term WHyperbolic.F Γ (xTy →ₜ xTy →ₜ realTy MetricSpace.ι →ₜ xTy) :=
   Term.func ()
 
--- ============================================================================
 -- The four axioms, as closed context-polymorphic formulas
--- ============================================================================
 
 /-- (W1) `∀z x y λ. d(z, W(x,y,λ̃)) ≤ℝ (1ℝ −ℝ λ̃)·ℝ d(z,x) +ℝ λ̃ ·ℝ d(z,y)`, with
 `λ̃ = clamp01 λ`. De Bruijn: `z = x₃, x = x₂, y = x₁, λ = x₀`. -/
@@ -161,12 +145,9 @@ theorem WHyperbolic.ax_W3_vf {Γ : Ctx MetricSpace.ι} :
 theorem WHyperbolic.ax_W4_vf {Γ : Ctx MetricSpace.ι} :
     (WHyperbolic.ax_W4 (Γ := Γ)).isVFree = true := by rfl
 
--- ============================================================================
 -- The premise set
--- ============================================================================
 
-/-- **The W-hyperbolic premise set: the four axioms, in every context.** The project's first
-non-empty premise set — `MetricSpace.Premises` is `fun _ => False`. -/
+/-- **The W-hyperbolic premise set: the four axioms, in every context.** -/
 def WHyperbolic.Premises : PremiseSet WHyperbolic.F
   -- by pattern matching, not `fun p => p.2 = …`: the latter leaves `⟨Γ, A⟩.1` inside the
   -- axiom's implicit context argument, and `subst` then sees `A` on both sides
@@ -209,9 +190,7 @@ def WHyperbolic.W4 {Γ : Ctx MetricSpace.ι} {a : Allowed} :
     Derivable WHyperbolic.F a WHyperbolic.Premises (WHyperbolic.ax_W4 (Γ := Γ)) :=
   .premise (Or.inr (Or.inr (Or.inr rfl)))
 
--- ============================================================================
 -- The model
--- ============================================================================
 
 -- `codeReal` (the real a code denotes) and `clampReal` (the semantic `[0,1]`-retraction)
 -- live in `CodeReal.lean`, shared with the normed-space instance.
@@ -246,20 +225,13 @@ noncomputable def WHyperbolicModel.si (M : WHyperbolicModel) :
   zeroInterp := fun () => M.zeroX
   distInterp := fun () => fun x y => Rounding.roundR (M.d x y)
 
--- ============================================================================
 -- Majorizability
--- ============================================================================
 
 /-- **The majorant of `W`: `λn₁ n₂ f. max n₁ n₂`, independent of the real argument.**
 
 If `d(a,x) ≤ n₁` and `d(a,y) ≤ n₂` then, for any `μ ∈ [0,1]`, (W1) at `z := a` gives
 `d(a, W(x,y,μ)) ≤ (1−μ)·n₁ + μ·n₂ ≤ max n₁ n₂`. The model clamps its parameter, so this holds
-for **every** code `f`, and the majorant does not look at `f` (or at its majorant) at all.
-
-That independence is the uniformity the `[0,1]`-retraction buys: bounds extracted through this
-majorant carry no dependence on `λ`, which is the characteristic feature of proof mining in
-hyperbolic spaces. Compare `MetricModel.zeroX_maj`, whose majorant is a space-dependent
-parameter `n₀` — here there is not even a parameter. -/
+for **every** code `f`, and the majorant does not look at `f` (or at its majorant) at all. -/
 def WHyperbolicModel.WMajorant (M : WHyperbolicModel) :
     Ty.interpret (fun () => M.carrier) (xTy →ₜ xTy →ₜ realTy MetricSpace.ι →ₜ xTy).hat :=
   -- the binder ascriptions are load-bearing (`Ty.hat` is not reducible)
@@ -371,12 +343,6 @@ and everything below starts at the **last** stage, applying `closedMajorizer` to
 demonstrate that the majorization layer computes at this model's constants, and that
 `WMajorant` genuinely discards its real argument — they do **not** exhibit a bound extracted
 from a proof.
-
-Bounds *are* mined from derivations at this model elsewhere —
-`Probes/WBoundDemo.lean`, `Probes/UPremiseDemo.lean`, `Probes/ContentExampleSpace.lean` and
-`Probes/WExtBoundDemo.lean`, the last of these through a `Derivable.premise` on
-`WHyperbolic.Premises` itself, with `docs/RESULTS.md` tabulating the values. But none of that
-is happening here. Read the numbers below as majorants of terms, not as mined bounds.
 -/
 
 /-- **The uniformity, kernel-checked**: for *any* closed real `f`, the majorant of
@@ -408,12 +374,7 @@ example (M : WHyperbolicModel) (h : M.d M.ref M.zeroX ≤ ((5 : ℕ) : ℝ))
 /-- **Nesting does not accumulate** — the sharper form. Three arbitrary, distinct parameters
 `f`, `g`, `k` in nested convex combinations, and the bound is still `901`. A majorant that
 paid a factor per nesting could not do this; `WMajorant`'s `max` is idempotent on equal
-arguments, so depth is free.
-
-Non-degeneracy is checked and is *positive* evidence here: claiming `902` makes `decide`
-report the proposition **false**, exhibiting the residual
-`902 = pairN (2 * ((max 5 5 + 5) * 2^(0+1))) (2^(0+1) - 1)` — in which `f`, `g`, `k` do not
-appear at all. That absence is the uniformity. -/
+arguments, so depth is free. -/
 example (M : WHyperbolicModel) (h : M.d M.ref M.zeroX ≤ ((5 : ℕ) : ℝ))
     (f g k : Term WHyperbolic.F [] rTy) :
     (901 : ℕ) = closedMajorizer (M.constMajorants 5 h)
@@ -430,9 +391,7 @@ example (M : WHyperbolicModel) (h : M.d M.ref M.zeroX ≤ ((5 : ℕ) : ℝ))
 
 end ComputesDemo
 
--- ============================================================================
 -- The equality interpretation — transferred, not rebuilt
--- ============================================================================
 
 /-- **`EqXInterp` for a W-hyperbolic model: the metric one, transferred.** Nothing about `W`
 enters, because `eqAtType` at `X` speaks only about `d`. -/
@@ -440,17 +399,10 @@ noncomputable def WHyperbolicModel.eqXInterp (M : WHyperbolicModel) :
     EqXInterp (fun () => M.carrier) WHyperbolic.F M.si :=
   M.eqXInterp_gen M.si (fun _ _ => rfl)
 
--- ============================================================================
 -- The premises in the model
--- ============================================================================
 
--- There is deliberately no named `AxiomsHold : Prop` here. The statement below has the shape
--- of `MetricModel.soundness_gen`'s `hprem` (and of `Soundness.lean`'s), but unlike there the
--- premise set is four fixed formulas over a model that already carries their content, so it is
--- a theorem, not a hypothesis. A named `Prop` for it once existed and was what let an earlier
--- pass write `(hax : M.AxiomsHold)` as a binder on `spremise`/`soundness`/the metatheorems and
--- justify it by analogy with `hprem` — a hidden `sorry`. The analogy fails because
--- `Soundness.lean`'s premise set is an abstract parameter; these are not.
+-- There is deliberately no named `AxiomsHold : Prop` here: the statement below is a theorem,
+-- not a hypothesis.
 
 section AxiomsInModel
 
@@ -551,9 +503,7 @@ theorem WHyperbolicModel.W4_holds (s t u v : Term WHyperbolic.F Γ xTy)
     clampReal_le_one]
   exact M.W4 _ _ _ _ _ (clampReal_nonneg _) (clampReal_le_one _)
 
-/-- **The four axioms hold in the model.** The one obligation the W-hyperbolic instantiation
-owed; with it, `spremise` and both metatheorems below take no hypothesis about the model
-beyond `WHyperbolicModel` itself. -/
+/-- **The four axioms hold in the model.** -/
 theorem WHyperbolicModel.axiomsHold :
     ∀ {Γ : Ctx MetricSpace.ι} (A : Formula WHyperbolic.F Γ), WHyperbolic.Premises ⟨Γ, A⟩ →
       ∀ env : Ctx.interpret (fun () => M.carrier) Γ, Formula.interpret M.si A env := by
@@ -586,9 +536,7 @@ theorem WHyperbolicModel.soundness (M : WHyperbolicModel)
     ∀ env : Ctx.interpret (fun () => M.carrier) Γ, Formula.interpret M.si A env :=
   M.soundness_gen M.si (fun _ _ => rfl) M.axiomsHold h
 
--- ============================================================================
 -- The W-hyperbolic metatheorems
--- ============================================================================
 
 /-- **The W-hyperbolic metatheorem** (extended input). `MetricModel.metric_metatheorem` with
 `W` in the signature and the four axioms as premises: from a derivation of
@@ -628,9 +576,7 @@ theorem WHyperbolicModel.w_metatheorem_classical (M : WHyperbolicModel)
     (ntStable_of_pu WHyperbolic.premises_pu) M.spremise
     M.abstractMajorizability hB_qf hB_vf hC_qf hC_vf prf
 
--- ============================================================================
 -- A worked derivation: `W(x,x,λ̃) =_X x`
--- ============================================================================
 
 /-! The first consequence of the axioms one proves about a W-hyperbolic space, done in the
 object theory to show it is *usable*, not merely definable. From (W1) at `z := x`, `y := x`:
@@ -641,27 +587,9 @@ and `d(x,x) =ℝ 0ℝ` (`dist_self`), so the right-hand side is `=ℝ 0ℝ`; wit
 (`dist_nonneg`) and `le_zero_eq_zero_R` this gives `d(x, W(x,x,λ̃)) =ℝ 0ℝ`, i.e.
 `x =_X W(x,x,λ̃)`, and symmetry (`eqAtType_sym_base`) finishes.
 
-Two general ℝ-layer facts were missing and are supplied here:
-
-* `mul_eq_zero_R_core : g =ℝ 0ℝ →ᶠ f ·ℝ g =ℝ 0ℝ` — the estimate is `mul_R_check`'s:
-  `|f̂| ≤ ⟨f(0)⟩ + 1 < ⟨2^b⟩` and `|ĝ(k+b+1)| < 2^{-(k+b)}`, so the product is below
-  `⟨2^b⟩ · 2^{-(k+b)} = 2^{-k}`. It belongs in `RealNumbers/Mul.lean` and is kept here only
-  to leave that module untouched in this pass;
-* `le_R_of_le_R_pu_nf`, a `le_R_of_le_R_pu` whose antecedent is stated over the *pushed-in*
-  weakenings. This is the display-hiding trap again: the instance of an axiom that
-  `pinst`/`rnorm` produces
-  has `Term.weaken` distributed over the application spine with every closed constant
-  restored, while `le_R_pu f g` carries `f.weaken` around the whole composite. Unifying the
-  two makes `isDefEq` push `rename` through `clamp01`, `mul_R`, … — the delta-expansion
-  pathology, seen as a heartbeat timeout at `papplym`. So the hypothesis is first brought to
-  the fully folded form (`wfold`) and the lemma is applied with its two side conditions
-  closed by `simp`, never by defeq.
-
-The bookkeeping lesson, recorded for the next space: `rnorm` restores `sub_R`'s weakening
-but not `add_R`/`mul_R`/`one_R`/`clamp01`'s, and the `closed_subst` set lacks
-`add_R`/`mul_R`/`one_R`/`zero_R`; a *partially* folded hypothesis is the worst case, since
-whichever side is folded, the other constant has to be expanded. `wfold`/`znorm` make the
-normal form total. -/
+Two general ℝ-layer facts are supplied here: `mul_eq_zero_R_core : g =ℝ 0ℝ →ᶠ f ·ℝ g =ℝ 0ℝ`
+and `le_R_of_le_R_pu_nf`, a `le_R_of_le_R_pu` whose antecedent is stated over the
+*pushed-in* weakenings. -/
 
 section MulZero
 
@@ -780,8 +708,7 @@ def mul_zero_est (f g : Term F Γ (realTy ι)) (k : Term F Γ Ty.nat) :
       · pexact hCle
   · pthm hfin
 
-/-- **`g =ℝ 0ℝ →ᶠ f ·ℝ g =ℝ 0ℝ`.** A general fact about the encoded reals; see the section
-header for why it lives here for now. -/
+/-- **`g =ℝ 0ℝ →ᶠ f ·ℝ g =ℝ 0ℝ`.** A general fact about the encoded reals. -/
 def mul_eq_zero_R_core (f g : Term F Γ (realTy ι)) :
     Derivable F al Premises
       (eq_R g Term.zero_R →ᶠ eq_R (Term.app2 Term.mul_R f g) Term.zero_R) := by
@@ -956,9 +883,7 @@ def WHyperbolic.W_self {Γ : Ctx MetricSpace.ι} {a : Allowed} :
 
 end WSelf
 
--- ============================================================================
 -- Axiom hygiene
--- ============================================================================
 
 #print axioms mul_eq_zero_R_core
 #print axioms WHyperbolic.W_self

@@ -33,9 +33,7 @@ composable with (W1)–(W4) instantiated at `λ := half_R`, which is how it is u
 
 open Formula
 
--- ============================================================================
 -- The two constants
--- ============================================================================
 
 /-- `½` as a real: the constant sequence `⟨2^{-1}⟩ℚ`. -/
 abbrev CAT0.half_R {Γ : Ctx MetricSpace.ι} : Term WHyperbolic.F Γ rTy :=
@@ -45,9 +43,7 @@ abbrev CAT0.half_R {Γ : Ctx MetricSpace.ι} : Term WHyperbolic.F Γ rTy :=
 abbrev CAT0.quarter_R {Γ : Ctx MetricSpace.ι} : Term WHyperbolic.F Γ rTy :=
   Term.lam (.app Term.pow2neg_Q (.app .succ (.app .succ .zero)))
 
--- ============================================================================
 -- The CN inequality
--- ============================================================================
 
 /-- (CN) `∀z x y. d(z, W(x,y,½̃))·d(z, W(x,y,½̃)) ≤ℝ
 (½·(d(z,x)·d(z,x)) +ℝ ½·(d(z,y)·d(z,y))) −ℝ ¼·(d(x,y)·d(x,y))`.
@@ -81,9 +77,7 @@ theorem CAT0.ax_CN_pu {Γ : Ctx MetricSpace.ι} :
 theorem CAT0.ax_CN_vf {Γ : Ctx MetricSpace.ι} :
     (CAT0.ax_CN (Γ := Γ)).isVFree = true := by rfl
 
--- ============================================================================
 -- The premise set: (W1)–(W4) and (CN)
--- ============================================================================
 
 /-- The CAT(0) premise set: the four W-hyperbolic axioms plus CN. -/
 def CAT0.Premises : PremiseSet WHyperbolic.F
@@ -134,9 +128,7 @@ def CAT0.CN {Γ : Ctx MetricSpace.ι} {a : Allowed} :
     Derivable WHyperbolic.F a CAT0.Premises (CAT0.ax_CN (Γ := Γ)) :=
   .premise (Or.inr rfl)
 
--- ============================================================================
 -- The model
--- ============================================================================
 
 /-- **A CAT(0) model**: a W-hyperbolic model satisfying CN on Mathlib `ℝ`. -/
 structure CAT0Model extends WHyperbolicModel where
@@ -145,9 +137,7 @@ structure CAT0Model extends WHyperbolicModel where
     d z (W x y (1/2)) * d z (W x y (1/2))
       ≤ (1/2) * (d z x * d z x) + (1/2) * (d z y * d z y) - (1/4) * (d x y * d x y)
 
--- ============================================================================
 -- The constants and CN in the model
--- ============================================================================
 
 section AxiomsInModel
 
@@ -252,9 +242,7 @@ theorem CAT0Model.soundness (M : CAT0Model)
     ∀ env : Ctx.interpret (fun () => M.carrier) Γ, Formula.interpret M.si A env :=
   M.soundness_gen M.si (fun _ _ => rfl) M.axiomsHold h
 
--- ============================================================================
 -- The CAT(0) metatheorems
--- ============================================================================
 
 /-- **The CAT(0) metatheorem** (extended input). Majorants and equality interpretation are
 the W-hyperbolic ones — CN adds a premise, not a constant, so the bound `Φ` is exactly as
@@ -293,9 +281,7 @@ theorem CAT0Model.cat0_metatheorem_classical (M : CAT0Model)
     (ntStable_of_pu CAT0.premises_pu) M.spremise
     M.abstractMajorizability hB_qf hB_vf hC_qf hC_vf prf
 
--- ============================================================================
 -- Axiom hygiene
--- ============================================================================
 
 #print axioms CAT0.premises_pu
 #print axioms CAT0.CN

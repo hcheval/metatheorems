@@ -14,20 +14,11 @@ namespace Metatheorems
 and transitive is therefore a **theorem**, not an assumption — but proving it needs
 symmetry and transitivity of `=ℝ`, which live in `RealNumbers.lean`. So it cannot be done
 where `eqAtType_refl`/`sym`/`trans` are defined (`Arithmetic.lean`), which sits *below* the
-real-number layer because ℚ and ℝ depend on it.
-
-That is the one genuine stratification the `Term.dist` design forces, and this file is where
-it is discharged:
-
-* `Arithmetic.lean` proves `eqAtType_sym`/`eqAtType_trans` for **eq-base-free** types (an
-  `autoParam` on `Ty.eqBaseFree`, so the ~164 ℚ/ℝ call sites are unchanged);
-* this file proves the **base** cases, which is everything the earlier ones exclude;
-* nothing in between needs them.
+real-number layer because ℚ and ℝ depend on it. `Arithmetic.lean` proves symmetry and
+transitivity for eq-base-free types; this file proves the **base** cases.
 
 `eqAtType_refl` needs nothing from here: at a base type it is literally the constructor
 `Derivable.dist_self`.
-
-See ARCHITECTURE.md §1 and §8.
 -/
 
 open Formula
@@ -44,8 +35,7 @@ def eqAtType_refl_base {Γ : Ctx ι} (i : ι) (t : Term F Γ (Ty.base i)) :
 /-- Symmetry of equality at a base type.
 
 `dist_comm` gives `d(s,t) =ℝ d(t,s)`; `eq_R_sym_core` turns that around, and
-`eq_R_trans_core` chains it with the hypothesis `d(s,t) =ℝ 0ℝ`. Nothing beyond the two
-already-proved `=ℝ` facts is needed — in particular none of the open ordered-field axioms. -/
+`eq_R_trans_core` chains it with the hypothesis `d(s,t) =ℝ 0ℝ`. -/
 def eqAtType_sym_base {Γ : Ctx ι} (i : ι) (s t : Term F Γ (Ty.base i)) :
     Derivable F al Premises
       (eqAtType (Ty.base i) s t →ᶠ eqAtType (Ty.base i) t s) :=
@@ -68,25 +58,8 @@ Derivable, not assumed. The mathematics is Kohlenbach's one-liner
     `0 =ℝ d(s,s) ≤ℝ d(s,u) +ℝ d(u,s) =ℝ d(s,u) +ℝ d(s,u)`
 
 — `dist_self`, `dist_tri` at `(s,u,s)`, `dist_comm` — followed by
-`nonneg_of_add_self_nonneg_core` to halve. What costs work is that `≤ℝ` and `=ℝ` are *tight*
-Π₁⁰ statements about `cauchyfy` codes, so the three ingredients must be read at indices far
-enough out that the estimate still fits inside `2^{-n}` after the doubling.
-
-The budget, with `Pₖ := 2^{-(n+k)}`, `D̂ₖ := ĉ(d(s,u))(n+k)`, `Êₖ`, `Ŝₖ` likewise for
-`d(u,s)` and `d(s,s)`:
-
-* `dist_tri` at `n+3` gives `Ŝ₄ −ℚ (D̂₅ +ℚ Ê₅) <ℚ P₃`, and `dist_self` at `n+3` gives
-  `−ℚ Ŝ₄ <ℚ P₃`; together `−ℚ(D̂₅ +ℚ Ê₅) <ℚ P₂`;
-* `dist_comm` at `n+4` gives `Ê₅ −ℚ D̂₅ <ℚ P₄`; adding, `−D̂₅ −ℚ D̂₅ <ℚ P₂ +ℚ P₄`;
-* moving back from index `n+5` to `n+2` costs `P₂` (`cauchyfy_two_step`) plus `P₅ ≤ P₄`
-  (`cauchyfy_cauchy`), i.e. the *same* bound `B := P₂ +ℚ P₄`, twice after doubling.
-
-Total `3B`, and `pow2neg_triple_bound` is exactly the fact that `3B ≤ℚ 2^{-n}` — with
-`2^{-(n+4)}` to spare. It is the sole reason index `n+3` is where the triangle inequality is
-read: at `n+2` the same accounting overshoots by `2^{-(n+3)}`.
-
-`MetricModel` will want this too, so it is factored out rather than inlined into
-`eqAtType_trans_base`. -/
+`nonneg_of_add_self_nonneg_core` to halve. The estimate is read at indices `n+3`..`n+5`, with
+total budget `3B ≤ℚ 2^{-n}` (`pow2neg_triple_bound`). -/
 def dist_nonneg {Γ : Ctx ι} (i : ι) (s u : Term F Γ (Ty.base i)) :
     Derivable F al Premises (le_R Term.zero_R (Term.app2 (Term.dist i) s u)) :=
   let sw : Term F (Ty.nat :: Γ) (Ty.base i) := s.weaken
@@ -234,12 +207,11 @@ def dist_nonneg {Γ : Ctx ι} (i : ι) (s u : Term F Γ (Ty.base i)) :
 * `Derivable.dist_tri` gives `d(s,u) ≤ℝ d(s,t) +ℝ d(t,u)` — in `le_R_pu` form, converted by
   `le_R_of_le_R_pu`;
 * `add_eq_zero_R_core` turns the two hypotheses into `d(s,t) +ℝ d(t,u) =ℝ 0`;
-* `le_zero_eq_zero_R_core` closes it — and its first conjunct, non-negativity, is the
-  hypothesis whose absence once made that lemma false. `dist_nonneg` supplies it.
+* `le_zero_eq_zero_R_core` closes it, with `dist_nonneg` supplying its non-negativity
+  conjunct.
 
 With `eqAtType_refl_base` and `eqAtType_sym_base` this completes the proof that base-type
-equality is an equivalence relation — the three fields the deleted `AdmissibleEqX` used to
-assume. -/
+equality is an equivalence relation. -/
 def eqAtType_trans_base {Γ : Ctx ι} (i : ι) (s t u : Term F Γ (Ty.base i)) :
     Derivable F al Premises
       (eqAtType (Ty.base i) s t ∧ᶠ eqAtType (Ty.base i) t u →ᶠ
@@ -267,19 +239,10 @@ def eqAtType_trans_base {Γ : Ctx ι} (i : ι) (s t u : Term F Γ (Ty.base i)) :
 
 /-- **The chained triangle inequality**: `⊢ d(x,w) ≤_ℝ (d(x,y) +_ℝ d(y,z)) +_ℝ d(z,w)`.
 
-The project's first *derived* object-level theorem about a space — everything else said about
-metric, W-hyperbolic, CAT(0) or normed spaces so far is either an axiom, a model fact, or a
-statement about the encoding itself.
-
 It needs nothing but free constructors: `Derivable.dist_tri` twice (no `.premise`, no proof
 mode at the axiom, so it holds in **every** `Derivable F al Premises`), and the non-strict
 order package of `RealNumbers/LeOrder.lean` — transitivity, left additive monotonicity, and
-`le_R_of_eq_R_core` to re-associate the sum.
-
-Chaining two triangle inequalities was **impossible before that package existed**: `dist_tri`
-delivers its conclusion as `le_R_pu`, and the `≤_ℝ` API was conversions only — no `le_R_trans`,
-no monotonicity. That is why this file, and the four space files above it, previously derived
-nothing at all. -/
+`le_R_of_eq_R_core` to re-associate the sum. -/
 def dist_tri_chain {Γ : Ctx ι} (i : ι) (x y z w : Term F Γ (Ty.base i)) :
     Derivable F al Premises
       (le_R (Term.app2 (Term.dist i) x w)
@@ -314,11 +277,8 @@ def dist_tri_chain {Γ : Ctx ι} (i : ι) (x y z w : Term F Γ (Ty.base i)) :
 /-- **The reverse triangle inequality**: `⊢ d(x,z) −ℝ d(y,z) ≤ℝ d(x,y)`.
 
 `Derivable.dist_tri` at `(x,y,z)` gives `d(x,z) ≤ℝ d(x,y) +ℝ d(y,z)`; moving `d(y,z)` to
-the left is `le_sub_R_of_le_add_core` (`RealNumbers/LeOrder.lean`), whose section comment
-records the accounting: as a *direct* estimate the statement is tight — every finite reading
-index overshoots `2^{-n}` — but it is derived instead from right monotonicity and the
-cancellation `(g +ℝ h) +ℝ (−ℝ h) ≤ℝ g`, so the only telescope it spends is the one inside
-`le_R_trans_core`. Free constructors only: holds in every `Derivable F al Premises`. -/
+the left is `le_sub_R_of_le_add_core` (`RealNumbers/LeOrder.lean`). Free constructors only:
+holds in every `Derivable F al Premises`. -/
 def dist_rev_tri {Γ : Ctx ι} (i : ι) (x y z : Term F Γ (Ty.base i)) :
     Derivable F al Premises
       (le_R (Term.app2 Term.sub_R

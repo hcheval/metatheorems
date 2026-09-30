@@ -11,15 +11,8 @@ namespace Metatheorems
 /-!
 # Mathlib structures ARE models of our theories
 
-Everything above this file is quantified over `MetricModel`, `WHyperbolicModel`, `CAT0Model`
-or `NormedModel` **as variables**. Until this file, the project constructed **no inhabitant of
-any of them** — so every space metatheorem was a statement about a class not known to be
-non-empty. That is not a hypothetical worry here: the total-majorizer `Majorizability` had
-provably no instances and was deleted for it (`MajorizabilityRel.lean`), and
-`AdmissibleEqX.eqx_refl` was outright *refutable* while looking like ordinary unfinished
-work. Both were found by trying to build the thing.
-
-This file does that, from **arbitrary** Mathlib structures — no concrete carrier, no extra
+This file constructs models of `MetricModel`, `WHyperbolicModel`, `CAT0Model` and
+`NormedModel` from **arbitrary** Mathlib structures — no concrete carrier, no extra
 hypotheses:
 
 | our structure | built from | how |
@@ -35,47 +28,17 @@ Combined with `NormedModel.axiomsHold`, `WHyperbolicModel.axiomsHold` and
 Mathlib real normed / real inner-product space, end to end, with no hypothesis beyond the
 Mathlib typeclasses.**
 
-The nontriviality side condition is confined to `NormedModel`, and it is not bookkeeping:
+The nontriviality side condition is confined to `NormedModel`:
 `Normed.ax_norm_one` (Kohlenbach's (9), `‖1_X‖ =ℝ 1ℝ`) is *false* in the zero space.
-`WHyperbolicModel` and `CAT0Model` are over `WHyperbolic.F`, a different signature with no
-`1_X`, so `WHyperbolicModel.ofNormed` and `CAT0Model.ofInner` are untouched by it and still
-take only the two/three Mathlib instances.
-
-`NormedModel` is not an imitation of Mathlib's notion — it is a bundling of it (`E : Type`
-plus the three instance fields, no axioms of its own), so `ofNormed` is essentially the
-identity and the instances come straight back out.
-
-## Two mechanical hazards, both paid for here
-
-* **`WHyperbolicModel.ofNormed` must be an `abbrev`.** As a `def`, `(ofNormed E).carrier` does
-  not reduce to `E` at elaboration time and every subsequent `•`/`−` fails instance synthesis
-  with `failed to synthesize HSMul ℝ (ofNormed E).carrier`. Same reason
-  `NormedModel.toMetricModel` is an `abbrev`.
-* **Every Mathlib `‖·‖` in this file is parenthesised.** The project's `‖t‖ si env` notation
-  takes *three* arguments, so an unparenthesised `‖a‖ * ‖a‖` tries to consume the `*` as `si`.
-  This is a live hazard in any file mixing the object notation with Mathlib norms.
-
-The four W-axiom identities are all discharged by Mathlib's `module` tactic; hand-rolled
-`abel` versions of them do **not** go through.
 
 ## Scope
 
 `carrier : Type` and `E : Type` are universe-monomorphic, so this covers `Type 0` spaces —
 `ℝ`, `EuclideanSpace ℝ (Fin n)`, and essentially every concrete example. A space in `Type u`
 would need the structures generalised first.
-
-All three space theories are covered. Normed spaces were the last to join: until
-`NormedModel.axiomsHold` was proved, `ofNormed` gave a model but the normed metatheorem still
-carried an `AxiomsHold` binder, so it was inhabited-but-not-applicable. No such gap remains,
-and no `AxiomsHold` binder survives anywhere in the tower.
-
-`ℝ` witnesses all of it — and `Nontrivial ℝ` is an instance, so the added binder costs the
-examples below nothing.
 -/
 
--- ============================================================================
 -- Metric spaces
--- ============================================================================
 
 /-- **Any Mathlib metric space, with a chosen point, is a `MetricModel`.** The point serves as
 both `0_X` and the majorization reference `a`. -/
@@ -90,18 +53,11 @@ def MetricModel.ofMetricSpace (X : Type) [MetricSpace X] (pt : X) : MetricModel 
   zeroX := pt
   ref := pt
 
--- ============================================================================
 -- Normed spaces
--- ============================================================================
 
 /-- **Any *nontrivial* Mathlib normed space over `ℝ` is a `NormedModel`** — definitionally,
 since `NormedModel` bundles exactly `E` with its three instances and asserts nothing further.
-
-`[Nontrivial E]` is what interprets `1_X` and validates Kohlenbach's axiom (9),
-`‖1_X‖ =ℝ 1ℝ` — false in the zero space, so the hypothesis is not removable. Carrying it as a
-*typeclass* rather than as an explicit unit vector is what keeps this the identity: the
-normalisation `‖v‖⁻¹ • v` happens once, inside `NormedModel.unitVec`, not at every
-instantiation site. -/
+`[Nontrivial E]` is what interprets `1_X` and validates Kohlenbach's axiom (9). -/
 abbrev NormedModel.ofNormed (E : Type) [NormedAddCommGroup E] [NormedSpace ℝ E]
     [Nontrivial E] : NormedModel :=
   { E := E }
@@ -109,15 +65,13 @@ abbrev NormedModel.ofNormed (E : Type) [NormedAddCommGroup E] [NormedSpace ℝ E
 /-- The Mathlib instance comes back out, so the bundling loses nothing. -/
 example (M : NormedModel) : NormedAddCommGroup M.E := M.normedGroup
 
--- ============================================================================
 -- W-hyperbolic spaces
--- ============================================================================
 
 /-- **Any Mathlib normed space is a W-hyperbolic model**, with `W` the segment map
 `W(x,y,λ) = (1−λ)x + λy` and `d(x,y) = ‖x − y‖`.
 
 (W2) holds exactly — `W(x,y,λ) − W(x,y,μ) = (λ−μ)(y−x)` — while (W1) and (W4) are the triangle
-inequality plus `norm_smul`, and (W3) is an identity. An `abbrev`; see the header. -/
+inequality plus `norm_smul`, and (W3) is an identity. An `abbrev`. -/
 noncomputable abbrev WHyperbolicModel.ofNormed (E : Type)
     [NormedAddCommGroup E] [NormedSpace ℝ E] : WHyperbolicModel where
   carrier := E
@@ -158,9 +112,7 @@ noncomputable abbrev WHyperbolicModel.ofNormed (E : Type)
           rw [norm_smul, norm_smul, Real.norm_eq_abs, Real.norm_eq_abs,
             abs_of_nonneg (by linarith : (0:ℝ) ≤ 1 - l), abs_of_nonneg h0]
 
--- ============================================================================
 -- CAT(0) spaces
--- ============================================================================
 
 /-- **Any Mathlib real inner-product space is a CAT(0) model.** CN holds with *equality* there
 — it is the median law, one step from `parallelogram_law_with_norm`:
@@ -181,9 +133,7 @@ noncomputable abbrev CAT0Model.ofInner (E : Type)
     rw [h1, norm_smul, Real.norm_eq_abs, abs_of_nonneg (by norm_num : (0:ℝ) ≤ (2:ℝ)⁻¹)]
     nlinarith [hpar, norm_nonneg ((z - x) + (z - y)), norm_nonneg (x - y)]
 
--- ============================================================================
 -- The payoff: the axioms hold in these models, with no hypotheses
--- ============================================================================
 
 /-- **Every Mathlib normed space satisfies the object-level normed-space axioms.**
 `NormedModel.axiomsHold` at `ofNormed`; no hypothesis beyond the typeclasses. -/
@@ -216,9 +166,7 @@ noncomputable example : CAT0Model := CAT0Model.ofInner ℝ
 noncomputable example : NormedModel := NormedModel.ofNormed ℝ
 noncomputable example : MetricModel := MetricModel.ofMetricSpace ℝ 0
 
--- ============================================================================
 -- Axiom hygiene
--- ============================================================================
 
 #print axioms MetricModel.ofMetricSpace
 #print axioms NormedModel.ofNormed

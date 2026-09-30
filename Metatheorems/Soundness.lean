@@ -22,19 +22,11 @@ hypotheses (section `variable`s, so that the recursion re-applies them automatic
                   `qfer`, all of which assert an
                   `eqAtType` between two terms with equal interpretations; at a base type
                   `eqAtType` is `d_i(·,·) =ℝ 0ℝ`, so reflexivity of `=_X` is exactly this
-                  model fact.  (This is the obstruction `Probes/SoundnessProbe.lean`
-                  identified as `probe_beta_needs_dist_self`.)
+                  model fact.
 * `hdist_comm`  — `d_i(x,y) =ℝ d_i(y,x)`.  Forced by `Derivable.dist_comm`.
 * `hdist_tri`   — `d_i(x,z) ≤ℝ d_i(x,y) +ℝ d_i(y,z)`.  Forced by `Derivable.dist_tri`.
 * `hsep`        — **separation**: `d_i(s,t) =ℝ 0ℝ` implies `‖s‖ = ‖t‖` in the model.
-                  Forced by `Derivable.qfer` only.  See `eq_of_interp_eqAtType` below: it is
-                  a genuine restriction (a proper pseudometric model does *not* satisfy it),
-                  and it is exactly what makes the quantifier-free extensionality rule sound
-                  in the full set-theoretic type structure.  The weaker, more faithful
-                  alternative would be to assume the model is *extensional* — that
-                  `funcInterp` and `distInterp` respect `=_X` — and derive the congruence for
-                  all terms by induction.  That is strictly more work (a logical relation over
-                  `Ty.interpret`) and is not done here; separation implies it.
+                  Forced by `Derivable.qfer` only.  See `eq_of_interp_eqAtType` below.
 
 Nothing else is assumed.  The `Allowed`-guarded principles (`lem`, `markov`, `ip`, `ac`,
 `qfac`) are all true in the full set-theoretic type structure, classically, so their guards
@@ -45,13 +37,8 @@ section
 
 variable {ι κ : Type} {X : ι → Type} {F : κ → Ty ι}
 
--- ============================================================================
 -- Semantics of formula substitution / weakening
--- ============================================================================
 
--- `Formula.interpret_substF` and `Formula.interpret_subst0` were developed here and have
--- since been hoisted into `Semantics.lean`, where they belong: they are pure core semantics
--- and need no imports beyond it.  They are used below exactly as before.
 
 theorem Formula.interpret_substVar0 (si : SpaceInterp X F) {Γ : Ctx ι} {ρ : Ty ι}
     (A : Formula F (ρ :: Γ)) (u : Term F (ρ :: Γ) ρ)
@@ -85,9 +72,7 @@ theorem Ctx.interpretSubst_acSubst (si : SpaceInterp X F) {Γ : Ctx ι} {ρ τ :
   rw [h, Ctx.interpretSubst_weaken_eq, Ctx.interpretSubst_weaken_eq,
     Ctx.interpretSubst_id]
 
--- ============================================================================
 -- `eq_R` / `le_R_pu` interpretation congruences
--- ============================================================================
 
 /-- `eq_R f g` mentions `f`, `g` only as `f.weaken`, `g.weaken` under a single `∀n`, so its
 interpretation factors through the interpreted values. -/
@@ -118,9 +103,7 @@ theorem le_R_pu_interp_congr (si : SpaceInterp X F) {Γ : Ctx ι}
     intro n; rw [Term.interpret_weaken, Term.interpret_weaken]; exact hg
   simp only [le_R_pu, Formula.interpret, Term.app2, Term.interpret, hfw, hgw]
 
--- ============================================================================
 -- Every type is inhabited in the model (needed for the `ip` case)
--- ============================================================================
 
 /-- A canonical element of every interpreted type.  It exists because `SpaceInterp` carries
 a `zeroInterp` for each base type; without it `Ty.interpret X (.base i)` could be empty and
@@ -132,9 +115,7 @@ def Ty.someElem (si : SpaceInterp X F) : (ρ : Ty ι) → Ty.interpret X ρ
   | .unit     => ()
   | .prod ρ τ => (Ty.someElem si ρ, Ty.someElem si τ)
 
--- ============================================================================
 -- `eqAtType` and semantic equality
--- ============================================================================
 
 /-- **Soundness of `eqAtType`**: terms with equal interpretations satisfy `=_ρ`.
 
@@ -217,9 +198,7 @@ private theorem ip_semantic {α : Type} (P : Prop) (Q : α → Prop) (d : α)
     exact ⟨x, fun _ => hx⟩
   · exact ⟨d, fun hc => absurd hc hp⟩
 
--- ============================================================================
 -- The soundness theorem
--- ============================================================================
 
 section Soundness
 

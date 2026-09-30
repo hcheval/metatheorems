@@ -39,9 +39,7 @@ section Transfer
 variable (M : MetricModel) {κ : Type} {F : κ → Ty MetricSpace.ι}
 variable (si : SpaceInterp (fun () => M.carrier) F)
 
--- ============================================================================
 -- The distance evaluates
--- ============================================================================
 
 /-- `d_X` is interpreted by `(d(x,y))◦` — under `hd`, for any `si`. -/
 theorem MetricModel.interp_dist_gen
@@ -74,9 +72,7 @@ theorem MetricModel.cauchyfyN_zero_R_gen {Γ : Ctx MetricSpace.ι}
     simp)]
   exact M.qval_interp_zero_R_gen si env n
 
--- ============================================================================
 -- The two directions of `=_X`
--- ============================================================================
 
 /-- The model fact behind `realize`: equal interpretations make `s =_X t` true. -/
 theorem MetricModel.eqAtType_base_holds_gen
@@ -143,9 +139,7 @@ theorem MetricModel.eqAtType_base_extract_gen
   exact M.eq_of_eqAtType_base_gen si hd s t env
     (interp_of_realizer_pu si (eqAtType (Ty.base ()) s t) rfl rfl env r)
 
--- ============================================================================
 -- Symmetry and triangle inequality in the model
--- ============================================================================
 
 /-- `dist_comm_holds`'s content. -/
 theorem MetricModel.dist_comm_interp_gen
@@ -231,9 +225,7 @@ theorem MetricModel.dist_tri_interp_gen
     exact key
   exact_mod_cast hcast
 
--- ============================================================================
 -- The `EqXInterp`, for any signature over the metric model
--- ============================================================================
 
 /-- **The `EqXInterp` of any `si` whose distance is `(d(x,y))◦`.** Field for field
 `MetricModel.eqXInterp`, which is the instance `si := M.si`, `hd := fun _ _ => rfl`. -/
@@ -246,9 +238,7 @@ noncomputable def MetricModel.eqXInterp_gen
   dist_comm_holds := fun i {_Γ} x y env => M.dist_comm_interp_gen si hd i x y env
   dist_tri_holds := fun i {_Γ} x y z env => M.dist_tri_interp_gen si hd i x y z env
 
--- ============================================================================
 -- Soundness, for any signature over the metric model
--- ============================================================================
 
 /-- **Semantic soundness for any `si` over a metric model**, relative to the truth of the
 signature's own premises (`hprem`). The four metric facts `Soundness.lean` asks for are
@@ -268,9 +258,7 @@ theorem MetricModel.soundness_gen
     (fun i {_Γ} x y env hxy => by cases i; exact M.eq_of_eqAtType_base_gen si hd x y env hxy)
     h
 
--- ============================================================================
 -- The two metric majorizability obligations, for any `si`
--- ============================================================================
 
 /-- `0_X` is majorizable, whatever `si` interprets it as: `⌈d(a, 0_X)⌉` works. -/
 theorem MetricModel.zeroX_maj_gen (N : ℕ) :
@@ -328,9 +316,7 @@ theorem MetricModel.dist_maj_gen
 
 end Transfer
 
--- ============================================================================
 -- Axiom hygiene
--- ============================================================================
 
 #print axioms MetricModel.eqXInterp_gen
 #print axioms MetricModel.soundness_gen
