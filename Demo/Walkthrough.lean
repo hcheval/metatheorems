@@ -581,31 +581,31 @@ on the context through `HVar.rec` with a dependent cast per level — turns it i
 in 18.5 s**. Depth 3 does not exist at any `keeping` tried. The wall at the top is the
 *delaborator*, not the traversal.
 
-The commands below regenerate `Demo/hilbert/`. Absolute paths: `#hilbert … to` resolves
-relative to the process's working directory, which is not this file's.
+The commands below regenerate `Demo/hilbert/`. `#hilbert … to` resolves paths relative to
+the process's working directory, which for `lake build` and the editor is the project root.
 ============================================================================ -/
 
 #hilbert contract_pm
-  to "/home/horatiu/LeanMisc/metatheorems/Demo/hilbert/contract_pm_d0"
+  to "Demo/hilbert/contract_pm_d0"
 #hilbert contract_pm depth 4
-  to "/home/horatiu/LeanMisc/metatheorems/Demo/hilbert/contract_pm_d4"
+  to "Demo/hilbert/contract_pm_d4"
 #hilbert compose_pm
-  to "/home/horatiu/LeanMisc/metatheorems/Demo/hilbert/compose_pm_d0"
+  to "Demo/hilbert/compose_pm_d0"
 #hilbert compose_pm depth 4
-  to "/home/horatiu/LeanMisc/metatheorems/Demo/hilbert/compose_pm_d4"
+  to "Demo/hilbert/compose_pm_d4"
 #hilbert compose_raw
-  to "/home/horatiu/LeanMisc/metatheorems/Demo/hilbert/compose_raw"
+  to "Demo/hilbert/compose_raw"
 #hilbert demo_add_comm
-  to "/home/horatiu/LeanMisc/metatheorems/Demo/hilbert/add_comm_pm_d0"
+  to "Demo/hilbert/add_comm_pm_d0"
 #hilbert demo_add_comm depth 4
-  to "/home/horatiu/LeanMisc/metatheorems/Demo/hilbert/add_comm_pm_d4"
+  to "Demo/hilbert/add_comm_pm_d4"
 
 -- The fixed point, and the fully expanded 1844-step listing — uncomment to run live
 -- (≈1.1 s and ≈15.3 s respectively; the second is too slow to sit in the build):
 -- #hilbert contract_pm depth 10
---   to "/home/horatiu/LeanMisc/metatheorems/Demo/hilbert/contract_pm_d10"
+--   to "Demo/hilbert/contract_pm_d10"
 -- #hilbert contract_pm all depth 10
---   to "/home/horatiu/LeanMisc/metatheorems/Demo/hilbert/contract_pm_all"
+--   to "Demo/hilbert/contract_pm_all"
 --   ⟹ 120 steps, then 1844. Six tactic lines; 1844 applications of Hilbert axioms.
 
 /-! ============================================================================

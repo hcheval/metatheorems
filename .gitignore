@@ -1,43 +1,27 @@
 /.lake
 
-# LaTeX build artifacts
+# LaTeX build artifacts and PDFs
 *.aux
 *.fdb_latexmk
 *.fls
 *.log
 *.out
 *.synctex.gz
-
-# PDFs (papers and build output)
 *.pdf
 
-# Writing about the project, as opposed to the project. Untracked 2026-09-06 before the
-# first push; both stay on disk.
-/Cheval.tex
+# Generated output of the probe files
+/hilbert-out/
+/term-print-out/
 
-# The reference document's LaTeX sources. Not our development, and its PDF was already
-# excluded by the *.pdf rule above, which left the repo tracking sources for a build it
-# could not run. Untracked 2026-09-06 before the first push; the directory stays on disk.
-/Metateorema-New3/
-
-# The LaTeX report. Kept on disk, not published; untracked 2026-10-28.
+# Local files, not part of the repository
+/CLAUDE.md
+/.claude/
+/scripts/
+/prezentare-bath/
 /docs/report/
-
-# NOTE: hilbert-out/ and term-print-out/ ARE tracked, deliberately. They are generated
-# (by `#hilbert … to "…"` in Probes/HilbertDemo.lean, and by Probes/TermPrintDemo.lean),
-# so they will show up as diffs after a probe run — but they are the project's readable
-# output, they cost a full build to regenerate, and they are wanted in a backup.
-
-# Editor / tooling scratch
+/Cheval.tex
+/Metateorema-New3/
+/AML-Formalization
+/.worktrees/
 _mcp_snippet_*.lean
 *.bak
-.claude/memory/
-.claude/worktrees/
-# Local permission/hook config. Also covered by a global ignore on this machine, but that
-# does not travel with the repo — keep it here so a fresh clone is safe too.
-.claude/settings.local.json
-
-# Agent worktrees (git worktree add .worktrees/<name>); branches live in .git regardless
-/.worktrees/
-
-/AML-Formalization
