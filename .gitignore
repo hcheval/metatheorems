@@ -20,10 +20,8 @@
 # could not run. Untracked 2026-09-06 before the first push; the directory stays on disk.
 /Metateorema-New3/
 
-# LaTeX build artifacts of docs/report/. The sources ARE tracked; report.pdf is not, because
-# of the *.pdf rule above — build it with `make` in docs/report/.
-docs/report/*.out
-docs/report/*.toc
+# The LaTeX report. Kept on disk, not published; untracked 2026-10-28.
+/docs/report/
 
 # NOTE: hilbert-out/ and term-print-out/ ARE tracked, deliberately. They are generated
 # (by `#hilbert … to "…"` in Probes/HilbertDemo.lean, and by Probes/TermPrintDemo.lean),
